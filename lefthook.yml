@@ -1,0 +1,29 @@
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: '*.{js,ts,svelte,json,md}'
+      run: pnpm exec prettier --write {staged_files}
+    lint:
+      glob: '*.{js,ts,svelte}'
+      run: pnpm exec eslint {staged_files}
+    secret-scan:
+      run: pnpm exec secretlint {staged_files}
+    actionlint:
+      glob: '.github/workflows/*.yml'
+      run: actionlint {staged_files}
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}
+
+pre-push:
+  parallel: true
+  commands:
+    typecheck:
+      run: pnpm run check
+    test:
+      run: pnpm run test:unit
+    e2e:
+      run: pnpm run test:e2e

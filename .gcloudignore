@@ -1,0 +1,10 @@
+.gcloudignore
+.git
+.gitignore
+node_modules
+build
+.svelte-kit
+.env
+.DS_Store
+docs
+poc
