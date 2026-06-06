@@ -67,6 +67,8 @@ Emoji in diegetic copy. Exclamation marks in Oracle/Sól lines (Sköll earns one
 ### Interpretation echo (public, before the answer)
 Pattern: **`You ask after {paraphrase}.`** — then a held beat, then the answer.
 
+The echo is what the **rival** sees when you Ask — your answer stays private to you (and a Scry-er). You only see the echo on the **rival's** Ask, where it opens the Scry/Hex window; you never get his answer (unless you Scry). The asker themselves sees the answer, which already restates the trait, so the echo is not shown back to them.
+
 Slash-separated echo lines below are parser paraphrase examples, not rotation pools. Use the single paraphrase that matches the interpreted query.
 
 | Question type | Echo |
@@ -79,7 +81,7 @@ Slash-separated echo lines below are parser paraphrase examples, not rotation po
 | Single rune | "You ask after Sowilo by name." |
 
 ### Answers (private to the asker; plus a Scry-er when the Scry reaction is in play)
-Templated. **Both verdicts restate the trait** — the Yes/No word answers the question as asked, and the clause states the ground truth about Sól's rune: `is reaching for` when she has the trait, `is not reaching for` when she doesn't. The engine fills `{value-phrase}`.
+Templated. **Both verdicts restate the trait** — `Yes. Sól is reaching for {value-phrase}.` when her rune has it, `No. Sól is not reaching for {value-phrase}.` when it doesn't. Verdict and clause always agree, so a negated Ask never double-negates. The engine fills `{value-phrase}`.
 
 **Pattern:** Yes → `Yes. Sól is reaching for {value-phrase}.` · No → `No. Sól is not reaching for {value-phrase}.`
 
@@ -94,7 +96,7 @@ Templated. **Both verdicts restate the trait** — the Yes/No word answers the q
 
 `{value-phrase}` by axis: element → "a/an {element} rune"; power → "a rune of {n} power" (ranges: "fewer than {n} power" / "{n} or more power"); light/dark → "a {light/dark} rune"; hue → "a/an {color} rune"; single rune → "{Rune}". Element and hue read lowercase in the phrase ("an earth rune," "a gold rune").
 
-**Negation** is the not-equal (`ne`) operator — "is it not fire?" flips the question; the engine owns it, the witch never applies it. The Yes/No answers the negated question while the clause still states the ground truth, so a `ne` Ask flips which way "reaching" points: a Yes to "is it not fire?" → `Yes. Sól is not reaching for a fire rune.`; a No → `No. Sól is reaching for a fire rune.` (A negated *range* — "not fewer than three" — resolves to the opposite comparison, not `ne`.)
+**Negation** is the not-equal (`ne`) operator the engine owns — the witch never applies it. The Oracle voices the trait's ground truth either way, so it never stacks negations: "is it fire?" and "is it not fire?" both yield `Yes. Sól is reaching for a fire rune.` when it is, or `No. Sól is not reaching for a fire rune.` when it isn't. (A negated *range* — "not fewer than three" — resolves to the opposite comparison, not `ne`.)
 
 > Voice-guard: never "I think," "maybe," "it seems," and no mood-only answers ("the dark thins"). State the verdict (Yes/No) and the trait clause — what Sól is or is not reaching for — and nothing more; never hedge or invent a reason.
 

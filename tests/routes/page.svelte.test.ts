@@ -39,11 +39,11 @@ describe('Save the Sun page', () => {
 		expect(spy).not.toHaveBeenCalled();
 	});
 
-	it('shows the Oracle echo and voiced answer for a resolved Ask', async () => {
+	it('shows only the voiced answer for a resolved Ask (no echo for your own Ask)', async () => {
 		const spy = askResult({
 			ok: true,
 			echo: 'You ask after the fire-runes.',
-			answer: 'No.',
+			answer: 'No. Sól is not reaching for a fire rune.',
 			affirmative: false,
 			turnConsumed: true
 		});
@@ -51,9 +51,9 @@ describe('Save the Sun page', () => {
 		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
 		await expect
-			.element(screen.getByTestId('interpretation'))
-			.toHaveTextContent('You ask after the fire-runes.');
-		await expect.element(screen.getByTestId('answer')).toHaveTextContent('No.');
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
+		expect(screen.container.querySelector('[data-testid="interpretation"]')).toBeNull();
 		expect(spy).toHaveBeenCalledOnce();
 	});
 

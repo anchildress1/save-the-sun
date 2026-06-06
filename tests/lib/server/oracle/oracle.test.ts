@@ -77,21 +77,21 @@ describe('voiceAnswer — Yes restates the trait, No is bare', () => {
 		);
 	});
 
-	it('a not-equal Yes affirms what Sól is NOT reaching for', () => {
+	it('a ne query the engine answers true (trait absent) voices a clean No', () => {
 		expect(voiceAnswer({ axis: 'element', value: 'Fire', op: 'ne' }, true)).toBe(
-			'Yes. Sól is not reaching for a fire rune.'
+			'No. Sól is not reaching for a fire rune.'
 		);
 	});
 
-	it('a power ne Yes reuses the exact-power phrase with the not-reaching framing', () => {
+	it('a power ne query answered true voices a clean No, no double negative', () => {
 		expect(voiceAnswer({ axis: 'power', op: 'ne', value: 3 }, true)).toBe(
-			'Yes. Sól is not reaching for a rune of 3 power.'
+			'No. Sól is not reaching for a rune of 3 power.'
 		);
 	});
 
-	it('a not-equal No flips back to the reaching framing', () => {
+	it('a ne query the engine answers false (trait present) voices a clean Yes', () => {
 		expect(voiceAnswer({ axis: 'fill', value: 'Light', op: 'ne' }, false)).toBe(
-			'No. Sól is reaching for a light rune.'
+			'Yes. Sól is reaching for a light rune.'
 		);
 	});
 });
@@ -167,10 +167,10 @@ describe('runOracle — one-query mapping + voicing [I]', () => {
 		});
 	});
 
-	it('resolves a not-equal query as the opposite predicate (engine owns it)', async () => {
+	it('a ne query on the secret’s own trait voices the ground truth (reaching)', async () => {
 		const engine = new GameEngine(SEED);
-		// "Is it NOT {the secret's element}?" — ne flips the truth: the secret IS that
-		// element, so the not-equal predicate is false → No.
+		// "Is it NOT {the secret's element}?" — it IS that element, so the trait is
+		// present: a clean "Yes. ... is reaching for", never "No ... is reaching".
 		const res = await runOracle(
 			engine,
 			'Human',
@@ -182,15 +182,14 @@ describe('runOracle — one-query mapping + voicing [I]', () => {
 				)
 			)
 		);
-		// "is it not {secret's element}?" → No, because it IS that element → reaching.
 		expect(res).toMatchObject({
 			ok: true,
-			affirmative: false,
-			answer: `No. Sól is reaching for ${valuePhrase({ axis: 'element', value: SECRET.element })}.`
+			affirmative: true,
+			answer: `Yes. Sól is reaching for ${valuePhrase({ axis: 'element', value: SECRET.element })}.`
 		});
 	});
 
-	it('a not-equal query the secret satisfies voices the not-reaching framing', async () => {
+	it('a ne query on a trait the secret lacks voices a clean No', async () => {
 		const engine = new GameEngine(SEED);
 		const otherElement = ELEMENTS.find((e) => e !== SECRET.element)!;
 		const res = await runOracle(
@@ -201,8 +200,8 @@ describe('runOracle — one-query mapping + voicing [I]', () => {
 		);
 		expect(res).toMatchObject({
 			ok: true,
-			affirmative: true,
-			answer: `Yes. Sól is not reaching for ${valuePhrase({ axis: 'element', value: otherElement })}.`
+			affirmative: false,
+			answer: `No. Sól is not reaching for ${valuePhrase({ axis: 'element', value: otherElement })}.`
 		});
 	});
 

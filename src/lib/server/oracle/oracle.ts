@@ -56,17 +56,21 @@ export function valuePhrase(query: Query): string {
 	}
 }
 
+/** Whether Sól's rune truly has the queried trait — a `ne` Ask is folded back to the truth. */
+function reachesFor(query: Query, engineAnswer: boolean): boolean {
+	return engineAnswer !== (query.op === 'ne');
+}
+
 /**
- * Both verdicts restate the trait. The Yes/No word answers the question as asked;
- * the clause states the ground truth about Sól's rune — "is reaching for" when she
- * has the trait, "is not reaching for" when she doesn't. A negated (`ne`) Ask flips
- * which way that points, so it's derived from the verdict XOR the negation.
+ * Voice the trait's ground truth, so the verdict and clause always agree:
+ * `Yes. Sól is reaching for {phrase}.` or `No. Sól is not reaching for {phrase}.`
+ * A negated Ask folds into the truth here, so the answer never double-negates.
  */
-export function voiceAnswer(query: Query, affirmative: boolean): string {
-	const verdict = affirmative ? 'Yes' : 'No';
-	const reaching = affirmative !== (query.op === 'ne');
-	const reach = reaching ? 'is reaching for' : 'is not reaching for';
-	return `${verdict}. Sól ${reach} ${valuePhrase(query)}.`;
+export function voiceAnswer(query: Query, engineAnswer: boolean): string {
+	const reaching = reachesFor(query, engineAnswer);
+	return reaching
+		? `Yes. Sól is reaching for ${valuePhrase(query)}.`
+		: `No. Sól is not reaching for ${valuePhrase(query)}.`;
 }
 
 function refuse(cls: RefusalClass): OracleResult {
@@ -101,14 +105,15 @@ export async function runOracle(
 		return { ok: false, reason: 'engine', engineReason: result.reason, turnConsumed: false };
 	}
 
-	// Fall back to a generic phrase so the echo frame is always well-formed, even
-	// if the LLM returns an empty paraphrase.
+	// Fall back to a generic phrase so the echo is always well-formed, even if the
+	// LLM returns an empty paraphrase. The echo surfaces on the opponent's Ask; the
+	// human asking sees the answer, which already restates the trait.
 	const paraphrase = interpretation.paraphrase.trim() || 'the sign you named';
 	return {
 		ok: true,
 		echo: `You ask after ${paraphrase}.`,
 		answer: voiceAnswer(query, result.answer),
-		affirmative: result.answer,
+		affirmative: reachesFor(query, result.answer),
 		turnConsumed: true
 	};
 }

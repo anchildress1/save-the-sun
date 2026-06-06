@@ -13,8 +13,9 @@
 	let askValue = $state('');
 	let pending = $state(false);
 
-	// The Oracle surface. Defaults read as ready, not blank (prd.md S3).
-	let interpretation = $state('—');
+	// The Oracle surface — one response at a time. Defaults read as ready, not blank
+	// (prd.md S3). The interpretation echo belongs to the rival's Ask (you see his
+	// question, not his answer); your own Ask shows the answer, which restates the trait.
 	let answer = $state('Twenty-four runes stand. None ruled out. Ask the Oracle.');
 
 	let selectedRune = $derived(
@@ -39,7 +40,6 @@
 		const question = askValue.trim();
 		if (question === '') {
 			// Refusal does not consume a turn (game-spec). Client-side gate, no dispatch.
-			interpretation = '—';
 			answer = 'Speak your question, witch.';
 			return;
 		}
@@ -47,14 +47,11 @@
 		try {
 			const { oracle } = await dispatch({ type: 'Ask', player: 'Human', question });
 			if (oracle.ok) {
-				interpretation = oracle.echo;
 				answer = oracle.answer;
 				askValue = '';
 			} else if (oracle.reason === 'refusal') {
-				interpretation = '—';
 				answer = oracle.line;
 			} else {
-				interpretation = '—';
 				// not-your-turn means the engine has handed the turn to Sköll.
 				answer =
 					oracle.engineReason === 'not-your-turn'
@@ -62,7 +59,6 @@
 						: 'The Oracle falls silent. Draw breath and try again.';
 			}
 		} catch {
-			interpretation = '—';
 			answer = 'The Oracle falls silent. Draw breath and try again.';
 		} finally {
 			pending = false;
@@ -87,7 +83,6 @@
 		if (selectedRune === null) return;
 		pending = true;
 		try {
-			interpretation = `You name ${selectedRune.name}.`;
 			const { cast } = await dispatch({
 				type: 'Cast',
 				player: 'Human',
@@ -99,7 +94,6 @@
 				answer = 'The rite falters. The rune slips away.';
 			}
 		} catch {
-			interpretation = '—';
 			answer = 'The rite falters. The rune slips away.';
 		} finally {
 			pending = false;
@@ -161,7 +155,6 @@
 
 			<div class="oracle-frame">
 				<span class="frame-label">The Rite</span>
-				<p class="frame-text echo" data-testid="interpretation">{interpretation}</p>
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
@@ -372,13 +365,6 @@
 		font-size: 0.92rem;
 		line-height: 1.4;
 		color: var(--ink);
-	}
-
-	.frame-text.echo {
-		color: var(--ink-muted);
-		font-style: italic;
-		font-size: 0.82rem;
-		margin-bottom: 0.35rem;
 	}
 
 	.frame-text.answer {

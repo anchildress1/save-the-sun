@@ -55,7 +55,7 @@ test('refuses an empty Ask without dispatching', async ({ page }) => {
 	await expect(page.getByTestId('answer')).toHaveText('Speak your question, witch.');
 });
 
-test('dispatches a non-empty Ask and shows the Oracle echo and answer', async ({ page }) => {
+test('dispatches a non-empty Ask and shows the voiced answer', async ({ page }) => {
 	await page.goto('/');
 	// Mock the Oracle response: e2e stays deterministic and never calls Gemini.
 	await page.route('**/api/action', (route) =>
@@ -65,7 +65,7 @@ test('dispatches a non-empty Ask and shows the Oracle echo and answer', async ({
 				oracle: {
 					ok: true,
 					echo: 'You ask after the fire-runes.',
-					answer: 'No.',
+					answer: 'No. Sól is not reaching for a fire rune.',
 					affirmative: false,
 					turnConsumed: true
 				}
@@ -74,8 +74,9 @@ test('dispatches a non-empty Ask and shows the Oracle echo and answer', async ({
 	);
 	await page.getByLabel(/ask the oracle/i).fill('Is it a fire rune?');
 	await page.getByRole('button', { name: 'Ask the Oracle' }).click();
-	await expect(page.getByTestId('interpretation')).toContainText('You ask after the fire-runes.');
-	await expect(page.getByTestId('answer')).toContainText('No.');
+	await expect(page.getByTestId('answer')).toContainText(
+		'No. Sól is not reaching for a fire rune.'
+	);
 });
 
 test('board screenshot for POC comparison', async ({ page }, testInfo) => {
