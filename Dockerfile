@@ -19,5 +19,9 @@ RUN npm install -g pnpm && pnpm install --prod --frozen-lockfile && pnpm store p
 
 COPY --from=builder /app/build build/
 
+# Drop root: the node image ships an unprivileged `node` user. The runtime only reads
+# build/ + node_modules and listens on a high port, so no root is needed.
+USER node
+
 EXPOSE 3000
 CMD ["node", "build"]
