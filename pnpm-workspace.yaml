@@ -1,2 +1,8 @@
 onlyBuiltDependencies:
   - esbuild
+
+# Force the transitive `cookie` to the patched 0.7.x line (GHSA out-of-bounds chars,
+# fixed in 0.7.0). @sveltejs/kit still declares ^0.6.0; 0.7 is API-compatible. Stay on
+# 0.7.x rather than the 1.x major to avoid breaking kit's cookie usage.
+overrides:
+  cookie: ^0.7.0
