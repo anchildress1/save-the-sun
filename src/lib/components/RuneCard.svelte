@@ -38,7 +38,11 @@
 
 	<header class="card-top">
 		<span class="badge">{rune.id}</span>
-		<span class="gem" aria-hidden="true"></span>
+		<!-- Color shown once: the dot plus its name (no-color-alone), top-right. -->
+		<span class="color-mark">
+			<span class="gem" aria-hidden="true"></span>
+			<span class="color-name">{rune.color}</span>
+		</span>
 	</header>
 
 	<div class="glyph-well">
@@ -51,27 +55,21 @@
 	</div>
 
 	<footer class="traits">
-		<div class="trait-row top">
-			<span class="trait element"
-				><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
-			>
-			<span class="trait hue"><span class="dot" aria-hidden="true"></span>{rune.color}</span>
-		</div>
+		<span class="trait element"
+			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
+		>
 		<!-- Pips encode power (count) and fill: white = light, black = dark. Light/dark
 		     never appears as a visible word (locked decision); the dark pip carries a light
 		     ring so it reads on the navy card, and the button's accessible name states the
-		     fill so screen-reader players get what sighted players read from the dots.
-		     Power sits on its own row so high-power (6-pip) cards never crowd the line. -->
-		<div class="trait-row power-row">
-			<span class="trait power">
-				<span class="pips" aria-hidden="true">
-					{#each pips as i (i)}
-						<span class="pip" class:dark={rune.fill === 'Dark'}></span>
-					{/each}
-				</span>
-				<span class="num">{rune.power}</span>
+		     fill so screen-reader players get what sighted players read from the dots. -->
+		<span class="trait power">
+			<span class="pips" aria-hidden="true">
+				{#each pips as i (i)}
+					<span class="pip" class:dark={rune.fill === 'Dark'}></span>
+				{/each}
 			</span>
-		</div>
+			<span class="num">{rune.power}</span>
+		</span>
 	</footer>
 
 	{#if crossed}
@@ -140,9 +138,24 @@
 	.card-top {
 		display: flex;
 		justify-content: space-between;
-		align-items: center;
+		align-items: flex-start;
 		position: relative;
 		z-index: 2;
+	}
+
+	.color-mark {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.22rem;
+	}
+
+	.color-name {
+		font-size: 0.62rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--ink-muted);
+		line-height: 1;
 	}
 
 	.badge {
@@ -213,11 +226,14 @@
 		white-space: nowrap;
 	}
 
+	/* One row: element (left) + power (right). Hue moved up by the color dot, so the
+	   line has room even for 6-pip earth runes. */
 	.traits {
 		position: relative;
 		z-index: 2;
 		display: flex;
-		flex-direction: column;
+		justify-content: space-between;
+		align-items: center;
 		gap: 0.3rem;
 		padding-top: 0.36rem;
 		border-top: 1px solid var(--gold-faint);
@@ -225,22 +241,7 @@
 		letter-spacing: 0.03em;
 		text-transform: uppercase;
 		color: var(--ink-muted);
-	}
-
-	/* Two rows: element + hue share the top line; power gets its own so 6-pip cards
-	   never crowd the names. Card height is set by aspect-ratio, so the extra row
-	   just borrows from the glyph well — every card stays identical. */
-	.trait-row {
-		display: flex;
-		align-items: center;
-		gap: 0.3rem;
 		overflow: hidden;
-	}
-	.trait-row.top {
-		justify-content: space-between;
-	}
-	.trait-row.power-row {
-		justify-content: flex-start;
 	}
 
 	.trait {
@@ -250,8 +251,7 @@
 		white-space: nowrap;
 		min-width: 0;
 	}
-	.trait.element,
-	.trait.hue {
+	.trait.element {
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
@@ -283,14 +283,6 @@
 		font-variant-numeric: tabular-nums;
 		font-weight: 600;
 		color: var(--ink);
-	}
-
-	.dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: var(--gem);
-		box-shadow: 0 0 5px var(--gem);
 	}
 
 	/* Crossed-off: dim the content, keep the strike vivid. */
