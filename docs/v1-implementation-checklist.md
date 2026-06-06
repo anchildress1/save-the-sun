@@ -69,6 +69,21 @@ Legend for test tags matches `test-checklist.md`: \[U\] unit · \[I\] integratio
 
 ---
 
+## S2.5 — Session Isolation & API Wiring
+
+*Bridges the gap between the server-side engine and the client UI. Depends on: S1, S2.*
+
+- [ ] Implement `sessionId` extraction or generation in `src/routes/api/action/+server.ts`
+- [ ] Refactor `src/lib/server/engine/session.ts` to map `sessionId` to isolated `GameEngine` instances
+- [ ] Eliminate shared global engine state to prevent race conditions during concurrent plays
+- [ ] Update `session.test.ts` to assert isolation between parallel sessions
+
+**Tests to land:** \[U\] parallel session isolation.
+
+**Done when:** the `api/action` endpoint correctly maintains multiple independent engine sessions simultaneously.
+
+---
+
 ## S3 — R3/R4 Human loop, Ask vs Cast, win on correct cast
 
 *The playable core, text-only is fine here — graphics arrive in S4. Depends on: S1, S2.*

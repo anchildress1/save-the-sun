@@ -11,7 +11,8 @@ const REFUSAL_LINES: Record<RefusalClass, string> = {
 	'secret-seeking': "That is Sól's to keep until you name it. I will not say.",
 	'prompt-injection': 'I answer the longest day, not you. Ask of the runes.',
 	unparseable: 'I cannot read that sign. Ask of element, power, light, or hue.',
-	empty: 'Speak your question, witch.'
+	empty: 'Speak your question, witch.',
+	'engine-error': "The fire gutters — the rite can't reach Sól. Draw breath and try again."
 };
 
 /** The exact refusal line for a class (`ux-copy.md` §1 Refusals). */

@@ -128,16 +128,23 @@ function ai(): GoogleGenAI {
 }
 
 export const interpret: Interpret = async (question) => {
-	const response = await ai().models.generateContent({
-		model: MODEL,
-		contents: question,
-		config: {
-			systemInstruction: SYSTEM_INSTRUCTION,
-			responseMimeType: 'application/json',
-			responseSchema: RESPONSE_SCHEMA,
-			thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-			temperature: 0
-		}
-	});
-	return normalize(JSON.parse(response.text ?? '{}') as RawResponse);
+	try {
+		const response = await ai().models.generateContent({
+			model: MODEL,
+			contents: question,
+			config: {
+				systemInstruction: SYSTEM_INSTRUCTION,
+				responseMimeType: 'application/json',
+				responseSchema: RESPONSE_SCHEMA,
+				thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+				temperature: 0
+			}
+		});
+		return normalize(JSON.parse(response.text ?? '{}') as RawResponse);
+	} catch (error) {
+		// Any adapter/transport failure (network, timeout, malformed JSON) degrades to an
+		// in-world engine-error refusal so a live round never hard-fails; the turn is preserved.
+		console.error('Oracle Gemini interpretation failed:', error);
+		return { kind: 'refusal', refusal: 'engine-error' };
+	}
 };

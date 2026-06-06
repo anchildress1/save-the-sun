@@ -8,7 +8,8 @@ export type RefusalClass =
 	| 'secret-seeking'
 	| 'prompt-injection'
 	| 'unparseable'
-	| 'empty';
+	| 'empty'
+	| 'engine-error';
 
 export interface QueryInterpretation {
 	kind: 'query';
