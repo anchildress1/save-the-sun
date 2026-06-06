@@ -11,7 +11,13 @@ export default defineConfig({
 			reporter: ['text-summary', 'lcov'],
 			reportsDirectory: 'coverage',
 			include: ['src/**/*.{ts,svelte}'],
-			exclude: ['src/**/*.d.ts', 'src/lib/index.ts']
+			exclude: ['src/**/*.d.ts', 'src/lib/index.ts'],
+			// Per-module CI floors (test-plan.md §coverage). The engine is the referee —
+			// strictest bar in the project. Raise these as modules land; never lower them.
+			thresholds: {
+				'src/lib/server/engine/engine.ts': { lines: 100, branches: 95 },
+				'src/lib/server/engine/queries.ts': { lines: 100, branches: 95 }
+			}
 		},
 		projects: [
 			{

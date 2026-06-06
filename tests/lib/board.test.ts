@@ -21,4 +21,25 @@ describe('Rune Board Data Source', () => {
 		expect(runes[0].id).toBe(1);
 		expect(runes[23].id).toBe(24);
 	});
+
+	it('makes every rune a unique (element, power, color) combination', () => {
+		const combos = runes.map((r) => `${r.element}:${r.power}:${r.color}`);
+		expect(new Set(combos).size).toBe(runes.length);
+	});
+
+	it('enforces the trait counts from rune-board.md', () => {
+		const tally = (key: (r: (typeof runes)[number]) => string | number) => {
+			const counts = new Map<string | number, number>();
+			for (const r of runes) counts.set(key(r), (counts.get(key(r)) ?? 0) + 1);
+			return counts;
+		};
+
+		for (const count of tally((r) => r.element).values()) expect(count).toBe(4);
+		for (const count of tally((r) => r.power).values()) expect(count).toBe(4);
+		for (const count of tally((r) => r.color).values()) expect(count).toBe(4);
+
+		const fill = tally((r) => r.fill);
+		expect(fill.get('Light')).toBe(12);
+		expect(fill.get('Dark')).toBe(12);
+	});
 });
