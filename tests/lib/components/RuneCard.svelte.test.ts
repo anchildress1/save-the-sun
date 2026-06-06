@@ -28,14 +28,19 @@ const perthro: Rune = {
 };
 
 describe('RuneCard', () => {
-	it('renders glyph, name, element, color, and power numeral as visible text', async () => {
+	it('renders glyph, name, element, and color as visible text', async () => {
 		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		await expect.element(screen.getByText('ᚢ')).toBeInTheDocument();
 		await expect.element(screen.getByText('Uruz')).toBeInTheDocument();
 		await expect.element(screen.getByText('Fire')).toBeInTheDocument();
 		await expect.element(screen.getByText('Silver')).toBeInTheDocument();
-		await expect.element(screen.getByText('4', { exact: true })).toBeInTheDocument();
-		await expect.element(screen.getByText('6', { exact: true })).toBeInTheDocument();
+	});
+
+	it('shows neither the power numeral nor the rune id as visible text', async () => {
+		// id 6 / power 4 — counting the pips and the accessible name carry power; the
+		// id is internal. Neither number appears on the card face.
+		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		expect(screen.container.textContent).not.toMatch(/[46]/);
 	});
 
 	it('never shows light/dark as a visible word (locked decision)', async () => {
@@ -45,15 +50,15 @@ describe('RuneCard', () => {
 		expect(dark.container.textContent).not.toMatch(/\b(light|dark)\b/i);
 	});
 
-	it('exposes fill to assistive tech via the accessible name (power + light/dark)', async () => {
+	it('speaks power + light/dark together in the accessible name ("{n} {light|dark} power")', async () => {
 		const light = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		await expect
-			.element(light.getByRole('button', { name: /cross off uruz, 4 light/i }))
+			.element(light.getByRole('button', { name: /cross off uruz, 4 light power/i }))
 			.toBeInTheDocument();
 
 		const dark = render(RuneCard, { rune: perthro, onAction: vi.fn() });
 		await expect
-			.element(dark.getByRole('button', { name: /cross off perthro, 1 dark/i }))
+			.element(dark.getByRole('button', { name: /cross off perthro, 1 dark power/i }))
 			.toBeInTheDocument();
 	});
 

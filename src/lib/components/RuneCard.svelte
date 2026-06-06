@@ -29,16 +29,16 @@
 	onclick={() => onAction(rune.id)}
 	style="--gem: {gem};"
 	aria-label={armed
-		? `Select ${rune.name} as cast target, ${rune.power} ${fillWord}`
+		? `Select ${rune.name} as cast target, ${rune.power} ${fillWord} power`
 		: crossed
-			? `Restore ${rune.name}, ${rune.power} ${fillWord}`
-			: `Cross off ${rune.name}, ${rune.power} ${fillWord}`}
+			? `Restore ${rune.name}, ${rune.power} ${fillWord} power`
+			: `Cross off ${rune.name}, ${rune.power} ${fillWord} power`}
 >
 	<div class="ambient" aria-hidden="true"></div>
 
 	<header class="card-top">
-		<span class="badge">{rune.id}</span>
-		<!-- Color shown once: the dot plus its name (no-color-alone), top-right. -->
+		<!-- Color shown once: the dot plus its name (no-color-alone), top-right. The
+		     rune id is not shown — it is an internal index, not player information. -->
 		<span class="color-mark">
 			<span class="gem" aria-hidden="true"></span>
 			<span class="color-name">{rune.color}</span>
@@ -58,17 +58,15 @@
 		<span class="trait element"
 			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
 		>
-		<!-- Pips encode power (count) and fill: white = light, black = dark. Light/dark
-		     never appears as a visible word (locked decision); the dark pip carries a light
-		     ring so it reads on the navy card, and the button's accessible name states the
-		     fill so screen-reader players get what sighted players read from the dots. -->
+		<!-- Pips ARE the power readout: count = power, fill = light/dark (white = light,
+		     black = dark). No numeral and no light/dark word on the card; the accessible
+		     name speaks them together as "{n} {light|dark} power" for screen-reader players. -->
 		<span class="trait power">
 			<span class="pips" aria-hidden="true">
 				{#each pips as i (i)}
 					<span class="pip" class:dark={rune.fill === 'Dark'}></span>
 				{/each}
 			</span>
-			<span class="num">{rune.power}</span>
 		</span>
 	</footer>
 
@@ -137,7 +135,7 @@
 
 	.card-top {
 		display: flex;
-		justify-content: space-between;
+		justify-content: flex-end;
 		align-items: flex-start;
 		position: relative;
 		z-index: 2;
@@ -156,18 +154,6 @@
 		text-transform: uppercase;
 		color: var(--ink-muted);
 		line-height: 1;
-	}
-
-	.badge {
-		font-size: 0.72rem;
-		line-height: 1;
-		color: var(--gold);
-		border: 1px solid var(--gold-dim);
-		border-radius: 3px;
-		padding: 0.14rem 0.34rem;
-		min-width: 1.2rem;
-		text-align: center;
-		font-variant-numeric: tabular-nums;
 	}
 
 	.gem {
@@ -277,12 +263,6 @@
 	.pip.dark {
 		background: #0c0c12;
 		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
-	}
-
-	.num {
-		font-variant-numeric: tabular-nums;
-		font-weight: 600;
-		color: var(--ink);
 	}
 
 	/* Crossed-off: dim the content, keep the strike vivid. */

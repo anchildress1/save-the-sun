@@ -87,7 +87,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## 6. UI / graphics presentation
 
 - [ ] [V] Rune grid renders as high-fidelity DOM components orchestrated by GSAP; 24 cards 6×4
-- [ ] [C] Each card shows glyph, swatch, name + meaning, power as filled pips **with numeral**, element symbol + name, color name (light/dark encoded by pip color — white light / black dark — and in the accessible name, never as a visible word)
+- [ ] [C] Each card shows glyph, swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken in the accessible name as "{n} light/dark power", never as visible text)
 - [ ] [A] Color name + element name accompany icons — nothing by color alone
 - [ ] [C] Card dims in place when crossed; restore affordance works
 - [ ] [C] Header: title, tagline, night-progress, turn pill ("Your move." / "Sköll moves.")
