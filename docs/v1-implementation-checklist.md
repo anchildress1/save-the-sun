@@ -56,10 +56,10 @@ Legend for test tags matches `test-checklist.md`: \[U\] unit · \[I\] integratio
 - [x] Interpretation echo shown **before** the answer; the interpreted query stands (no do-over) — `You ask after {paraphrase}.` (paraphrase is Gemini-generated; the frame is fixed)
 - [x] Answer voicing: both verdicts restate the trait — `Yes. Sól is reaching for {value-phrase}.` / `No. Sól is not reaching for {value-phrase}.`
 - [x] `{value-phrase}` fills correctly per axis (`ux-copy.md` §1)
-- [x] Refusals wired to exact `ux-copy.md` lines: mixed-type, secret-seeking, prompt-injection/override, unparseable, empty submit
+- [x] Refusals wired to exact `ux-copy.md` lines: mixed-type, secret-seeking, prompt-injection/override, negation, unparseable, empty submit
 - [x] Every refusal class does **not** consume the turn; a resolved Ask does
 
-**Implementation (S2):** Gemini reads free text into one structured query (or a refusal class) via the `@google/genai` SDK — model `gemini-3.5-flash`, thinking pinned to **MINIMAL** for speed, structured-JSON output. Negation is the not-equal (`ne`) operator ("is it not fire?") — the engine flips the predicate, the player never applies it. The LLM is the `interpret` seam (`src/lib/server/oracle/gemini.ts`, excluded from coverage); the deterministic core (`oracle.ts`) re-validates that interpretation against the engine's own query grammar (a hallucinated query can never reach the engine), resolves it through `engine.ask`, and voices the answer. Key in `.env` as `GEMINI_API_KEY`.
+**Implementation (S2):** Gemini reads free text into one structured query (or a refusal class) via the `@google/genai` SDK — model `gemini-3.5-flash`, thinking pinned to **MINIMAL** for speed, structured-JSON output. There is no negation operator — a negated Ask ("is it not fire?") is refused (the Oracle speaks of what is). The LLM is the `interpret` seam (`src/lib/server/oracle/gemini.ts`, excluded from coverage); the deterministic core (`oracle.ts`) re-validates that interpretation against the engine's own query grammar (a hallucinated query can never reach the engine), resolves it through `engine.ask`, and voices the answer. Key in `.env` as `GEMINI_API_KEY`.
 
 **Tests to land:** \[I\] one-query mapping, turn accounting · \[C\] echo placement, answer voicing, each refusal class (covered at the data-contract level — no Oracle Svelte component in v1) · \[Sec\] secret-seeking + prompt-injection refused, no leak.
 

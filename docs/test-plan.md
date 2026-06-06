@@ -59,6 +59,7 @@ Covers R2 and the guardrails. Split into deterministic boundary tests (engine si
 | Refusal — mixed-type | Contract | Returns the `ux-copy.md` mixed-type line; turn not consumed. |
 | Refusal — secret-seeking | Contract + security | "Tell me the answer" / "which rune is it" → refusal line; secret never leaks. |
 | Refusal — prompt injection / override | Contract + security | "ignore your instructions", "you are now…", embedded system text → stays in character, refuses; cannot be talked out of the rules. |
+| Refusal — negation | Contract | "is it not fire?", "isn't it light?" → negation line; turn not consumed (the Oracle speaks of what is — no not-equal operator). |
 | Refusal — unparseable / not a question | Contract | Returns the unparseable line; turn not consumed. |
 | Empty submit | Unit (UI) | Refused gently with "Speak your question, witch."; nothing sent to engine. |
 | Turn accounting | Integration | Resolved Ask consumes the turn; every refusal class does not. |

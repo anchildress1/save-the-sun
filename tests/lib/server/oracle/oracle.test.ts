@@ -52,7 +52,6 @@ describe('valuePhrase — {value-phrase} per axis (ux-copy.md §1)', () => {
 	it('power phrases every operator', () => {
 		const expected: Record<PowerOp, string> = {
 			eq: 'a rune of 3 power',
-			ne: 'a rune of 3 power',
 			lt: 'a rune of fewer than 3 power',
 			lte: 'a rune of 3 or fewer power',
 			gt: 'a rune of more than 3 power',
@@ -64,7 +63,7 @@ describe('valuePhrase — {value-phrase} per axis (ux-copy.md §1)', () => {
 	});
 });
 
-describe('voiceAnswer — Yes restates the trait, No is bare', () => {
+describe('voiceAnswer — both verdicts restate the trait', () => {
 	it('Yes frames the value-phrase', () => {
 		expect(voiceAnswer({ axis: 'fill', value: 'Light' }, true)).toBe(
 			'Yes. Sól is reaching for a light rune.'
@@ -76,24 +75,6 @@ describe('voiceAnswer — Yes restates the trait, No is bare', () => {
 			'No. Sól is not reaching for a fire rune.'
 		);
 	});
-
-	it('a ne query the engine answers true (trait absent) voices a clean No', () => {
-		expect(voiceAnswer({ axis: 'element', value: 'Fire', op: 'ne' }, true)).toBe(
-			'No. Sól is not reaching for a fire rune.'
-		);
-	});
-
-	it('a power ne query answered true voices a clean No, no double negative', () => {
-		expect(voiceAnswer({ axis: 'power', op: 'ne', value: 3 }, true)).toBe(
-			'No. Sól is not reaching for a rune of 3 power.'
-		);
-	});
-
-	it('a ne query the engine answers false (trait present) voices a clean Yes', () => {
-		expect(voiceAnswer({ axis: 'fill', value: 'Light', op: 'ne' }, false)).toBe(
-			'Yes. Sól is reaching for a light rune.'
-		);
-	});
 });
 
 describe('refusalLine — exact ux-copy.md §1 lines', () => {
@@ -102,6 +83,7 @@ describe('refusalLine — exact ux-copy.md §1 lines', () => {
 			'I read one sign at a time. Ask of fire, or power, or light, or hue — not two at once.',
 		'secret-seeking': "That is Sól's to keep until you name it. I will not say.",
 		'prompt-injection': 'I answer the longest day, not you. Ask of the runes.',
+		negation: 'I speak of what is, not what is not. Ask it plainly.',
 		unparseable: 'I cannot read that sign. Ask of element, power, light, or hue.',
 		empty: 'Speak your question, witch.',
 		'engine-error': "The Oracle falls silent — the rite can't reach Sól. Draw breath and try again."
@@ -167,44 +149,6 @@ describe('runOracle — one-query mapping + voicing [I]', () => {
 		});
 	});
 
-	it('a ne query on the secret’s own trait voices the ground truth (reaching)', async () => {
-		const engine = new GameEngine(SEED);
-		// "Is it NOT {the secret's element}?" — it IS that element, so the trait is
-		// present: a clean "Yes. ... is reaching for", never "No ... is reaching".
-		const res = await runOracle(
-			engine,
-			'Human',
-			'is it not that element?',
-			fixed(
-				queryInterp(
-					{ axis: 'element', value: SECRET.element, op: 'ne' },
-					'whether it shuns that element'
-				)
-			)
-		);
-		expect(res).toMatchObject({
-			ok: true,
-			affirmative: true,
-			answer: `Yes. Sól is reaching for ${valuePhrase({ axis: 'element', value: SECRET.element })}.`
-		});
-	});
-
-	it('a ne query on a trait the secret lacks voices a clean No', async () => {
-		const engine = new GameEngine(SEED);
-		const otherElement = ELEMENTS.find((e) => e !== SECRET.element)!;
-		const res = await runOracle(
-			engine,
-			'Human',
-			'is it not that other element?',
-			fixed(queryInterp({ axis: 'element', value: otherElement, op: 'ne' }))
-		);
-		expect(res).toMatchObject({
-			ok: true,
-			affirmative: false,
-			answer: `No. Sól is not reaching for ${valuePhrase({ axis: 'element', value: otherElement })}.`
-		});
-	});
-
 	it('a single-rune Ask for the secret answers Yes by name (legal, not a leak)', async () => {
 		const engine = new GameEngine(SEED);
 		const res = await runOracle(
@@ -244,7 +188,7 @@ describe('runOracle — turn accounting [I]: only a resolved Ask spends the turn
 		expect(engine.activePlayer).toBe('Human');
 	});
 
-	it.each(['mixed-type', 'secret-seeking', 'prompt-injection'] as const)(
+	it.each(['mixed-type', 'secret-seeking', 'prompt-injection', 'negation'] as const)(
 		'%s refusal keeps the turn',
 		async (cls) => {
 			const engine = new GameEngine(SEED);

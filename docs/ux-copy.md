@@ -96,7 +96,7 @@ Templated. **Both verdicts restate the trait** — `Yes. Sól is reaching for {v
 
 `{value-phrase}` by axis: element → "a/an {element} rune"; power → "a rune of {n} power" (ranges: "fewer than {n} power" / "{n} or more power"); light/dark → "a {light/dark} rune"; hue → "a/an {color} rune"; single rune → "{Rune}". Element and hue read lowercase in the phrase ("an earth rune," "a gold rune").
 
-**Negation** is the not-equal (`ne`) operator the engine owns — the witch never applies it. The Oracle voices the trait's ground truth either way, so it never stacks negations: "is it fire?" and "is it not fire?" both yield `Yes. Sól is reaching for a fire rune.` when it is, or `No. Sól is not reaching for a fire rune.` when it isn't. (A negated *range* — "not fewer than three" — resolves to the opposite comparison, not `ne`.)
+**Negation is not asked.** The Oracle speaks of what *is*, never what is not, so a negated Ask ("is it not fire?", "isn't it light?", "anything but gold?") is refused — there is no not-equal operator. The witch asks plainly and reads the verdict; a `No` already tells them what Sól is not reaching for.
 
 > Voice-guard: never "I think," "maybe," "it seems," and no mood-only answers ("the dark thins"). State the verdict (Yes/No) and the trait clause — what Sól is or is not reaching for — and nothing more; never hedge or invent a reason.
 
@@ -106,6 +106,7 @@ Templated. **Both verdicts restate the trait** — `Yes. Sól is reaching for {v
 | Mixed-type ("is it a red fire rune?") | "I read one sign at a time. Ask of fire, or power, or light, or hue — not two at once." |
 | Asks for the secret | "That is Sól's to keep until you name it. I will not say." |
 | Prompt poking / override | "I answer the longest day, not you. Ask of the runes." |
+| Negated Ask ("is it not fire?") | "I speak of what is, not what is not. Ask it plainly." |
 | Unparseable / not a question | "I cannot read that sign. Ask of element, power, light, or hue." |
 | Empty submit | "Speak your question, witch." |
 

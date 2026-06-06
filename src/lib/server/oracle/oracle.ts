@@ -11,6 +11,7 @@ const REFUSAL_LINES: Record<RefusalClass, string> = {
 		'I read one sign at a time. Ask of fire, or power, or light, or hue — not two at once.',
 	'secret-seeking': "That is Sól's to keep until you name it. I will not say.",
 	'prompt-injection': 'I answer the longest day, not you. Ask of the runes.',
+	negation: 'I speak of what is, not what is not. Ask it plainly.',
 	unparseable: 'I cannot read that sign. Ask of element, power, light, or hue.',
 	empty: 'Speak your question, witch.',
 	'engine-error': "The Oracle falls silent — the rite can't reach Sól. Draw breath and try again."
@@ -35,7 +36,6 @@ function article(word: string): 'a' | 'an' {
 function powerPhrase(op: PowerOp, n: number): string {
 	switch (op) {
 		case 'eq':
-		case 'ne':
 			return `a rune of ${n} power`;
 		case 'lt':
 			return `a rune of fewer than ${n} power`;
@@ -64,19 +64,12 @@ export function valuePhrase(query: Query): string {
 	}
 }
 
-/** Whether Sól's rune truly has the queried trait — a `ne` Ask is folded back to the truth. */
-function reachesFor(query: Query, engineAnswer: boolean): boolean {
-	return engineAnswer !== (query.op === 'ne');
-}
-
 /**
- * Voice the trait's ground truth, so the verdict and clause always agree:
- * `Yes. Sól is reaching for {phrase}.` or `No. Sól is not reaching for {phrase}.`
- * A negated Ask folds into the truth here, so the answer never double-negates.
+ * Both verdicts restate the trait: `Yes. Sól is reaching for {phrase}.` or
+ * `No. Sól is not reaching for {phrase}.` — the verdict and clause always agree.
  */
-export function voiceAnswer(query: Query, engineAnswer: boolean): string {
-	const reaching = reachesFor(query, engineAnswer);
-	return reaching
+export function voiceAnswer(query: Query, affirmative: boolean): string {
+	return affirmative
 		? `Yes. Sól is reaching for ${valuePhrase(query)}.`
 		: `No. Sól is not reaching for ${valuePhrase(query)}.`;
 }
@@ -129,7 +122,7 @@ export async function runOracle(
 		ok: true,
 		echo: `You ask after ${paraphrase}.`,
 		answer: voiceAnswer(query, result.answer),
-		affirmative: reachesFor(query, result.answer),
+		affirmative: result.answer,
 		turnConsumed: true
 	};
 }

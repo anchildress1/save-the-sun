@@ -35,26 +35,25 @@ describe('Gemini Oracle adapter', () => {
 		sdk.generateContent.mockReset();
 	});
 
-	it('requests structured JSON with minimal thinking and maps a value-axis ne query', async () => {
+	it('requests structured JSON with minimal thinking and maps a value query', async () => {
 		geminiJson({
 			kind: 'query',
 			axis: 'element',
 			elementValue: 'Fire',
-			valueOp: 'ne',
-			paraphrase: 'whether it shuns fire'
+			paraphrase: 'the fire-runes'
 		});
 
-		const result = await interpret('Is it not fire?');
+		const result = await interpret('Is it a fire rune?');
 
 		expect(result).toEqual({
 			kind: 'query',
-			query: { axis: 'element', value: 'Fire', op: 'ne' },
-			paraphrase: 'whether it shuns fire'
+			query: { axis: 'element', value: 'Fire' },
+			paraphrase: 'the fire-runes'
 		});
 		expect(sdk.generateContent).toHaveBeenCalledWith(
 			expect.objectContaining({
 				model: 'gemini-3.5-flash',
-				contents: 'Is it not fire?',
+				contents: 'Is it a fire rune?',
 				config: expect.objectContaining({
 					responseMimeType: 'application/json',
 					thinkingConfig: { thinkingLevel: 'MINIMAL' },
@@ -64,24 +63,24 @@ describe('Gemini Oracle adapter', () => {
 		);
 	});
 
-	it('maps a power ne query', async () => {
+	it('maps a power range query', async () => {
 		geminiJson({
 			kind: 'query',
 			axis: 'power',
-			powerOp: 'ne',
+			powerOp: 'lt',
 			powerValue: 3,
-			paraphrase: 'not three power'
+			paraphrase: 'fewer than three power'
 		});
 
-		await expect(interpret('Is its power not three?')).resolves.toEqual({
+		await expect(interpret('Fewer than three power?')).resolves.toEqual({
 			kind: 'query',
-			query: { axis: 'power', op: 'ne', value: 3 },
-			paraphrase: 'not three power'
+			query: { axis: 'power', op: 'lt', value: 3 },
+			paraphrase: 'fewer than three power'
 		});
 		expect(sdk.generateContent).toHaveBeenCalledOnce();
 	});
 
-	it.each(['mixed-type', 'secret-seeking', 'prompt-injection'] as const)(
+	it.each(['mixed-type', 'secret-seeking', 'prompt-injection', 'negation'] as const)(
 		'maps %s refusals',
 		async (refusal) => {
 			geminiJson({ kind: 'refusal', refusalClass: refusal });

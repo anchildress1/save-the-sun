@@ -50,7 +50,6 @@ describe('resolveQuery — truthful trait resolution (all 24 × all axes)', () =
 describe('resolveQuery — power ranges correct at boundaries (1 and 6 inclusive)', () => {
 	const compare: Record<PowerOp, (p: number, n: number) => boolean> = {
 		eq: (p, n) => p === n,
-		ne: (p, n) => p !== n,
 		lt: (p, n) => p < n,
 		lte: (p, n) => p <= n,
 		gt: (p, n) => p > n,
@@ -146,48 +145,17 @@ describe('parseQuery — validation (the referee leash)', () => {
 		expect(parseQuery({ axis: 'power', op: 'lt', value: 'three' })).toBeNull();
 	});
 
-	it('accepts a not-equal op on a value axis', () => {
-		expect(parseQuery({ axis: 'element', value: 'Fire', op: 'ne' })).toEqual({
-			axis: 'element',
-			value: 'Fire',
-			op: 'ne'
-		});
+	it('rejects an op key on a value axis (no operators there — negation is refused upstream)', () => {
+		expect(parseQuery({ axis: 'element', value: 'Fire', op: 'ne' })).toBeNull();
+		expect(parseQuery({ axis: 'fill', value: 'Light', op: 'eq' })).toBeNull();
 	});
 
-	it('accepts ne as a power op', () => {
-		expect(parseQuery({ axis: 'power', op: 'ne', value: 3 })).toEqual({
+	it('accepts an out-of-range power value (resolves to a truthful No, never rejected)', () => {
+		expect(parseQuery({ axis: 'power', op: 'eq', value: 7 })).toEqual({
 			axis: 'power',
-			op: 'ne',
-			value: 3
+			op: 'eq',
+			value: 7
 		});
-	});
-
-	it('normalizes an explicit op:eq to the bare value query', () => {
-		expect(parseQuery({ axis: 'fill', value: 'Light', op: 'eq' })).toEqual({
-			axis: 'fill',
-			value: 'Light'
-		});
-	});
-
-	it('rejects an unknown op on a value axis (no ordering to compare)', () => {
-		expect(parseQuery({ axis: 'element', value: 'Fire', op: 'lt' })).toBeNull();
-		expect(parseQuery({ axis: 'color', value: 'Gold', op: 'between' })).toBeNull();
-	});
-});
-
-describe('resolveQuery — ne is the opposite of eq', () => {
-	const secret = runes.find((r) => r.element === 'Fire')!;
-
-	it('value-axis ne is the negation of equality', () => {
-		for (const value of ELEMENTS) {
-			const eq = resolveQuery(secret, { axis: 'element', value });
-			expect(resolveQuery(secret, { axis: 'element', value, op: 'ne' })).toBe(!eq);
-		}
-	});
-
-	it('power ne is the negation of power eq across 1..6', () => {
-		for (const n of POWERS) {
-			expect(resolveQuery(secret, { axis: 'power', op: 'ne', value: n })).toBe(secret.power !== n);
-		}
+		expect(runes.some((r) => resolveQuery(r, { axis: 'power', op: 'eq', value: 7 }))).toBe(false);
 	});
 });

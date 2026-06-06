@@ -7,6 +7,7 @@ export type RefusalClass =
 	| 'mixed-type'
 	| 'secret-seeking'
 	| 'prompt-injection'
+	| 'negation'
 	| 'unparseable'
 	| 'empty'
 	| 'engine-error';

@@ -33,6 +33,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C] Mixed-type refusal returns `ux-copy.md` line; turn not consumed
 - [x] [Sec] Secret-seeking Ask refused; secret never leaks
 - [x] [Sec] Prompt-injection / override stays in character, refuses
+- [x] [C] Negated Ask ("is it not fire?") refused with the negation line; turn not consumed
 - [x] [C] Unparseable / not-a-question refusal; turn not consumed
 - [x] [C] Empty submit refused with "Speak your question, witch." (nothing sent)
 - [x] [I] Resolved Ask consumes turn; every refusal class does not

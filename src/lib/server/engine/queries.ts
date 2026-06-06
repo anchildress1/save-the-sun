@@ -6,31 +6,25 @@
 
 import { runes, type Rune } from '$lib/board';
 
-export type PowerOp = 'eq' | 'ne' | 'lt' | 'lte' | 'gt' | 'gte';
-
-// Operator on a value axis: `eq` (default when omitted) or `ne` ("not equal",
-// for "is it NOT fire?"). Absent means eq, never ne.
-export type ValueOp = 'eq' | 'ne';
+// Power comparisons only. There is no negation operator — the Oracle answers what
+// IS, so a negated Ask ("is it not fire?") is refused, never turned into a query.
+export type PowerOp = 'eq' | 'lt' | 'lte' | 'gt' | 'gte';
 
 export interface ElementQuery {
 	axis: 'element';
 	value: string;
-	op?: ValueOp;
 }
 export interface FillQuery {
 	axis: 'fill';
 	value: 'Light' | 'Dark';
-	op?: ValueOp;
 }
 export interface ColorQuery {
 	axis: 'color';
 	value: string;
-	op?: ValueOp;
 }
 export interface RuneQuery {
 	axis: 'rune';
 	value: string;
-	op?: ValueOp;
 }
 export interface PowerQuery {
 	axis: 'power';
@@ -43,8 +37,7 @@ export type Query = ElementQuery | FillQuery | ColorQuery | RuneQuery | PowerQue
 const ELEMENTS = new Set(runes.map((r) => r.element));
 const COLORS = new Set(runes.map((r) => r.color));
 const NAMES = new Set(runes.map((r) => r.name));
-const POWER_OPS: ReadonlySet<string> = new Set<PowerOp>(['eq', 'ne', 'lt', 'lte', 'gt', 'gte']);
-const VALUE_OPS: ReadonlySet<string> = new Set<ValueOp>(['eq', 'ne']);
+const POWER_OPS: ReadonlySet<string> = new Set<PowerOp>(['eq', 'lt', 'lte', 'gt', 'gte']);
 
 // Single-value axes: a {axis, value} query whose value must be in the allowed set.
 const VALUE_AXES: Record<string, ReadonlySet<unknown>> = {
@@ -68,17 +61,8 @@ export function parseQuery(input: unknown): Query | null {
 }
 
 function parseValueQuery(axis: string, q: Record<string, unknown>): Query | null {
-	// op is optional (defaults to eq); when present it must be eq or ne.
-	if (
-		!shapeOk(q, ['axis', 'value'], ['op']) ||
-		!VALUE_AXES[axis].has(q.value) ||
-		('op' in q && !VALUE_OPS.has(q.op as string))
-	) {
-		return null;
-	}
-	const query = { axis, value: q.value } as Query;
-	if (q.op === 'ne') query.op = 'ne';
-	return query;
+	if (!shapeOk(q, ['axis', 'value']) || !VALUE_AXES[axis].has(q.value)) return null;
+	return { axis, value: q.value } as Query;
 }
 
 function parsePowerQuery(q: Record<string, unknown>): Query | null {
@@ -119,16 +103,14 @@ export function resolveQuery(secret: Rune, query: Query): boolean {
 	}
 }
 
-function matchValue(actual: string, query: { value: string; op?: ValueOp }): boolean {
-	return query.op === 'ne' ? actual !== query.value : actual === query.value;
+function matchValue(actual: string, query: { value: string }): boolean {
+	return actual === query.value;
 }
 
 function matchPower(power: number, op: PowerOp, value: number): boolean {
 	switch (op) {
 		case 'eq':
 			return power === value;
-		case 'ne':
-			return power !== value;
 		case 'lt':
 			return power < value;
 		case 'lte':
