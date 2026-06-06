@@ -16,9 +16,9 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *First because everything routes through one action interface (`game-spec.md` Architecture). Depends on: nothing.*
 
-- [ ] Single Cloud Run service scaffold (frontend + backend + engine in-process; Gemini called outbound only)
-- [ ] One shared action interface (Ask / Cast / cross-off / react) that both the human UI and the Gemini opponent call — no second path
-- [ ] `rune-board.md` loaded as the single board data source (24 runes, fixed on-screen order)
+- [x] Single Cloud Run service scaffold (frontend + backend + engine in-process; Gemini called outbound only)
+- [x] One shared action interface (Ask / Cast / cross-off / react) that both the human UI and the Gemini opponent call — no second path
+- [x] `rune-board.md` loaded as the single board data source (24 runes, fixed on-screen order)
 - [ ] Deploy a hello-world build to the public URL early to de-risk the June 21 deploy
 
 **Done when:** the service deploys, serves the board JSON in fixed order, and the action interface stub is the only entry point for game actions.
@@ -87,20 +87,20 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 ## S4 — R6 Graphics presentation + accessible DOM layer
 
-*The Plain tier — the v1 surface. Built as real Canvas/WebGL with a focusable DOM layer on top (`prd.md` UI Direction). Depends on: S3.*
+*The Plain tier — the v1 surface. Built as high-fidelity DOM components orchestrated by GSAP, with a native focusable layer for controls (`prd.md` UI Direction). Depends on: S3.*
 
-- [ ] Rune grid rendered via Canvas/WebGL (no framework components); 24 cards, 6×4, fixed order
-- [ ] Each card shows: glyph, color swatch, name + meaning, power as ○/● pips **with numeral**, light/dark label, element symbol + name, color name
-- [ ] Nothing conveyed by color alone — color name, light/dark label, element name always accompany their icons
+- [ ] Rune grid rendered as high-fidelity DOM components orchestrated by GSAP; 24 cards, 6×4, fixed order
+- [ ] Each card shows: glyph, color swatch, name + meaning, power as filled pips **with numeral**, element symbol + name, color name (light/dark is queryable via the Oracle, not shown on the card)
+- [ ] Nothing conveyed by color alone — color name and element name always accompany their icons
 - [ ] Card dims in place when crossed; restore affordance present and works
 - [ ] Header: title "Save the Sun", tagline "A rite for the longest day," night-progress indicator, turn pill ("Your move." / "Sköll moves.")
 - [ ] Right column order: Rite transcript → Reactions panel (Scry · Hex) → Ask input with suggestion chips → "Cast the rune"
 - [ ] Persistent explainer "Ask. Cross off what it can't be. Cast when you're ready."
-- [ ] Accessible DOM layer sits above the canvas so rendering never blocks keyboard play
+- [ ] Native focusable DOM elements carry the controls so rendering never blocks keyboard play
 
 **Tests to land:** [V] grid renders, visual-regression snapshots for grid + crossed/armed states · [C] card content, cross-off affordance, header chrome · [A] no-color-alone assertion.
 
-**Done when:** the grid is fully playable by mouse and keyboard with the canvas drawn, DOM controls live; UI CI floor (line 80% / branch 70%) + graphics smoke (line 60%) met.
+**Done when:** the grid is fully playable by mouse and keyboard with the DOM grid rendered, controls live; UI CI floor (line 80% / branch 70%) + graphics smoke (line 60%) met.
 
 ---
 

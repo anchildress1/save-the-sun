@@ -134,9 +134,9 @@ Covers R3, R4, and the casting flow. One shared action interface serves both the
 
 | Area | Test type | What to test |
 |---|---|---|
-| Graphics layer | Smoke / visual | Rune grid renders via Canvas/WebGL (not framework components); 24 cards, 6×4. |
-| Card content | Component | Each card shows glyph, color swatch, name + meaning, power as ○/● pips **with numeral**, light/dark label, element symbol + name, color name. |
-| No color alone | a11y assertion | Color name, light/dark label, and element name always accompany their icons — nothing conveyed by color alone. |
+| Graphics layer | Smoke / visual | Rune grid renders as high-fidelity DOM components orchestrated by GSAP; 24 cards, 6×4. |
+| Card content | Component | Each card shows glyph, color swatch, name + meaning, power as filled pips **with numeral**, element symbol + name, color name. Light/dark is not shown on the card (queryable via the Oracle). |
+| No color alone | a11y assertion | Color name and element name always accompany their icons — nothing conveyed by color alone. |
 | Cross-off affordance | Component | Card dims in place when crossed; restore affordance present and works. |
 | Header chrome | Component | Title, tagline, night-progress indicator, turn pill ("Your move." / "Sköll moves."). |
 | Visual regression | Visual | Snapshot the grid and crossed/armed states to catch unintended drift. |
@@ -218,7 +218,7 @@ Tiered by blast radius. The engine owns truth, so it carries the hardest bar; UI
 | **Oracle pipeline** (parse, query-build, refusal, turn accounting) | **90%** | **85%** | Parsing/guardrail logic is deterministic; LLM voicing is eval-verified, not line-gated. |
 | **Reactions** (Scry/Hex state machine) | **95%** | **90%** | Small, sharp, easy to break silently. |
 | **UI / interaction** (cards, arming flow, chrome, error states) | **80%** | **70%** | Behavior-tested; rendering pixels covered by visual regression instead. |
-| **Graphics render layer** | **60%** | n/a | Smoke + visual regression carry this; line coverage is a weak signal for Canvas. |
+| **Graphics render layer** | **60%** | n/a | Smoke + visual regression carry this; line coverage is a weak signal for animated DOM. |
 | **Project overall gate** | **85%** | **80%** | Hard floor for the whole repo. |
 
 **Non-coverage gates also enforced in CI:**

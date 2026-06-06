@@ -1,0 +1,315 @@
+<script lang="ts">
+	import type { Rune } from '$lib/board';
+	import { gemColor, elementIcon } from './runeVisuals';
+
+	let {
+		rune,
+		crossed = false,
+		armed = false,
+		onAction
+	}: {
+		rune: Rune;
+		crossed?: boolean;
+		armed?: boolean;
+		onAction: (id: number) => void;
+	} = $props();
+
+	let gem = $derived(gemColor(rune.color));
+	let icon = $derived(elementIcon(rune.element));
+	let pips = $derived(Array.from({ length: rune.power }, (_, i) => i));
+</script>
+
+<button
+	class="rune-card"
+	class:crossed
+	class:armed
+	data-rune-id={rune.id}
+	data-rune-name={rune.name}
+	onclick={() => onAction(rune.id)}
+	style="--gem: {gem};"
+	aria-label={armed
+		? `Select ${rune.name} as cast target`
+		: crossed
+			? `Restore ${rune.name}`
+			: `Cross off ${rune.name}`}
+>
+	<div class="ambient" aria-hidden="true"></div>
+
+	<header class="card-top">
+		<span class="badge">{rune.id}</span>
+		<span class="gem" aria-hidden="true"></span>
+	</header>
+
+	<div class="glyph-well">
+		<span class="glyph">{rune.glyph}</span>
+	</div>
+
+	<div class="ident">
+		<span class="name">{rune.name}</span>
+		<span class="meaning">{rune.meaning}</span>
+	</div>
+
+	<footer class="traits">
+		<span class="trait element"
+			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
+		>
+		<!-- Pips are power count only (filled = legibility on the dark card, not a trait).
+		     Light/dark is queryable via the Oracle and derivable from element, so it is
+		     not surfaced on the card. -->
+		<span class="trait power" aria-label="power {rune.power}">
+			<span class="pips" aria-hidden="true">
+				{#each pips as i (i)}
+					<span class="pip"></span>
+				{/each}
+			</span>
+			<span class="num">{rune.power}</span>
+		</span>
+		<span class="trait hue"><span class="dot" aria-hidden="true"></span>{rune.color}</span>
+	</footer>
+
+	{#if crossed}
+		<span class="strike s1" aria-hidden="true"></span>
+		<span class="strike s2" aria-hidden="true"></span>
+	{/if}
+</button>
+
+<style>
+	.rune-card {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		/* width:100% + min-width:0 — a <button> defaults to fit-content, and its nowrap
+		   trait row sets a wide min-content; min-width:0 lets the card shrink to its grid
+		   cell (overflow is clipped) so all 24 cards are identical. */
+		width: 100%;
+		min-width: 0;
+		aspect-ratio: 4 / 5;
+		padding: 0.55rem 0.6rem 0.5rem;
+		text-align: left;
+		cursor: pointer;
+		overflow: hidden;
+		border: 1px solid var(--gold-dim);
+		border-radius: 7px;
+		color: var(--ink);
+		background:
+			radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.04) 0%, transparent 55%),
+			linear-gradient(180deg, var(--bg-card-top) 0%, var(--bg-card-bottom) 100%);
+		box-shadow:
+			0 6px 18px rgba(0, 0, 0, 0.45),
+			inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+		transition:
+			transform 0.25s cubic-bezier(0.2, 0, 0, 1),
+			border-color 0.25s ease,
+			box-shadow 0.25s ease;
+	}
+
+	.rune-card:hover {
+		transform: translateY(-3px);
+		border-color: var(--gold);
+		box-shadow:
+			0 10px 26px rgba(0, 0, 0, 0.6),
+			0 0 16px rgba(217, 169, 74, 0.18);
+	}
+
+	.rune-card:focus-visible {
+		outline: 2px solid var(--gold-bright);
+		outline-offset: 2px;
+	}
+
+	.ambient {
+		position: absolute;
+		inset: -30% -10% auto -10%;
+		height: 90%;
+		background: radial-gradient(circle at 50% 0%, var(--gem) 0%, transparent 62%);
+		opacity: 0.16;
+		mix-blend-mode: screen;
+		pointer-events: none;
+	}
+	.rune-card:hover .ambient {
+		opacity: 0.28;
+	}
+
+	.card-top {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		position: relative;
+		z-index: 2;
+	}
+
+	.badge {
+		font-size: 0.62rem;
+		line-height: 1;
+		color: var(--gold);
+		border: 1px solid var(--gold-dim);
+		border-radius: 3px;
+		padding: 0.12rem 0.3rem;
+		min-width: 1.1rem;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.gem {
+		width: 11px;
+		height: 11px;
+		border-radius: 50%;
+		background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.7), var(--gem) 60%);
+		box-shadow:
+			0 0 8px var(--gem),
+			inset 0 0 2px rgba(0, 0, 0, 0.4);
+	}
+
+	.glyph-well {
+		position: relative;
+		z-index: 2;
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.glyph {
+		font-family: var(--font-display);
+		font-size: clamp(2rem, 3.4vw, 3.2rem);
+		line-height: 1;
+		color: var(--gold-bright);
+		text-shadow:
+			0 0 10px rgba(217, 169, 74, 0.55),
+			0 0 26px rgba(217, 169, 74, 0.25);
+	}
+
+	.ident {
+		position: relative;
+		z-index: 2;
+		display: flex;
+		flex-direction: column;
+		gap: 0.05rem;
+		text-align: center;
+	}
+
+	.name {
+		font-family: var(--font-display);
+		font-size: 0.72rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--gold);
+	}
+
+	.meaning {
+		font-size: 0.54rem;
+		font-style: italic;
+		color: var(--ink-faint);
+		line-height: 1.2;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.traits {
+		position: relative;
+		z-index: 2;
+		display: flex;
+		flex-wrap: nowrap;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.3rem;
+		padding-top: 0.32rem;
+		border-top: 1px solid var(--gold-faint);
+		font-size: 0.5rem;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--ink-muted);
+		/* Single line, always — a wrapped footer is what made cards uneven height. */
+		overflow: hidden;
+	}
+
+	.trait {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.18rem;
+		white-space: nowrap;
+	}
+
+	.ic {
+		color: var(--gold-bright);
+		font-size: 0.66rem;
+	}
+
+	.pips {
+		display: inline-flex;
+		gap: 1.5px;
+	}
+
+	/* Filled white so the power count reads on the dark card. */
+	.pip {
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.9);
+	}
+
+	.num {
+		font-variant-numeric: tabular-nums;
+		color: var(--ink);
+	}
+
+	.dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--gem);
+		box-shadow: 0 0 5px var(--gem);
+	}
+
+	/* Crossed-off: dim the content, keep the strike vivid. */
+	.rune-card.crossed {
+		border-color: rgba(255, 255, 255, 0.06);
+	}
+	.rune-card.crossed .card-top,
+	.rune-card.crossed .glyph-well,
+	.rune-card.crossed .ident,
+	.rune-card.crossed .traits {
+		opacity: 0.32;
+		filter: grayscale(80%);
+	}
+	.rune-card.crossed .ambient {
+		opacity: 0;
+	}
+
+	.strike {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 132%;
+		height: 2px;
+		background: var(--strike);
+		box-shadow: 0 0 8px rgba(200, 71, 63, 0.7);
+		z-index: 5;
+		pointer-events: none;
+	}
+	.s1 {
+		transform: translate(-50%, -50%) rotate(32deg);
+	}
+	.s2 {
+		transform: translate(-50%, -50%) rotate(-32deg);
+	}
+
+	/* Armed for cast: gold halo, content restored even if crossed. */
+	.rune-card.armed {
+		border-color: var(--gold-bright);
+		box-shadow:
+			0 0 0 1px var(--gold-bright),
+			0 0 22px rgba(217, 169, 74, 0.35);
+	}
+	.rune-card.armed .ambient {
+		opacity: 0.3;
+	}
+	.rune-card.armed.crossed .card-top,
+	.rune-card.armed.crossed .glyph-well,
+	.rune-card.armed.crossed .ident,
+	.rune-card.armed.crossed .traits {
+		opacity: 1;
+		filter: none;
+	}
+</style>
