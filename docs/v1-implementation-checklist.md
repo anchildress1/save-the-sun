@@ -16,9 +16,9 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *First because everything routes through one action interface (`game-spec.md` Architecture). Depends on: nothing.*
 
-- [ ] Single Cloud Run service scaffold (frontend + backend + engine in-process; Gemini called outbound only)
-- [ ] One shared action interface (Ask / Cast / cross-off / react) that both the human UI and the Gemini opponent call — no second path
-- [ ] `rune-board.md` loaded as the single board data source (24 runes, fixed on-screen order)
+- [x] Single Cloud Run service scaffold (frontend + backend + engine in-process; Gemini called outbound only)
+- [x] One shared action interface (Ask / Cast / cross-off / react) that both the human UI and the Gemini opponent call — no second path
+- [x] `rune-board.md` loaded as the single board data source (24 runes, fixed on-screen order)
 - [ ] Deploy a hello-world build to the public URL early to de-risk the June 21 deploy
 
 **Done when:** the service deploys, serves the board JSON in fixed order, and the action interface stub is the only entry point for game actions.
