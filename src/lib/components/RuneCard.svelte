@@ -37,7 +37,9 @@
 	<div class="ambient" aria-hidden="true"></div>
 
 	<header class="card-top">
-		<span class="name">{rune.name}</span>
+		<span class="trait element"
+			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
+		>
 		<!-- Color shown once: the dot plus its name (no-color-alone), top-right. The
 		     rune id is not shown — it is an internal index, not player information. -->
 		<span class="color-mark">
@@ -48,13 +50,10 @@
 
 	<div class="middle">
 		<span class="glyph">{rune.glyph}</span>
-		<span class="meaning">{rune.meaning}</span>
+		<span class="name">{rune.name}</span>
 	</div>
 
 	<footer class="traits">
-		<span class="trait element"
-			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
-		>
 		<!-- Pips ARE the power value: count = power, fill = light/dark (white = light,
 		     black = dark). The "POWER" label names the trait; the value is shown by the pip
 		     count and narrated in the accessible name as "{n} {light|dark} power". -->
@@ -136,6 +135,11 @@
 		justify-content: space-between;
 		align-items: flex-start;
 		gap: 0.4rem;
+		/* element (left) + colour (right) share this small uppercase label style */
+		font-size: 0.62rem;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--ink-muted);
 		position: relative;
 		z-index: 2;
 	}
@@ -188,34 +192,23 @@
 	}
 
 	.name {
+		max-width: 100%;
 		font-family: var(--font-display);
-		font-size: 0.82rem;
+		font-size: 0.9rem;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: var(--gold);
-		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
-	.meaning {
-		font-size: 0.66rem;
-		font-style: italic;
-		color: var(--ink-muted);
-		line-height: 1.2;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	/* One row: element (left) + power (right). Hue moved up by the color dot, so the
-	   line has room even for 6-pip earth runes. */
+	/* Footer holds the power row only — element and colour live in the top corners. */
 	.traits {
 		position: relative;
 		z-index: 2;
 		display: flex;
-		justify-content: space-between;
+		justify-content: center;
 		align-items: center;
 		gap: 0.3rem;
 		padding-top: 0.36rem;
@@ -241,7 +234,7 @@
 
 	.ic {
 		color: var(--gold-bright);
-		font-size: 0.88rem;
+		font-size: 0.82rem;
 	}
 
 	.pips {
