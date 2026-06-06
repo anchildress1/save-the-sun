@@ -275,8 +275,8 @@
 		left: 50%;
 		width: 132%;
 		height: 2px;
-		background: var(--strike);
-		box-shadow: 0 0 8px rgba(200, 71, 63, 0.7);
+		background: #ffffff;
+		box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
 		z-index: 5;
 		pointer-events: none;
 	}
