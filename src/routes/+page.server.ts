@@ -1,12 +1,14 @@
 import type { PageServerLoad } from './$types';
 
-// A fresh board order each load so patterns don't jump out. Generated on the server so
-// SSR and hydration share one seed — server load data is serialized to the client and
-// reused, never recomputed, so the order can't differ between the two renders. When
-// Sköll arrives this seed becomes engine-owned so he sees the same board. A refresh
-// starts a new night with a new layout.
+// Seed for the on-screen board ORDER only — the shuffle that keeps element/light-dark
+// groupings from jumping out. This is display state: public, shown on screen, and later
+// shared with Sköll so he reasons over the same layout. It is NOT the secret. The secret
+// rune is the engine's own concern (backend referee, chosen independently) and must never
+// be derivable from this public order. Generated on the server so SSR and hydration share
+// one order; a refresh starts a new night with a new layout.
 export const load: PageServerLoad = () => {
-	// Web Crypto, not Math.random — the board seed will later drive the secret rune, so it
-	// must not be a predictable PRNG. Returns a uint32; mulberry32 takes it via seed >>> 0.
+	// Web Crypto rather than Math.random — harmless for a display seed and keeps a single
+	// secure RNG path (and clears the Sonar weak-PRNG hotspot). Returns a uint32, which
+	// mulberry32 consumes via seed >>> 0.
 	return { boardSeed: crypto.getRandomValues(new Uint32Array(1))[0] };
 };
