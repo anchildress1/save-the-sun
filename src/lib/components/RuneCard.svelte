@@ -263,17 +263,19 @@
 		gap: 2px;
 	}
 
-	/* Pips show power count; fill encodes light/dark — white = light, black = dark.
-	   The dark pip gets a light ring so it doesn't vanish into the navy card. */
+	/* Pips show power count; fill encodes light/dark by the rune convention — ○ light is
+	   hollow (a ring), ● dark is filled (a solid disc). Filledness carries the trait, not
+	   colour, so it reads on the dark card: a dark rune is unmistakably "filled". */
 	.pip {
-		width: 7px;
-		height: 7px;
+		width: 8px;
+		height: 8px;
 		border-radius: 50%;
-		background: rgba(255, 255, 255, 0.92);
+		background: transparent;
+		box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.85);
 	}
 	.pip.dark {
-		background: #0c0c12;
-		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+		background: rgba(255, 255, 255, 0.92);
+		box-shadow: none;
 	}
 
 	/* Crossed-off: dim the content, keep the strike vivid. */
