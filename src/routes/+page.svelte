@@ -21,14 +21,14 @@
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
 	);
 
-	async function dispatch(action: GameAction): Promise<ActionResult> {
+	async function dispatch<T extends ActionResult>(action: GameAction): Promise<T> {
 		const res = await fetch('/api/action', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(action)
 		});
 		if (!res.ok) throw new Error(`Action rejected (${res.status})`);
-		return res.json();
+		return res.json() as Promise<T>;
 	}
 
 	async function submitAsk() {
@@ -41,10 +41,19 @@
 		}
 		pending = true;
 		try {
-			const result = await dispatch({ type: 'Ask', player: 'Human', question });
-			interpretation = `You ask after “${question}.”`;
-			answer = result.message;
-			askValue = '';
+			const { oracle } = await dispatch<Extract<ActionResult, { type: 'Ask' }>>({
+				type: 'Ask',
+				player: 'Human',
+				question
+			});
+			if (oracle.ok) {
+				interpretation = oracle.echo;
+				answer = oracle.answer;
+				askValue = '';
+			} else {
+				interpretation = '—';
+				answer = oracle.reason === 'refusal' ? oracle.line : 'The fire gutters. Ask again.';
+			}
 		} catch {
 			answer = 'The fire gutters. Ask again.';
 		} finally {
@@ -70,13 +79,17 @@
 		if (selectedRune === null) return;
 		pending = true;
 		try {
-			const result = await dispatch({
+			const { cast } = await dispatch<Extract<ActionResult, { type: 'Cast' }>>({
 				type: 'Cast',
 				player: 'Human',
 				runeName: selectedRune.name
 			});
 			interpretation = `You name ${selectedRune.name}.`;
-			answer = result.message;
+			if (cast.ok) {
+				answer = cast.won ? 'The rune is true.' : 'The rune is not the one. The night holds.';
+			} else {
+				answer = 'The fire gutters. The rune slips away.';
+			}
 		} catch {
 			answer = 'The fire gutters. The rune slips away.';
 		} finally {

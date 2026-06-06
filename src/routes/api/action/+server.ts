@@ -1,5 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import { handleAction, type GameAction } from '$lib/server/engine/actions';
+import { getEngine } from '$lib/server/engine/session';
+import { interpret } from '$lib/server/oracle/gemini';
 import type { RequestHandler } from './$types';
 
 const ACTION_TYPES = new Set(['Ask', 'Cast', 'CrossOff', 'React']);
@@ -18,5 +20,5 @@ export const POST: RequestHandler = async ({ request }) => {
 		error(400, 'Unknown action type.');
 	}
 
-	return json(handleAction(body as GameAction));
+	return json(await handleAction(body as GameAction, { engine: getEngine(), interpret }));
 };

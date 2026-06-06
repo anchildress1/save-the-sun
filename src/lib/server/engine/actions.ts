@@ -1,5 +1,8 @@
-// Shared action interface stub (S0)
-// This is the single entry point for all game actions for both Human and Sköll.
+// Shared action interface — the single entry point for game actions (Human + Sköll).
+
+import type { GameEngine, CastResult } from './engine';
+import { runOracle } from '$lib/server/oracle/oracle';
+import type { Interpret, OracleResult } from '$lib/server/oracle/types';
 
 export type Player = 'Human' | 'Sköll';
 
@@ -30,17 +33,33 @@ export interface ReactAction extends ActionRequest {
 
 export type GameAction = AskAction | CastAction | CrossOffAction | ReactAction;
 
-export interface ActionResult {
-	success: boolean;
-	message: string;
-	// Further state will be added in S1/S2/S3
+/** Injected dependencies so the router stays testable. */
+export interface ActionDeps {
+	engine: GameEngine;
+	interpret: Interpret;
 }
 
-export function handleAction(action: GameAction): ActionResult {
-	// S0 Stub: In future stories, this will route to the deterministic engine (S1),
-	// the Oracle pipeline (S2), or the Reactions handler (S5).
-	return {
-		success: true,
-		message: `Action ${action.type} received for ${action.player}.`
-	};
+export type ActionResult =
+	| { type: 'Ask'; oracle: OracleResult }
+	| { type: 'Cast'; cast: CastResult }
+	| { type: 'CrossOff'; ok: true }
+	| { type: 'React'; ok: true };
+
+/** Route one action to the engine/Oracle. */
+export async function handleAction(action: GameAction, deps: ActionDeps): Promise<ActionResult> {
+	switch (action.type) {
+		case 'Ask':
+			return {
+				type: 'Ask',
+				oracle: await runOracle(deps.engine, action.player, action.question, deps.interpret)
+			};
+		case 'Cast':
+			return { type: 'Cast', cast: deps.engine.cast(action.player, action.runeName) };
+		case 'CrossOff':
+			// Private aid; the engine never referees crossings.
+			return { type: 'CrossOff', ok: true };
+		case 'React':
+			// Reactions resolve in S5.
+			return { type: 'React', ok: true };
+	}
 }
