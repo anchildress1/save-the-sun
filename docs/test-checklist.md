@@ -86,7 +86,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 6. UI / graphics presentation
 
-- [ ] [V] Rune grid renders via Canvas/WebGL (not framework components); 24 cards 6×4
+- [ ] [V] Rune grid renders as high-fidelity DOM components orchestrated by GSAP; 24 cards 6×4
 - [ ] [C] Each card shows glyph, swatch, name + meaning, power ○/● pips **with numeral**, light/dark label, element symbol + name, color name
 - [ ] [A] Color name + light/dark + element always accompany icons — nothing by color alone
 - [ ] [C] Card dims in place when crossed; restore affordance works
