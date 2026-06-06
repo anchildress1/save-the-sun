@@ -106,7 +106,9 @@ export async function runOracle(
 
 	const result = engine.ask(player, query);
 	if (!result.ok) {
-		console.warn(`[oracle] engine rejected ${player}'s Ask: ${result.reason}`);
+		console.warn(
+			`[oracle] engine rejected ${player}'s Ask (${result.reason}): ${JSON.stringify(query)}`
+		);
 		return { ok: false, reason: 'engine', engineReason: result.reason, turnConsumed: false };
 	}
 	if (dev)
@@ -114,9 +116,9 @@ export async function runOracle(
 			`[oracle] engine answered ${result.answer} for ${JSON.stringify(query)} [deterministic-engine]`
 		);
 
-	// Fall back to a generic phrase so the echo is always well-formed, even if the
-	// LLM returns an empty paraphrase. The echo surfaces on the opponent's Ask; the
-	// human asking sees the answer, which already restates the trait.
+	// Fall back to a generic phrase so the echo is always well-formed, even if the LLM returns
+	// an empty paraphrase. (The echo is for the opponent's Ask in S5/S6; your own Ask shows the
+	// answer below, which already restates the trait.)
 	const paraphrase = interpretation.paraphrase.trim() || 'the sign you named';
 	return {
 		ok: true,

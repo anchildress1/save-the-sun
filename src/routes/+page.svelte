@@ -13,9 +13,10 @@
 	let askValue = $state('');
 	let pending = $state(false);
 
-	// The Oracle surface — one response at a time. Defaults read as ready, not blank
-	// (prd.md S3). The interpretation echo belongs to the rival's Ask (you see his
-	// question, not his answer); your own Ask shows the answer, which restates the trait.
+	// The Oracle surface — one response at a time. Defaults read as ready, not blank (prd.md
+	// S3). Your Ask shows the answer, which restates the trait. The interpretation echo is
+	// reserved for the rival's Ask (you'd see his question, not his answer) — wired in S5/S6,
+	// so it is deliberately not rendered for your own Ask today.
 	let answer = $state('Twenty-four runes stand. None ruled out. Ask the Oracle.');
 
 	let selectedRune = $derived(
@@ -58,7 +59,10 @@
 						? 'The wolf is moving. Hold.'
 						: 'The Oracle falls silent. Draw breath and try again.';
 			}
-		} catch {
+		} catch (err) {
+			// A real 500 here means something the server-side degradation did NOT catch — keep
+			// a trace so it's distinguishable from an expected in-world refusal.
+			console.error('[ui] Ask dispatch failed:', err);
 			answer = 'The Oracle falls silent. Draw breath and try again.';
 		} finally {
 			pending = false;
@@ -91,9 +95,11 @@
 			if (cast.ok) {
 				answer = cast.won ? 'The rune is true.' : 'The rune is not the one. The night holds.';
 			} else {
+				console.warn('[ui] Cast rejected by engine:', cast.reason);
 				answer = 'The rite falters. The rune slips away.';
 			}
-		} catch {
+		} catch (err) {
+			console.error('[ui] Cast dispatch failed:', err);
 			answer = 'The rite falters. The rune slips away.';
 		} finally {
 			pending = false;

@@ -61,13 +61,13 @@ export function parseQuery(input: unknown): Query | null {
 }
 
 function parseValueQuery(axis: string, q: Record<string, unknown>): Query | null {
-	if (!shapeOk(q, ['axis', 'value']) || !VALUE_AXES[axis].has(q.value)) return null;
+	if (!shapeOk(q, 'axis', 'value') || !VALUE_AXES[axis].has(q.value)) return null;
 	return { axis, value: q.value } as Query;
 }
 
 function parsePowerQuery(q: Record<string, unknown>): Query | null {
 	if (
-		!shapeOk(q, ['axis', 'op', 'value']) ||
+		!shapeOk(q, 'axis', 'op', 'value') ||
 		typeof q.op !== 'string' ||
 		!POWER_OPS.has(q.op) ||
 		!Number.isInteger(q.value)
@@ -77,11 +77,11 @@ function parsePowerQuery(q: Record<string, unknown>): Query | null {
 	return { axis: 'power', op: q.op as PowerOp, value: q.value as number };
 }
 
-// Keys must be exactly required + optional; a stray trait key is a mixed query, rejected.
-function shapeOk(q: Record<string, unknown>, required: string[], optional: string[] = []): boolean {
-	const allowed = new Set([...required, ...optional]);
+// Keys must be exactly the allowed set — no missing, no extras. A stray trait key makes a
+// mixed query (e.g. `{axis:'element', value, color}`); reject it rather than half-resolve.
+function shapeOk(q: Record<string, unknown>, ...allowed: string[]): boolean {
 	const keys = Object.keys(q);
-	return required.every((r) => r in q) && keys.every((k) => allowed.has(k));
+	return keys.length === allowed.length && keys.every((k) => allowed.includes(k));
 }
 
 /**

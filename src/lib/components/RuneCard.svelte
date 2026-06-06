@@ -58,9 +58,9 @@
 
 	<footer class="traits">
 		<!-- Pips are aria-hidden, so they carry power for sighted players only: pip count =
-		     power, pip fill = light/dark (white = light, black = dark). The numeric value is
-		     never written; screen-reader players get it from the button's accessible name
-		     ("{n} {light|dark} power"). The label beside the pips names the trait. -->
+		     power, pip fill = light/dark (hollow ring = light, solid disc = dark). The numeric
+		     value is never written; screen-reader players get it from the button's accessible
+		     name ("{n} {light|dark} power"). The label beside the pips names the trait. -->
 		<span class="trait power">
 			<span class="pips" aria-hidden="true">
 				{#each pips as i (i)}

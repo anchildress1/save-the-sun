@@ -188,26 +188,29 @@ describe('runOracle — turn accounting [I]: only a resolved Ask spends the turn
 		expect(engine.activePlayer).toBe('Human');
 	});
 
-	it.each(['mixed-type', 'secret-seeking', 'prompt-injection', 'negation'] as const)(
-		'%s refusal keeps the turn',
-		async (cls) => {
-			const engine = new GameEngine(SEED);
-			const res = await runOracle(
-				engine,
-				'Human',
-				'something',
-				fixed({ kind: 'refusal', refusal: cls })
-			);
-			expect(res).toMatchObject({
-				ok: false,
-				reason: 'refusal',
-				refusal: cls,
-				line: refusalLine(cls)
-			});
-			expect(res.turnConsumed).toBe(false);
-			expect(engine.activePlayer).toBe('Human');
-		}
-	);
+	it.each([
+		'mixed-type',
+		'secret-seeking',
+		'prompt-injection',
+		'negation',
+		'engine-error'
+	] as const)('%s refusal keeps the turn', async (cls) => {
+		const engine = new GameEngine(SEED);
+		const res = await runOracle(
+			engine,
+			'Human',
+			'something',
+			fixed({ kind: 'refusal', refusal: cls })
+		);
+		expect(res).toMatchObject({
+			ok: false,
+			reason: 'refusal',
+			refusal: cls,
+			line: refusalLine(cls)
+		});
+		expect(res.turnConsumed).toBe(false);
+		expect(engine.activePlayer).toBe('Human');
+	});
 
 	it('an out-of-vocabulary query from Gemini becomes an unparseable refusal, no turn spent', async () => {
 		const engine = new GameEngine(SEED);

@@ -117,6 +117,7 @@ function ai(): GoogleGenAI {
 }
 
 export const interpret: Interpret = async (question) => {
+	let raw: RawResponse;
 	try {
 		const response = await ai().models.generateContent({
 			model: MODEL,
@@ -129,11 +130,13 @@ export const interpret: Interpret = async (question) => {
 				temperature: 0
 			}
 		});
-		return normalize(JSON.parse(response.text ?? '{}') as RawResponse);
+		raw = JSON.parse(response.text ?? '{}') as RawResponse;
 	} catch (err) {
-		// Any adapter/transport failure (network, timeout, malformed JSON) degrades to an
-		// in-world engine-error refusal so a live round never hard-fails; the turn is preserved.
+		// Only transport/parse failures degrade to an in-world engine-error so a live round
+		// never hard-fails; the turn is preserved. normalize() is pure and stays OUTSIDE the
+		// catch, so a mapping bug surfaces loudly instead of masquerading as a network outage.
 		console.error(`[oracle] Gemini interpret failed (model=${MODEL}):`, err);
 		return { kind: 'refusal', refusal: 'engine-error' };
 	}
+	return normalize(raw);
 };

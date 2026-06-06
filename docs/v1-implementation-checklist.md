@@ -224,7 +224,7 @@ Legend for test tags matches `test-checklist.md`: \[U\] unit · \[I\] integratio
 - [ ] Best-on-desktop notice on small screens — **no** responsive reflow attempted
 - [ ] Degradation: Plain (v1) round fully winnable on the static grid, audio muted by default; Reduced tier (reduced-motion OR WebGL/audio unavailable) stays unaffected and fair
 
-**Tests to land:** \[E\][manual] keyboard round + full keyboard cast path · \[A\] axe names/roles, contrast, color-independence · \[C\] reduced-motion · \[manual\] 200% zoom · \[E\] Plain + Reduced degradation, \[S\] fairness invariant · \[C\] best-on-desktop notice.
+**Tests to land:** \[E\]\[manual\] keyboard round + full keyboard cast path · \[A\] axe names/roles, contrast, color-independence · \[C\] reduced-motion · \[manual\] 200% zoom · \[E\] Plain + Reduced degradation, \[S\] fairness invariant · \[C\] best-on-desktop notice.
 
 **Done when:** the Lighthouse a11y CI gate passes (≥ 0.95, target ≈ 1.0) and the build fails below it.
 
