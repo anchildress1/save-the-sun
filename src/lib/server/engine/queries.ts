@@ -6,23 +6,31 @@
 
 import { runes, type Rune } from '$lib/board';
 
-export type PowerOp = 'eq' | 'lt' | 'lte' | 'gt' | 'gte';
+export type PowerOp = 'eq' | 'ne' | 'lt' | 'lte' | 'gt' | 'gte';
+
+// Operator on a value axis: `eq` (default when omitted) or `ne` ("not equal",
+// for "is it NOT fire?"). Absent means eq, never ne.
+export type ValueOp = 'eq' | 'ne';
 
 export interface ElementQuery {
 	axis: 'element';
 	value: string;
+	op?: ValueOp;
 }
 export interface FillQuery {
 	axis: 'fill';
 	value: 'Light' | 'Dark';
+	op?: ValueOp;
 }
 export interface ColorQuery {
 	axis: 'color';
 	value: string;
+	op?: ValueOp;
 }
 export interface RuneQuery {
 	axis: 'rune';
 	value: string;
+	op?: ValueOp;
 }
 export interface PowerQuery {
 	axis: 'power';
@@ -35,7 +43,8 @@ export type Query = ElementQuery | FillQuery | ColorQuery | RuneQuery | PowerQue
 const ELEMENTS = new Set(runes.map((r) => r.element));
 const COLORS = new Set(runes.map((r) => r.color));
 const NAMES = new Set(runes.map((r) => r.name));
-const POWER_OPS: ReadonlySet<string> = new Set<PowerOp>(['eq', 'lt', 'lte', 'gt', 'gte']);
+const POWER_OPS: ReadonlySet<string> = new Set<PowerOp>(['eq', 'ne', 'lt', 'lte', 'gt', 'gte']);
+const VALUE_OPS: ReadonlySet<string> = new Set<ValueOp>(['eq', 'ne']);
 
 // Single-value axes: a {axis, value} query whose value must be in the allowed set.
 const VALUE_AXES: Record<string, ReadonlySet<unknown>> = {
@@ -59,13 +68,22 @@ export function parseQuery(input: unknown): Query | null {
 }
 
 function parseValueQuery(axis: string, q: Record<string, unknown>): Query | null {
-	if (!onlyKeys(q, 'axis', 'value') || !VALUE_AXES[axis].has(q.value)) return null;
-	return { axis, value: q.value } as Query;
+	// op is optional (defaults to eq); when present it must be eq or ne.
+	if (
+		!shapeOk(q, ['axis', 'value'], ['op']) ||
+		!VALUE_AXES[axis].has(q.value) ||
+		('op' in q && !VALUE_OPS.has(q.op as string))
+	) {
+		return null;
+	}
+	const query = { axis, value: q.value } as Query;
+	if (q.op === 'ne') query.op = 'ne';
+	return query;
 }
 
 function parsePowerQuery(q: Record<string, unknown>): Query | null {
 	if (
-		!onlyKeys(q, 'axis', 'op', 'value') ||
+		!shapeOk(q, ['axis', 'op', 'value']) ||
 		typeof q.op !== 'string' ||
 		!POWER_OPS.has(q.op) ||
 		!Number.isInteger(q.value)
@@ -75,14 +93,11 @@ function parsePowerQuery(q: Record<string, unknown>): Query | null {
 	return { axis: 'power', op: q.op as PowerOp, value: q.value as number };
 }
 
-/**
- * Whether an object's keys are EXACTLY the allowed set — no missing, no extras. Rejects
- * mixed-type payloads like `{ axis: 'element', value: 'Fire', color: 'Red' }`: a query
- * carries one axis, so a stray trait key is a malformed (mixed) query, not a droppable extra.
- */
-function onlyKeys(q: Record<string, unknown>, ...allowed: string[]): boolean {
+// Keys must be exactly required + optional; a stray trait key is a mixed query, rejected.
+function shapeOk(q: Record<string, unknown>, required: string[], optional: string[] = []): boolean {
+	const allowed = new Set([...required, ...optional]);
 	const keys = Object.keys(q);
-	return keys.length === allowed.length && keys.every((k) => allowed.includes(k));
+	return required.every((r) => r in q) && keys.every((k) => allowed.has(k));
 }
 
 /**
@@ -92,25 +107,35 @@ function onlyKeys(q: Record<string, unknown>, ...allowed: string[]): boolean {
 export function resolveQuery(secret: Rune, query: Query): boolean {
 	switch (query.axis) {
 		case 'element':
-			return secret.element === query.value;
+			return matchValue(secret.element, query);
 		case 'fill':
-			return secret.fill === query.value;
+			return matchValue(secret.fill, query);
 		case 'color':
-			return secret.color === query.value;
+			return matchValue(secret.color, query);
 		case 'rune':
-			return secret.name === query.value;
+			return matchValue(secret.name, query);
 		case 'power':
-			switch (query.op) {
-				case 'eq':
-					return secret.power === query.value;
-				case 'lt':
-					return secret.power < query.value;
-				case 'lte':
-					return secret.power <= query.value;
-				case 'gt':
-					return secret.power > query.value;
-				case 'gte':
-					return secret.power >= query.value;
-			}
+			return matchPower(secret.power, query.op, query.value);
+	}
+}
+
+function matchValue(actual: string, query: { value: string; op?: ValueOp }): boolean {
+	return query.op === 'ne' ? actual !== query.value : actual === query.value;
+}
+
+function matchPower(power: number, op: PowerOp, value: number): boolean {
+	switch (op) {
+		case 'eq':
+			return power === value;
+		case 'ne':
+			return power !== value;
+		case 'lt':
+			return power < value;
+		case 'lte':
+			return power <= value;
+		case 'gt':
+			return power > value;
+		case 'gte':
+			return power >= value;
 	}
 }
