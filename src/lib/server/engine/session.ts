@@ -9,7 +9,7 @@ function randomSeed(): number {
 }
 
 export function getEngine(): GameEngine {
-	if (engine === null) engine = new GameEngine(randomSeed());
+	engine ??= new GameEngine(randomSeed());
 	return engine;
 }
 

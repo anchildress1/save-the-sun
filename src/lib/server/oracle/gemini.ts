@@ -123,7 +123,7 @@ function normalize(raw: RawResponse): Interpretation {
 
 let client: GoogleGenAI | null = null;
 function ai(): GoogleGenAI {
-	if (!client) client = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+	client ??= new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 	return client;
 }
 
