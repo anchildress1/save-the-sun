@@ -15,21 +15,44 @@ const uruz: Rune = {
 	color: 'Silver'
 };
 
+// A Dark rune to assert the solid-pip semantics.
+const perthro: Rune = {
+	id: 13,
+	name: 'Perthro',
+	glyph: 'ᛈ',
+	meaning: 'dice-cup, fate',
+	element: 'Spirit',
+	power: 1,
+	fill: 'Dark',
+	color: 'Gold'
+};
+
 describe('RuneCard', () => {
-	it('renders glyph, name, and every trait as visible text (no color alone)', async () => {
+	it('renders glyph, name, element, color, and power numeral as visible text', async () => {
 		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		await expect.element(screen.getByText('ᚢ')).toBeInTheDocument();
 		await expect.element(screen.getByText('Uruz')).toBeInTheDocument();
 		await expect.element(screen.getByText('Fire')).toBeInTheDocument();
-		await expect.element(screen.getByText('Light')).toBeInTheDocument();
 		await expect.element(screen.getByText('Silver')).toBeInTheDocument();
 		await expect.element(screen.getByText('4', { exact: true })).toBeInTheDocument();
 		await expect.element(screen.getByText('6', { exact: true })).toBeInTheDocument();
 	});
 
-	it('renders one pip per power point', async () => {
+	it('does not print a light/dark word; the axis lives in the pip fill + label', async () => {
 		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
-		expect(screen.container.querySelectorAll('.pip')).toHaveLength(4);
+		expect(screen.container.textContent).not.toMatch(/\b(light|dark)\b/i);
+		await expect.element(screen.getByLabelText(/power 4, light/i)).toBeInTheDocument();
+	});
+
+	it('encodes light/dark in the pips: hollow for light, solid for dark', async () => {
+		const light = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		// 4 pips, none carry the solid "dark" modifier.
+		expect(light.container.querySelectorAll('.pip')).toHaveLength(4);
+		expect(light.container.querySelectorAll('.pip.dark')).toHaveLength(0);
+
+		const dark = render(RuneCard, { rune: perthro, onAction: vi.fn() });
+		expect(dark.container.querySelectorAll('.pip')).toHaveLength(1);
+		expect(dark.container.querySelectorAll('.pip.dark')).toHaveLength(1);
 	});
 
 	it('fires onAction with the rune id on click', async () => {

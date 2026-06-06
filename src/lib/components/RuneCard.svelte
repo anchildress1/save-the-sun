@@ -53,7 +53,9 @@
 		<span class="trait element"
 			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
 		>
-		<span class="trait power" aria-label="{rune.power} power, {rune.fill}">
+		<!-- Pips carry two axes at once (rune-board.md): count = power,
+		     fill = light/dark (hollow ○ = light, solid ● = dark). -->
+		<span class="trait power" aria-label="power {rune.power}, {rune.fill.toLowerCase()}">
 			<span class="pips" aria-hidden="true">
 				{#each pips as i (i)}
 					<span class="pip" class:dark={rune.fill === 'Dark'}></span>
@@ -61,7 +63,6 @@
 			</span>
 			<span class="num">{rune.power}</span>
 		</span>
-		<span class="trait fill">{rune.fill}</span>
 		<span class="trait hue"><span class="dot" aria-hidden="true"></span>{rune.color}</span>
 	</footer>
 
@@ -77,6 +78,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
+		/* width:100% + min-width:0 — a <button> defaults to fit-content, and its nowrap
+		   trait row sets a wide min-content; min-width:0 lets the card shrink to its grid
+		   cell (overflow is clipped) so all 24 cards are identical. */
+		width: 100%;
+		min-width: 0;
 		aspect-ratio: 4 / 5;
 		padding: 0.55rem 0.6rem 0.5rem;
 		text-align: left;
@@ -203,16 +209,18 @@
 		position: relative;
 		z-index: 2;
 		display: flex;
-		flex-wrap: wrap;
-		justify-content: center;
+		flex-wrap: nowrap;
+		justify-content: space-between;
 		align-items: center;
-		gap: 0.18rem 0.4rem;
+		gap: 0.3rem;
 		padding-top: 0.32rem;
 		border-top: 1px solid var(--gold-faint);
 		font-size: 0.5rem;
-		letter-spacing: 0.06em;
+		letter-spacing: 0.05em;
 		text-transform: uppercase;
 		color: var(--ink-muted);
+		/* Single line, always — a wrapped footer is what made cards uneven height. */
+		overflow: hidden;
 	}
 
 	.trait {
@@ -232,15 +240,16 @@
 		gap: 1.5px;
 	}
 
+	/* rune-board.md: hollow ○ = light (default), solid ● = dark. */
 	.pip {
-		width: 4px;
-		height: 4px;
+		width: 5px;
+		height: 5px;
 		border-radius: 50%;
 		border: 1px solid var(--ink-muted);
-		background: var(--ink-muted);
+		background: transparent;
 	}
 	.pip.dark {
-		background: transparent;
+		background: var(--ink-muted);
 	}
 
 	.num {

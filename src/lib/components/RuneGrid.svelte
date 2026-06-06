@@ -94,17 +94,24 @@
 <style>
 	.rune-grid {
 		display: grid;
-		grid-template-columns: repeat(6, 1fr);
+		/* minmax(0, 1fr), not 1fr: each card's nowrap trait row has a wide min-content,
+		   and plain 1fr lets columns blow out past their share (cards overflow into the
+		   Oracle panel and come out uneven). minmax(0,…) caps them to equal cells. */
+		grid-template-columns: repeat(6, minmax(0, 1fr));
 		gap: 0.7rem;
 		width: 100%;
+		/* start (not stretch): let each card's aspect-ratio set its height so every
+		   card is identical, instead of rows stretching to their tallest card. */
+		align-items: start;
 		/* Establish a positioning context for any future background mood layers */
 		position: relative;
 	}
 
 	.rune-card-wrapper {
-		/* Stable positioning wrapper for the staggered entrance. Visible by default so a
+		/* Stable positioning wrapper for the staggered entrance. Block (not flex/stretch)
+		   so the card's aspect-ratio governs its height. Visible by default so a
 		   failed/absent GSAP run never leaves the board blank. */
-		display: flex;
+		display: block;
 	}
 
 	.sr-only {
