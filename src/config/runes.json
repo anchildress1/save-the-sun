@@ -1,242 +1,242 @@
 [
-  {
-    "id": 1,
-    "name": "Sowilo",
-    "glyph": "ᛋ",
-    "meaning": "sun",
-    "element": "Sun",
-    "power": 1,
-    "fill": "Light",
-    "color": "Blue"
-  },
-  {
-    "id": 2,
-    "name": "Dagaz",
-    "glyph": "ᛞ",
-    "meaning": "day, dawn",
-    "element": "Sun",
-    "power": 2,
-    "fill": "Light",
-    "color": "Red"
-  },
-  {
-    "id": 3,
-    "name": "Kenaz",
-    "glyph": "ᚲ",
-    "meaning": "torch",
-    "element": "Sun",
-    "power": 2,
-    "fill": "Light",
-    "color": "Green"
-  },
-  {
-    "id": 4,
-    "name": "Wunjo",
-    "glyph": "ᚹ",
-    "meaning": "joy",
-    "element": "Sun",
-    "power": 1,
-    "fill": "Light",
-    "color": "Red"
-  },
-  {
-    "id": 5,
-    "name": "Fehu",
-    "glyph": "ᚠ",
-    "meaning": "cattle, wealth",
-    "element": "Fire",
-    "power": 3,
-    "fill": "Light",
-    "color": "Green"
-  },
-  {
-    "id": 6,
-    "name": "Uruz",
-    "glyph": "ᚢ",
-    "meaning": "aurochs, strength",
-    "element": "Fire",
-    "power": 4,
-    "fill": "Light",
-    "color": "Silver"
-  },
-  {
-    "id": 7,
-    "name": "Thurisaz",
-    "glyph": "ᚦ",
-    "meaning": "thorn, giant",
-    "element": "Fire",
-    "power": 4,
-    "fill": "Light",
-    "color": "Red"
-  },
-  {
-    "id": 8,
-    "name": "Tiwaz",
-    "glyph": "ᛏ",
-    "meaning": "the god Tyr",
-    "element": "Fire",
-    "power": 3,
-    "fill": "Light",
-    "color": "Blue"
-  },
-  {
-    "id": 9,
-    "name": "Ansuz",
-    "glyph": "ᚨ",
-    "meaning": "god, breath",
-    "element": "Air",
-    "power": 5,
-    "fill": "Light",
-    "color": "Red"
-  },
-  {
-    "id": 10,
-    "name": "Raido",
-    "glyph": "ᚱ",
-    "meaning": "ride, journey",
-    "element": "Air",
-    "power": 6,
-    "fill": "Light",
-    "color": "Blue"
-  },
-  {
-    "id": 11,
-    "name": "Ehwaz",
-    "glyph": "ᛖ",
-    "meaning": "horse",
-    "element": "Air",
-    "power": 5,
-    "fill": "Light",
-    "color": "Blue"
-  },
-  {
-    "id": 12,
-    "name": "Gebo",
-    "glyph": "ᚷ",
-    "meaning": "gift",
-    "element": "Air",
-    "power": 6,
-    "fill": "Light",
-    "color": "Green"
-  },
-  {
-    "id": 13,
-    "name": "Perthro",
-    "glyph": "ᛈ",
-    "meaning": "dice-cup, fate",
-    "element": "Spirit",
-    "power": 1,
-    "fill": "Dark",
-    "color": "Gold"
-  },
-  {
-    "id": 14,
-    "name": "Eihwaz",
-    "glyph": "ᛇ",
-    "meaning": "yew tree",
-    "element": "Spirit",
-    "power": 1,
-    "fill": "Dark",
-    "color": "Silver"
-  },
-  {
-    "id": 15,
-    "name": "Algiz",
-    "glyph": "ᛉ",
-    "meaning": "elk, protection",
-    "element": "Spirit",
-    "power": 2,
-    "fill": "Dark",
-    "color": "Green"
-  },
-  {
-    "id": 16,
-    "name": "Mannaz",
-    "glyph": "ᛗ",
-    "meaning": "humanity",
-    "element": "Spirit",
-    "power": 2,
-    "fill": "Dark",
-    "color": "Black"
-  },
-  {
-    "id": 17,
-    "name": "Laguz",
-    "glyph": "ᛚ",
-    "meaning": "water, lake",
-    "element": "Water",
-    "power": 3,
-    "fill": "Dark",
-    "color": "Black"
-  },
-  {
-    "id": 18,
-    "name": "Isa",
-    "glyph": "ᛁ",
-    "meaning": "ice",
-    "element": "Water",
-    "power": 3,
-    "fill": "Dark",
-    "color": "Gold"
-  },
-  {
-    "id": 19,
-    "name": "Hagalaz",
-    "glyph": "ᚺ",
-    "meaning": "hail",
-    "element": "Water",
-    "power": 4,
-    "fill": "Dark",
-    "color": "Black"
-  },
-  {
-    "id": 20,
-    "name": "Naudiz",
-    "glyph": "ᚾ",
-    "meaning": "need",
-    "element": "Water",
-    "power": 4,
-    "fill": "Dark",
-    "color": "Gold"
-  },
-  {
-    "id": 21,
-    "name": "Jera",
-    "glyph": "ᛃ",
-    "meaning": "year, harvest",
-    "element": "Earth",
-    "power": 5,
-    "fill": "Dark",
-    "color": "Black"
-  },
-  {
-    "id": 22,
-    "name": "Berkana",
-    "glyph": "ᛒ",
-    "meaning": "birch",
-    "element": "Earth",
-    "power": 5,
-    "fill": "Dark",
-    "color": "Silver"
-  },
-  {
-    "id": 23,
-    "name": "Ingwaz",
-    "glyph": "ᛜ",
-    "meaning": "the god Ing, fertility",
-    "element": "Earth",
-    "power": 6,
-    "fill": "Dark",
-    "color": "Gold"
-  },
-  {
-    "id": 24,
-    "name": "Othala",
-    "glyph": "ᛟ",
-    "meaning": "heritage, estate",
-    "element": "Earth",
-    "power": 6,
-    "fill": "Dark",
-    "color": "Silver"
-  }
+	{
+		"id": 1,
+		"name": "Sowilo",
+		"glyph": "ᛋ",
+		"meaning": "sun",
+		"element": "Sun",
+		"power": 1,
+		"fill": "Light",
+		"color": "Blue"
+	},
+	{
+		"id": 2,
+		"name": "Dagaz",
+		"glyph": "ᛞ",
+		"meaning": "day, dawn",
+		"element": "Sun",
+		"power": 2,
+		"fill": "Light",
+		"color": "Red"
+	},
+	{
+		"id": 3,
+		"name": "Kenaz",
+		"glyph": "ᚲ",
+		"meaning": "torch",
+		"element": "Sun",
+		"power": 2,
+		"fill": "Light",
+		"color": "Green"
+	},
+	{
+		"id": 4,
+		"name": "Wunjo",
+		"glyph": "ᚹ",
+		"meaning": "joy",
+		"element": "Sun",
+		"power": 1,
+		"fill": "Light",
+		"color": "Red"
+	},
+	{
+		"id": 5,
+		"name": "Fehu",
+		"glyph": "ᚠ",
+		"meaning": "cattle, wealth",
+		"element": "Fire",
+		"power": 3,
+		"fill": "Light",
+		"color": "Green"
+	},
+	{
+		"id": 6,
+		"name": "Uruz",
+		"glyph": "ᚢ",
+		"meaning": "aurochs, strength",
+		"element": "Fire",
+		"power": 4,
+		"fill": "Light",
+		"color": "Silver"
+	},
+	{
+		"id": 7,
+		"name": "Thurisaz",
+		"glyph": "ᚦ",
+		"meaning": "thorn, giant",
+		"element": "Fire",
+		"power": 4,
+		"fill": "Light",
+		"color": "Red"
+	},
+	{
+		"id": 8,
+		"name": "Tiwaz",
+		"glyph": "ᛏ",
+		"meaning": "the god Tyr",
+		"element": "Fire",
+		"power": 3,
+		"fill": "Light",
+		"color": "Blue"
+	},
+	{
+		"id": 9,
+		"name": "Ansuz",
+		"glyph": "ᚨ",
+		"meaning": "god, breath",
+		"element": "Air",
+		"power": 5,
+		"fill": "Light",
+		"color": "Red"
+	},
+	{
+		"id": 10,
+		"name": "Raido",
+		"glyph": "ᚱ",
+		"meaning": "ride, journey",
+		"element": "Air",
+		"power": 6,
+		"fill": "Light",
+		"color": "Blue"
+	},
+	{
+		"id": 11,
+		"name": "Ehwaz",
+		"glyph": "ᛖ",
+		"meaning": "horse",
+		"element": "Air",
+		"power": 5,
+		"fill": "Light",
+		"color": "Blue"
+	},
+	{
+		"id": 12,
+		"name": "Gebo",
+		"glyph": "ᚷ",
+		"meaning": "gift",
+		"element": "Air",
+		"power": 6,
+		"fill": "Light",
+		"color": "Green"
+	},
+	{
+		"id": 13,
+		"name": "Perthro",
+		"glyph": "ᛈ",
+		"meaning": "dice-cup, fate",
+		"element": "Spirit",
+		"power": 1,
+		"fill": "Dark",
+		"color": "Gold"
+	},
+	{
+		"id": 14,
+		"name": "Eihwaz",
+		"glyph": "ᛇ",
+		"meaning": "yew tree",
+		"element": "Spirit",
+		"power": 1,
+		"fill": "Dark",
+		"color": "Silver"
+	},
+	{
+		"id": 15,
+		"name": "Algiz",
+		"glyph": "ᛉ",
+		"meaning": "elk, protection",
+		"element": "Spirit",
+		"power": 2,
+		"fill": "Dark",
+		"color": "Green"
+	},
+	{
+		"id": 16,
+		"name": "Mannaz",
+		"glyph": "ᛗ",
+		"meaning": "humanity",
+		"element": "Spirit",
+		"power": 2,
+		"fill": "Dark",
+		"color": "Black"
+	},
+	{
+		"id": 17,
+		"name": "Laguz",
+		"glyph": "ᛚ",
+		"meaning": "water, lake",
+		"element": "Water",
+		"power": 3,
+		"fill": "Dark",
+		"color": "Black"
+	},
+	{
+		"id": 18,
+		"name": "Isa",
+		"glyph": "ᛁ",
+		"meaning": "ice",
+		"element": "Water",
+		"power": 3,
+		"fill": "Dark",
+		"color": "Gold"
+	},
+	{
+		"id": 19,
+		"name": "Hagalaz",
+		"glyph": "ᚺ",
+		"meaning": "hail",
+		"element": "Water",
+		"power": 4,
+		"fill": "Dark",
+		"color": "Black"
+	},
+	{
+		"id": 20,
+		"name": "Naudiz",
+		"glyph": "ᚾ",
+		"meaning": "need",
+		"element": "Water",
+		"power": 4,
+		"fill": "Dark",
+		"color": "Gold"
+	},
+	{
+		"id": 21,
+		"name": "Jera",
+		"glyph": "ᛃ",
+		"meaning": "year, harvest",
+		"element": "Earth",
+		"power": 5,
+		"fill": "Dark",
+		"color": "Black"
+	},
+	{
+		"id": 22,
+		"name": "Berkana",
+		"glyph": "ᛒ",
+		"meaning": "birch",
+		"element": "Earth",
+		"power": 5,
+		"fill": "Dark",
+		"color": "Silver"
+	},
+	{
+		"id": 23,
+		"name": "Ingwaz",
+		"glyph": "ᛜ",
+		"meaning": "the god Ing, fertility",
+		"element": "Earth",
+		"power": 6,
+		"fill": "Dark",
+		"color": "Gold"
+	},
+	{
+		"id": 24,
+		"name": "Othala",
+		"glyph": "ᛟ",
+		"meaning": "heritage, estate",
+		"element": "Earth",
+		"power": 6,
+		"fill": "Dark",
+		"color": "Silver"
+	}
 ]
