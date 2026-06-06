@@ -135,8 +135,8 @@ Covers R3, R4, and the casting flow. One shared action interface serves both the
 | Area | Test type | What to test |
 |---|---|---|
 | Graphics layer | Smoke / visual | Rune grid renders as high-fidelity DOM components orchestrated by GSAP; 24 cards, 6×4. |
-| Card content | Component | Each card shows glyph, color swatch, name + meaning, power as pips (count = power, fill = light/dark: hollow ○ light, solid ● dark) **with numeral**, element symbol + name, color name. |
-| No color alone | a11y assertion | Color name and element name always accompany their icons; light/dark rides the pip fill — nothing conveyed by color alone. |
+| Card content | Component | Each card shows glyph, color swatch, name + meaning, power as filled pips **with numeral**, element symbol + name, color name. Light/dark is not shown on the card (queryable via the Oracle). |
+| No color alone | a11y assertion | Color name and element name always accompany their icons — nothing conveyed by color alone. |
 | Cross-off affordance | Component | Card dims in place when crossed; restore affordance present and works. |
 | Header chrome | Component | Title, tagline, night-progress indicator, turn pill ("Your move." / "Sköll moves."). |
 | Visual regression | Visual | Snapshot the grid and crossed/armed states to catch unintended drift. |

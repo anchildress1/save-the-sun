@@ -87,8 +87,8 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## 6. UI / graphics presentation
 
 - [ ] [V] Rune grid renders as high-fidelity DOM components orchestrated by GSAP; 24 cards 6×4
-- [ ] [C] Each card shows glyph, swatch, name + meaning, power pips (count = power, fill = light/dark: hollow ○ light, solid ● dark) **with numeral**, element symbol + name, color name
-- [ ] [A] Color name + element name accompany icons; light/dark rides the pip fill — nothing by color alone
+- [ ] [C] Each card shows glyph, swatch, name + meaning, power as filled pips **with numeral**, element symbol + name, color name (light/dark not shown on card — queryable via the Oracle)
+- [ ] [A] Color name + element name accompany icons — nothing by color alone
 - [ ] [C] Card dims in place when crossed; restore affordance works
 - [ ] [C] Header: title, tagline, night-progress, turn pill ("Your move." / "Sköll moves.")
 - [ ] [V] Visual regression snapshots for grid + crossed/armed states
