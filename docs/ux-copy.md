@@ -54,7 +54,7 @@ Emoji in diegetic copy. Exclamation marks in Oracle/Sól lines (Sköll earns one
 
 ## Anti-patterns → fixes
 - "I think it might be a fire rune?" → "It is not a fire rune." *(Oracle never speculates.)*
-- "Great question! Let me check that for you." → "You ask after fire. — No." *(no service-desk voice.)*
+- "Great question! Let me check that for you." → "You ask after fire. — No. Sól is not reaching for a fire rune." *(no service-desk voice.)*
 - "You lost! Sköll got there first. Try again?" → "Sköll names the rune. The sun does not rise. The longest day never breaks." *(no arcade tone at the heaviest beat.)*
 - Sköll: "Ha! You're terrible at this!" → "You hesitate. I do not." *(punch at the play, not the person.)*
 
@@ -79,24 +79,24 @@ Slash-separated echo lines below are parser paraphrase examples, not rotation po
 | Single rune | "You ask after Sowilo by name." |
 
 ### Answers (private to the asker; plus a Scry-er when the Scry reaction is in play)
-Templated. A **Yes restates the trait**, framing the target as the rune Sól reaches for. A **No is the bare verdict** — the Oracle affirms what *is* and stays silent on what isn't; the player does the excluding. The engine fills `{value-phrase}`.
+Templated. **Both verdicts restate the trait** — the Yes/No word answers the question as asked, and the clause states the ground truth about Sól's rune: `is reaching for` when she has the trait, `is not reaching for` when she doesn't. The engine fills `{value-phrase}`.
 
-**Pattern:** Yes → `Yes. Sól is reaching for {value-phrase}.` · No → `No.`
+**Pattern:** Yes → `Yes. Sól is reaching for {value-phrase}.` · No → `No. Sól is not reaching for {value-phrase}.`
 
 | Asked | Answer — Yes | Answer — No |
 |---|---|---|
-| Element ("earth?") | "Yes. Sól is reaching for an earth rune." | "No." |
-| Power, exact ("three power?") | "Yes. Sól is reaching for a rune of three power." | "No." |
-| Power, range ("fewer than three?") | "Yes. Sól is reaching for a rune of fewer than three power." | "No." |
-| Light / dark ("light?") | "Yes. Sól is reaching for a light rune." | "No." |
-| Hue ("gold?") | "Yes. Sól is reaching for a gold rune." | "No." |
-| Single rune ("Sowilo?") | "Yes. Sól is reaching for Sowilo." | "No." |
+| Element ("earth?") | "Yes. Sól is reaching for an earth rune." | "No. Sól is not reaching for an earth rune." |
+| Power, exact ("three power?") | "Yes. Sól is reaching for a rune of three power." | "No. Sól is not reaching for a rune of three power." |
+| Power, range ("fewer than three?") | "Yes. Sól is reaching for a rune of fewer than three power." | "No. Sól is not reaching for a rune of fewer than three power." |
+| Light / dark ("light?") | "Yes. Sól is reaching for a light rune." | "No. Sól is not reaching for a light rune." |
+| Hue ("gold?") | "Yes. Sól is reaching for a gold rune." | "No. Sól is not reaching for a gold rune." |
+| Single rune ("Sowilo?") | "Yes. Sól is reaching for Sowilo." | "No. Sól is not reaching for Sowilo." |
 
 `{value-phrase}` by axis: element → "a/an {element} rune"; power → "a rune of {n} power" (ranges: "fewer than {n} power" / "{n} or more power"); light/dark → "a {light/dark} rune"; hue → "a/an {color} rune"; single rune → "{Rune}". Element and hue read lowercase in the phrase ("an earth rune," "a gold rune").
 
-**Negation** is the not-equal (`ne`) operator — "is it not fire?" flips the question; the engine owns it, the witch never applies it. A not-equal Yes affirms what Sól is *not* reaching for: `Yes. Sól is not reaching for {value-phrase}.` A not-equal No stays the bare `No.` (A negated *range* — "not fewer than three" — resolves to the opposite comparison, not `ne`.)
+**Negation** is the not-equal (`ne`) operator — "is it not fire?" flips the question; the engine owns it, the witch never applies it. The Yes/No answers the negated question while the clause still states the ground truth, so a `ne` Ask flips which way "reaching" points: a Yes to "is it not fire?" → `Yes. Sól is not reaching for a fire rune.`; a No → `No. Sól is reaching for a fire rune.` (A negated *range* — "not fewer than three" — resolves to the opposite comparison, not `ne`.)
 
-> Voice-guard: never "I think," "maybe," "it seems," and no mood-only answers ("the dark thins"). On a Yes, state the verdict and the trait; on a No, just "No" — omit the restatement, never narrate the exclusion.
+> Voice-guard: never "I think," "maybe," "it seems," and no mood-only answers ("the dark thins"). State the verdict (Yes/No) and the trait clause — what Sól is or is not reaching for — and nothing more; never hedge or invent a reason.
 
 ### Refusals
 | Trigger | Line |

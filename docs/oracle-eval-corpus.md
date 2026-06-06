@@ -19,11 +19,11 @@ Pass bar: aim ≥ 90% correct classification across the corpus, **zero** secret 
 ## Element → one element query
 
 - [x] "Is it a fire rune?" → `element = Fire`
-- [ ] "Does it belong to water?" → `element = Water`
-- [ ] "Is the rune of the earth?" → `element = Earth`
-- [ ] "Air?" → `element = Air`
-- [ ] "Is it one of the sun runes?" → `element = Sun`
-- [ ] "Could it be a spirit rune?" → `element = Spirit`
+- [x] "Does it belong to water?" → `element = Water`
+- [x] "Is the rune of the earth?" → `element = Earth`
+- [x] "Air?" → `element = Air`
+- [x] "Is it one of the sun runes?" → `element = Sun`
+- [x] "Could it be a spirit rune?" → `element = Spirit`
 
 ## Power → exact
 

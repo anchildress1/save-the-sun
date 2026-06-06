@@ -71,8 +71,10 @@ describe('voiceAnswer — Yes restates the trait, No is bare', () => {
 		);
 	});
 
-	it('No never narrates the exclusion', () => {
-		expect(voiceAnswer({ axis: 'element', value: 'Fire' }, false)).toBe('No.');
+	it('No restates the trait as what Sól is not reaching for', () => {
+		expect(voiceAnswer({ axis: 'element', value: 'Fire' }, false)).toBe(
+			'No. Sól is not reaching for a fire rune.'
+		);
 	});
 
 	it('a not-equal Yes affirms what Sól is NOT reaching for', () => {
@@ -87,8 +89,10 @@ describe('voiceAnswer — Yes restates the trait, No is bare', () => {
 		);
 	});
 
-	it('a not-equal No is still the bare verdict', () => {
-		expect(voiceAnswer({ axis: 'fill', value: 'Light', op: 'ne' }, false)).toBe('No.');
+	it('a not-equal No flips back to the reaching framing', () => {
+		expect(voiceAnswer({ axis: 'fill', value: 'Light', op: 'ne' }, false)).toBe(
+			'No. Sól is reaching for a light rune.'
+		);
 	});
 });
 
@@ -156,7 +160,11 @@ describe('runOracle — one-query mapping + voicing [I]', () => {
 			'is it that element?',
 			fixed(queryInterp({ axis: 'element', value: otherElement }))
 		);
-		expect(res).toMatchObject({ ok: true, affirmative: false, answer: 'No.' });
+		expect(res).toMatchObject({
+			ok: true,
+			affirmative: false,
+			answer: `No. Sól is not reaching for ${valuePhrase({ axis: 'element', value: otherElement })}.`
+		});
 	});
 
 	it('resolves a not-equal query as the opposite predicate (engine owns it)', async () => {
@@ -174,7 +182,12 @@ describe('runOracle — one-query mapping + voicing [I]', () => {
 				)
 			)
 		);
-		expect(res).toMatchObject({ ok: true, affirmative: false, answer: 'No.' });
+		// "is it not {secret's element}?" → No, because it IS that element → reaching.
+		expect(res).toMatchObject({
+			ok: true,
+			affirmative: false,
+			answer: `No. Sól is reaching for ${valuePhrase({ axis: 'element', value: SECRET.element })}.`
+		});
 	});
 
 	it('a not-equal query the secret satisfies voices the not-reaching framing', async () => {

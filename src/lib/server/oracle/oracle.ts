@@ -56,11 +56,17 @@ export function valuePhrase(query: Query): string {
 	}
 }
 
-/** Yes restates the trait; No is bare. A `ne` query flips Yes to "is not reaching for". */
+/**
+ * Both verdicts restate the trait. The Yes/No word answers the question as asked;
+ * the clause states the ground truth about Sól's rune — "is reaching for" when she
+ * has the trait, "is not reaching for" when she doesn't. A negated (`ne`) Ask flips
+ * which way that points, so it's derived from the verdict XOR the negation.
+ */
 export function voiceAnswer(query: Query, affirmative: boolean): string {
-	if (!affirmative) return 'No.';
-	const reach = query.op === 'ne' ? 'is not reaching for' : 'is reaching for';
-	return `Yes. Sól ${reach} ${valuePhrase(query)}.`;
+	const verdict = affirmative ? 'Yes' : 'No';
+	const reaching = affirmative !== (query.op === 'ne');
+	const reach = reaching ? 'is reaching for' : 'is not reaching for';
+	return `${verdict}. Sól ${reach} ${valuePhrase(query)}.`;
 }
 
 function refuse(cls: RefusalClass): OracleResult {

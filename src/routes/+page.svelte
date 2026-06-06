@@ -160,12 +160,8 @@
 			<h2 class="oracle-title">The Oracle</h2>
 
 			<div class="oracle-frame">
-				<span class="frame-label">The Ask</span>
-				<p class="frame-text" data-testid="interpretation">{interpretation}</p>
-			</div>
-
-			<div class="oracle-frame">
-				<span class="frame-label">The Answer</span>
+				<span class="frame-label">The Rite</span>
+				<p class="frame-text echo" data-testid="interpretation">{interpretation}</p>
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
@@ -376,6 +372,13 @@
 		font-size: 0.92rem;
 		line-height: 1.4;
 		color: var(--ink);
+	}
+
+	.frame-text.echo {
+		color: var(--ink-muted);
+		font-style: italic;
+		font-size: 0.82rem;
+		margin-bottom: 0.35rem;
 	}
 
 	.frame-text.answer {
