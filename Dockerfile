@@ -10,10 +10,14 @@ RUN pnpm run build
 FROM node:26-alpine AS runner
 
 WORKDIR /app
+ENV NODE_ENV=production
+
+# Production deps only — devDependencies (Playwright, ESLint, Vitest…) never reach
+# the runtime image. adapter-node's build/ externalizes runtime `dependencies`.
+COPY package.json pnpm-lock.yaml ./
+RUN npm install -g pnpm && pnpm install --prod --frozen-lockfile && pnpm store prune
+
 COPY --from=builder /app/build build/
-COPY --from=builder /app/node_modules node_modules/
-COPY package.json ./
 
 EXPOSE 3000
-ENV NODE_ENV=production
 CMD ["node", "build"]
