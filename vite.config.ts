@@ -49,8 +49,17 @@ export default defineConfig({
 					browser: {
 						enabled: true,
 						headless: true,
-						provider: playwright(),
-						instances: [{ browser: 'chromium' }]
+						// reducedMotion so RuneGrid skips its GSAP entrance — cards render at their
+						// static resting state instead of being caught mid-animation in headless CI
+						// (the animated path is covered by the Playwright e2e suite).
+						provider: playwright({ contextOptions: { reducedMotion: 'reduce' } }),
+						instances: [
+							{
+								browser: 'chromium',
+								// Desktop viewport, not the mobile-ish default, so the 6-col board fits.
+								viewport: { width: 1280, height: 800 }
+							}
+						]
 					}
 				}
 			}
