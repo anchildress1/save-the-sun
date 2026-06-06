@@ -137,19 +137,19 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## Enforced coverage gates (CI — PR fails below floor)
 
-- [ ] **Engine** — line **100%** / branch **95%**
+- [x] **Engine** — line **100%** / branch **95%**
 - [ ] **Deterministic fallback policy** — line **95%** / branch **90%**
 - [ ] **Action interface** — line **90%** / branch **85%**
 - [ ] **Oracle pipeline** — line **90%** / branch **85%**
 - [ ] **Reactions** — line **95%** / branch **90%**
 - [ ] **UI / interaction** — line **80%** / branch **70%**
 - [ ] **Graphics render layer** — line **60%** (smoke + visual carry it)
-- [ ] **Project overall** — line **85%** / branch **80%**
+- [x] **Project overall** — line **85%** / branch **80%**
 
 ## Enforced non-coverage gates (CI)
 
 - [ ] Lighthouse accessibility ≥ 0.95 (target ≈ 1.0)
-- [ ] Round-solvability property test passes across all seeds
+- [x] Round-solvability property test passes across all seeds
 - [ ] Secret-leak security assertion (engine API + Sköll payload)
 - [ ] Voice/terminology lint — zero diegetic violations
 
