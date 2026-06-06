@@ -6,11 +6,11 @@ import { load } from '$routes/+page.server';
 const runLoad = () => load({} as never) as { boardSeed: number };
 
 describe('+page.server load — board seed', () => {
-	it('returns an integer seed within the valid range', () => {
+	it('returns a uint32 integer seed', () => {
 		const { boardSeed } = runLoad();
 		expect(Number.isInteger(boardSeed)).toBe(true);
 		expect(boardSeed).toBeGreaterThanOrEqual(0);
-		expect(boardSeed).toBeLessThan(0x7fffffff);
+		expect(boardSeed).toBeLessThan(2 ** 32);
 	});
 
 	it('reseeds per load so the layout varies', () => {

@@ -6,5 +6,7 @@ import type { PageServerLoad } from './$types';
 // Sköll arrives this seed becomes engine-owned so he sees the same board. A refresh
 // starts a new night with a new layout.
 export const load: PageServerLoad = () => {
-	return { boardSeed: Math.floor(Math.random() * 0x7fffffff) };
+	// Web Crypto, not Math.random — the board seed will later drive the secret rune, so it
+	// must not be a predictable PRNG. Returns a uint32; mulberry32 takes it via seed >>> 0.
+	return { boardSeed: crypto.getRandomValues(new Uint32Array(1))[0] };
 };
