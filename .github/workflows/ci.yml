@@ -52,14 +52,14 @@ jobs:
       - name: Typecheck
         run: make typecheck
 
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
       - name: Unit Tests
         run: make test
 
       - name: Build
         run: make build
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
 
       - name: E2E Tests
         run: make e2e
