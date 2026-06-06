@@ -68,8 +68,12 @@
 	</footer>
 
 	{#if crossed}
-		<span class="strike s1" aria-hidden="true"></span>
-		<span class="strike s2" aria-hidden="true"></span>
+		<!-- Chalk-style X: corner-to-corner diagonals inset so they reach toward the
+		     edges without touching them. viewBox is 4:5 to match the card aspect. -->
+		<svg class="strikeout" viewBox="0 0 80 100" preserveAspectRatio="none" aria-hidden="true">
+			<line x1="5" y1="6" x2="75" y2="94" />
+			<line x1="75" y1="6" x2="5" y2="94" />
+		</svg>
 	{/if}
 </button>
 
@@ -269,23 +273,21 @@
 		opacity: 0;
 	}
 
-	.strike {
+	.strikeout {
 		position: absolute;
-		top: 50%;
-		left: 50%;
-		/* Big X, but inset — stops short of the card edges. */
-		width: 86%;
-		height: 2px;
-		border-radius: 1px;
-		background: #ffffff;
+		inset: 0;
+		width: 100%;
+		height: 100%;
 		z-index: 5;
 		pointer-events: none;
 	}
-	.s1 {
-		transform: translate(-50%, -50%) rotate(45deg);
-	}
-	.s2 {
-		transform: translate(-50%, -50%) rotate(-45deg);
+	/* Round caps + soft white read as a chalk stroke; vector-effect keeps the line an
+	   even thickness despite the non-uniform viewBox scaling. */
+	.strikeout line {
+		stroke: rgba(255, 255, 255, 0.9);
+		stroke-width: 2.5;
+		stroke-linecap: round;
+		vector-effect: non-scaling-stroke;
 	}
 
 	/* Armed for cast: gold halo, content restored even if crossed. */

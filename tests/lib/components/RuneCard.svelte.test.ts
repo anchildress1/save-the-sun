@@ -87,7 +87,8 @@ describe('RuneCard', () => {
 	it('shows a restore label and strike marks when crossed', async () => {
 		const screen = render(RuneCard, { rune: uruz, crossed: true, onAction: vi.fn() });
 		await expect.element(screen.getByRole('button', { name: /restore uruz/i })).toBeInTheDocument();
-		expect(screen.container.querySelectorAll('.strike')).toHaveLength(2);
+		// Chalk X: one strikeout svg with two diagonal lines.
+		expect(screen.container.querySelectorAll('.strikeout line')).toHaveLength(2);
 	});
 
 	it('exposes a cast-target label when armed', async () => {
