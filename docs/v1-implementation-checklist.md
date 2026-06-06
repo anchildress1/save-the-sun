@@ -238,7 +238,7 @@ Legend for test tags matches `test-checklist.md`: \[U\] unit · \[I\] integratio
 - [ ] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
 - [ ] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
 - [ ] Sköll vs Oracle lines attributable to the correct speaker; Sköll taunt pool does not repeat within a game
-- [ ] Connection/engine error shown in-world ("The fire gutters…") **without** losing crossings or turn state
+- [ ] Connection/engine error shown in-world ("The Oracle falls silent…") **without** losing crossings or turn state
 
 **Tests to land:** \[A\] string + terminology lint · \[Eval\] speaker-distinctness · \[I\] no-repeat taunts, error-state preserves crossings/turn.
 

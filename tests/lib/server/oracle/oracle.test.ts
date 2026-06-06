@@ -100,7 +100,7 @@ describe('refusalLine — exact ux-copy.md §1 lines', () => {
 		'prompt-injection': 'I answer the longest day, not you. Ask of the runes.',
 		unparseable: 'I cannot read that sign. Ask of element, power, light, or hue.',
 		empty: 'Speak your question, witch.',
-		'engine-error': "The fire gutters — the rite can't reach Sól. Draw breath and try again."
+		'engine-error': "The Oracle falls silent — the rite can't reach Sól. Draw breath and try again."
 	};
 	for (const cls of Object.keys(lines) as RefusalClass[]) {
 		it(`${cls}`, () => {

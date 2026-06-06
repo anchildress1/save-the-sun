@@ -207,7 +207,7 @@ Sól speaks only at victory — the goddess's rarity is the power.
 | State | Copy |
 |---|---|
 | Board, before any Ask | "Twenty-four runes stand. None ruled out. Ask the Oracle." |
-| Connection / engine error | "The fire gutters — the rite can't reach Sól. Draw breath and try again." |
+| Connection / engine error | "The Oracle falls silent — the rite can't reach Sól. Draw breath and try again." |
 | Action while it's Sköll's move | "The wolf is moving. Hold." |
 
 ---

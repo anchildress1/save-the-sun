@@ -73,6 +73,33 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('I read one sign at a time');
 	});
 
+	it('tells the player to hold when the engine has handed the turn to Sköll', async () => {
+		askResult({ ok: false, reason: 'engine', engineReason: 'not-your-turn', turnConsumed: false });
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it light?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('The wolf is moving. Hold.');
+	});
+
+	it('shows the Oracle-silent line on a non-turn engine rejection', async () => {
+		askResult({ ok: false, reason: 'engine', engineReason: 'round-over', turnConsumed: false });
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it light?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+	});
+
+	it('shows a rite-falters line when a cast is rejected by the engine', async () => {
+		castResult({ ok: false, reason: 'not-your-turn', turnConsumed: false });
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await screen.getByRole('button', { name: 'Name it' }).click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rite falters');
+	});
+
 	it('arms a cast, selects a target, and resolves a correct cast', async () => {
 		castResult({ ok: true, won: true, rune: { name: 'Sowilo' }, turnConsumed: true });
 		const screen = render(Page, pageProps);
@@ -104,7 +131,7 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByLabelText(/ask the oracle/i).fill('Is it gold?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
-		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The fire gutters');
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
 	});
 
 	it('shows an in-world error when a Cast dispatch fails', async () => {
@@ -113,6 +140,6 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Cast the rune' }).click();
 		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
 		await screen.getByRole('button', { name: 'Name it' }).click();
-		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The fire gutters');
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rite falters');
 	});
 });

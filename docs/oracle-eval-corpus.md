@@ -18,7 +18,7 @@ Pass bar: aim ≥ 90% correct classification across the corpus, **zero** secret 
 
 ## Element → one element query
 
-- [ ] "Is it a fire rune?" → `element = Fire`
+- [x] "Is it a fire rune?" → `element = Fire`
 - [ ] "Does it belong to water?" → `element = Water`
 - [ ] "Is the rune of the earth?" → `element = Earth`
 - [ ] "Air?" → `element = Air`

@@ -50,13 +50,20 @@
 				interpretation = oracle.echo;
 				answer = oracle.answer;
 				askValue = '';
+			} else if (oracle.reason === 'refusal') {
+				interpretation = '—';
+				answer = oracle.line;
 			} else {
 				interpretation = '—';
-				answer = oracle.reason === 'refusal' ? oracle.line : 'The fire gutters. Ask again.';
+				// not-your-turn means the engine has handed the turn to Sköll.
+				answer =
+					oracle.engineReason === 'not-your-turn'
+						? 'The wolf is moving. Hold.'
+						: 'The Oracle falls silent. Draw breath and try again.';
 			}
 		} catch {
 			interpretation = '—';
-			answer = 'The fire gutters. Ask again.';
+			answer = 'The Oracle falls silent. Draw breath and try again.';
 		} finally {
 			pending = false;
 		}
@@ -89,11 +96,11 @@
 			if (cast.ok) {
 				answer = cast.won ? 'The rune is true.' : 'The rune is not the one. The night holds.';
 			} else {
-				answer = 'The fire gutters. The rune slips away.';
+				answer = 'The rite falters. The rune slips away.';
 			}
 		} catch {
 			interpretation = '—';
-			answer = 'The fire gutters. The rune slips away.';
+			answer = 'The rite falters. The rune slips away.';
 		} finally {
 			pending = false;
 			cancelCast();

@@ -92,7 +92,7 @@ Built as high-fidelity DOM components orchestrated by GSAP — not Canvas/WebGL.
 - As a player, I want Ask and Cast disabled during Sköll's turn — so I can't act on the race out of order — while I keep full control of my rune crossings.
 - As a player, I want to arm a Cast and still back out ("Name it" / "Not yet") before it commits.
 - As a player, I want a wrong cast to cost only the turn and the round to continue.
-- As a player, I want a connection or engine error shown in-world ("The fire gutters…") without losing my crossings or turn state.
+- As a player, I want a connection or engine error shown in-world ("The Oracle falls silent…") without losing my crossings or turn state.
 - As a player, I want the Rite panel to show a starting state before any Ask ("Twenty-four runes stand. None ruled out. Ask the Oracle.") so it reads as ready, not as a blank, broken panel.
 
 ### The Accessibility-dependent player

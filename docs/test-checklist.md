@@ -113,7 +113,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 9. Error handling & edge states
 
-- [ ] [I][E] Connection/engine error shown in-world ("The fire gutters…") **without losing crossings or turn state**
+- [ ] [I][E] Connection/engine error shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**
 - [x] [C] Empty submit refused with "Speak your question, witch."
 - [ ] [C] Small screens get best-on-desktop notice — no responsive reflow
 - [x] [I] Invalid Ask costs only the rephrase, never a false answer

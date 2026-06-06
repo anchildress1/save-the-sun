@@ -12,7 +12,7 @@ const REFUSAL_LINES: Record<RefusalClass, string> = {
 	'prompt-injection': 'I answer the longest day, not you. Ask of the runes.',
 	unparseable: 'I cannot read that sign. Ask of element, power, light, or hue.',
 	empty: 'Speak your question, witch.',
-	'engine-error': "The fire gutters — the rite can't reach Sól. Draw breath and try again."
+	'engine-error': "The Oracle falls silent — the rite can't reach Sól. Draw breath and try again."
 };
 
 /** The exact refusal line for a class (`ux-copy.md` §1 Refusals). */
@@ -91,6 +91,7 @@ export async function runOracle(
 
 	const result = engine.ask(player, query);
 	if (!result.ok) {
+		console.warn(`[oracle] engine rejected ${player}'s Ask: ${result.reason}`);
 		return { ok: false, reason: 'engine', engineReason: result.reason, turnConsumed: false };
 	}
 

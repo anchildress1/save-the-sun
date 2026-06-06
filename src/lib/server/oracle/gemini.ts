@@ -9,9 +9,9 @@ import type { Interpretation, Interpret } from './types';
 
 const MODEL = 'gemini-3.5-flash';
 
-const ELEMENTS = [...new Set(runes.map((r) => r.element))];
-const COLORS = [...new Set(runes.map((r) => r.color))];
-const NAMES = runes.map((r) => r.name);
+const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
+const COLORS: string[] = [...new Set(runes.map((r) => r.color))];
+const NAMES: string[] = runes.map((r) => r.name);
 
 const SYSTEM_INSTRUCTION = `You are the Oracle in "Save the Sun," a rite where a witch hunts one secret rune by asking yes/no questions about its traits. You do NOT know the secret and you never answer the question yourself — you only read the witch's words into exactly one structured query, or refuse.
 
@@ -141,10 +141,10 @@ export const interpret: Interpret = async (question) => {
 			}
 		});
 		return normalize(JSON.parse(response.text ?? '{}') as RawResponse);
-	} catch (error) {
+	} catch (err) {
 		// Any adapter/transport failure (network, timeout, malformed JSON) degrades to an
 		// in-world engine-error refusal so a live round never hard-fails; the turn is preserved.
-		console.error('Oracle Gemini interpretation failed:', error);
+		console.error(`[oracle] Gemini interpret failed (model=${MODEL}):`, err);
 		return { kind: 'refusal', refusal: 'engine-error' };
 	}
 };

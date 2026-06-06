@@ -177,7 +177,7 @@ A mood feature that can't degrade to the tier below doesn't ship — so each tie
 
 | Area | Test type | What to test |
 |---|---|---|
-| Connection / engine error | Integration + E2E | Shown in-world ("The fire gutters…") **without losing crossings or turn state**. |
+| Connection / engine error | Integration + E2E | Shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**. |
 | Empty submit | Component | Refused with "Speak your question, witch." |
 | Best-on-desktop notice | Component | Small screens get the notice — no responsive reflow attempted. |
 | Malformed Ask recovery | Integration | Invalid Ask costs only the rephrase, never a false answer (ties to §2). |
