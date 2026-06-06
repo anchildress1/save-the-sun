@@ -37,6 +37,14 @@ const COLORS = new Set(runes.map((r) => r.color));
 const NAMES = new Set(runes.map((r) => r.name));
 const POWER_OPS: ReadonlySet<string> = new Set<PowerOp>(['eq', 'lt', 'lte', 'gt', 'gte']);
 
+// Single-value axes: a {axis, value} query whose value must be in the allowed set.
+const VALUE_AXES: Record<string, ReadonlySet<unknown>> = {
+	element: ELEMENTS,
+	fill: new Set(['Light', 'Dark']),
+	color: COLORS,
+	rune: NAMES
+};
+
 /**
  * Validate an untrusted query payload into a canonical Query.
  * @param input loosely-typed payload from a UI or LLM tool call
@@ -45,33 +53,26 @@ const POWER_OPS: ReadonlySet<string> = new Set<PowerOp>(['eq', 'lt', 'lte', 'gt'
 export function parseQuery(input: unknown): Query | null {
 	if (typeof input !== 'object' || input === null) return null;
 	const q = input as Record<string, unknown>;
-	switch (q.axis) {
-		case 'element':
-			return onlyKeys(q, 'axis', 'value') && typeof q.value === 'string' && ELEMENTS.has(q.value)
-				? { axis: 'element', value: q.value }
-				: null;
-		case 'fill':
-			return onlyKeys(q, 'axis', 'value') && (q.value === 'Light' || q.value === 'Dark')
-				? { axis: 'fill', value: q.value }
-				: null;
-		case 'color':
-			return onlyKeys(q, 'axis', 'value') && typeof q.value === 'string' && COLORS.has(q.value)
-				? { axis: 'color', value: q.value }
-				: null;
-		case 'rune':
-			return onlyKeys(q, 'axis', 'value') && typeof q.value === 'string' && NAMES.has(q.value)
-				? { axis: 'rune', value: q.value }
-				: null;
-		case 'power':
-			return onlyKeys(q, 'axis', 'op', 'value') &&
-				typeof q.op === 'string' &&
-				POWER_OPS.has(q.op) &&
-				Number.isInteger(q.value)
-				? { axis: 'power', op: q.op as PowerOp, value: q.value as number }
-				: null;
-		default:
-			return null;
+	if (q.axis === 'power') return parsePowerQuery(q);
+	if (typeof q.axis === 'string' && q.axis in VALUE_AXES) return parseValueQuery(q.axis, q);
+	return null;
+}
+
+function parseValueQuery(axis: string, q: Record<string, unknown>): Query | null {
+	if (!onlyKeys(q, 'axis', 'value') || !VALUE_AXES[axis].has(q.value)) return null;
+	return { axis, value: q.value } as Query;
+}
+
+function parsePowerQuery(q: Record<string, unknown>): Query | null {
+	if (
+		!onlyKeys(q, 'axis', 'op', 'value') ||
+		typeof q.op !== 'string' ||
+		!POWER_OPS.has(q.op) ||
+		!Number.isInteger(q.value)
+	) {
+		return null;
 	}
+	return { axis: 'power', op: q.op as PowerOp, value: q.value as number };
 }
 
 /**

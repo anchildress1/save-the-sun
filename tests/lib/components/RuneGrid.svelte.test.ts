@@ -3,8 +3,8 @@ import { describe, it, expect, vi } from 'vitest';
 import RuneGrid from '$lib/components/RuneGrid.svelte';
 
 function cardIds(container: HTMLElement): number[] {
-	return [...container.querySelectorAll('.rune-card[data-rune-id]')].map((el) =>
-		Number(el.getAttribute('data-rune-id'))
+	return [...container.querySelectorAll<HTMLElement>('.rune-card[data-rune-id]')].map((el) =>
+		Number(el.dataset.runeId)
 	);
 }
 

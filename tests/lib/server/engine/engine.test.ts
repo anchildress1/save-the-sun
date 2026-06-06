@@ -228,7 +228,11 @@ describe('GameEngine — secret confidentiality (no path leaks the secret pre-ca
 	it('returns only a boolean from an Ask — never the secret', () => {
 		const engine = new GameEngine(7);
 		const result = engine.ask('Human', { axis: 'element', value: 'Fire' });
-		expect(Object.keys(result).sort()).toEqual(['answer', 'ok', 'turnConsumed']);
+		expect(Object.keys(result).sort((a, b) => a.localeCompare(b))).toEqual([
+			'answer',
+			'ok',
+			'turnConsumed'
+		]);
 	});
 
 	it('does not reveal the rune on a wrong cast', () => {
