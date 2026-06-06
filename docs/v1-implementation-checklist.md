@@ -90,7 +90,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 *The Plain tier — the v1 surface. Built as high-fidelity DOM components orchestrated by GSAP, with a native focusable layer for controls (`prd.md` UI Direction). Depends on: S3.*
 
 - [ ] Rune grid rendered as high-fidelity DOM components orchestrated by GSAP; 24 cards, 6×4, fixed order
-- [ ] Each card shows: glyph, color swatch, name + meaning, power as filled pips **with numeral**, element symbol + name, color name (light/dark is queryable via the Oracle, not shown on the card)
+- [ ] Each card shows: glyph, color swatch, name + meaning, power as filled pips **with numeral**, element symbol + name, color name (light/dark encoded by pip color — white light / black dark — and in the accessible name, never as a visible word; still a queryable Oracle axis)
 - [ ] Nothing conveyed by color alone — color name and element name always accompany their icons
 - [ ] Card dims in place when crossed; restore affordance present and works
 - [ ] Header: title "Save the Sun", tagline "A rite for the longest day," night-progress indicator, turn pill ("Your move." / "Sköll moves.")

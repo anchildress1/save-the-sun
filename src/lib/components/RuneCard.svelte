@@ -17,6 +17,7 @@
 	let gem = $derived(gemColor(rune.color));
 	let icon = $derived(elementIcon(rune.element));
 	let pips = $derived(Array.from({ length: rune.power }, (_, i) => i));
+	let fillWord = $derived(rune.fill === 'Light' ? 'light' : 'dark');
 </script>
 
 <button
@@ -28,10 +29,10 @@
 	onclick={() => onAction(rune.id)}
 	style="--gem: {gem};"
 	aria-label={armed
-		? `Select ${rune.name} as cast target`
+		? `Select ${rune.name} as cast target, ${rune.power} ${fillWord}`
 		: crossed
-			? `Restore ${rune.name}`
-			: `Cross off ${rune.name}`}
+			? `Restore ${rune.name}, ${rune.power} ${fillWord}`
+			: `Cross off ${rune.name}, ${rune.power} ${fillWord}`}
 >
 	<div class="ambient" aria-hidden="true"></div>
 
@@ -53,13 +54,14 @@
 		<span class="trait element"
 			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
 		>
-		<!-- Pips are power count only (filled = legibility on the dark card, not a trait).
-		     Light/dark is queryable via the Oracle and derivable from element, so it is
-		     not surfaced on the card. -->
-		<span class="trait power" aria-label="power {rune.power}">
+		<!-- Pips encode power (count) and fill: white = light, black = dark. Light/dark
+		     never appears as a visible word (locked decision); the dark pip carries a light
+		     ring so it reads on the navy card, and the button's accessible name states the
+		     fill so screen-reader players get what sighted players read from the dots. -->
+		<span class="trait power">
 			<span class="pips" aria-hidden="true">
 				{#each pips as i (i)}
-					<span class="pip"></span>
+					<span class="pip" class:dark={rune.fill === 'Dark'}></span>
 				{/each}
 			</span>
 			<span class="num">{rune.power}</span>
@@ -241,12 +243,17 @@
 		gap: 1.5px;
 	}
 
-	/* Filled white so the power count reads on the dark card. */
+	/* Pips show power count; fill encodes light/dark — white = light, black = dark.
+	   The dark pip gets a light ring so it doesn't vanish into the navy card. */
 	.pip {
 		width: 5px;
 		height: 5px;
 		border-radius: 50%;
-		background: rgba(255, 255, 255, 0.9);
+		background: rgba(255, 255, 255, 0.92);
+	}
+	.pip.dark {
+		background: #0c0c12;
+		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
 	}
 
 	.num {

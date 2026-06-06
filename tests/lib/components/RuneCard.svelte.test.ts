@@ -38,22 +38,33 @@ describe('RuneCard', () => {
 		await expect.element(screen.getByText('6', { exact: true })).toBeInTheDocument();
 	});
 
-	it('does not surface the light/dark axis on the card (queryable via the Oracle)', async () => {
-		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
-		expect(screen.container.textContent).not.toMatch(/\b(light|dark)\b/i);
-		// The power label carries no fill; pips are power count only.
-		await expect.element(screen.getByLabelText('power 4')).toBeInTheDocument();
+	it('never shows light/dark as a visible word (locked decision)', async () => {
+		const light = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		expect(light.container.textContent).not.toMatch(/\b(light|dark)\b/i);
+		const dark = render(RuneCard, { rune: perthro, onAction: vi.fn() });
+		expect(dark.container.textContent).not.toMatch(/\b(light|dark)\b/i);
 	});
 
-	it('renders pips as filled power markers — count = power, no fill variance', async () => {
+	it('exposes fill to assistive tech via the accessible name (power + light/dark)', async () => {
+		const light = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		await expect
+			.element(light.getByRole('button', { name: /cross off uruz, 4 light/i }))
+			.toBeInTheDocument();
+
+		const dark = render(RuneCard, { rune: perthro, onAction: vi.fn() });
+		await expect
+			.element(dark.getByRole('button', { name: /cross off perthro, 1 dark/i }))
+			.toBeInTheDocument();
+	});
+
+	it('encodes fill on the pips — light pips plain, dark pips marked; count = power', async () => {
 		const light = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		expect(light.container.querySelectorAll('.pip')).toHaveLength(4);
 		expect(light.container.querySelectorAll('.pip.dark')).toHaveLength(0);
 
-		// A Dark rune renders the same pip treatment — only the count differs.
 		const dark = render(RuneCard, { rune: perthro, onAction: vi.fn() });
 		expect(dark.container.querySelectorAll('.pip')).toHaveLength(1);
-		expect(dark.container.querySelectorAll('.pip.dark')).toHaveLength(0);
+		expect(dark.container.querySelectorAll('.pip.dark')).toHaveLength(1);
 	});
 
 	it('fires onAction with the rune id on click', async () => {
