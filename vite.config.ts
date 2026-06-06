@@ -14,18 +14,20 @@ export default defineConfig({
 			// +layout.svelte is framework boilerplate (favicon + theme import + <slot>) with
 			// no logic to test; index.ts is a re-export barrel.
 			exclude: ['src/**/*.d.ts', 'src/lib/index.ts', 'src/routes/+layout.svelte'],
-			// CI coverage floors (test-plan.md §coverage). Globs gate per module; raise
-			// these as modules land, never lower them. Enforced by `make test` (CI) and the
-			// pre-push hook.
+			// CI coverage floors (test-plan.md §coverage). Globs gate per module — the engine
+			// is the referee and carries the strictest bar. Raise these as modules land;
+			// never lower them. Enforced by `make test` (CI) and the pre-push hook.
 			thresholds: {
 				lines: 85,
 				branches: 80,
 				functions: 85,
 				statements: 85,
-				'src/lib/components/**': { lines: 80, branches: 70 },
-				'src/routes/+page.svelte': { lines: 80, branches: 70 },
+				'src/lib/server/engine/engine.ts': { lines: 100, branches: 95 },
+				'src/lib/server/engine/queries.ts': { lines: 100, branches: 95 },
 				'src/lib/server/engine/actions.ts': { lines: 90, branches: 85 },
-				'src/routes/api/action/+server.ts': { lines: 90, branches: 85 }
+				'src/routes/api/action/+server.ts': { lines: 90, branches: 85 },
+				'src/lib/components/**': { lines: 80, branches: 70 },
+				'src/routes/+page.svelte': { lines: 80, branches: 70 }
 			}
 		},
 		projects: [

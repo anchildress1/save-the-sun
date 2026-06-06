@@ -28,19 +28,19 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *The single source of truth. Strictest coverage bar in the project. Depends on: S0.*
 
-- [ ] Load all 24 Elder Futhark runes; assert every rune is a unique (element, power, color) combo
-- [ ] Trait counts enforced: element 4 each · power 4 each · fill 12/12 · color 4 each
-- [ ] Secret selection: exactly one secret rune per round; refresh/new round reseeds
-- [ ] Truthful trait resolution for all axes — element, power, fill (light/dark), hue
-- [ ] Power ranges: "fewer than N", "at least N", "N or more", exact N — correct at boundaries (1 and 6 inclusive)
-- [ ] Single-rune query eliminates exactly that rune; yes only for the secret
-- [ ] Win/cast: only the secret wins; every other cast fails → "wasted turn, round continues," never ends the game
-- [ ] Cast accepts **any** rune, crossed or not — engine never reads the player's crossings
-- [ ] Legality: mixed-type / malformed / already-asked queries flagged invalid
-- [ ] Turn accounting: a refused/invalid Ask does **not** consume the turn; a resolved Ask does
-- [ ] Strict alternation, human-first; out-of-order Ask/Cast rejected
-- [ ] Secret confidentiality: no engine path returns the secret before a correct cast
-- [ ] Per-player wrong-cast counter increments from v1 (threshold unused until v2 — hook only)
+- [x] Load all 24 Elder Futhark runes; assert every rune is a unique (element, power, color) combo
+- [x] Trait counts enforced: element 4 each · power 4 each · fill 12/12 · color 4 each
+- [x] Secret selection: exactly one secret rune per round; refresh/new round reseeds
+- [x] Truthful trait resolution for all axes — element, power, fill (light/dark), hue
+- [x] Power ranges: "fewer than N", "at least N", "N or more", exact N — correct at boundaries (1 and 6 inclusive)
+- [x] Single-rune query eliminates exactly that rune; yes only for the secret
+- [x] Win/cast: only the secret wins; every other cast fails → "wasted turn, round continues," never ends the game
+- [x] Cast accepts **any** rune, crossed or not — engine never reads the player's crossings
+- [x] Legality: mixed-type / malformed / already-asked queries flagged invalid
+- [x] Turn accounting: a refused/invalid Ask does **not** consume the turn; a resolved Ask does
+- [x] Strict alternation, human-first; out-of-order Ask/Cast rejected
+- [x] Secret confidentiality: no engine path returns the secret before a correct cast
+- [x] Per-player wrong-cast counter increments from v1 (threshold unused until v2 — hook only)
 
 **Tests to land:** [U] board integrity, secret selection, trait resolution (table-driven all 24 × all axes), power boundaries, single-rune, win/cast, crossed-rune cast, legality, turn accounting, alternation, wrong-cast counter · [Sec] secret never returned pre-cast.
 

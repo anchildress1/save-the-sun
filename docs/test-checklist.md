@@ -8,22 +8,22 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 1. Engine — the referee (highest priority)
 
-- [ ] [U] All 24 Elder Futhark runes load
-- [ ] [U] Every rune is a unique (element, power, color) combination
-- [ ] [U] Trait counts match `rune-board.md` (element 4 each · power 4 each · fill 12/12 · color 4 each)
-- [ ] [U] Exactly one secret rune per round; refresh/new round reseeds
-- [ ] [U] Element / power / fill / hue queries resolve truthfully (table-driven, all 24 × all axes)
-- [ ] [U] Power ranges correct at boundaries — "fewer than N", "at least N", "N or more", exact (1 and 6 inclusive)
-- [ ] [U] Single-rune query eliminates exactly that rune; yes only for the secret
-- [ ] [U] **Only the secret wins a Cast; every other rune fails**
-- [ ] [U] Wrong cast = wasted turn, round continues (never ends game)
-- [ ] [U] Engine accepts a Cast of a crossed-off rune; never validates against crossings
-- [ ] [U] Mixed-type / malformed / already-asked queries flagged invalid
-- [ ] [U] Refused/invalid Ask does **not** consume the turn; resolved Ask does
-- [ ] [Sec] No engine path returns the secret before a correct cast
-- [ ] [U] Strict alternation, human-first; out-of-order Ask/Cast rejected
-- [ ] [U] Scry returns same answer to rival; Hex suppresses answer + spends turn; Cast never interruptible
-- [ ] [U] Per-player wrong-cast counter increments from v1 (threshold unused until v2)
+- [x] [U] All 24 Elder Futhark runes load
+- [x] [U] Every rune is a unique (element, power, color) combination
+- [x] [U] Trait counts match `rune-board.md` (element 4 each · power 4 each · fill 12/12 · color 4 each)
+- [x] [U] Exactly one secret rune per round; refresh/new round reseeds
+- [x] [U] Element / power / fill / hue queries resolve truthfully (table-driven, all 24 × all axes)
+- [x] [U] Power ranges correct at boundaries — "fewer than N", "at least N", "N or more", exact (1 and 6 inclusive)
+- [x] [U] Single-rune query eliminates exactly that rune; yes only for the secret
+- [x] [U] **Only the secret wins a Cast; every other rune fails**
+- [x] [U] Wrong cast = wasted turn, round continues (never ends game)
+- [x] [U] Engine accepts a Cast of a crossed-off rune; never validates against crossings
+- [x] [U] Mixed-type / malformed / already-asked queries flagged invalid
+- [x] [U] Refused/invalid Ask does **not** consume the turn; resolved Ask does
+- [x] [Sec] No engine path returns the secret before a correct cast
+- [x] [U] Strict alternation, human-first; out-of-order Ask/Cast rejected
+- [ ] [U] Scry returns same answer to rival; Hex suppresses answer + spends turn; Cast never interruptible _(S5)_
+- [x] [U] Per-player wrong-cast counter increments from v1 (threshold unused until v2)
 
 ## 2. Oracle pipeline (Gemini, Role 1)
 
@@ -157,14 +157,14 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 - [ ] Weighted-random vs argmax statistical test present and passing (§3)
 - [ ] Turn-accounting-on-refusal covered for **every** refusal class (§2)
-- [ ] Crossed-rune cast legality covered (§1)
+- [x] Crossed-rune cast legality covered (§1)
 - [ ] Cast sacredness: reactions never offered on a Cast (§5)
 - [ ] Degradation **fairness** (solvable), not just renders (§8)
 - [ ] Secret never present in Sköll's payload (§3)
 
 ## Build-order alignment
 
-- [ ] Engine suite lands with engine
+- [x] Engine suite lands with engine
 - [ ] Oracle suite lands with Oracle
 - [ ] Human-loop + win/cast suites land with that module
 - [ ] Reactions suite lands with reactions
