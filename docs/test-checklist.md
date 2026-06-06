@@ -27,16 +27,16 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 2. Oracle pipeline (Gemini, Role 1)
 
-- [ ] [I] Free-text maps to exactly one query type; multi-type intent rejected, not split
-- [ ] [C] Echo matches the resolved query, shown **before** the answer; interpreted query stands (no do-over)
-- [ ] [C] Yes restates the trait; No is the bare verdict, no exclusion narration; `{value-phrase}` fills per axis
-- [ ] [C] Mixed-type refusal returns `ux-copy.md` line; turn not consumed
-- [ ] [Sec] Secret-seeking Ask refused; secret never leaks
-- [ ] [Sec] Prompt-injection / override stays in character, refuses
-- [ ] [C] Unparseable / not-a-question refusal; turn not consumed
-- [ ] [C] Empty submit refused with "Speak your question, witch." (nothing sent)
-- [ ] [I] Resolved Ask consumes turn; every refusal class does not
-- [ ] [Eval] ~40-phrasing corpus scored for correct query-type / refusal-class
+- [x] [I] Free-text maps to exactly one query type; multi-type intent rejected, not split
+- [x] [C] Echo matches the resolved query, shown **before** the answer; interpreted query stands (no do-over)
+- [x] [C] Yes restates the trait; No is the bare verdict, no exclusion narration; `{value-phrase}` fills per axis
+- [x] [C] Mixed-type refusal returns `ux-copy.md` line; turn not consumed
+- [x] [Sec] Secret-seeking Ask refused; secret never leaks
+- [x] [Sec] Prompt-injection / override stays in character, refuses
+- [x] [C] Unparseable / not-a-question refusal; turn not consumed
+- [x] [C] Empty submit refused with "Speak your question, witch." (nothing sent)
+- [x] [I] Resolved Ask consumes turn; every refusal class does not
+- [ ] [Eval] ~40-phrasing corpus scored for correct query-type / refusal-class _(live Gemini — manual/offline, intentionally out of deterministic CI; phrases in `oracle-eval-corpus.md`)_
 
 ## 3. Sköll — opponent + deterministic floor
 
@@ -114,9 +114,9 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## 9. Error handling & edge states
 
 - [ ] [I][E] Connection/engine error shown in-world ("The fire gutters…") **without losing crossings or turn state**
-- [ ] [C] Empty submit refused with "Speak your question, witch."
+- [x] [C] Empty submit refused with "Speak your question, witch."
 - [ ] [C] Small screens get best-on-desktop notice — no responsive reflow
-- [ ] [I] Invalid Ask costs only the rephrase, never a false answer
+- [x] [I] Invalid Ask costs only the rephrase, never a false answer
 - [ ] [S] Every seeded round winnable through legal Asks; Oracle never lies (fuzz across secrets/seeds)
 
 ## 10. Debug view
@@ -140,7 +140,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] **Engine** — line **100%** / branch **95%**
 - [ ] **Deterministic fallback policy** — line **95%** / branch **90%**
 - [ ] **Action interface** — line **90%** / branch **85%**
-- [ ] **Oracle pipeline** — line **90%** / branch **85%**
+- [x] **Oracle pipeline** — line **90%** / branch **85%**
 - [ ] **Reactions** — line **95%** / branch **90%**
 - [ ] **UI / interaction** — line **80%** / branch **70%**
 - [ ] **Graphics render layer** — line **60%** (smoke + visual carry it)
@@ -156,7 +156,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## High-risk gaps — do not skip
 
 - [ ] Weighted-random vs argmax statistical test present and passing (§3)
-- [ ] Turn-accounting-on-refusal covered for **every** refusal class (§2)
+- [x] Turn-accounting-on-refusal covered for **every** refusal class (§2)
 - [x] Crossed-rune cast legality covered (§1)
 - [ ] Cast sacredness: reactions never offered on a Cast (§5)
 - [ ] Degradation **fairness** (solvable), not just renders (§8)
@@ -165,7 +165,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## Build-order alignment
 
 - [x] Engine suite lands with engine
-- [ ] Oracle suite lands with Oracle
+- [x] Oracle suite lands with Oracle
 - [ ] Human-loop + win/cast suites land with that module
 - [ ] Reactions suite lands with reactions
 - [ ] Opponent (Gemini + floor) suite lands with opponent

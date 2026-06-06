@@ -52,14 +52,18 @@ Legend for test tags matches `test-checklist.md`: \[U\] unit · \[I\] integratio
 
 *Turns free text into one engine query and voices the truthful answer. Depends on: S1.*
 
-- [ ] Free-text → exactly one structured query type (element / power / fill / hue / single rune); multi-type intent **rejected**, never silently split
-- [ ] Interpretation echo shown **before** the answer; the interpreted query stands (no do-over) — `You ask after {paraphrase}.`
-- [ ] Answer voicing: Yes restates the trait (`Yes. Sól is reaching for {value-phrase}.`); No is the bare `No.` with no exclusion narration
-- [ ] `{value-phrase}` fills correctly per axis (`ux-copy.md` §1)
-- [ ] Refusals wired to exact `ux-copy.md` lines: mixed-type, secret-seeking, prompt-injection/override, unparseable, empty submit
-- [ ] Every refusal class does **not** consume the turn; a resolved Ask does
+- [x] Free-text → exactly one structured query type (element / power / fill / hue / single rune); multi-type intent **rejected**, never silently split
+- [x] Interpretation echo shown **before** the answer; the interpreted query stands (no do-over) — `You ask after {paraphrase}.` (paraphrase is Gemini-generated; the frame is fixed)
+- [x] Answer voicing: Yes restates the trait (`Yes. Sól is reaching for {value-phrase}.`); No is the bare `No.` with no exclusion narration
+- [x] `{value-phrase}` fills correctly per axis (`ux-copy.md` §1)
+- [x] Refusals wired to exact `ux-copy.md` lines: mixed-type, secret-seeking, prompt-injection/override, unparseable, empty submit
+- [x] Every refusal class does **not** consume the turn; a resolved Ask does
 
-**Tests to land:** \[I\] one-query mapping, turn accounting · \[C\] echo placement, answer voicing, each refusal class · \[Sec\] secret-seeking + prompt-injection refused, no leak · \[Eval\] ~40-phrasing corpus scored for query-type / refusal-class.
+**Implementation (S2):** Gemini reads free text into one structured query (or a refusal class) via the `@google/genai` SDK — model `gemini-3.5-flash`, thinking pinned to **MINIMAL** for speed, structured-JSON output. Negation is the not-equal (`ne`) operator ("is it not fire?") — the engine flips the predicate, the player never applies it. The LLM is the `interpret` seam (`src/lib/server/oracle/gemini.ts`, excluded from coverage); the deterministic core (`oracle.ts`) re-validates that interpretation against the engine's own query grammar (a hallucinated query can never reach the engine), resolves it through `engine.ask`, and voices the answer. Key in `.env` as `GEMINI_API_KEY`.
+
+**Tests to land:** \[I\] one-query mapping, turn accounting · \[C\] echo placement, answer voicing, each refusal class (covered at the data-contract level — no Oracle Svelte component in v1) · \[Sec\] secret-seeking + prompt-injection refused, no leak.
+
+> \[Eval\] The ~40-phrasing corpus scores the **live** Gemini classifier, so it needs a key and the network — it is a manual/offline check, deliberately out of the deterministic CI suite. CI proves the mapping + voicing + refusal logic; the eval proves Gemini's reading. Run it before the demo.
 
 **Done when:** Oracle hits its CI floor (line 90% / branch 85%) and the secret-leak security assertion holds through the Oracle path.
 

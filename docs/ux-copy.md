@@ -92,7 +92,9 @@ Templated. A **Yes restates the trait**, framing the target as the rune Sól rea
 | Hue ("gold?") | "Yes. Sól is reaching for a gold rune." | "No." |
 | Single rune ("Sowilo?") | "Yes. Sól is reaching for Sowilo." | "No." |
 
-`{value-phrase}` by axis: element → "a/an {element} rune"; power → "a rune of {n} power" (ranges: "fewer than {n} power" / "{n} or more power"); light/dark → "a {light/dark} rune"; hue → "a/an {color} rune"; single rune → "{Rune}".
+`{value-phrase}` by axis: element → "a/an {element} rune"; power → "a rune of {n} power" (ranges: "fewer than {n} power" / "{n} or more power"); light/dark → "a {light/dark} rune"; hue → "a/an {color} rune"; single rune → "{Rune}". Element and hue read lowercase in the phrase ("an earth rune," "a gold rune").
+
+**Negation** is the not-equal (`ne`) operator — "is it not fire?" flips the question; the engine owns it, the witch never applies it. A not-equal Yes affirms what Sól is *not* reaching for: `Yes. Sól is not reaching for {value-phrase}.` A not-equal No stays the bare `No.` (A negated *range* — "not fewer than three" — resolves to the opposite comparison, not `ne`.)
 
 > Voice-guard: never "I think," "maybe," "it seems," and no mood-only answers ("the dark thins"). On a Yes, state the verdict and the trait; on a No, just "No" — omit the restatement, never narrate the exclusion.
 
