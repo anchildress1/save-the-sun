@@ -273,8 +273,8 @@
 		position: absolute;
 		top: 50%;
 		left: 50%;
-		/* 66% width keeps the X inset — it doesn't run to the card edges. */
-		width: 66%;
+		/* Big X, but inset — stops short of the card edges. */
+		width: 86%;
 		height: 2px;
 		border-radius: 1px;
 		background: #ffffff;
