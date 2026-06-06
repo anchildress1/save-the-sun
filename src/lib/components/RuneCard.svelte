@@ -51,6 +51,7 @@
 	<div class="middle">
 		<span class="glyph">{rune.glyph}</span>
 		<span class="name">{rune.name}</span>
+		<span class="meaning">{rune.meaning}</span>
 	</div>
 
 	<footer class="traits">
@@ -205,6 +206,18 @@
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: var(--gold);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* Smaller, quieter line under the name. */
+	.meaning {
+		max-width: 100%;
+		font-size: 0.62rem;
+		font-style: italic;
+		color: var(--ink-muted);
+		line-height: 1.2;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;

@@ -47,6 +47,11 @@ describe('RuneCard', () => {
 		await expect.element(screen.getByText('Silver')).toBeInTheDocument();
 	});
 
+	it('displays the meaning under the name', async () => {
+		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		await expect.element(screen.getByText('aurochs, strength')).toBeInTheDocument();
+	});
+
 	it('shows no digits on the card face — power value and rune id are never written', async () => {
 		// Power reaches the player via pip count + accessible name; the id is internal.
 		// The only numbers a card could show are those two, so the face has no digits.
