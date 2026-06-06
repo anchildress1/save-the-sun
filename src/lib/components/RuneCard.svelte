@@ -273,17 +273,19 @@
 		position: absolute;
 		top: 50%;
 		left: 50%;
-		width: 132%;
+		/* 66% width keeps the X inset — it doesn't run to the card edges. */
+		width: 66%;
 		height: 2px;
+		border-radius: 1px;
 		background: #ffffff;
 		z-index: 5;
 		pointer-events: none;
 	}
 	.s1 {
-		transform: translate(-50%, -50%) rotate(32deg);
+		transform: translate(-50%, -50%) rotate(45deg);
 	}
 	.s2 {
-		transform: translate(-50%, -50%) rotate(-32deg);
+		transform: translate(-50%, -50%) rotate(-45deg);
 	}
 
 	/* Armed for cast: gold halo, content restored even if crossed. */
