@@ -36,7 +36,7 @@ Legend for test tags matches `test-checklist.md`: \[U\] unit · \[I\] integratio
 - [x] Single-rune query eliminates exactly that rune; yes only for the secret
 - [x] Win/cast: only the secret wins; every other cast fails → "wasted turn, round continues," never ends the game
 - [x] Cast accepts **any** rune, crossed or not — engine never reads the player's crossings
-- [x] Legality: mixed-type / malformed / already-asked queries flagged invalid
+- [x] Legality: mixed-type / malformed queries flagged invalid (a repeated question is legal play — the Oracle answers the same truth again; re-asking is never disallowed)
 - [x] Turn accounting: a refused/invalid Ask does **not** consume the turn; a resolved Ask does
 - [x] Strict alternation, human-first; out-of-order Ask/Cast rejected
 - [x] Secret confidentiality: no engine path returns the secret before a correct cast
@@ -88,7 +88,7 @@ Legend for test tags matches `test-checklist.md`: \[U\] unit · \[I\] integratio
 
 *The Plain tier — the v1 surface. Built as high-fidelity DOM components orchestrated by GSAP, with a native focusable layer for controls (`prd.md` UI Direction). Depends on: S3.*
 
-- [ ] Rune grid rendered as high-fidelity DOM components orchestrated by GSAP; 24 cards, 6×4, in a per-round seeded shuffle (stable within a round, not the sorted data order)
+- [ ] Rune grid rendered as high-fidelity DOM components orchestrated by GSAP; 24 cards, 6×4, in a per-round seeded shuffle (stable within a round, not the sorted data order). The seed is a server-generated Web Crypto uint32 — display-only and public (shared with Sköll for the same layout); the secret rune is the engine's own and is never derived from it
 - [ ] Each card shows: glyph, color swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken together in the accessible name as "{n} light/dark power", never as visible text; light/dark still a queryable Oracle axis)
 - [ ] Nothing conveyed by color alone — color name and element name always accompany their icons
 - [ ] Card dims in place when crossed; restore affordance present and works

@@ -114,10 +114,3 @@ export function resolveQuery(secret: Rune, query: Query): boolean {
 			}
 	}
 }
-
-/** Canonical key for already-asked tracking. Two queries collide iff they ask the same thing. */
-export function queryKey(query: Query): string {
-	return query.axis === 'power'
-		? `power:${query.op}:${query.value}`
-		: `${query.axis}:${query.value}`;
-}

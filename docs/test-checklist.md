@@ -18,7 +18,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [U] **Only the secret wins a Cast; every other rune fails**
 - [x] [U] Wrong cast = wasted turn, round continues (never ends game)
 - [x] [U] Engine accepts a Cast of a crossed-off rune; never validates against crossings
-- [x] [U] Mixed-type / malformed / already-asked queries flagged invalid
+- [x] [U] Mixed-type / malformed queries flagged invalid; a repeated question is allowed (resolves again, not an error)
 - [x] [U] Refused/invalid Ask does **not** consume the turn; resolved Ask does
 - [x] [Sec] No engine path returns the secret before a correct cast
 - [x] [U] Strict alternation, human-first; out-of-order Ask/Cast rejected
@@ -43,7 +43,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 **Referee / leash**
 
 - [ ] [Sec][I] Sköll's tool-call inputs contain only earned state — never the secret, never the human's crossings
-- [ ] [I] Illegal/malformed Sköll calls rejected (already-asked, non-splitting, bad rune, mixed-type, out-of-turn)
+- [ ] [I] Illegal/malformed Sköll calls rejected (bad rune, mixed-type, out-of-turn); re-asking is legal play (not rejected) — the floor avoids redundant/non-splitting questions for move quality
 - [ ] [U] Board passed as JSON in fixed on-screen order; payload asserted not pre-sorted
 - [ ] [I] Sköll cross-off/restore mutates only his private sheet; traceable in debug log
 - [ ] [I] Wrong Sköll cast wastes only his turn; round continues

@@ -8,15 +8,10 @@
 
 import { runes, type Rune } from '$lib/board';
 import { mulberry32 } from '$lib/prng';
-import { parseQuery, queryKey, resolveQuery } from './queries';
+import { parseQuery, resolveQuery } from './queries';
 import type { Player } from './actions';
 
-export type InvalidReason =
-	| 'round-over'
-	| 'not-your-turn'
-	| 'malformed-query'
-	| 'already-asked'
-	| 'unknown-rune';
+export type InvalidReason = 'round-over' | 'not-your-turn' | 'malformed-query' | 'unknown-rune';
 
 export type AskResult =
 	| { ok: true; answer: boolean; turnConsumed: true }
@@ -33,7 +28,6 @@ interface Round {
 	status: 'active' | 'won';
 	winner: Player | null;
 	wrongCasts: Record<Player, number>;
-	asked: Record<Player, Set<string>>;
 }
 
 /** Pick the secret rune for a seed. Deterministic; the production round path. */
@@ -55,8 +49,7 @@ export class GameEngine {
 			active: 'Human', // strict alternation, human moves first
 			status: 'active',
 			winner: null,
-			wrongCasts: { Human: 0, Sköll: 0 },
-			asked: { Human: new Set(), Sköll: new Set() }
+			wrongCasts: { Human: 0, Sköll: 0 }
 		};
 	}
 
@@ -87,8 +80,9 @@ export class GameEngine {
 	}
 
 	/**
-	 * Resolve an Ask. A refused Ask (out of turn, malformed, already asked) never
-	 * consumes the turn; a resolved Ask does.
+	 * Resolve an Ask. A refused Ask (out of turn, malformed) never consumes the turn; a
+	 * resolved Ask does. Repeating a question is legal play — the Oracle answers the same
+	 * truth again; the engine never disallows a re-ask.
 	 */
 	ask(player: Player, input: unknown): AskResult {
 		if (this.#round.status !== 'active')
@@ -99,11 +93,6 @@ export class GameEngine {
 		const query = parseQuery(input);
 		if (query === null) return { ok: false, reason: 'malformed-query', turnConsumed: false };
 
-		const key = queryKey(query);
-		if (this.#round.asked[player].has(key))
-			return { ok: false, reason: 'already-asked', turnConsumed: false };
-
-		this.#round.asked[player].add(key);
 		const answer = resolveQuery(this.#round.secret, query);
 		this.#advance();
 		return { ok: true, answer, turnConsumed: true };

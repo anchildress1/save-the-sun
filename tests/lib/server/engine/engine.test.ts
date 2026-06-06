@@ -93,13 +93,18 @@ describe('GameEngine.ask — truth + turn accounting', () => {
 		expect(engine.activePlayer).toBe('Human');
 	});
 
-	it('rejects an already-asked query without consuming the turn', () => {
-		const engine = new GameEngine(7);
-		engine.ask('Human', { axis: 'element', value: 'Fire' }); // Human → Sköll
+	it('allows a repeated question — re-asking is legal play, not an error', () => {
+		const seed = 7;
+		const secret = selectSecret(seed);
+		const engine = new GameEngine(seed);
+		const query = { axis: 'element', value: secret.element } as const;
+		const first = engine.ask('Human', query); // Human → Sköll
 		engine.ask('Sköll', { axis: 'fill', value: 'Dark' }); // Sköll → Human
-		const repeat = engine.ask('Human', { axis: 'element', value: 'Fire' });
-		expect(repeat).toEqual({ ok: false, reason: 'already-asked', turnConsumed: false });
-		expect(engine.activePlayer).toBe('Human');
+		const repeat = engine.ask('Human', query); // same question again
+		// Both resolve identically and each consumes the turn — no "already-asked" refusal.
+		expect(repeat).toEqual(first);
+		expect(repeat).toEqual({ ok: true, answer: true, turnConsumed: true });
+		expect(engine.activePlayer).toBe('Sköll');
 	});
 
 	it('alternates strictly, human → Sköll → human', () => {
@@ -108,13 +113,6 @@ describe('GameEngine.ask — truth + turn accounting', () => {
 		expect(engine.activePlayer).toBe('Sköll');
 		expect(engine.ask('Sköll', { axis: 'fill', value: 'Dark' }).ok).toBe(true);
 		expect(engine.activePlayer).toBe('Human');
-	});
-
-	it('lets each player ask the same query independently (asked is per-player)', () => {
-		const engine = new GameEngine(7);
-		engine.ask('Human', { axis: 'color', value: 'Gold' }); // Human → Sköll
-		const skoll = engine.ask('Sköll', { axis: 'color', value: 'Gold' });
-		expect(skoll.ok).toBe(true);
 	});
 });
 
@@ -197,7 +195,7 @@ describe('GameEngine — round is over once won', () => {
 });
 
 describe('GameEngine.newRound — reseed clears all per-round state', () => {
-	it('resets secret, turn, status, counters, and asked history', () => {
+	it('resets secret, turn, status, and counters', () => {
 		const engine = new GameEngine(7);
 		engine.ask('Human', { axis: 'element', value: 'Fire' });
 		engine.cast('Sköll', otherRune(selectSecret(7)).name);
@@ -207,7 +205,6 @@ describe('GameEngine.newRound — reseed clears all per-round state', () => {
 		expect(engine.winner).toBeNull();
 		expect(engine.wrongCastCount('Human')).toBe(0);
 		expect(engine.wrongCastCount('Sköll')).toBe(0);
-		// asked history cleared: the same query resolves again rather than being refused.
 		expect(engine.ask('Human', { axis: 'element', value: 'Fire' }).ok).toBe(true);
 	});
 

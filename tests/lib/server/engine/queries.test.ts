@@ -1,12 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { runes } from '$lib/board';
-import {
-	parseQuery,
-	resolveQuery,
-	queryKey,
-	type PowerOp,
-	type Query
-} from '$lib/server/engine/queries';
+import { parseQuery, resolveQuery, type PowerOp } from '$lib/server/engine/queries';
 
 const ELEMENTS = [...new Set(runes.map((r) => r.element))];
 const COLORS = [...new Set(runes.map((r) => r.color))];
@@ -149,19 +143,5 @@ describe('parseQuery — validation (the referee leash)', () => {
 		expect(parseQuery({ axis: 'power', op: 5, value: 3 })).toBeNull();
 		expect(parseQuery({ axis: 'power', op: 'lt', value: 2.5 })).toBeNull();
 		expect(parseQuery({ axis: 'power', op: 'lt', value: 'three' })).toBeNull();
-	});
-});
-
-describe('queryKey — collides iff the same thing is asked', () => {
-	it('is stable per query and distinguishes axis + value', () => {
-		expect(queryKey({ axis: 'element', value: 'Fire' })).toBe('element:Fire');
-		expect(queryKey({ axis: 'power', op: 'lt', value: 3 })).toBe('power:lt:3');
-		expect(queryKey({ axis: 'rune', value: 'Sowilo' })).toBe('rune:Sowilo');
-	});
-
-	it('separates a power exact from a power range on the same number', () => {
-		const a: Query = { axis: 'power', op: 'eq', value: 3 };
-		const b: Query = { axis: 'power', op: 'lt', value: 3 };
-		expect(queryKey(a)).not.toBe(queryKey(b));
 	});
 });
