@@ -65,7 +65,7 @@ Mood is carried as much by language as by graphics. The Oracle's reverence, Skö
 
 ## UI Direction
 
-Built as graphics — Canvas/WebGL like *Carbon Trace*, not a React app. Claude Design sets the visual direction; the game is drawn, not assembled from framework components. An accessible DOM layer sits on top for text and controls (the *Carbon Trace* pattern — graphics underneath, real focusable elements above), so the rendering never blocks keyboard play or the v1.5 screen-reader layer. The grid is the Plain tier; the mood layer is drawn around and behind it without touching its logic.
+Built as high-fidelity DOM components orchestrated by GSAP — not Canvas/WebGL. Claude Design sets the visual direction. The grid uses CSS `mix-blend-mode` and radial gradients for its lighting engine, avoiding the performance tax of constant WebGL or heavy SVG filters on steady-state elements. Transient SVG filters (`feDisplacementMap`) are reserved for hero moments like the Cast stinger. The rendering uses native focusable elements so it naturally supports keyboard play and the v1.5 screen-reader layer without needing a separate shadow DOM.
 
 - **Header:** title "Save the Sun" + tagline "A rite for the longest day," the night-progress indicator, and a turn pill ("Your move." / "Sköll moves.").
 - **Rune grid (left / main):** 24 rune cards, 6×4. Each card shows the glyph, a color swatch, name + meaning, the **power** value as ○/● pips with its numeral, the light/dark label, the element symbol + name, and the color name. Cards cross off in place; a crossed card dims with a restore affordance. The textual color, light/dark, and element names always accompany their icons — color is a game trait, so nothing is conveyed by color alone.
@@ -101,7 +101,7 @@ Built as graphics — Canvas/WebGL like *Carbon Trace*, not a React app. Claude 
 - As a screen-reader player, I want the round narrated and navigable — Ask, read, cross, Cast — without depending on visual cues. (v1.5)
 
 ### Immersion
-- As a player, I want the world's motion to be real, hand-crafted graphics — actual canvas drawing, not React/CSS faking it, and simple enough to skip a sprite engine — so it feels crafted rather than animated chrome. (v1 rendering)
+- As a player, I want the world's motion to feel crafted and organic — using GSAP choreography and CSS lighting effects instead of static UI states — so the atmosphere breathes without the overhead of a full 3D/WebGL engine. (v1 rendering)
 - As a player, I want the night to close toward dawn as turns pass — a fire burning down the page, the world darkening — felt as pressure without a punitive timer. (v2)
 - As a player, I want any motion kept gentle, never sweeping or strobing enough to make me motion sick, and fully cut under reduced motion.
 
@@ -158,7 +158,7 @@ Deterministic fallback (acceptance criteria — this is the floor that fires **o
 - Cast when exactly one candidate remains. If no splitting question exists before that point, cast the best remaining candidate.
 - All candidate state, legality, and truth resolution stay in the deterministic engine; Gemini only voices the chosen action.
 
-**R6. Graphics presentation.** The rune grid is rendered as real graphics (Canvas/WebGL, no framework — the *Carbon Trace* approach), with an accessible DOM layer on top for text and controls. Claude Design sets the visual direction.
+**R6. Graphics presentation.** The rune grid is rendered using high-fidelity DOM elements orchestrated by GSAP, with CSS `mix-blend-mode` and radial gradients for lighting. SVG filters (`feTurbulence` / `feDisplacementMap`) are reserved exclusively for transient "hero" moments (like the Cast transition) to preserve steady-state performance. An accessible DOM layer sits natively on top for text and controls. Claude Design sets the visual direction.
 
 **R7. First-run intro** — a skippable coach-mark tour over the live board, plus the title screen.
 

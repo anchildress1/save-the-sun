@@ -1,5 +1,25 @@
 <script lang="ts">
-	import CanvasBoard from '$lib/components/CanvasBoard.svelte';
+	import RuneGrid from '$lib/components/RuneGrid.svelte';
+
+	let castMode = $state(false);
+	let selectedTargetId: number | null = $state(null);
+
+	function toggleCastMode() {
+		castMode = !castMode;
+		selectedTargetId = null;
+	}
+
+	function handleTargetSelect(id: number) {
+		selectedTargetId = id;
+	}
+
+	function confirmCast() {
+		if (selectedTargetId !== null) {
+			console.log('Casting rune', selectedTargetId);
+			// Engine hookup later
+			toggleCastMode();
+		}
+	}
 </script>
 
 <main>
@@ -14,7 +34,7 @@
 
 	<div class="game-layout">
 		<section class="board-section">
-			<CanvasBoard />
+			<RuneGrid {castMode} onSelectTarget={handleTargetSelect} />
 		</section>
 
 		<aside class="right-column">
@@ -29,11 +49,25 @@
 
 			<div class="ask-panel">
 				<label for="oracle-ask">Ask the Oracle — one sign at a time</label>
-				<input type="text" id="oracle-ask" placeholder="e.g. Is it a water rune?" />
+				<input
+					type="text"
+					id="oracle-ask"
+					placeholder="e.g. Is it a water rune?"
+					disabled={castMode}
+				/>
 			</div>
 
 			<div class="cast-panel">
-				<button class="cast-btn">Cast the rune</button>
+				{#if castMode}
+					{#if selectedTargetId !== null}
+						<button class="cast-btn commit" onclick={confirmCast}>Name it</button>
+					{:else}
+						<button class="cast-btn pending" disabled>Select target...</button>
+					{/if}
+					<button class="cast-btn cancel" onclick={toggleCastMode}>Not yet</button>
+				{:else}
+					<button class="cast-btn" onclick={toggleCastMode}>Cast the rune</button>
+				{/if}
 			</div>
 		</aside>
 	</div>
