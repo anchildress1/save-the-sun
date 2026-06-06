@@ -6,6 +6,18 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	test: {
 		expect: { requireAssertions: true },
+		coverage: {
+			provider: 'v8',
+			reporter: ['text-summary', 'lcov'],
+			reportsDirectory: 'coverage',
+			include: ['src/**/*.{ts,svelte}'],
+			exclude: [
+				'src/**/*.{test,spec}.{ts,js}',
+				'src/**/*.e2e.{ts,js}',
+				'src/**/*.d.ts',
+				'src/lib/index.ts'
+			]
+		},
 		projects: [
 			{
 				extends: './vite.config.ts',

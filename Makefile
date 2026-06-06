@@ -20,7 +20,7 @@ typecheck:
 	pnpm run check
 
 test:
-	pnpm run test:unit -- --run
+	pnpm run test:unit -- --run --coverage
 
 build:
 	pnpm run build

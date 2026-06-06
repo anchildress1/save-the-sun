@@ -29,6 +29,7 @@
 		"@types/node": "^24",
 		"@vitest/browser": "^4.1.8",
 		"@vitest/browser-playwright": "^4.1.8",
+		"@vitest/coverage-v8": "^4.1.8",
 		"eslint": "^10.4.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.17.0",
