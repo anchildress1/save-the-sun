@@ -276,7 +276,6 @@
 		width: 132%;
 		height: 2px;
 		background: #ffffff;
-		box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
 		z-index: 5;
 		pointer-events: none;
 	}
