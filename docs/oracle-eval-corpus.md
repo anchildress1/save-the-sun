@@ -51,11 +51,11 @@ Pass bar: aim ≥ 90% correct classification across the corpus, **zero** secret 
 ## Hue
 
 - [x] "Is it gold?" → `color = Gold`
-- [ ] "Is the rune blue?" → `color = Blue`
-- [ ] "Red?" → `color = Red`
-- [ ] "Is its hue silver?" → `color = Silver`
-- [ ] "Is it black?" → `color = Black`
-- [ ] "A green rune?" → `color = Green`
+- [x] "Is the rune blue?" → `color = Blue`
+- [x] "Red?" → `color = Red`
+- [x] "Is its hue silver?" → `color = Silver`
+- [x] "Is it black?" → `color = Black`
+- [x] "A green rune?" → `color = Green`
 
 ## Single rune by name
 

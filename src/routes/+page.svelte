@@ -177,7 +177,7 @@
 					submitAsk();
 				}}
 			>
-				<label for="oracle-ask">Ask the Oracle — one sign at a time</label>
+				<label for="oracle-ask">Ask the Oracle — element, power, light, or hue</label>
 				<input
 					id="oracle-ask"
 					type="text"
