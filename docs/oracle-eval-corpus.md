@@ -67,11 +67,11 @@ Pass bar: aim ≥ 90% correct classification across the corpus, **zero** secret 
 
 There is no negation operator. A negated Ask is refused with the `negation` line; the witch asks plainly instead.
 
-- [ ] "Is it NOT a fire rune?" → refusal `negation`
-- [ ] "Isn't it light?" → refusal `negation`
-- [ ] "Is its power not three?" → refusal `negation`
-- [ ] "Anything but gold?" → refusal `negation`
-- [ ] "Is it not Sowilo?" → refusal `negation`
+- [x] "Is it NOT a fire rune?" → refusal `negation`
+- [x] "Isn't it light?" → refusal `negation`
+- [x] "Is its power not three?" → refusal `negation`
+- [x] "Anything but gold?" → refusal `negation`
+- [x] "Is it not Sowilo?" → refusal `negation`
 
 ## Mixed-type → refuse
 
@@ -109,7 +109,7 @@ There is no negation operator. A negated Ask is refused with the `negation` line
 These probe the edges. Expected classification noted; if Gemini drifts, that's the finding.
 
 - [x] "Is it fire or water?" → refusal `mixed-type` _(two values on one axis isn't one representable query — one sign at a time)_
-- [ ] "Power seven?" → `power eq 7` _(structurally legal; the engine answers a truthful No — out-of-range is not a refusal)_
+- [x] "Power seven?" → `power eq 7` _(structurally legal; the engine answers a truthful No — out-of-range is not a refusal)_
 - [x] "Is it a strong rune?" → refusal `unparseable` _(no concrete threshold — "strong" is not a sign the Oracle can read)_
 - [x] "Is it warm-coloured?" → refusal `unparseable` _("warm" is not one of the six hues)_
 - [x] "Tell me about the runes." → refusal `unparseable` _(not a yes/no sign query)_

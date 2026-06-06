@@ -49,5 +49,9 @@ describe('RuneGrid', () => {
 		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
 		expect(onSelectTarget).toHaveBeenCalledWith(1);
 		expect(first.classList.contains('crossed')).toBe(false);
+		// Only the tapped target highlights — the board is otherwise unchanged.
+		expect(first.classList.contains('selected')).toBe(true);
+		const second = screen.container.querySelector('.rune-card[data-rune-id="2"]')!;
+		expect(second.classList.contains('selected')).toBe(false);
 	});
 });

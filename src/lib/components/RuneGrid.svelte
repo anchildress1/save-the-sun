@@ -23,10 +23,18 @@
 
 	// Local state for crossed-off runes
 	let crossedOff = new SvelteSet<number>();
+	// The armed cast target — only this card highlights; the rest of the board is untouched.
+	let selectedId: number | null = $state(null);
 	let gridContainer: HTMLElement;
+
+	// Leaving cast mode (commit or cancel) clears the highlight.
+	$effect(() => {
+		if (!castMode) selectedId = null;
+	});
 
 	function handleRuneAction(id: number) {
 		if (castMode) {
+			selectedId = id;
 			onSelectTarget(id);
 			return;
 		}
@@ -100,6 +108,7 @@
 				{rune}
 				crossed={crossedOff.has(rune.id)}
 				armed={castMode}
+				selected={castMode && selectedId === rune.id}
 				onAction={handleRuneAction}
 			/>
 		</div>

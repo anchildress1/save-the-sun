@@ -6,11 +6,13 @@
 		rune,
 		crossed = false,
 		armed = false,
+		selected = false,
 		onAction
 	}: {
 		rune: Rune;
 		crossed?: boolean;
 		armed?: boolean;
+		selected?: boolean;
 		onAction: (id: number) => void;
 	} = $props();
 
@@ -23,7 +25,7 @@
 <button
 	class="rune-card"
 	class:crossed
-	class:armed
+	class:selected
 	data-rune-id={rune.id}
 	data-rune-name={rune.name}
 	onclick={() => onAction(rune.id)}
@@ -70,10 +72,9 @@
 	</footer>
 
 	<!-- Chalk-style X: corner-to-corner diagonals inset so they reach toward the edges
-	     without touching them. Hidden while armed — a crossed rune is still legal to cast,
-	     so cast mode restores the card (see .armed.crossed) and the strike would contradict
-	     the "Select as cast target" affordance. -->
-	{#if crossed && !armed}
+	     without touching them. Stays visible in cast mode so the player keeps sight of every
+	     elimination while choosing what to cast — a crossed rune is still legal to cast. -->
+	{#if crossed}
 		<svg class="strikeout" viewBox="0 0 80 100" preserveAspectRatio="none" aria-hidden="true">
 			<line x1="5" y1="6" x2="75" y2="94" />
 			<line x1="75" y1="6" x2="5" y2="94" />
@@ -306,19 +307,21 @@
 		vector-effect: non-scaling-stroke;
 	}
 
-	/* Armed for cast: gold halo, content restored even if crossed. */
-	.rune-card.armed {
+	/* The chosen cast target: gold halo on that one card only — the rest of the board is
+	   unchanged, crossings and all. Its content is restored to readable even if crossed
+	   (you can read what you're about to cast); the X stays so you still see it was ruled out. */
+	.rune-card.selected {
 		border-color: var(--gold-bright);
 		box-shadow:
 			0 0 0 1px var(--gold-bright),
 			0 0 22px rgba(217, 169, 74, 0.35);
 	}
-	.rune-card.armed .ambient {
+	.rune-card.selected .ambient {
 		opacity: 0.3;
 	}
-	.rune-card.armed.crossed .card-top,
-	.rune-card.armed.crossed .middle,
-	.rune-card.armed.crossed .traits {
+	.rune-card.selected.crossed .card-top,
+	.rune-card.selected.crossed .middle,
+	.rune-card.selected.crossed .traits {
 		opacity: 1;
 		filter: none;
 	}
