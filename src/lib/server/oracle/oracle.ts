@@ -93,9 +93,12 @@ export async function runOracle(
 		return { ok: false, reason: 'engine', engineReason: result.reason, turnConsumed: false };
 	}
 
+	// Fall back to a generic phrase so the echo frame is always well-formed, even
+	// if the LLM returns an empty paraphrase.
+	const paraphrase = interpretation.paraphrase.trim() || 'the sign you named';
 	return {
 		ok: true,
-		echo: `You ask after ${interpretation.paraphrase}.`,
+		echo: `You ask after ${paraphrase}.`,
 		answer: voiceAnswer(query, result.answer),
 		affirmative: result.answer,
 		turnConsumed: true

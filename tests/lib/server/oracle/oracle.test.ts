@@ -120,6 +120,17 @@ describe('runOracle — one-query mapping + voicing [I]', () => {
 		expect(res).toMatchObject({ ok: true, echo: 'You ask after the fire-runes.' });
 	});
 
+	it('falls back to a generic phrase when the paraphrase is blank', async () => {
+		const engine = new GameEngine(SEED);
+		const res = await runOracle(
+			engine,
+			'Human',
+			'is it light?',
+			fixed(queryInterp({ axis: 'fill', value: 'Light' }, '   '))
+		);
+		expect(res).toMatchObject({ ok: true, echo: 'You ask after the sign you named.' });
+	});
+
 	it('voices a truthful Yes for the secret’s own trait', async () => {
 		const engine = new GameEngine(SEED);
 		const res = await runOracle(

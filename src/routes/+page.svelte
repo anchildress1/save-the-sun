@@ -21,14 +21,18 @@
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
 	);
 
-	async function dispatch<T extends ActionResult>(action: GameAction): Promise<T> {
+	// Return type is derived from the action's `type`, so a caller can't request a
+	// mismatched result shape.
+	async function dispatch<T extends ActionResult['type']>(
+		action: Extract<GameAction, { type: T }>
+	): Promise<Extract<ActionResult, { type: T }>> {
 		const res = await fetch('/api/action', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(action)
 		});
 		if (!res.ok) throw new Error(`Action rejected (${res.status})`);
-		return res.json() as Promise<T>;
+		return res.json() as Promise<Extract<ActionResult, { type: T }>>;
 	}
 
 	async function submitAsk() {
@@ -41,11 +45,7 @@
 		}
 		pending = true;
 		try {
-			const { oracle } = await dispatch<Extract<ActionResult, { type: 'Ask' }>>({
-				type: 'Ask',
-				player: 'Human',
-				question
-			});
+			const { oracle } = await dispatch({ type: 'Ask', player: 'Human', question });
 			if (oracle.ok) {
 				interpretation = oracle.echo;
 				answer = oracle.answer;
@@ -55,6 +55,7 @@
 				answer = oracle.reason === 'refusal' ? oracle.line : 'The fire gutters. Ask again.';
 			}
 		} catch {
+			interpretation = '—';
 			answer = 'The fire gutters. Ask again.';
 		} finally {
 			pending = false;
@@ -79,18 +80,19 @@
 		if (selectedRune === null) return;
 		pending = true;
 		try {
-			const { cast } = await dispatch<Extract<ActionResult, { type: 'Cast' }>>({
+			interpretation = `You name ${selectedRune.name}.`;
+			const { cast } = await dispatch({
 				type: 'Cast',
 				player: 'Human',
 				runeName: selectedRune.name
 			});
-			interpretation = `You name ${selectedRune.name}.`;
 			if (cast.ok) {
 				answer = cast.won ? 'The rune is true.' : 'The rune is not the one. The night holds.';
 			} else {
 				answer = 'The fire gutters. The rune slips away.';
 			}
 		} catch {
+			interpretation = '—';
 			answer = 'The fire gutters. The rune slips away.';
 		} finally {
 			pending = false;
