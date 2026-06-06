@@ -5,6 +5,33 @@ import { interpret } from '$lib/server/oracle/gemini';
 import type { RequestHandler } from './$types';
 
 const ACTION_TYPES = new Set(['Ask', 'Cast', 'CrossOff', 'React']);
+const PLAYERS = new Set(['Human', 'Sköll']);
+const REACTIONS = new Set(['Scry', 'Hex', 'Pass']);
+
+function isAction(body: Partial<GameAction>): body is GameAction {
+	if (!body || typeof body.type !== 'string' || !ACTION_TYPES.has(body.type)) return false;
+	if (!('player' in body) || typeof body.player !== 'string' || !PLAYERS.has(body.player))
+		return false;
+
+	switch (body.type) {
+		case 'Ask':
+			return 'question' in body && typeof body.question === 'string';
+		case 'Cast':
+			return 'runeName' in body && typeof body.runeName === 'string';
+		case 'CrossOff':
+			return (
+				'runeId' in body &&
+				typeof body.runeId === 'number' &&
+				Number.isInteger(body.runeId) &&
+				'crossed' in body &&
+				typeof body.crossed === 'boolean'
+			);
+		case 'React':
+			return (
+				'reaction' in body && typeof body.reaction === 'string' && REACTIONS.has(body.reaction)
+			);
+	}
+}
 
 // Single server entry point for game actions. Both the human UI and (later) the
 // Gemini-driven Sköll route through handleAction — no second path.
@@ -20,5 +47,9 @@ export const POST: RequestHandler = async ({ request }) => {
 		error(400, 'Unknown action type.');
 	}
 
-	return json(await handleAction(body as GameAction, { engine: getEngine(), interpret }));
+	if (!isAction(body)) {
+		error(400, 'Malformed action payload.');
+	}
+
+	return json(await handleAction(body, { engine: getEngine(), interpret }));
 };
