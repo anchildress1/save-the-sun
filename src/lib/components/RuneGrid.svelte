@@ -48,20 +48,27 @@
 	}
 
 	onMount(() => {
-		// Entrance stagger. Uses `from` so the grid's resting state is fully visible —
-		// if JS or GSAP never runs, the board still renders (degradation contract).
-		// Skipped under reduced-motion.
+		// Entrance stagger. Uses `from` so the grid's resting state is fully visible if JS
+		// or GSAP never runs. Skipped under reduced-motion.
 		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		if (reduce) return;
 		const cards = gridContainer.querySelectorAll('.rune-card-wrapper');
-		gsap.from(cards, {
-			y: 20,
-			opacity: 0,
-			duration: 0.6,
-			stagger: 0.03,
-			ease: 'power2.out',
-			clearProps: 'opacity,transform'
-		});
+		try {
+			gsap.from(cards, {
+				y: 20,
+				opacity: 0,
+				duration: 0.6,
+				stagger: 0.03,
+				ease: 'power2.out',
+				clearProps: 'opacity,transform'
+			});
+		} catch (err) {
+			// `from` writes opacity:0 immediately and clears it on completion — a throw
+			// mid-flight would strand cards invisible. Strip the inline styles so the CSS
+			// resting state shows, and surface the failure. The board must never go blank.
+			cards.forEach((card) => card.removeAttribute('style'));
+			console.error('Rune entrance animation failed; board forced visible.', err);
+		}
 	});
 </script>
 

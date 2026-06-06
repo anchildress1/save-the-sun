@@ -14,9 +14,10 @@ describe('shuffledBoard', () => {
 		}
 	});
 
-	it('is deterministic — same seed yields the same order', () => {
-		expect(ids(shuffledBoard(42))).toEqual(ids(shuffledBoard(42)));
-		expect(ids(shuffledBoard(123456))).toEqual(ids(shuffledBoard(123456)));
+	it('is deterministic — same seed yields the same order (across many seeds)', () => {
+		for (let seed = 0; seed < 50; seed++) {
+			expect(ids(shuffledBoard(seed))).toEqual(ids(shuffledBoard(seed)));
+		}
 	});
 
 	it('does not return the sorted data order (patterns must not jump out)', () => {

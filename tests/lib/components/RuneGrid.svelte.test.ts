@@ -25,6 +25,13 @@ describe('RuneGrid', () => {
 		expect(a).toEqual(b);
 	});
 
+	it('does not reshuffle when a card is crossed off (order depends only on the seed)', async () => {
+		const screen = render(RuneGrid, { boardSeed: 7, onSelectTarget: vi.fn() });
+		const before = cardIds(screen.container);
+		await screen.getByRole('button', { name: /cross off sowilo/i }).click();
+		expect(cardIds(screen.container)).toEqual(before);
+	});
+
 	it('crosses a card off and restores it on repeat clicks', async () => {
 		const screen = render(RuneGrid, { onSelectTarget: vi.fn() });
 		const first = screen.container.querySelector('.rune-card[data-rune-id="1"]')!;

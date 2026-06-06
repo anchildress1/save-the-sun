@@ -4,8 +4,9 @@
 	import type { GameAction, ActionResult } from '$lib/server/engine/actions';
 	import type { PageProps } from './$types';
 
-	// Default seed is only for isolated component tests; the route always supplies one.
-	let { data = { boardSeed: 0 } }: PageProps = $props();
+	// data (incl. boardSeed) comes from +page.server.ts. No default — a missing load
+	// should fail loudly, not silently fall back to a frozen board.
+	let { data }: PageProps = $props();
 
 	let castMode = $state(false);
 	let selectedTargetId: number | null = $state(null);

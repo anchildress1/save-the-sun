@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { load } from '$routes/+page';
+import { load } from '$routes/+page.server';
 
-// load is synchronous and returns { boardSeed }; the PageLoad signature widens the
+// load is synchronous and returns { boardSeed }; the PageServerLoad signature widens the
 // return to MaybePromise<…>, so narrow it for the assertions.
 const runLoad = () => load({} as never) as { boardSeed: number };
 
-describe('+page load — board seed', () => {
+describe('+page.server load — board seed', () => {
 	it('returns an integer seed within the valid range', () => {
 		const { boardSeed } = runLoad();
 		expect(Number.isInteger(boardSeed)).toBe(true);

@@ -40,7 +40,7 @@
 		<span class="trait element"
 			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
 		>
-		<!-- Color shown once: the dot plus its name (no-color-alone), top-right. The
+		<!-- Colour shown once: a gem dot beside its name (no-colour-alone), top-right. The
 		     rune id is not shown — it is an internal index, not player information. -->
 		<span class="color-mark">
 			<span class="gem" aria-hidden="true"></span>
@@ -54,9 +54,10 @@
 	</div>
 
 	<footer class="traits">
-		<!-- Pips ARE the power value: count = power, fill = light/dark (white = light,
-		     black = dark). The "POWER" label names the trait; the value is shown by the pip
-		     count and narrated in the accessible name as "{n} {light|dark} power". -->
+		<!-- Pips are aria-hidden, so they carry power for sighted players only: pip count =
+		     power, pip fill = light/dark (white = light, black = dark). The numeric value is
+		     never written; screen-reader players get it from the button's accessible name
+		     ("{n} {light|dark} power"). The label beside the pips names the trait. -->
 		<span class="trait power">
 			<span class="pips" aria-hidden="true">
 				{#each pips as i (i)}
@@ -67,9 +68,11 @@
 		</span>
 	</footer>
 
-	{#if crossed}
-		<!-- Chalk-style X: corner-to-corner diagonals inset so they reach toward the
-		     edges without touching them. viewBox is 4:5 to match the card aspect. -->
+	<!-- Chalk-style X: corner-to-corner diagonals inset so they reach toward the edges
+	     without touching them. Hidden while armed — a crossed rune is still legal to cast,
+	     so cast mode restores the card (see .armed.crossed) and the strike would contradict
+	     the "Select as cast target" affordance. -->
+	{#if crossed && !armed}
 		<svg class="strikeout" viewBox="0 0 80 100" preserveAspectRatio="none" aria-hidden="true">
 			<line x1="5" y1="6" x2="75" y2="94" />
 			<line x1="75" y1="6" x2="5" y2="94" />
