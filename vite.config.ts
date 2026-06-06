@@ -4,6 +4,11 @@ import { playwright } from '@vitest/browser-playwright';
 
 export default defineConfig({
 	plugins: [sveltekit()],
+	// Keep the dev server from reloading the live app when a test run or build rewrites
+	// generated artifacts — a coverage run was flooding `make dev` with page reloads.
+	server: {
+		watch: { ignored: ['**/coverage/**', '**/test-results/**', '**/build/**'] }
+	},
 	test: {
 		expect: { requireAssertions: true },
 		coverage: {
