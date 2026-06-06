@@ -16,6 +16,24 @@
 	function handleClick() {
 		onAction(rune.id);
 	}
+
+	const colorMap: Record<string, string> = {
+		Blue: '#204BC9',
+		Red: '#D43131',
+		Green: '#299C41',
+		Silver: '#E0E0E0',
+		Gold: '#E8B831',
+		Black: '#4a4a4a'
+	};
+
+	const elementIconMap: Record<string, string> = {
+		Sun: '☼',
+		Fire: '🜂',
+		Air: '🜁',
+		Water: '🜄',
+		Earth: '🜃',
+		Spirit: '✧'
+	};
 </script>
 
 <button
@@ -30,33 +48,36 @@
 			: `Cross off ${rune.name}`}
 >
 	<div class="card-inner">
-		<!-- Top Meta -->
+		<!-- Top Meta: Number & Color Orb -->
 		<div class="meta-row top">
-			<span class="element" title="{rune.element} Element">{rune.element}</span>
-			<span class="power" aria-label="Power {rune.power}">
-				{#each [0, 1, 2, 3, 4] as i (i)}
-					<span class="pip" class:filled={i < rune.power}></span>
-				{/each}
-			</span>
+			<span class="rune-id">{rune.id}</span>
+			<div class="color-orb" style="--gem-color: {colorMap[rune.color] || '#fff'}"></div>
 		</div>
 
-		<!-- Central Glyph -->
-		<div class="glyph-container">
+		<!-- Central Content -->
+		<div class="center-content">
 			<div class="glyph">{rune.glyph}</div>
+			<h3 class="name">{rune.name.toUpperCase()}</h3>
+			<p class="meaning">{rune.meaning.toLowerCase()}</p>
 		</div>
 
-		<!-- Identity -->
-		<div class="identity">
-			<h3 class="name">{rune.name}</h3>
-			<p class="meaning">{rune.meaning}</p>
-		</div>
+		<!-- Bottom Stats -->
+		<div class="bottom-stats">
+			<div class="stats-row">
+				<div class="pips" aria-label="{rune.power} {rune.fill}">
+					{#each Array(rune.power) as _, i (i)}
+						<span class="pip {rune.fill.toLowerCase()}"></span>
+					{/each}
+				</div>
+				<span class="stat-text silver">{rune.power} {rune.fill.toUpperCase()}</span>
+			</div>
 
-		<!-- Bottom Meta -->
-		<div class="meta-row bottom">
-			<span class="polarity" class:dark={rune.fill === 'Dark'}>{rune.fill}</span>
-			<div class="color-swatch-container" title="Color: {rune.color}">
-				<div class="color-swatch" style="--swatch-color: {rune.color.toLowerCase()}"></div>
-				<span class="sr-only">{rune.color}</span>
+			<div class="stats-row">
+				<div class="element-box stat-text gold">
+					<span class="element-icon">{elementIconMap[rune.element] || '•'}</span>
+					<span>{rune.element.toUpperCase()}</span>
+				</div>
+				<span class="stat-text blue-gold">{rune.color.toUpperCase()}</span>
 			</div>
 		</div>
 	</div>
@@ -75,23 +96,19 @@
 		position: relative;
 		display: flex;
 		flex-direction: column;
-		background: #0f0f11;
-		border: 1px solid #2a2a2a;
+		background: #0b0e14; /* Deep dark background like POC */
+		border: 1px solid #c5a559; /* Gold border */
 		border-radius: 4px;
 		padding: 0;
 		color: #e0e0e0;
 		text-align: left;
 		cursor: pointer;
 		overflow: hidden;
-		transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
-		min-height: 180px;
-		font-family:
-			system-ui,
-			-apple-system,
-			BlinkMacSystemFont,
-			'Segoe UI',
-			Roboto,
-			sans-serif;
+		transition:
+			transform 0.2s cubic-bezier(0.2, 0, 0, 1),
+			border-color 0.2s;
+		min-height: 200px;
+		font-family: 'Cinzel', Georgia, serif; /* Fallback to elegant serif */
 	}
 
 	.rune-card:focus-visible {
@@ -100,137 +117,190 @@
 	}
 
 	.rune-card:hover {
-		border-color: #4a4a4a;
+		border-color: #e8b831;
 		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(197, 165, 89, 0.15);
 	}
 
 	.card-inner {
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-		padding: 0.75rem;
+		padding: 0.6rem;
 		z-index: 2;
 		position: relative;
 	}
 
 	/* Top Meta */
-	.meta-row {
+	.meta-row.top {
 		display: flex;
 		justify-content: space-between;
-		align-items: center;
-		font-size: 0.75rem;
-		color: #888;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
+		align-items: flex-start;
 	}
 
-	.power {
-		display: flex;
-		gap: 2px;
+	.rune-id {
+		font-size: 0.85rem;
+		color: #c5a559;
+		line-height: 1;
 	}
 
-	.pip {
-		width: 4px;
-		height: 4px;
+	.color-orb {
+		width: 12px;
+		height: 12px;
 		border-radius: 50%;
-		border: 1px solid #666;
+		/* Render a shiny gem */
+		background: radial-gradient(circle at 35% 35%, #ffffff 0%, var(--gem-color) 40%, #000000 90%);
+		box-shadow:
+			0 0 3px var(--gem-color),
+			inset 0 0 2px rgba(255, 255, 255, 0.4);
+		border: 1px solid rgba(0, 0, 0, 0.5);
 	}
 
-	.pip.filled {
-		background: #ccc;
-		border-color: #ccc;
-	}
-
-	/* Glyph */
-	.glyph-container {
+	/* Center Content */
+	.center-content {
 		flex: 1;
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		margin: 0.5rem 0;
 	}
 
 	.glyph {
-		font-size: 3rem;
+		font-size: 3.5rem;
 		line-height: 1;
-		color: #eee;
+		color: #c5a559;
 		font-weight: 300;
-	}
-
-	/* Identity */
-	.identity {
-		margin-bottom: 0.75rem;
+		margin-bottom: 0.25rem;
 	}
 
 	.name {
 		margin: 0;
-		font-size: 1rem;
+		font-size: 0.8rem;
 		font-weight: 600;
-		color: #fff;
-		letter-spacing: 0.02em;
+		color: #c5a559;
+		letter-spacing: 0.1em;
 	}
 
 	.meaning {
-		margin: 0.25rem 0 0 0;
-		font-size: 0.8rem;
-		color: #999;
-		font-style: italic;
+		margin: 0.15rem 0 0 0;
+		font-size: 0.65rem;
+		color: #d8d8d8;
+		font-family: system-ui, sans-serif;
 	}
 
-	/* Bottom Meta */
-	.polarity.dark {
-		color: #666;
-	}
-
-	.color-swatch-container {
+	/* Bottom Stats */
+	.bottom-stats {
 		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		margin-top: auto;
+		padding-top: 0.5rem;
+		border-top: 1px solid rgba(197, 165, 89, 0.2);
+	}
+
+	.stats-row {
+		display: flex;
+		justify-content: space-between;
 		align-items: center;
 	}
 
-	.color-swatch {
-		width: 12px;
-		height: 12px;
-		border-radius: 2px;
-		background-color: var(--swatch-color);
-		border: 1px solid rgba(255, 255, 255, 0.2);
+	.stat-text {
+		font-family:
+			system-ui,
+			-apple-system,
+			sans-serif;
+		font-size: 0.6rem;
+		letter-spacing: 0.05em;
+	}
+
+	.stat-text.silver {
+		color: #d8d8d8;
+	}
+
+	.stat-text.gold {
+		color: #c5a559;
+	}
+
+	.stat-text.blue-gold {
+		/* A slightly muted gold/blue for the color text to match the POC */
+		color: #9aa5b1;
+	}
+
+	.pips {
+		display: flex;
+		gap: 4px;
+		align-items: center;
+	}
+
+	.pip {
+		/* Reactive sizes but equal: using em makes them scale with font size */
+		width: 0.5em;
+		height: 0.5em;
+		border-radius: 50%;
+		border: 1px solid #d8d8d8;
+		display: inline-block;
+	}
+
+	.pip.light {
+		background: transparent;
+	}
+
+	.pip.dark {
+		background: #d8d8d8;
+	}
+
+	.element-box {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.element-icon {
+		font-size: 0.8rem;
+		line-height: 1;
 	}
 
 	/* Cross-off State */
 	.rune-card.crossed .card-inner {
-		opacity: 0.3;
-		filter: grayscale(100%);
+		opacity: 0.25;
+		filter: grayscale(80%) brightness(0.8);
 	}
 
 	.rune-card.crossed:hover .card-inner {
-		opacity: 0.5;
+		opacity: 0.4;
 	}
 
+	/* Big X overlay to match POC */
 	.cross-overlay {
 		position: absolute;
 		inset: 0;
 		z-index: 3;
-		background: linear-gradient(
-			to bottom right,
-			transparent 48%,
-			rgba(200, 0, 0, 0.5) 49%,
-			rgba(200, 0, 0, 0.5) 51%,
-			transparent 52%
-		);
+		background:
+			linear-gradient(
+				to bottom right,
+				transparent 48%,
+				rgba(160, 160, 160, 0.7) 49%,
+				rgba(160, 160, 160, 0.7) 51%,
+				transparent 52%
+			),
+			linear-gradient(
+				to top right,
+				transparent 48%,
+				rgba(160, 160, 160, 0.7) 49%,
+				rgba(160, 160, 160, 0.7) 51%,
+				transparent 52%
+			);
 		pointer-events: none;
 	}
 
 	/* Armed State (Casting) */
 	.rune-card.armed {
-		border-color: #888;
-	}
-
-	.rune-card.armed:hover {
-		border-color: #fff;
-		box-shadow: 0 0 12px rgba(255, 255, 255, 0.1);
+		border-color: #e8b831;
+		box-shadow: 0 0 15px rgba(232, 184, 49, 0.2);
 	}
 
 	.rune-card.armed.crossed .card-inner {
-		/* Bring back full opacity if it's targeted during cast mode */
 		opacity: 1;
 		filter: none;
 	}
@@ -240,26 +310,14 @@
 		position: absolute;
 		inset: 0;
 		z-index: 1;
-		background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
+		background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.08) 0%, transparent 80%);
 		mix-blend-mode: screen;
 		pointer-events: none;
-		opacity: 0.5;
+		opacity: 0.6;
 		transition: opacity 0.3s ease;
 	}
 
 	.rune-card:hover .lighting-overlay {
 		opacity: 1;
-	}
-
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		padding: 0;
-		margin: -1px;
-		overflow: hidden;
-		clip: rect(0, 0, 0, 0);
-		white-space: nowrap;
-		border-width: 0;
 	}
 </style>
