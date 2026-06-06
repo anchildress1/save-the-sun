@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { runes } from './board';
+import { runes } from '$lib/board';
 
 describe('Rune Board Data Source', () => {
 	it('loads exactly 24 runes from runes.json', () => {

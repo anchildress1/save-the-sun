@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { POST } from './+server';
+import { POST } from '$routes/api/action/+server';
 
 function call(body: string | object) {
 	const request = new Request('http://localhost/api/action', {

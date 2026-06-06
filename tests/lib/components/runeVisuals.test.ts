@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { runes } from '$lib/board';
-import { gemColor, elementIcon, GEM_COLOR, ELEMENT_ICON } from './runeVisuals';
+import { gemColor, elementIcon, GEM_COLOR, ELEMENT_ICON } from '$lib/components/runeVisuals';
 
 describe('rune visual maps', () => {
 	it('maps every rune color to a defined gem color', () => {

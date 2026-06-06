@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import Page from './+page.svelte';
+import Page from '$routes/+page.svelte';
 
 afterEach(() => {
 	vi.unstubAllGlobals();

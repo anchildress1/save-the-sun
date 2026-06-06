@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
-import RuneCard from './RuneCard.svelte';
+import RuneCard from '$lib/components/RuneCard.svelte';
 import type { Rune } from '$lib/board';
 
 // id 6 / power 4 so the badge and power numerals never collide in text queries.

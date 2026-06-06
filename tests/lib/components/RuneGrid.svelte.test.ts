@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
-import RuneGrid from './RuneGrid.svelte';
+import RuneGrid from '$lib/components/RuneGrid.svelte';
 
 function cardIds(container: HTMLElement): number[] {
 	return [...container.querySelectorAll('.rune-card[data-rune-id]')].map((el) =>

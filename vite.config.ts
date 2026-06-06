@@ -11,12 +11,7 @@ export default defineConfig({
 			reporter: ['text-summary', 'lcov'],
 			reportsDirectory: 'coverage',
 			include: ['src/**/*.{ts,svelte}'],
-			exclude: [
-				'src/**/*.{test,spec}.{ts,js}',
-				'src/**/*.e2e.{ts,js}',
-				'src/**/*.d.ts',
-				'src/lib/index.ts'
-			]
+			exclude: ['src/**/*.d.ts', 'src/lib/index.ts']
 		},
 		projects: [
 			{
@@ -24,16 +19,15 @@ export default defineConfig({
 				test: {
 					name: 'server',
 					environment: 'node',
-					include: ['src/**/*.{test,spec}.{js,ts}'],
-					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
+					include: ['tests/**/*.{test,spec}.{js,ts}'],
+					exclude: ['tests/**/*.svelte.{test,spec}.{js,ts}']
 				}
 			},
 			{
 				extends: './vite.config.ts',
 				test: {
 					name: 'client',
-					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
-					exclude: ['src/lib/server/**'],
+					include: ['tests/**/*.svelte.{test,spec}.{js,ts}'],
 					setupFiles: ['./vitest-setup-client.ts'],
 					browser: {
 						enabled: true,

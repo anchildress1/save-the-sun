@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { handleAction } from './actions';
+import { handleAction } from '$lib/server/engine/actions';
 
 describe('Shared Action Interface', () => {
 	it('handles Ask action stub', () => {
