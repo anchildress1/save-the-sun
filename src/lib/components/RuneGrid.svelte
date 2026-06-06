@@ -1,17 +1,23 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { runes } from '$lib/board';
+	import { shuffledBoard } from '$lib/boardOrder';
 	import RuneCard from './RuneCard.svelte';
 	import gsap from 'gsap';
 
 	let {
 		castMode = false,
+		boardSeed = 0,
 		onSelectTarget
 	}: {
 		castMode?: boolean;
+		boardSeed?: number;
 		onSelectTarget: (id: number) => void;
 	} = $props();
+
+	// Shuffled on-screen order, fixed per seed. Depends only on boardSeed, so cross-off
+	// updates never reshuffle the board.
+	let board = $derived(shuffledBoard(boardSeed));
 
 	// Local state for crossed-off runes
 	let crossedOff = new SvelteSet<number>();
@@ -79,7 +85,7 @@
 </svg>
 
 <div class="rune-grid" data-testid="rune-grid" bind:this={gridContainer}>
-	{#each runes as rune (rune.id)}
+	{#each board as rune (rune.id)}
 		<div class="rune-card-wrapper">
 			<RuneCard
 				{rune}

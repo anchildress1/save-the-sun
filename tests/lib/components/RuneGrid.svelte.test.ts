@@ -9,11 +9,20 @@ function cardIds(container: HTMLElement): number[] {
 }
 
 describe('RuneGrid', () => {
-	it('renders all 24 runes in fixed on-screen order', async () => {
-		const screen = render(RuneGrid, { onSelectTarget: vi.fn() });
+	it('renders all 24 runes shuffled — every rune present, not the sorted order', async () => {
+		const sorted = Array.from({ length: 24 }, (_, i) => i + 1);
+		const screen = render(RuneGrid, { boardSeed: 42, onSelectTarget: vi.fn() });
 		const ids = cardIds(screen.container);
 		expect(ids).toHaveLength(24);
-		expect(ids).toEqual(Array.from({ length: 24 }, (_, i) => i + 1));
+		expect([...ids].sort((a, b) => a - b)).toEqual(sorted);
+		// Anti-pattern board: the on-screen order must not be the sorted data order.
+		expect(ids).not.toEqual(sorted);
+	});
+
+	it('keeps the same order for the same seed across renders', async () => {
+		const a = cardIds(render(RuneGrid, { boardSeed: 7, onSelectTarget: vi.fn() }).container);
+		const b = cardIds(render(RuneGrid, { boardSeed: 7, onSelectTarget: vi.fn() }).container);
+		expect(a).toEqual(b);
 	});
 
 	it('crosses a card off and restores it on repeat clicks', async () => {
