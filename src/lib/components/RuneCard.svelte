@@ -53,12 +53,13 @@
 		<span class="trait element"
 			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
 		>
-		<!-- Pips carry two axes at once (rune-board.md): count = power,
-		     fill = light/dark (hollow ○ = light, solid ● = dark). -->
-		<span class="trait power" aria-label="power {rune.power}, {rune.fill.toLowerCase()}">
+		<!-- Pips are power count only (filled = legibility on the dark card, not a trait).
+		     Light/dark is queryable via the Oracle and derivable from element, so it is
+		     not surfaced on the card. -->
+		<span class="trait power" aria-label="power {rune.power}">
 			<span class="pips" aria-hidden="true">
 				{#each pips as i (i)}
-					<span class="pip" class:dark={rune.fill === 'Dark'}></span>
+					<span class="pip"></span>
 				{/each}
 			</span>
 			<span class="num">{rune.power}</span>
@@ -240,16 +241,12 @@
 		gap: 1.5px;
 	}
 
-	/* rune-board.md: hollow ○ = light (default), solid ● = dark. */
+	/* Filled white so the power count reads on the dark card. */
 	.pip {
 		width: 5px;
 		height: 5px;
 		border-radius: 50%;
-		border: 1px solid var(--ink-muted);
-		background: transparent;
-	}
-	.pip.dark {
-		background: var(--ink-muted);
+		background: rgba(255, 255, 255, 0.9);
 	}
 
 	.num {

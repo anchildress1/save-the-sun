@@ -38,21 +38,22 @@ describe('RuneCard', () => {
 		await expect.element(screen.getByText('6', { exact: true })).toBeInTheDocument();
 	});
 
-	it('does not print a light/dark word; the axis lives in the pip fill + label', async () => {
+	it('does not surface the light/dark axis on the card (queryable via the Oracle)', async () => {
 		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		expect(screen.container.textContent).not.toMatch(/\b(light|dark)\b/i);
-		await expect.element(screen.getByLabelText(/power 4, light/i)).toBeInTheDocument();
+		// The power label carries no fill; pips are power count only.
+		await expect.element(screen.getByLabelText('power 4')).toBeInTheDocument();
 	});
 
-	it('encodes light/dark in the pips: hollow for light, solid for dark', async () => {
+	it('renders pips as filled power markers — count = power, no fill variance', async () => {
 		const light = render(RuneCard, { rune: uruz, onAction: vi.fn() });
-		// 4 pips, none carry the solid "dark" modifier.
 		expect(light.container.querySelectorAll('.pip')).toHaveLength(4);
 		expect(light.container.querySelectorAll('.pip.dark')).toHaveLength(0);
 
+		// A Dark rune renders the same pip treatment — only the count differs.
 		const dark = render(RuneCard, { rune: perthro, onAction: vi.fn() });
 		expect(dark.container.querySelectorAll('.pip')).toHaveLength(1);
-		expect(dark.container.querySelectorAll('.pip.dark')).toHaveLength(1);
+		expect(dark.container.querySelectorAll('.pip.dark')).toHaveLength(0);
 	});
 
 	it('fires onAction with the rune id on click', async () => {
