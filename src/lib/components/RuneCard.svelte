@@ -51,22 +51,27 @@
 	</div>
 
 	<footer class="traits">
-		<span class="trait element"
-			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
-		>
+		<div class="trait-row top">
+			<span class="trait element"
+				><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
+			>
+			<span class="trait hue"><span class="dot" aria-hidden="true"></span>{rune.color}</span>
+		</div>
 		<!-- Pips encode power (count) and fill: white = light, black = dark. Light/dark
 		     never appears as a visible word (locked decision); the dark pip carries a light
 		     ring so it reads on the navy card, and the button's accessible name states the
-		     fill so screen-reader players get what sighted players read from the dots. -->
-		<span class="trait power">
-			<span class="pips" aria-hidden="true">
-				{#each pips as i (i)}
-					<span class="pip" class:dark={rune.fill === 'Dark'}></span>
-				{/each}
+		     fill so screen-reader players get what sighted players read from the dots.
+		     Power sits on its own row so high-power (6-pip) cards never crowd the line. -->
+		<div class="trait-row power-row">
+			<span class="trait power">
+				<span class="pips" aria-hidden="true">
+					{#each pips as i (i)}
+						<span class="pip" class:dark={rune.fill === 'Dark'}></span>
+					{/each}
+				</span>
+				<span class="num">{rune.power}</span>
 			</span>
-			<span class="num">{rune.power}</span>
-		</span>
-		<span class="trait hue"><span class="dot" aria-hidden="true"></span>{rune.color}</span>
+		</div>
 	</footer>
 
 	{#if crossed}
@@ -141,20 +146,20 @@
 	}
 
 	.badge {
-		font-size: 0.62rem;
+		font-size: 0.72rem;
 		line-height: 1;
 		color: var(--gold);
 		border: 1px solid var(--gold-dim);
 		border-radius: 3px;
-		padding: 0.12rem 0.3rem;
-		min-width: 1.1rem;
+		padding: 0.14rem 0.34rem;
+		min-width: 1.2rem;
 		text-align: center;
 		font-variant-numeric: tabular-nums;
 	}
 
 	.gem {
-		width: 11px;
-		height: 11px;
+		width: 13px;
+		height: 13px;
 		border-radius: 50%;
 		background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.7), var(--gem) 60%);
 		box-shadow:
@@ -173,7 +178,7 @@
 
 	.glyph {
 		font-family: var(--font-display);
-		font-size: clamp(2rem, 3.4vw, 3.2rem);
+		font-size: clamp(2.4rem, 3.8vw, 3.6rem);
 		line-height: 1;
 		color: var(--gold-bright);
 		text-shadow:
@@ -192,16 +197,16 @@
 
 	.name {
 		font-family: var(--font-display);
-		font-size: 0.72rem;
-		letter-spacing: 0.14em;
+		font-size: 0.92rem;
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--gold);
 	}
 
 	.meaning {
-		font-size: 0.54rem;
+		font-size: 0.66rem;
 		font-style: italic;
-		color: var(--ink-faint);
+		color: var(--ink-muted);
 		line-height: 1.2;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -212,58 +217,77 @@
 		position: relative;
 		z-index: 2;
 		display: flex;
-		flex-wrap: nowrap;
-		justify-content: space-between;
-		align-items: center;
+		flex-direction: column;
 		gap: 0.3rem;
-		padding-top: 0.32rem;
+		padding-top: 0.36rem;
 		border-top: 1px solid var(--gold-faint);
-		font-size: 0.5rem;
-		letter-spacing: 0.05em;
+		font-size: 0.7rem;
+		letter-spacing: 0.03em;
 		text-transform: uppercase;
 		color: var(--ink-muted);
-		/* Single line, always — a wrapped footer is what made cards uneven height. */
+	}
+
+	/* Two rows: element + hue share the top line; power gets its own so 6-pip cards
+	   never crowd the names. Card height is set by aspect-ratio, so the extra row
+	   just borrows from the glyph well — every card stays identical. */
+	.trait-row {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
 		overflow: hidden;
+	}
+	.trait-row.top {
+		justify-content: space-between;
+	}
+	.trait-row.power-row {
+		justify-content: flex-start;
 	}
 
 	.trait {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.18rem;
+		gap: 0.22rem;
 		white-space: nowrap;
+		min-width: 0;
+	}
+	.trait.element,
+	.trait.hue {
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.ic {
 		color: var(--gold-bright);
-		font-size: 0.66rem;
+		font-size: 0.88rem;
 	}
 
 	.pips {
 		display: inline-flex;
-		gap: 1.5px;
+		gap: 2px;
 	}
 
 	/* Pips show power count; fill encodes light/dark — white = light, black = dark.
 	   The dark pip gets a light ring so it doesn't vanish into the navy card. */
 	.pip {
-		width: 5px;
-		height: 5px;
+		width: 7px;
+		height: 7px;
 		border-radius: 50%;
 		background: rgba(255, 255, 255, 0.92);
 	}
 	.pip.dark {
 		background: #0c0c12;
-		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 	}
 
 	.num {
 		font-variant-numeric: tabular-nums;
+		font-weight: 600;
 		color: var(--ink);
 	}
 
 	.dot {
-		width: 6px;
-		height: 6px;
+		width: 8px;
+		height: 8px;
 		border-radius: 50%;
 		background: var(--gem);
 		box-shadow: 0 0 5px var(--gem);
