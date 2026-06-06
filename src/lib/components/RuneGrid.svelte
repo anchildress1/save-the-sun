@@ -30,7 +30,7 @@
 			crossedOff.add(id);
 
 			// Cross-off stinger animation
-			const card = gridContainer.querySelector(`[data-rune-id="${id}"]`);
+			const card = gridContainer.querySelector(`.rune-card[data-rune-id="${id}"]`);
 			if (card) {
 				gsap.fromTo(
 					card,
@@ -42,13 +42,20 @@
 	}
 
 	onMount(() => {
-		// Entrance stagger animation
+		// Entrance stagger. Uses `from` so the grid's resting state is fully visible —
+		// if JS or GSAP never runs, the board still renders (degradation contract).
+		// Skipped under reduced-motion.
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		if (reduce) return;
 		const cards = gridContainer.querySelectorAll('.rune-card-wrapper');
-		gsap.fromTo(
-			cards,
-			{ y: 20, opacity: 0 },
-			{ y: 0, opacity: 1, duration: 0.6, stagger: 0.03, ease: 'power2.out' }
-		);
+		gsap.from(cards, {
+			y: 20,
+			opacity: 0,
+			duration: 0.6,
+			stagger: 0.03,
+			ease: 'power2.out',
+			clearProps: 'opacity,transform'
+		});
 	});
 </script>
 
@@ -71,9 +78,9 @@
 	</defs>
 </svg>
 
-<div class="rune-grid" bind:this={gridContainer}>
+<div class="rune-grid" data-testid="rune-grid" bind:this={gridContainer}>
 	{#each runes as rune (rune.id)}
-		<div class="rune-card-wrapper" data-rune-id={rune.id}>
+		<div class="rune-card-wrapper">
 			<RuneCard
 				{rune}
 				crossed={crossedOff.has(rune.id)}
@@ -88,15 +95,16 @@
 	.rune-grid {
 		display: grid;
 		grid-template-columns: repeat(6, 1fr);
-		gap: 1rem;
+		gap: 0.7rem;
 		width: 100%;
 		/* Establish a positioning context for any future background mood layers */
 		position: relative;
 	}
 
 	.rune-card-wrapper {
-		/* Used as a stable positioning wrapper for the staggered entrance */
-		opacity: 0;
+		/* Stable positioning wrapper for the staggered entrance. Visible by default so a
+		   failed/absent GSAP run never leaves the board blank. */
+		display: flex;
 	}
 
 	.sr-only {

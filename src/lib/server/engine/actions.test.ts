@@ -13,4 +13,27 @@ describe('Shared Action Interface', () => {
 		expect(result.success).toBe(true);
 		expect(result.message).toContain('Cast');
 	});
+
+	it('handles CrossOff action stub', () => {
+		const result = handleAction({
+			type: 'CrossOff',
+			player: 'Human',
+			runeId: 5,
+			crossed: true
+		});
+		expect(result.success).toBe(true);
+		expect(result.message).toContain('CrossOff');
+	});
+
+	it('handles React action stub', () => {
+		const result = handleAction({ type: 'React', player: 'Sköll', reaction: 'Scry' });
+		expect(result.success).toBe(true);
+		expect(result.message).toContain('React');
+	});
+
+	it('names the acting player in the result', () => {
+		expect(handleAction({ type: 'Ask', player: 'Sköll', question: 'fire?' }).message).toContain(
+			'Sköll'
+		);
+	});
 });

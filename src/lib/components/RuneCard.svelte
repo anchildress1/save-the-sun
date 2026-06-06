@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Rune } from '$lib/board';
+	import { gemColor, elementIcon } from './runeVisuals';
 
 	let {
 		rune,
@@ -13,82 +14,61 @@
 		onAction: (id: number) => void;
 	} = $props();
 
-	function handleClick() {
-		onAction(rune.id);
-	}
-
-	const colorMap: Record<string, string> = {
-		Blue: '#204BC9',
-		Red: '#D43131',
-		Green: '#299C41',
-		Silver: '#E0E0E0',
-		Gold: '#E8B831',
-		Black: '#4a4a4a'
-	};
-
-	const elementIconMap: Record<string, string> = {
-		Sun: '☼',
-		Fire: '🜂',
-		Air: '🜁',
-		Water: '🜄',
-		Earth: '🜃',
-		Spirit: '✧'
-	};
+	let gem = $derived(gemColor(rune.color));
+	let icon = $derived(elementIcon(rune.element));
+	let pips = $derived(Array.from({ length: rune.power }, (_, i) => i));
 </script>
 
 <button
 	class="rune-card"
 	class:crossed
 	class:armed
-	onclick={handleClick}
+	data-rune-id={rune.id}
+	data-rune-name={rune.name}
+	onclick={() => onAction(rune.id)}
+	style="--gem: {gem};"
 	aria-label={armed
 		? `Select ${rune.name} as cast target`
 		: crossed
 			? `Restore ${rune.name}`
 			: `Cross off ${rune.name}`}
 >
-	<div class="card-inner">
-		<!-- Top Meta: Number & Color Orb -->
-		<div class="meta-row top">
-			<span class="rune-id">{rune.id}</span>
-			<div class="color-orb" style="--gem-color: {colorMap[rune.color] || '#fff'}"></div>
-		</div>
+	<div class="ambient" aria-hidden="true"></div>
 
-		<!-- Central Content -->
-		<div class="center-content">
-			<div class="glyph">{rune.glyph}</div>
-			<h3 class="name">{rune.name.toUpperCase()}</h3>
-			<p class="meaning">{rune.meaning.toLowerCase()}</p>
-		</div>
+	<header class="card-top">
+		<span class="badge">{rune.id}</span>
+		<span class="gem" aria-hidden="true"></span>
+	</header>
 
-		<!-- Bottom Stats -->
-		<div class="bottom-stats">
-			<div class="stats-row">
-				<div class="pips" aria-label="{rune.power} {rune.fill}">
-					{#each Array(rune.power) as _, i (i)}
-						<span class="pip {rune.fill.toLowerCase()}"></span>
-					{/each}
-				</div>
-				<span class="stat-text silver">{rune.power} {rune.fill.toUpperCase()}</span>
-			</div>
-
-			<div class="stats-row">
-				<div class="element-box stat-text gold">
-					<span class="element-icon">{elementIconMap[rune.element] || '•'}</span>
-					<span>{rune.element.toUpperCase()}</span>
-				</div>
-				<span class="stat-text blue-gold">{rune.color.toUpperCase()}</span>
-			</div>
-		</div>
+	<div class="glyph-well">
+		<span class="glyph">{rune.glyph}</span>
 	</div>
 
-	<!-- Cross-off Overlay -->
-	{#if crossed}
-		<div class="cross-overlay"></div>
-	{/if}
+	<div class="ident">
+		<span class="name">{rune.name}</span>
+		<span class="meaning">{rune.meaning}</span>
+	</div>
 
-	<!-- Lighting Gradient overlay -->
-	<div class="lighting-overlay"></div>
+	<footer class="traits">
+		<span class="trait element"
+			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
+		>
+		<span class="trait power" aria-label="{rune.power} power, {rune.fill}">
+			<span class="pips" aria-hidden="true">
+				{#each pips as i (i)}
+					<span class="pip" class:dark={rune.fill === 'Dark'}></span>
+				{/each}
+			</span>
+			<span class="num">{rune.power}</span>
+		</span>
+		<span class="trait fill">{rune.fill}</span>
+		<span class="trait hue"><span class="dot" aria-hidden="true"></span>{rune.color}</span>
+	</footer>
+
+	{#if crossed}
+		<span class="strike s1" aria-hidden="true"></span>
+		<span class="strike s2" aria-hidden="true"></span>
+	{/if}
 </button>
 
 <style>
@@ -96,228 +76,234 @@
 		position: relative;
 		display: flex;
 		flex-direction: column;
-		background: #0b0e14; /* Deep dark background like POC */
-		border: 1px solid #c5a559; /* Gold border */
-		border-radius: 4px;
-		padding: 0;
-		color: #e0e0e0;
+		gap: 0.35rem;
+		aspect-ratio: 4 / 5;
+		padding: 0.55rem 0.6rem 0.5rem;
 		text-align: left;
 		cursor: pointer;
 		overflow: hidden;
+		border: 1px solid var(--gold-dim);
+		border-radius: 7px;
+		color: var(--ink);
+		background:
+			radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.04) 0%, transparent 55%),
+			linear-gradient(180deg, var(--bg-card-top) 0%, var(--bg-card-bottom) 100%);
+		box-shadow:
+			0 6px 18px rgba(0, 0, 0, 0.45),
+			inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 		transition:
-			transform 0.2s cubic-bezier(0.2, 0, 0, 1),
-			border-color 0.2s;
-		min-height: 200px;
-		font-family: 'Cinzel', Georgia, serif; /* Fallback to elegant serif */
-	}
-
-	.rune-card:focus-visible {
-		outline: 2px solid #fff;
-		outline-offset: 2px;
+			transform 0.25s cubic-bezier(0.2, 0, 0, 1),
+			border-color 0.25s ease,
+			box-shadow 0.25s ease;
 	}
 
 	.rune-card:hover {
-		border-color: #e8b831;
-		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(197, 165, 89, 0.15);
+		transform: translateY(-3px);
+		border-color: var(--gold);
+		box-shadow:
+			0 10px 26px rgba(0, 0, 0, 0.6),
+			0 0 16px rgba(217, 169, 74, 0.18);
 	}
 
-	.card-inner {
-		display: flex;
-		flex-direction: column;
-		height: 100%;
-		padding: 0.6rem;
-		z-index: 2;
-		position: relative;
+	.rune-card:focus-visible {
+		outline: 2px solid var(--gold-bright);
+		outline-offset: 2px;
 	}
 
-	/* Top Meta */
-	.meta-row.top {
+	.ambient {
+		position: absolute;
+		inset: -30% -10% auto -10%;
+		height: 90%;
+		background: radial-gradient(circle at 50% 0%, var(--gem) 0%, transparent 62%);
+		opacity: 0.16;
+		mix-blend-mode: screen;
+		pointer-events: none;
+	}
+	.rune-card:hover .ambient {
+		opacity: 0.28;
+	}
+
+	.card-top {
 		display: flex;
 		justify-content: space-between;
-		align-items: flex-start;
+		align-items: center;
+		position: relative;
+		z-index: 2;
 	}
 
-	.rune-id {
-		font-size: 0.85rem;
-		color: #c5a559;
+	.badge {
+		font-size: 0.62rem;
 		line-height: 1;
+		color: var(--gold);
+		border: 1px solid var(--gold-dim);
+		border-radius: 3px;
+		padding: 0.12rem 0.3rem;
+		min-width: 1.1rem;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
 	}
 
-	.color-orb {
-		width: 12px;
-		height: 12px;
+	.gem {
+		width: 11px;
+		height: 11px;
 		border-radius: 50%;
-		/* Render a shiny gem */
-		background: radial-gradient(circle at 35% 35%, #ffffff 0%, var(--gem-color) 40%, #000000 90%);
+		background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.7), var(--gem) 60%);
 		box-shadow:
-			0 0 3px var(--gem-color),
-			inset 0 0 2px rgba(255, 255, 255, 0.4);
-		border: 1px solid rgba(0, 0, 0, 0.5);
+			0 0 8px var(--gem),
+			inset 0 0 2px rgba(0, 0, 0, 0.4);
 	}
 
-	/* Center Content */
-	.center-content {
+	.glyph-well {
+		position: relative;
+		z-index: 2;
 		flex: 1;
 		display: flex;
-		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		margin: 0.5rem 0;
 	}
 
 	.glyph {
-		font-size: 3.5rem;
+		font-family: var(--font-display);
+		font-size: clamp(2rem, 3.4vw, 3.2rem);
 		line-height: 1;
-		color: #c5a559;
-		font-weight: 300;
-		margin-bottom: 0.25rem;
+		color: var(--gold-bright);
+		text-shadow:
+			0 0 10px rgba(217, 169, 74, 0.55),
+			0 0 26px rgba(217, 169, 74, 0.25);
+	}
+
+	.ident {
+		position: relative;
+		z-index: 2;
+		display: flex;
+		flex-direction: column;
+		gap: 0.05rem;
+		text-align: center;
 	}
 
 	.name {
-		margin: 0;
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: #c5a559;
-		letter-spacing: 0.1em;
+		font-family: var(--font-display);
+		font-size: 0.72rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--gold);
 	}
 
 	.meaning {
-		margin: 0.15rem 0 0 0;
-		font-size: 0.65rem;
-		color: #d8d8d8;
-		font-family: system-ui, sans-serif;
+		font-size: 0.54rem;
+		font-style: italic;
+		color: var(--ink-faint);
+		line-height: 1.2;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
-	/* Bottom Stats */
-	.bottom-stats {
+	.traits {
+		position: relative;
+		z-index: 2;
 		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-		margin-top: auto;
-		padding-top: 0.5rem;
-		border-top: 1px solid rgba(197, 165, 89, 0.2);
-	}
-
-	.stats-row {
-		display: flex;
-		justify-content: space-between;
+		flex-wrap: wrap;
+		justify-content: center;
 		align-items: center;
+		gap: 0.18rem 0.4rem;
+		padding-top: 0.32rem;
+		border-top: 1px solid var(--gold-faint);
+		font-size: 0.5rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--ink-muted);
 	}
 
-	.stat-text {
-		font-family:
-			system-ui,
-			-apple-system,
-			sans-serif;
-		font-size: 0.6rem;
-		letter-spacing: 0.05em;
+	.trait {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.18rem;
+		white-space: nowrap;
 	}
 
-	.stat-text.silver {
-		color: #d8d8d8;
-	}
-
-	.stat-text.gold {
-		color: #c5a559;
-	}
-
-	.stat-text.blue-gold {
-		/* A slightly muted gold/blue for the color text to match the POC */
-		color: #9aa5b1;
+	.ic {
+		color: var(--gold-bright);
+		font-size: 0.66rem;
 	}
 
 	.pips {
-		display: flex;
-		gap: 4px;
-		align-items: center;
+		display: inline-flex;
+		gap: 1.5px;
 	}
 
 	.pip {
-		/* Reactive sizes but equal: using em makes them scale with font size */
-		width: 0.5em;
-		height: 0.5em;
+		width: 4px;
+		height: 4px;
 		border-radius: 50%;
-		border: 1px solid #d8d8d8;
-		display: inline-block;
+		border: 1px solid var(--ink-muted);
+		background: var(--ink-muted);
 	}
-
-	.pip.light {
+	.pip.dark {
 		background: transparent;
 	}
 
-	.pip.dark {
-		background: #d8d8d8;
+	.num {
+		font-variant-numeric: tabular-nums;
+		color: var(--ink);
 	}
 
-	.element-box {
-		display: flex;
-		align-items: center;
-		gap: 4px;
+	.dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--gem);
+		box-shadow: 0 0 5px var(--gem);
 	}
 
-	.element-icon {
-		font-size: 0.8rem;
-		line-height: 1;
+	/* Crossed-off: dim the content, keep the strike vivid. */
+	.rune-card.crossed {
+		border-color: rgba(255, 255, 255, 0.06);
+	}
+	.rune-card.crossed .card-top,
+	.rune-card.crossed .glyph-well,
+	.rune-card.crossed .ident,
+	.rune-card.crossed .traits {
+		opacity: 0.32;
+		filter: grayscale(80%);
+	}
+	.rune-card.crossed .ambient {
+		opacity: 0;
 	}
 
-	/* Cross-off State */
-	.rune-card.crossed .card-inner {
-		opacity: 0.25;
-		filter: grayscale(80%) brightness(0.8);
-	}
-
-	.rune-card.crossed:hover .card-inner {
-		opacity: 0.4;
-	}
-
-	/* Big X overlay to match POC */
-	.cross-overlay {
+	.strike {
 		position: absolute;
-		inset: 0;
-		z-index: 3;
-		background:
-			linear-gradient(
-				to bottom right,
-				transparent 48%,
-				rgba(160, 160, 160, 0.7) 49%,
-				rgba(160, 160, 160, 0.7) 51%,
-				transparent 52%
-			),
-			linear-gradient(
-				to top right,
-				transparent 48%,
-				rgba(160, 160, 160, 0.7) 49%,
-				rgba(160, 160, 160, 0.7) 51%,
-				transparent 52%
-			);
+		top: 50%;
+		left: 50%;
+		width: 132%;
+		height: 2px;
+		background: var(--strike);
+		box-shadow: 0 0 8px rgba(200, 71, 63, 0.7);
+		z-index: 5;
 		pointer-events: none;
 	}
-
-	/* Armed State (Casting) */
-	.rune-card.armed {
-		border-color: #e8b831;
-		box-shadow: 0 0 15px rgba(232, 184, 49, 0.2);
+	.s1 {
+		transform: translate(-50%, -50%) rotate(32deg);
+	}
+	.s2 {
+		transform: translate(-50%, -50%) rotate(-32deg);
 	}
 
-	.rune-card.armed.crossed .card-inner {
+	/* Armed for cast: gold halo, content restored even if crossed. */
+	.rune-card.armed {
+		border-color: var(--gold-bright);
+		box-shadow:
+			0 0 0 1px var(--gold-bright),
+			0 0 22px rgba(217, 169, 74, 0.35);
+	}
+	.rune-card.armed .ambient {
+		opacity: 0.3;
+	}
+	.rune-card.armed.crossed .card-top,
+	.rune-card.armed.crossed .glyph-well,
+	.rune-card.armed.crossed .ident,
+	.rune-card.armed.crossed .traits {
 		opacity: 1;
 		filter: none;
-	}
-
-	/* Lighting Engine Overlay */
-	.lighting-overlay {
-		position: absolute;
-		inset: 0;
-		z-index: 1;
-		background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.08) 0%, transparent 80%);
-		mix-blend-mode: screen;
-		pointer-events: none;
-		opacity: 0.6;
-		transition: opacity 0.3s ease;
-	}
-
-	.rune-card:hover .lighting-overlay {
-		opacity: 1;
 	}
 </style>

@@ -1,0 +1,55 @@
+/* Save the Sun — visual theme tokens.
+   Midnight-navy ground + warm-gold ritual accent, matching the POC board. */
+
+:root {
+	/* Ground */
+	--bg-deep: #060912;
+	--bg-night: #0b1022;
+	--bg-panel: #0e1428;
+	--bg-card-top: #18203a;
+	--bg-card-bottom: #0d1226;
+
+	/* Gold accent (titles, borders, glyphs) */
+	--gold: #d9a94a;
+	--gold-bright: #e9c877;
+	--gold-dim: rgba(217, 169, 74, 0.28);
+	--gold-faint: rgba(217, 169, 74, 0.14);
+
+	/* Ink */
+	--ink: #e7e3d6;
+	--ink-muted: #a9a392;
+	--ink-faint: #6f6c62;
+
+	/* Signals */
+	--strike: #c8473f;
+
+	/* Type */
+	--font-display: 'Cinzel', 'Trajan Pro', 'Georgia', 'Times New Roman', serif;
+	--font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+	margin: 0;
+	background-color: var(--bg-deep);
+	/* Layered radial glows + a faint starfield for the night sky. */
+	background-image:
+		radial-gradient(circle at 50% -10%, rgba(217, 169, 74, 0.1) 0%, transparent 42%),
+		radial-gradient(circle at 84% 6%, rgba(160, 190, 240, 0.08) 0%, transparent 30%),
+		radial-gradient(1px 1px at 18% 24%, rgba(255, 255, 255, 0.5) 0, transparent 100%),
+		radial-gradient(1px 1px at 67% 14%, rgba(255, 255, 255, 0.35) 0, transparent 100%),
+		radial-gradient(1px 1px at 39% 9%, rgba(255, 255, 255, 0.4) 0, transparent 100%),
+		radial-gradient(1px 1px at 88% 30%, rgba(255, 255, 255, 0.3) 0, transparent 100%),
+		linear-gradient(180deg, var(--bg-night) 0%, var(--bg-deep) 70%);
+	background-attachment: fixed;
+	color: var(--ink);
+	font-family: var(--font-body);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		transition-duration: 0.001ms !important;
+	}
+}
