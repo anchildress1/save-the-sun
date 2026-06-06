@@ -33,7 +33,7 @@ describe('RuneGrid', () => {
 	});
 
 	it('crosses a card off and restores it on repeat clicks', async () => {
-		const screen = render(RuneGrid, { onSelectTarget: vi.fn() });
+		const screen = render(RuneGrid, { boardSeed: 0, onSelectTarget: vi.fn() });
 		const first = screen.container.querySelector('.rune-card[data-rune-id="1"]')!;
 		expect(first.classList.contains('crossed')).toBe(false);
 		await screen.getByRole('button', { name: /cross off sowilo/i }).click();
@@ -44,7 +44,7 @@ describe('RuneGrid', () => {
 
 	it('routes a tap to onSelectTarget in cast mode without crossing off', async () => {
 		const onSelectTarget = vi.fn();
-		const screen = render(RuneGrid, { castMode: true, onSelectTarget });
+		const screen = render(RuneGrid, { boardSeed: 0, castMode: true, onSelectTarget });
 		const first = screen.container.querySelector('.rune-card[data-rune-id="1"]')!;
 		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
 		expect(onSelectTarget).toHaveBeenCalledWith(1);

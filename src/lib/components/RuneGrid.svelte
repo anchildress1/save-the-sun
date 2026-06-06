@@ -5,13 +5,15 @@
 	import RuneCard from './RuneCard.svelte';
 	import gsap from 'gsap';
 
+	// boardSeed is required (no default): a missing seed should surface, not silently fall
+	// back to a frozen order and hide a load/SSR-wiring bug.
 	let {
 		castMode = false,
-		boardSeed = 0,
+		boardSeed,
 		onSelectTarget
 	}: {
 		castMode?: boolean;
-		boardSeed?: number;
+		boardSeed: number;
 		onSelectTarget: (id: number) => void;
 	} = $props();
 
