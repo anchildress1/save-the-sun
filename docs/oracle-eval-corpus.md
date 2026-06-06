@@ -27,30 +27,30 @@ Pass bar: aim ≥ 90% correct classification across the corpus, **zero** secret 
 
 ## Power → exact
 
-- [ ] "Is its power exactly three?" → `power eq 3`
-- [ ] "Three power?" → `power eq 3`
-- [ ] "Does it have a power of five?" → `power eq 5`
+- [x] "Is its power exactly three?" → `power eq 3`
+- [x] "Three power?" → `power eq 3`
+- [x] "Does it have a power of five?" → `power eq 5`
 
 ## Power → ranges
 
-- [ ] "Is its power fewer than three?" → `power lt 3`
-- [ ] "Under four power?" → `power lt 4`
-- [ ] "At least two power?" → `power gte 2`
-- [ ] "Is it two or more?" → `power gte 2`
-- [ ] "More than four power?" → `power gt 4`
-- [ ] "Stronger than five?" → `power gt 5`
-- [ ] "At most three power?" → `power lte 3`
-- [ ] "Is its power no greater than two?" → `power lte 2`
+- [x] "Is its power fewer than three?" → `power lt 3`
+- [x] "Under four power?" → `power lt 4`
+- [x] "At least two power?" → `power gte 2`
+- [x] "Is it two or more?" → `power gte 2`
+- [x] "More than four power?" → `power gt 4`
+- [x] "Stronger than five?" → `power gt 5`
+- [x] "At most three power?" → `power lte 3`
+- [x] "Is its power no greater than two?" → `power lte 2`
 
 ## Light / dark
 
-- [ ] "Is it a light rune?" → `fill = Light`
-- [ ] "Is the rune dark?" → `fill = Dark`
-- [ ] "Is it bright?" → `fill = Light` _(synonym)_
+- [x] "Is it a light rune?" → `fill = Light`
+- [x] "Is the rune dark?" → `fill = Dark`
+- [x] "Is it bright?" → `fill = Light` _(synonym)_
 
 ## Hue
 
-- [ ] "Is it gold?" → `color = Gold`
+- [x] "Is it gold?" → `color = Gold`
 - [ ] "Is the rune blue?" → `color = Blue`
 - [ ] "Red?" → `color = Red`
 - [ ] "Is its hue silver?" → `color = Silver`

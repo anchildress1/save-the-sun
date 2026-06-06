@@ -1,9 +1,10 @@
 // Oracle deterministic core (S2) — voices the engine's truth, per `ux-copy.md` §1.
 
+import { dev } from '$app/environment';
 import { parseQuery, type PowerOp, type Query } from '$lib/server/engine/queries';
 import type { GameEngine } from '$lib/server/engine/engine';
 import type { Player } from '$lib/server/engine/actions';
-import type { Interpret, OracleResult, RefusalClass } from './types';
+import type { Interpret, Interpretation, OracleResult, RefusalClass } from './types';
 
 const REFUSAL_LINES: Record<RefusalClass, string> = {
 	'mixed-type':
@@ -18,6 +19,13 @@ const REFUSAL_LINES: Record<RefusalClass, string> = {
 /** The exact refusal line for a class (`ux-copy.md` §1 Refusals). */
 export function refusalLine(cls: RefusalClass): string {
 	return REFUSAL_LINES[cls];
+}
+
+/** One-line summary of what Gemini read, for the dev debug log. */
+function describe(interpretation: Interpretation): string {
+	return interpretation.kind === 'query'
+		? `query ${JSON.stringify(interpretation.query)}`
+		: `refusal:${interpretation.refusal}`;
 }
 
 function article(word: string): 'a' | 'an' {
@@ -93,6 +101,10 @@ export async function runOracle(
 	if (question.trim() === '') return refuse('empty');
 
 	const interpretation = await interpret(question);
+	if (dev)
+		console.debug(
+			`[oracle] ${player} asked ${JSON.stringify(question)} → ${describe(interpretation)} [LLM-inference]`
+		);
 	if (interpretation.kind === 'refusal') return refuse(interpretation.refusal);
 
 	// Re-validate: the LLM's query is untrusted, so a bad one is treated as unreadable.
@@ -104,6 +116,10 @@ export async function runOracle(
 		console.warn(`[oracle] engine rejected ${player}'s Ask: ${result.reason}`);
 		return { ok: false, reason: 'engine', engineReason: result.reason, turnConsumed: false };
 	}
+	if (dev)
+		console.debug(
+			`[oracle] engine answered ${result.answer} for ${JSON.stringify(query)} [deterministic-engine]`
+		);
 
 	// Fall back to a generic phrase so the echo is always well-formed, even if the
 	// LLM returns an empty paraphrase. The echo surfaces on the opponent's Ask; the
