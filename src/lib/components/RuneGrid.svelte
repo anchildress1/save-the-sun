@@ -1,17 +1,25 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { runes } from '$lib/board';
+	import { shuffledBoard } from '$lib/boardOrder';
 	import RuneCard from './RuneCard.svelte';
 	import gsap from 'gsap';
 
+	// boardSeed is required (no default): a missing seed should surface, not silently fall
+	// back to a frozen order and hide a load/SSR-wiring bug.
 	let {
 		castMode = false,
+		boardSeed,
 		onSelectTarget
 	}: {
 		castMode?: boolean;
+		boardSeed: number;
 		onSelectTarget: (id: number) => void;
 	} = $props();
+
+	// Shuffled on-screen order, fixed per seed. Depends only on boardSeed, so cross-off
+	// updates never reshuffle the board.
+	let board = $derived(shuffledBoard(boardSeed));
 
 	// Local state for crossed-off runes
 	let crossedOff = new SvelteSet<number>();
@@ -42,20 +50,27 @@
 	}
 
 	onMount(() => {
-		// Entrance stagger. Uses `from` so the grid's resting state is fully visible —
-		// if JS or GSAP never runs, the board still renders (degradation contract).
-		// Skipped under reduced-motion.
+		// Entrance stagger. Uses `from` so the grid's resting state is fully visible if JS
+		// or GSAP never runs. Skipped under reduced-motion.
 		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		if (reduce) return;
 		const cards = gridContainer.querySelectorAll('.rune-card-wrapper');
-		gsap.from(cards, {
-			y: 20,
-			opacity: 0,
-			duration: 0.6,
-			stagger: 0.03,
-			ease: 'power2.out',
-			clearProps: 'opacity,transform'
-		});
+		try {
+			gsap.from(cards, {
+				y: 20,
+				opacity: 0,
+				duration: 0.6,
+				stagger: 0.03,
+				ease: 'power2.out',
+				clearProps: 'opacity,transform'
+			});
+		} catch (err) {
+			// `from` writes opacity:0 immediately and clears it on completion — a throw
+			// mid-flight would strand cards invisible. Strip the inline styles so the CSS
+			// resting state shows, and surface the failure. The board must never go blank.
+			cards.forEach((card) => card.removeAttribute('style'));
+			console.error('Rune entrance animation failed; board forced visible.', err);
+		}
 	});
 </script>
 
@@ -79,7 +94,7 @@
 </svg>
 
 <div class="rune-grid" data-testid="rune-grid" bind:this={gridContainer}>
-	{#each runes as rune (rune.id)}
+	{#each board as rune (rune.id)}
 		<div class="rune-card-wrapper">
 			<RuneCard
 				{rune}

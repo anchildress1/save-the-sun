@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from 'vitest';
 import RuneCard from '$lib/components/RuneCard.svelte';
 import type { Rune } from '$lib/board';
 
-// id 6 / power 4 so the badge and power numerals never collide in text queries.
 const uruz: Rune = {
 	id: 6,
 	name: 'Uruz',
@@ -15,7 +14,7 @@ const uruz: Rune = {
 	color: 'Silver'
 };
 
-// A Dark rune to assert the solid-pip semantics.
+// A Dark rune (power 1) to assert the dark-pip marker.
 const perthro: Rune = {
 	id: 13,
 	name: 'Perthro',
@@ -27,33 +26,81 @@ const perthro: Rune = {
 	color: 'Gold'
 };
 
+// Max power (6) + Dark — confirms every pip gets the dark marker, not just the first.
+const othala: Rune = {
+	id: 24,
+	name: 'Othala',
+	glyph: 'ᛟ',
+	meaning: 'heritage, estate',
+	element: 'Earth',
+	power: 6,
+	fill: 'Dark',
+	color: 'Silver'
+};
+
 describe('RuneCard', () => {
-	it('renders glyph, name, element, color, and power numeral as visible text', async () => {
+	it('renders glyph, name, element, and color as visible text', async () => {
 		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		await expect.element(screen.getByText('ᚢ')).toBeInTheDocument();
 		await expect.element(screen.getByText('Uruz')).toBeInTheDocument();
 		await expect.element(screen.getByText('Fire')).toBeInTheDocument();
 		await expect.element(screen.getByText('Silver')).toBeInTheDocument();
-		await expect.element(screen.getByText('4', { exact: true })).toBeInTheDocument();
-		await expect.element(screen.getByText('6', { exact: true })).toBeInTheDocument();
 	});
 
-	it('does not surface the light/dark axis on the card (queryable via the Oracle)', async () => {
+	it('displays the meaning under the name', async () => {
 		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
-		expect(screen.container.textContent).not.toMatch(/\b(light|dark)\b/i);
-		// The power label carries no fill; pips are power count only.
-		await expect.element(screen.getByLabelText('power 4')).toBeInTheDocument();
+		await expect.element(screen.getByText('aurochs, strength')).toBeInTheDocument();
 	});
 
-	it('renders pips as filled power markers — count = power, no fill variance', async () => {
+	it('shows no digits on the card face — power value and rune id are never written', async () => {
+		// Power reaches the player via pip count + accessible name; the id is internal.
+		// The only numbers a card could show are those two, so the face has no digits.
+		for (const rune of [uruz, perthro, othala]) {
+			const screen = render(RuneCard, { rune, onAction: vi.fn() });
+			expect(screen.container.textContent).not.toMatch(/\d/);
+		}
+	});
+
+	it('never shows light/dark as a visible word (locked decision)', async () => {
+		const light = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		expect(light.container.textContent).not.toMatch(/\b(light|dark)\b/i);
+		const dark = render(RuneCard, { rune: perthro, onAction: vi.fn() });
+		expect(dark.container.textContent).not.toMatch(/\b(light|dark)\b/i);
+	});
+
+	it('speaks power + light/dark together in the accessible name ("{n} {light|dark} power")', async () => {
+		const light = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		await expect
+			.element(light.getByRole('button', { name: /cross off uruz, 4 light power/i }))
+			.toBeInTheDocument();
+
+		const dark = render(RuneCard, { rune: perthro, onAction: vi.fn() });
+		await expect
+			.element(dark.getByRole('button', { name: /cross off perthro, 1 dark power/i }))
+			.toBeInTheDocument();
+	});
+
+	it('labels the power pips so every trait on the card is labelled (value not written)', async () => {
+		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		await expect.element(screen.getByText('power', { exact: true })).toBeInTheDocument();
+	});
+
+	it('encodes fill on every pip — light plain, dark marked; pip count = power', async () => {
 		const light = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		expect(light.container.querySelectorAll('.pip')).toHaveLength(4);
 		expect(light.container.querySelectorAll('.pip.dark')).toHaveLength(0);
 
-		// A Dark rune renders the same pip treatment — only the count differs.
-		const dark = render(RuneCard, { rune: perthro, onAction: vi.fn() });
-		expect(dark.container.querySelectorAll('.pip')).toHaveLength(1);
-		expect(dark.container.querySelectorAll('.pip.dark')).toHaveLength(0);
+		const darkOne = render(RuneCard, { rune: perthro, onAction: vi.fn() });
+		expect(darkOne.container.querySelectorAll('.pip')).toHaveLength(1);
+		expect(darkOne.container.querySelectorAll('.pip.dark')).toHaveLength(1);
+
+		// Max power, Dark: all six pips carry the dark marker (not just the first).
+		const darkSix = render(RuneCard, { rune: othala, onAction: vi.fn() });
+		expect(darkSix.container.querySelectorAll('.pip')).toHaveLength(6);
+		expect(darkSix.container.querySelectorAll('.pip.dark')).toHaveLength(6);
+		await expect
+			.element(darkSix.getByRole('button', { name: /cross off othala, 6 dark power/i }))
+			.toBeInTheDocument();
 	});
 
 	it('fires onAction with the rune id on click', async () => {
@@ -63,16 +110,30 @@ describe('RuneCard', () => {
 		expect(onAction).toHaveBeenCalledWith(6);
 	});
 
-	it('shows a restore label and strike marks when crossed', async () => {
+	it('shows a restore label (with power + fill) and the chalk X when crossed', async () => {
 		const screen = render(RuneCard, { rune: uruz, crossed: true, onAction: vi.fn() });
-		await expect.element(screen.getByRole('button', { name: /restore uruz/i })).toBeInTheDocument();
-		expect(screen.container.querySelectorAll('.strike')).toHaveLength(2);
+		// The power + fill suffix must survive on every aria-label branch, not just cross-off.
+		await expect
+			.element(screen.getByRole('button', { name: /restore uruz, 4 light power/i }))
+			.toBeInTheDocument();
+		// Chalk X: one strikeout svg with two diagonal lines.
+		expect(screen.container.querySelectorAll('.strikeout line')).toHaveLength(2);
 	});
 
-	it('exposes a cast-target label when armed', async () => {
+	it('exposes a cast-target label (with power + fill) when armed', async () => {
 		const screen = render(RuneCard, { rune: uruz, armed: true, onAction: vi.fn() });
+		await expect
+			.element(screen.getByRole('button', { name: /select uruz as cast target, 4 light power/i }))
+			.toBeInTheDocument();
+	});
+
+	it('armed + crossed: a crossed rune stays castable — no chalk X, cast-target label wins', async () => {
+		// A crossed rune is still legal to cast, so cast mode restores it: the strike must
+		// not contradict the "Select as cast target" affordance.
+		const screen = render(RuneCard, { rune: uruz, crossed: true, armed: true, onAction: vi.fn() });
 		await expect
 			.element(screen.getByRole('button', { name: /select uruz as cast target/i }))
 			.toBeInTheDocument();
+		expect(screen.container.querySelectorAll('.strikeout')).toHaveLength(0);
 	});
 });

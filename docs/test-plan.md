@@ -32,7 +32,7 @@ Covers R1, R3, R4, R12 truth resolution, and the Architecture contract. Pure, de
 | Single-rune query | Unit | "is it Sowilo?" eliminates exactly that one; correct yes only for the secret. |
 | Win/cast logic | Unit | **Only the secret wins a Cast; every other rune fails.** Wrong cast returns "wasted turn, round continues," never ends the game. |
 | Cast accepts any rune | Unit | Engine accepts a Cast of a crossed-off rune; engine never reads or validates against the player's crossings. |
-| Legality validation | Unit | Mixed-type, malformed, and already-asked queries are flagged invalid; a refused/invalid Ask does **not** consume the turn; a resolved Ask does. |
+| Legality validation | Unit | Mixed-type and malformed queries are flagged invalid; a refused/invalid Ask does **not** consume the turn; a resolved Ask does. A repeated question is legal — it resolves again and consumes the turn (re-asking is part of deduction, not an error). |
 | Secret confidentiality | Unit + security | No engine API path returns the secret before a correct cast; Sköll's earned-state payload never contains it (assert by inspection of the tool-call contract). |
 | Strict alternation | Unit | Human-first, one action per turn; engine rejects an out-of-order Ask/Cast. |
 | Reaction resolution | Unit | Scry returns the same answer to the rival; Hex suppresses the answer and spends the active player's turn; Cast is never interruptible. |
@@ -76,7 +76,7 @@ Covers R5 and the Architecture contract. **We never assert a specific Gemini mov
 | Area | Test type | What to test |
 |---|---|---|
 | Earned-only state | Integration + security | Sköll's tool-call inputs contain only his own candidates, his own answers, and anything Scried — never the secret, never the human's crossings. |
-| Tool-call validation | Integration | Illegal or malformed Sköll calls (ask already asked, non-splitting, bad rune name, mixed-type, out-of-turn) are rejected by the engine. |
+| Tool-call validation | Integration | Illegal or malformed Sköll calls (bad rune name, mixed-type, out-of-turn) are rejected by the engine. Re-asking is legal play and is **not** rejected — the deterministic floor simply avoids redundant/non-splitting questions for move quality (its own candidate-set concern, not an engine rejection). |
 | Board order contract | Unit | Board is passed as JSON in fixed on-screen order; harness asserts the payload is not pre-sorted. |
 | Sköll cross-off as working memory | Integration | Sköll's cross-off/restore tool actions mutate only his private sheet and are traceable in the debug log. |
 | Wrong cast | Integration | A wrong Sköll cast wastes only his turn; the round continues. |
@@ -135,7 +135,7 @@ Covers R3, R4, and the casting flow. One shared action interface serves both the
 | Area | Test type | What to test |
 |---|---|---|
 | Graphics layer | Smoke / visual | Rune grid renders as high-fidelity DOM components orchestrated by GSAP; 24 cards, 6×4. |
-| Card content | Component | Each card shows glyph, color swatch, name + meaning, power as filled pips **with numeral**, element symbol + name, color name. Light/dark is not shown on the card (queryable via the Oracle). |
+| Card content | Component | Each card shows glyph, color swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name. Rune id not shown. Light/dark encoded by pip color (white light / black dark); pip count + fill spoken together in the accessible name as "{n} light/dark power", never as visible text; light/dark still a queryable Oracle axis. |
 | No color alone | a11y assertion | Color name and element name always accompany their icons — nothing conveyed by color alone. |
 | Cross-off affordance | Component | Card dims in place when crossed; restore affordance present and works. |
 | Header chrome | Component | Title, tagline, night-progress indicator, turn pill ("Your move." / "Sköll moves."). |

@@ -8,22 +8,22 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 1. Engine — the referee (highest priority)
 
-- [ ] [U] All 24 Elder Futhark runes load
-- [ ] [U] Every rune is a unique (element, power, color) combination
-- [ ] [U] Trait counts match `rune-board.md` (element 4 each · power 4 each · fill 12/12 · color 4 each)
-- [ ] [U] Exactly one secret rune per round; refresh/new round reseeds
-- [ ] [U] Element / power / fill / hue queries resolve truthfully (table-driven, all 24 × all axes)
-- [ ] [U] Power ranges correct at boundaries — "fewer than N", "at least N", "N or more", exact (1 and 6 inclusive)
-- [ ] [U] Single-rune query eliminates exactly that rune; yes only for the secret
-- [ ] [U] **Only the secret wins a Cast; every other rune fails**
-- [ ] [U] Wrong cast = wasted turn, round continues (never ends game)
-- [ ] [U] Engine accepts a Cast of a crossed-off rune; never validates against crossings
-- [ ] [U] Mixed-type / malformed / already-asked queries flagged invalid
-- [ ] [U] Refused/invalid Ask does **not** consume the turn; resolved Ask does
-- [ ] [Sec] No engine path returns the secret before a correct cast
-- [ ] [U] Strict alternation, human-first; out-of-order Ask/Cast rejected
-- [ ] [U] Scry returns same answer to rival; Hex suppresses answer + spends turn; Cast never interruptible
-- [ ] [U] Per-player wrong-cast counter increments from v1 (threshold unused until v2)
+- [x] [U] All 24 Elder Futhark runes load
+- [x] [U] Every rune is a unique (element, power, color) combination
+- [x] [U] Trait counts match `rune-board.md` (element 4 each · power 4 each · fill 12/12 · color 4 each)
+- [x] [U] Exactly one secret rune per round; refresh/new round reseeds
+- [x] [U] Element / power / fill / hue queries resolve truthfully (table-driven, all 24 × all axes)
+- [x] [U] Power ranges correct at boundaries — "fewer than N", "at least N", "N or more", exact (1 and 6 inclusive)
+- [x] [U] Single-rune query eliminates exactly that rune; yes only for the secret
+- [x] [U] **Only the secret wins a Cast; every other rune fails**
+- [x] [U] Wrong cast = wasted turn, round continues (never ends game)
+- [x] [U] Engine accepts a Cast of a crossed-off rune; never validates against crossings
+- [x] [U] Mixed-type / malformed queries flagged invalid; a repeated question is allowed (resolves again, not an error)
+- [x] [U] Refused/invalid Ask does **not** consume the turn; resolved Ask does
+- [x] [Sec] No engine path returns the secret before a correct cast
+- [x] [U] Strict alternation, human-first; out-of-order Ask/Cast rejected
+- [ ] [U] Scry returns same answer to rival; Hex suppresses answer + spends turn; Cast never interruptible _(S5)_
+- [x] [U] Per-player wrong-cast counter increments from v1 (threshold unused until v2)
 
 ## 2. Oracle pipeline (Gemini, Role 1)
 
@@ -43,7 +43,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 **Referee / leash**
 
 - [ ] [Sec][I] Sköll's tool-call inputs contain only earned state — never the secret, never the human's crossings
-- [ ] [I] Illegal/malformed Sköll calls rejected (already-asked, non-splitting, bad rune, mixed-type, out-of-turn)
+- [ ] [I] Illegal/malformed Sköll calls rejected (bad rune, mixed-type, out-of-turn); re-asking is legal play (not rejected) — the floor avoids redundant/non-splitting questions for move quality
 - [ ] [U] Board passed as JSON in fixed on-screen order; payload asserted not pre-sorted
 - [ ] [I] Sköll cross-off/restore mutates only his private sheet; traceable in debug log
 - [ ] [I] Wrong Sköll cast wastes only his turn; round continues
@@ -87,7 +87,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## 6. UI / graphics presentation
 
 - [ ] [V] Rune grid renders as high-fidelity DOM components orchestrated by GSAP; 24 cards 6×4
-- [ ] [C] Each card shows glyph, swatch, name + meaning, power as filled pips **with numeral**, element symbol + name, color name (light/dark not shown on card — queryable via the Oracle)
+- [ ] [C] Each card shows glyph, swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken in the accessible name as "{n} light/dark power", never as visible text)
 - [ ] [A] Color name + element name accompany icons — nothing by color alone
 - [ ] [C] Card dims in place when crossed; restore affordance works
 - [ ] [C] Header: title, tagline, night-progress, turn pill ("Your move." / "Sköll moves.")
@@ -137,19 +137,19 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## Enforced coverage gates (CI — PR fails below floor)
 
-- [ ] **Engine** — line **100%** / branch **95%**
+- [x] **Engine** — line **100%** / branch **95%**
 - [ ] **Deterministic fallback policy** — line **95%** / branch **90%**
 - [ ] **Action interface** — line **90%** / branch **85%**
 - [ ] **Oracle pipeline** — line **90%** / branch **85%**
 - [ ] **Reactions** — line **95%** / branch **90%**
 - [ ] **UI / interaction** — line **80%** / branch **70%**
 - [ ] **Graphics render layer** — line **60%** (smoke + visual carry it)
-- [ ] **Project overall** — line **85%** / branch **80%**
+- [x] **Project overall** — line **85%** / branch **80%**
 
 ## Enforced non-coverage gates (CI)
 
 - [ ] Lighthouse accessibility ≥ 0.95 (target ≈ 1.0)
-- [ ] Round-solvability property test passes across all seeds
+- [x] Round-solvability property test passes across all seeds
 - [ ] Secret-leak security assertion (engine API + Sköll payload)
 - [ ] Voice/terminology lint — zero diegetic violations
 
@@ -157,14 +157,14 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 - [ ] Weighted-random vs argmax statistical test present and passing (§3)
 - [ ] Turn-accounting-on-refusal covered for **every** refusal class (§2)
-- [ ] Crossed-rune cast legality covered (§1)
+- [x] Crossed-rune cast legality covered (§1)
 - [ ] Cast sacredness: reactions never offered on a Cast (§5)
 - [ ] Degradation **fairness** (solvable), not just renders (§8)
 - [ ] Secret never present in Sköll's payload (§3)
 
 ## Build-order alignment
 
-- [ ] Engine suite lands with engine
+- [x] Engine suite lands with engine
 - [ ] Oracle suite lands with Oracle
 - [ ] Human-loop + win/cast suites land with that module
 - [ ] Reactions suite lands with reactions

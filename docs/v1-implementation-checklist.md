@@ -8,7 +8,7 @@ This is a **sequencing + implementation** doc, not a capacity plan. No points, n
 
 **Build spine** (`game-spec.md`): engine → Oracle → human loop → win/cast → reactions → opponent. UI, a11y, and the demo scaffolding interleave where each becomes testable.
 
-Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration · [C] component · [E] e2e · [A] a11y · [S] statistical/property · [Sec] security · [Eval] scored eval · [V] visual.
+Legend for test tags matches `test-checklist.md`: \[U\] unit · \[I\] integration · \[C\] component · \[E\] e2e · \[A\] a11y · \[S\] statistical/property · \[Sec\] security · \[Eval\] scored eval · \[V\] visual.
 
 ---
 
@@ -18,10 +18,9 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 - [x] Single Cloud Run service scaffold (frontend + backend + engine in-process; Gemini called outbound only)
 - [x] One shared action interface (Ask / Cast / cross-off / react) that both the human UI and the Gemini opponent call — no second path
-- [x] `rune-board.md` loaded as the single board data source (24 runes, fixed on-screen order)
-- [ ] Deploy a hello-world build to the public URL early to de-risk the June 21 deploy
+- [x] `rune-board.md` loaded as the single board data source (24 runes; on-screen order is a per-round seeded shuffle, not the sorted data order)
 
-**Done when:** the service deploys, serves the board JSON in fixed order, and the action interface stub is the only entry point for game actions.
+**Done when:** the service deploys, serves the board in a stable per-round (seeded) order, and the action interface stub is the only entry point for game actions.
 
 ---
 
@@ -29,21 +28,21 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *The single source of truth. Strictest coverage bar in the project. Depends on: S0.*
 
-- [ ] Load all 24 Elder Futhark runes; assert every rune is a unique (element, power, color) combo
-- [ ] Trait counts enforced: element 4 each · power 4 each · fill 12/12 · color 4 each
-- [ ] Secret selection: exactly one secret rune per round; refresh/new round reseeds
-- [ ] Truthful trait resolution for all axes — element, power, fill (light/dark), hue
-- [ ] Power ranges: "fewer than N", "at least N", "N or more", exact N — correct at boundaries (1 and 6 inclusive)
-- [ ] Single-rune query eliminates exactly that rune; yes only for the secret
-- [ ] Win/cast: only the secret wins; every other cast fails → "wasted turn, round continues," never ends the game
-- [ ] Cast accepts **any** rune, crossed or not — engine never reads the player's crossings
-- [ ] Legality: mixed-type / malformed / already-asked queries flagged invalid
-- [ ] Turn accounting: a refused/invalid Ask does **not** consume the turn; a resolved Ask does
-- [ ] Strict alternation, human-first; out-of-order Ask/Cast rejected
-- [ ] Secret confidentiality: no engine path returns the secret before a correct cast
-- [ ] Per-player wrong-cast counter increments from v1 (threshold unused until v2 — hook only)
+- [x] Load all 24 Elder Futhark runes; assert every rune is a unique (element, power, color) combo
+- [x] Trait counts enforced: element 4 each · power 4 each · fill 12/12 · color 4 each
+- [x] Secret selection: exactly one secret rune per round; refresh/new round reseeds
+- [x] Truthful trait resolution for all axes — element, power, fill (light/dark), hue
+- [x] Power ranges: "fewer than N", "at least N", "N or more", exact N — correct at boundaries (1 and 6 inclusive)
+- [x] Single-rune query eliminates exactly that rune; yes only for the secret
+- [x] Win/cast: only the secret wins; every other cast fails → "wasted turn, round continues," never ends the game
+- [x] Cast accepts **any** rune, crossed or not — engine never reads the player's crossings
+- [x] Legality: mixed-type / malformed queries flagged invalid (a repeated question is legal play — the Oracle answers the same truth again; re-asking is never disallowed)
+- [x] Turn accounting: a refused/invalid Ask does **not** consume the turn; a resolved Ask does
+- [x] Strict alternation, human-first; out-of-order Ask/Cast rejected
+- [x] Secret confidentiality: no engine path returns the secret before a correct cast
+- [x] Per-player wrong-cast counter increments from v1 (threshold unused until v2 — hook only)
 
-**Tests to land:** [U] board integrity, secret selection, trait resolution (table-driven all 24 × all axes), power boundaries, single-rune, win/cast, crossed-rune cast, legality, turn accounting, alternation, wrong-cast counter · [Sec] secret never returned pre-cast.
+**Tests to land:** \[U\] board integrity, secret selection, trait resolution (table-driven all 24 × all axes), power boundaries, single-rune, win/cast, crossed-rune cast, legality, turn accounting, alternation, wrong-cast counter · \[Sec\] secret never returned pre-cast.
 
 **Done when:** engine hits its CI floor (line 100% / branch 95%) and the round-solvability property test passes across all seeds.
 
@@ -60,7 +59,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Refusals wired to exact `ux-copy.md` lines: mixed-type, secret-seeking, prompt-injection/override, unparseable, empty submit
 - [ ] Every refusal class does **not** consume the turn; a resolved Ask does
 
-**Tests to land:** [I] one-query mapping, turn accounting · [C] echo placement, answer voicing, each refusal class · [Sec] secret-seeking + prompt-injection refused, no leak · [Eval] ~40-phrasing corpus scored for query-type / refusal-class.
+**Tests to land:** \[I\] one-query mapping, turn accounting · \[C\] echo placement, answer voicing, each refusal class · \[Sec\] secret-seeking + prompt-injection refused, no leak · \[Eval\] ~40-phrasing corpus scored for query-type / refusal-class.
 
 **Done when:** Oracle hits its CI floor (line 90% / branch 85%) and the secret-leak security assertion holds through the Oracle path.
 
@@ -79,7 +78,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Pre-Ask panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle." (not blank)
 - [ ] Win on correct cast resolves the round
 
-**Tests to land:** [I] Ask/Cast distinct · [C] cross-off anytime, disabled-during-Sköll, arming flow, two-behavior isolation, starting Rite state · [E] wrong-cast continues.
+**Tests to land:** \[I\] Ask/Cast distinct · \[C\] cross-off anytime, disabled-during-Sköll, arming flow, two-behavior isolation, starting Rite state · \[E\] wrong-cast continues.
 
 **Done when:** a full human-only round (no Sköll yet) is winnable end-to-end through the action interface; action-interface CI floor (line 90% / branch 85%) met.
 
@@ -89,8 +88,8 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *The Plain tier — the v1 surface. Built as high-fidelity DOM components orchestrated by GSAP, with a native focusable layer for controls (`prd.md` UI Direction). Depends on: S3.*
 
-- [ ] Rune grid rendered as high-fidelity DOM components orchestrated by GSAP; 24 cards, 6×4, fixed order
-- [ ] Each card shows: glyph, color swatch, name + meaning, power as filled pips **with numeral**, element symbol + name, color name (light/dark is queryable via the Oracle, not shown on the card)
+- [ ] Rune grid rendered as high-fidelity DOM components orchestrated by GSAP; 24 cards, 6×4, in a per-round seeded shuffle (stable within a round, not the sorted data order). The seed is a server-generated Web Crypto uint32 — display-only and public (shared with Sköll for the same layout); the secret rune is the engine's own and is never derived from it
+- [ ] Each card shows: glyph, color swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken together in the accessible name as "{n} light/dark power", never as visible text; light/dark still a queryable Oracle axis)
 - [ ] Nothing conveyed by color alone — color name and element name always accompany their icons
 - [ ] Card dims in place when crossed; restore affordance present and works
 - [ ] Header: title "Save the Sun", tagline "A rite for the longest day," night-progress indicator, turn pill ("Your move." / "Sköll moves.")
@@ -98,7 +97,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Persistent explainer "Ask. Cross off what it can't be. Cast when you're ready."
 - [ ] Native focusable DOM elements carry the controls so rendering never blocks keyboard play
 
-**Tests to land:** [V] grid renders, visual-regression snapshots for grid + crossed/armed states · [C] card content, cross-off affordance, header chrome · [A] no-color-alone assertion.
+**Tests to land:** \[V\] grid renders, visual-regression snapshots for grid + crossed/armed states · \[C\] card content, cross-off affordance, header chrome · \[A\] no-color-alone assertion.
 
 **Done when:** the grid is fully playable by mouse and keyboard with the DOM grid rendered, controls live; UI CI floor (line 80% / branch 70%) + graphics smoke (line 60%) met.
 
@@ -115,7 +114,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Hex → question dies, no answer to anyone, active player's turn spent
 - [ ] Human-side prompt on Sköll's Ask: "Sköll asks. Answer it?" → Scry / Hex / Let it pass (`ux-copy.md` §3)
 
-**Tests to land:** [I] one-use-each, trigger-on-Ask-only (never Cast), interrupt window, Scry effect, Hex effect · [C] human prompt copy · [U] reaction resolution in engine.
+**Tests to land:** \[I\] one-use-each, trigger-on-Ask-only (never Cast), interrupt window, Scry effect, Hex effect · \[C\] human prompt copy · \[U\] reaction resolution in engine.
 
 **Done when:** reactions hit their CI floor (line 95% / branch 90%) and the cast-sacredness guard (reactions never offered on a Cast) is tested.
 
@@ -145,7 +144,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Casts when exactly one candidate remains; if no splitter exists earlier, casts the best remaining candidate
 - [ ] Same seed + same state → same sampled move (reproducible for the demo)
 
-**Tests to land:** [Sec][I] earned-only payload, no secret · [I] tool-call validation, cross-off tracing, wrong-cast · [U] board-order-not-presorted, candidate set, split score, cast condition, determinism-under-seed · [S] **non-argmax** statistical test · [Eval] ~12-year-old persona, computation tells flagged.
+**Tests to land:** \[Sec\]\[I\] earned-only payload, no secret · \[I\] tool-call validation, cross-off tracing, wrong-cast · \[U\] board-order-not-presorted, candidate set, split score, cast condition, determinism-under-seed · \[S\] **non-argmax** statistical test · \[Eval\] ~12-year-old persona, computation tells flagged.
 
 **Done when:** Sköll plays a full round through the same interface as the human, the floor catches every injected failure, and the fallback-policy CI floor (line 95% / branch 90%) is met. **The non-argmax statistical test is non-negotiable** (`test-checklist.md` high-risk gaps).
 
@@ -159,7 +158,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] First-run onboarding, one concept per step, dismissable, board visible behind (`ux-copy.md` §5 steps 1–4)
 - [ ] Skippable coach-mark tour over the live board; final button "Take up the runes."
 
-**Tests to land:** [C] title chrome, onboarding step copy, skip path.
+**Tests to land:** \[C\] title chrome, onboarding step copy, skip path.
 
 **Done when:** a first-time player can read the stakes, Ask, cross, and Cast concepts before the board, and skip cleanly.
 
@@ -173,7 +172,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Any turn the deterministic floor fired is flagged
 - [ ] Engine truth shown beside Gemini's reasoning — the demo contrast holds
 
-**Tests to land:** [I] result tagging, fallback flag, truth-vs-reasoning.
+**Tests to land:** \[I\] result tagging, fallback flag, truth-vs-reasoning.
 
 **Done when:** the debug view can be screen-shared during the demo and visibly separates fact from inference for every turn.
 
@@ -187,7 +186,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Defeat sequence: Sköll's winning cast → "Sköll takes the sun…" → CTAs "Stand against him again" / "Leave the fire."
 - [ ] Replay starts a fresh round (new secret reseed)
 
-**Tests to land:** [C] win/lose copy, replay reseeds.
+**Tests to land:** \[C\] win/lose copy, replay reseeds.
 
 **Done when:** both endings render their exact in-world lines and replay restarts a fair new round — no "Play again," no arcade tone.
 
@@ -206,7 +205,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Best-on-desktop notice on small screens — **no** responsive reflow attempted
 - [ ] Degradation: Plain (v1) round fully winnable on the static grid, audio muted by default; Reduced tier (reduced-motion OR WebGL/audio unavailable) stays unaffected and fair
 
-**Tests to land:** [E][manual] keyboard round + full keyboard cast path · [A] axe names/roles, contrast, color-independence · [C] reduced-motion · [manual] 200% zoom · [E] Plain + Reduced degradation, [S] fairness invariant · [C] best-on-desktop notice.
+**Tests to land:** \[E\][manual] keyboard round + full keyboard cast path · \[A\] axe names/roles, contrast, color-independence · \[C\] reduced-motion · \[manual\] 200% zoom · \[E\] Plain + Reduced degradation, \[S\] fairness invariant · \[C\] best-on-desktop notice.
 
 **Done when:** the Lighthouse a11y CI gate passes (≥ 0.95, target ≈ 1.0) and the build fails below it.
 
@@ -222,7 +221,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Sköll vs Oracle lines attributable to the correct speaker; Sköll taunt pool does not repeat within a game
 - [ ] Connection/engine error shown in-world ("The fire gutters…") **without** losing crossings or turn state
 
-**Tests to land:** [A] string + terminology lint · [Eval] speaker-distinctness · [I] no-repeat taunts, error-state preserves crossings/turn.
+**Tests to land:** \[A\] string + terminology lint · \[Eval\] speaker-distinctness · \[I\] no-repeat taunts, error-state preserves crossings/turn.
 
 **Done when:** the voice/terminology lint reports zero diegetic violations in CI.
 

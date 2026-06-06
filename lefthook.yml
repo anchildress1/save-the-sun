@@ -24,6 +24,7 @@ pre-push:
     typecheck:
       run: pnpm run check
     test:
-      run: pnpm run test:unit
+      # Coverage run so the CI floors (vite.config thresholds) are enforced on push.
+      run: pnpm run test:coverage
     e2e:
       run: pnpm run test:e2e
