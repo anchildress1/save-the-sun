@@ -7,7 +7,7 @@ import type { Interpretation, Interpret, RefusalClass } from '$lib/server/oracle
 
 const ELEMENTS = [...new Set(runes.map((r) => r.element))];
 const COLORS = [...new Set(runes.map((r) => r.color))];
-const VOWEL_ELEMENTS = ['Air', 'Earth'];
+const VOWEL_ELEMENTS = new Set(['Air', 'Earth']);
 
 // A seed whose secret is known, so Yes/No answers can be asserted exactly.
 const SEED = 1;
@@ -27,7 +27,7 @@ const queryInterp = (query: Query, paraphrase = 'the sign'): Interpretation => (
 describe('valuePhrase — {value-phrase} per axis (ux-copy.md §1)', () => {
 	it('element uses the right article and lowercases the value', () => {
 		for (const value of ELEMENTS) {
-			const article = VOWEL_ELEMENTS.includes(value) ? 'an' : 'a';
+			const article = VOWEL_ELEMENTS.has(value) ? 'an' : 'a';
 			expect(valuePhrase({ axis: 'element', value })).toBe(
 				`${article} ${value.toLowerCase()} rune`
 			);

@@ -37,6 +37,18 @@ describe('POST /api/action', () => {
 		expect(data).toMatchObject({ type: 'Ask', oracle: { ok: true } });
 	});
 
+	it('lets the human Ask again — the absent Sköll turn is skipped', async () => {
+		const first = await (
+			await call({ type: 'Ask', player: 'Human', question: 'is it light?' })
+		).json();
+		expect(first).toMatchObject({ type: 'Ask', oracle: { ok: true } });
+		// Without the pre-Sköll skip this second Ask would be rejected as not-your-turn.
+		const second = await (
+			await call({ type: 'Ask', player: 'Human', question: 'is it dark?' })
+		).json();
+		expect(second).toMatchObject({ type: 'Ask', oracle: { ok: true } });
+	});
+
 	it('routes a Cast to the engine', async () => {
 		const res = await call({ type: 'Cast', player: 'Human', runeName: selectSecret(SEED).name });
 		const data = await res.json();

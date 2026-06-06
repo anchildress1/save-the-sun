@@ -240,6 +240,24 @@ describe('GameEngine — secret confidentiality (no path leaks the secret pre-ca
 	});
 });
 
+describe('GameEngine — passTurn skips a player with no mover', () => {
+	it('hands the turn on while the round is active', () => {
+		const engine = new GameEngine(1);
+		engine.ask('Human', { axis: 'fill', value: 'Light' }); // Human → Sköll
+		expect(engine.activePlayer).toBe('Sköll');
+		engine.passTurn();
+		expect(engine.activePlayer).toBe('Human');
+	});
+
+	it('is a no-op once the round is won', () => {
+		const engine = new GameEngine(1);
+		engine.cast('Human', selectSecret(1).name); // win
+		engine.passTurn();
+		expect(engine.status).toBe('won');
+		expect(engine.activePlayer).toBe('Human');
+	});
+});
+
 describe('GameEngine — round solvability (every secret winnable through legal Asks; Oracle never lies)', () => {
 	it('reaches every one of the 24 secrets by some seed', () => {
 		const seedFor = new Map<string, number>();

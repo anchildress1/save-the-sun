@@ -79,6 +79,11 @@ export class GameEngine {
 		this.#round.active = this.#round.active === 'Human' ? 'Sköll' : 'Human';
 	}
 
+	/** Hand the turn on without an action — used to skip a player that has no mover yet. */
+	passTurn(): void {
+		if (this.#round.status === 'active') this.#advance();
+	}
+
 	/**
 	 * Resolve an Ask. A refused Ask (out of turn, malformed) never consumes the turn; a
 	 * resolved Ask does. Repeating a question is legal play — the Oracle answers the same

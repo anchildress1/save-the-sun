@@ -51,5 +51,12 @@ export const POST: RequestHandler = async ({ request }) => {
 		error(400, 'Malformed action payload.');
 	}
 
-	return json(await handleAction(body, { engine: getEngine(), interpret }));
+	const engine = getEngine();
+	const result = await handleAction(body, { engine, interpret });
+
+	// Pre-Sköll shim (S6): the opponent has no mover yet, so skip his turn and hand
+	// play straight back to the human. Remove once the Gemini opponent is wired.
+	if (engine.status === 'active' && engine.activePlayer === 'Sköll') engine.passTurn();
+
+	return json(result);
 };
