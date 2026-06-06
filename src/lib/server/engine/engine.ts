@@ -7,6 +7,7 @@
 // before a correct cast — the only secret-bearing path is a winning CastResult.
 
 import { runes, type Rune } from '$lib/board';
+import { mulberry32 } from '$lib/prng';
 import { parseQuery, queryKey, resolveQuery } from './queries';
 import type { Player } from './actions';
 
@@ -33,18 +34,6 @@ interface Round {
 	winner: Player | null;
 	wrongCasts: Record<Player, number>;
 	asked: Record<Player, Set<string>>;
-}
-
-// mulberry32: a tiny, fast, fully deterministic PRNG. Same seed → same stream,
-// which is what makes a round reproducible for the demo.
-function mulberry32(seed: number): () => number {
-	let a = seed >>> 0;
-	return () => {
-		a = (a + 0x6d2b79f5) | 0;
-		let t = Math.imul(a ^ (a >>> 15), 1 | a);
-		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
 }
 
 /** Pick the secret rune for a seed. Deterministic; the production round path. */
