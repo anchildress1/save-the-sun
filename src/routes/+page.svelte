@@ -154,7 +154,6 @@
 			<h2 class="oracle-title">The Oracle</h2>
 
 			<div class="oracle-frame">
-				<span class="frame-label">The Rite</span>
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
@@ -348,15 +347,6 @@
 		border-radius: 6px;
 		padding: 0.55rem 0.7rem;
 		background: rgba(0, 0, 0, 0.25);
-	}
-
-	.frame-label {
-		display: block;
-		font-size: 0.6rem;
-		letter-spacing: 0.24em;
-		text-transform: uppercase;
-		color: var(--gold);
-		margin-bottom: 0.25rem;
 	}
 
 	.frame-text {
