@@ -37,6 +37,7 @@
 	<div class="ambient" aria-hidden="true"></div>
 
 	<header class="card-top">
+		<span class="name">{rune.name}</span>
 		<!-- Color shown once: the dot plus its name (no-color-alone), top-right. The
 		     rune id is not shown — it is an internal index, not player information. -->
 		<span class="color-mark">
@@ -45,12 +46,8 @@
 		</span>
 	</header>
 
-	<div class="glyph-well">
+	<div class="middle">
 		<span class="glyph">{rune.glyph}</span>
-	</div>
-
-	<div class="ident">
-		<span class="name">{rune.name}</span>
 		<span class="meaning">{rune.meaning}</span>
 	</div>
 
@@ -58,15 +55,16 @@
 		<span class="trait element"
 			><span class="ic" aria-hidden="true">{icon}</span>{rune.element}</span
 		>
-		<!-- Pips ARE the power readout: count = power, fill = light/dark (white = light,
-		     black = dark). No numeral and no light/dark word on the card; the accessible
-		     name speaks them together as "{n} {light|dark} power" for screen-reader players. -->
+		<!-- Pips ARE the power value: count = power, fill = light/dark (white = light,
+		     black = dark). The "POWER" label names the trait; the value is shown by the pip
+		     count and narrated in the accessible name as "{n} {light|dark} power". -->
 		<span class="trait power">
 			<span class="pips" aria-hidden="true">
 				{#each pips as i (i)}
 					<span class="pip" class:dark={rune.fill === 'Dark'}></span>
 				{/each}
 			</span>
+			<span class="power-label">power</span>
 		</span>
 	</footer>
 
@@ -88,7 +86,7 @@
 		width: 100%;
 		min-width: 0;
 		aspect-ratio: 4 / 5;
-		padding: 0.55rem 0.6rem 0.5rem;
+		padding: 0.5rem 0.55rem;
 		text-align: left;
 		cursor: pointer;
 		overflow: hidden;
@@ -135,8 +133,9 @@
 
 	.card-top {
 		display: flex;
-		justify-content: flex-end;
+		justify-content: space-between;
 		align-items: flex-start;
+		gap: 0.4rem;
 		position: relative;
 		z-index: 2;
 	}
@@ -166,13 +165,16 @@
 			inset 0 0 2px rgba(0, 0, 0, 0.4);
 	}
 
-	.glyph-well {
+	.middle {
 		position: relative;
 		z-index: 2;
 		flex: 1;
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
+		gap: 0.2rem;
+		text-align: center;
 	}
 
 	.glyph {
@@ -185,21 +187,16 @@
 			0 0 26px rgba(217, 169, 74, 0.25);
 	}
 
-	.ident {
-		position: relative;
-		z-index: 2;
-		display: flex;
-		flex-direction: column;
-		gap: 0.05rem;
-		text-align: center;
-	}
-
 	.name {
 		font-family: var(--font-display);
-		font-size: 0.92rem;
-		letter-spacing: 0.12em;
+		font-size: 0.82rem;
+		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: var(--gold);
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.meaning {
@@ -270,8 +267,7 @@
 		border-color: rgba(255, 255, 255, 0.06);
 	}
 	.rune-card.crossed .card-top,
-	.rune-card.crossed .glyph-well,
-	.rune-card.crossed .ident,
+	.rune-card.crossed .middle,
 	.rune-card.crossed .traits {
 		opacity: 0.32;
 		filter: grayscale(80%);
@@ -309,8 +305,7 @@
 		opacity: 0.3;
 	}
 	.rune-card.armed.crossed .card-top,
-	.rune-card.armed.crossed .glyph-well,
-	.rune-card.armed.crossed .ident,
+	.rune-card.armed.crossed .middle,
 	.rune-card.armed.crossed .traits {
 		opacity: 1;
 		filter: none;

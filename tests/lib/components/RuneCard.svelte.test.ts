@@ -62,6 +62,11 @@ describe('RuneCard', () => {
 			.toBeInTheDocument();
 	});
 
+	it('labels the power pips so every trait on the card is labelled (value not written)', async () => {
+		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		await expect.element(screen.getByText('power', { exact: true })).toBeInTheDocument();
+	});
+
 	it('encodes fill on the pips — light pips plain, dark pips marked; count = power', async () => {
 		const light = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		expect(light.container.querySelectorAll('.pip')).toHaveLength(4);
