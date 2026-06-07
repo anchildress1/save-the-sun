@@ -1,4 +1,4 @@
-import { resetEngine } from '$lib/server/engine/session';
+import { getEngine } from '$lib/server/engine/session';
 import type { PageServerLoad } from './$types';
 
 // Seed for the on-screen board ORDER only — the shuffle that keeps element/light-dark
@@ -8,8 +8,9 @@ import type { PageServerLoad } from './$types';
 // be derivable from this public order. Generated on the server so SSR and hydration share
 // one order.
 export const load: PageServerLoad = ({ locals }) => {
-	// A refresh starts a new night: reseed this session's engine (new secret, human-first).
-	resetEngine(locals.sessionId);
+	// Lazily ensure the session's engine — a refresh resumes the same round, it does NOT
+	// reseed. The secret lives as long as the session; a new round comes from a new session.
+	getEngine(locals.sessionId);
 	// Web Crypto rather than Math.random — harmless for a display seed and keeps a single
 	// secure RNG path (and clears the Sonar weak-PRNG hotspot). Returns a uint32, which
 	// mulberry32 consumes via seed >>> 0.
