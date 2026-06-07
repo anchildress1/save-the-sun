@@ -9,6 +9,23 @@
 	// should fail loudly, not silently fall back to a frozen board.
 	let { data }: PageProps = $props();
 
+	// Every in-world line the Rite swaps in at runtime, in one place (ux-copy.md). Static chrome
+	// (title, button labels) stays inline in the template; these are the lines the Oracle panel,
+	// the turn pill, and the cast prompt show as play resolves.
+	const RITE = {
+		ready: 'Twenty-four runes stand. None ruled out. Ask the Oracle.',
+		emptyAsk: 'Speak your question, witch.',
+		wolfMoving: 'The wolf is moving. Hold.',
+		oracleSilent: 'The Oracle falls silent. Draw breath and try again.',
+		castFalters: 'The rite falters. The rune slips away.',
+		wrongCast: 'The rune is not the one. The night holds.',
+		runeTrue: 'The rune is true.',
+		yourMove: 'Your move.',
+		skollMoves: 'Sköll moves.',
+		chooseTarget: 'Choose a rune from the board.',
+		castPrompt: (name: string) => `Cast ${name}?`
+	};
+
 	let castMode = $state(false);
 	let selectedTargetId: number | null = $state(null);
 	let askValue = $state('');
@@ -28,15 +45,13 @@
 	// Won rounds read as resolved, not as a phantom turn. Defeat (Sköll's win) arrives with the
 	// opponent in S6; in v1 only the human can win, so a resolved round is always the true rune.
 	let turnPill = $derived(
-		roundOver ? 'The rune is true.' : activePlayer === 'Human' ? 'Your move.' : 'Sköll moves.'
+		roundOver ? RITE.runeTrue : activePlayer === 'Human' ? RITE.yourMove : RITE.skollMoves
 	);
 
 	function applyState(state: GameState) {
 		activePlayer = state.activePlayer;
 		roundStatus = state.status;
 	}
-
-	const READY = 'Twenty-four runes stand. None ruled out. Ask the Oracle.';
 
 	// Tracks the loaded seed until a new game overrides it. A changed seed remounts RuneGrid
 	// (via {#key}), discarding its crossings and highlight; the parent's cast arming is
@@ -49,7 +64,7 @@
 	// shows the answer, which restates the trait. The interpretation echo is reserved for the
 	// rival's Ask (you'd see his question, not his answer) — wired in S5/S6, so it is
 	// deliberately not rendered for your own Ask today.
-	let answer = $state(untrack(() => (data.state.status === 'won' ? 'The rune is true.' : READY)));
+	let answer = $state(untrack(() => (data.state.status === 'won' ? RITE.runeTrue : RITE.ready)));
 
 	let selectedRune = $derived(
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
@@ -73,7 +88,7 @@
 		const question = askValue.trim();
 		if (question === '') {
 			// Refusal does not consume a turn (game-spec). Client-side gate, no dispatch.
-			answer = 'Speak your question, witch.';
+			answer = RITE.emptyAsk;
 			return;
 		}
 		pending = true;
@@ -87,16 +102,13 @@
 				answer = oracle.line;
 			} else {
 				// not-your-turn means the engine has handed the turn to Sköll.
-				answer =
-					oracle.engineReason === 'not-your-turn'
-						? 'The wolf is moving. Hold.'
-						: 'The Oracle falls silent. Draw breath and try again.';
+				answer = oracle.engineReason === 'not-your-turn' ? RITE.wolfMoving : RITE.oracleSilent;
 			}
 		} catch (err) {
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
 			console.error('[ui] Ask dispatch failed:', err);
-			answer = 'The Oracle falls silent. Draw breath and try again.';
+			answer = RITE.oracleSilent;
 		} finally {
 			pending = false;
 		}
@@ -127,7 +139,7 @@
 			// reset — treat it as a hard failure, not a silent no-op.
 			if (!Number.isFinite(seed)) throw new Error('New game response missing boardSeed');
 			seedOverride = seed; // remounts RuneGrid → crossings + highlight clear
-			answer = READY;
+			answer = RITE.ready;
 			askValue = '';
 			// Fresh round: human-first, active again.
 			activePlayer = 'Human';
@@ -135,7 +147,7 @@
 			cancelCast();
 		} catch (err) {
 			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
-			answer = 'The Oracle falls silent. Draw breath and try again.';
+			answer = RITE.oracleSilent;
 		} finally {
 			pending = false;
 		}
@@ -152,14 +164,14 @@
 			});
 			applyState(state);
 			if (cast.ok) {
-				answer = cast.won ? 'The rune is true.' : 'The rune is not the one. The night holds.';
+				answer = cast.won ? RITE.runeTrue : RITE.wrongCast;
 			} else {
 				console.warn('[ui] Cast rejected by engine:', cast.reason);
-				answer = 'The rite falters. The rune slips away.';
+				answer = RITE.castFalters;
 			}
 		} catch (err) {
 			console.error('[ui] Cast dispatch failed:', err);
-			answer = 'The rite falters. The rune slips away.';
+			answer = RITE.castFalters;
 		} finally {
 			pending = false;
 			cancelCast();
@@ -266,7 +278,7 @@
 				<span class="cast-label">Cast a Rune</span>
 				{#if castMode}
 					<p class="cast-hint" data-testid="cast-hint">
-						{selectedRune ? `Cast ${selectedRune.name}?` : 'Choose a rune from the board.'}
+						{selectedRune ? RITE.castPrompt(selectedRune.name) : RITE.chooseTarget}
 					</p>
 					<div class="cast-actions">
 						<button
