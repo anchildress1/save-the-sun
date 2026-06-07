@@ -30,6 +30,8 @@
 		runeTrue: 'The rune is true.',
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
+		// His turn failed to load (network/Advance error) — in-world stall with a retry affordance.
+		wolfStalled: 'The wolf stalls in the dark. Rouse him to move.',
 		// Reaction outcomes on Sköll's Ask (ux-copy.md §3). A Scry surfaces his answer itself in the
 		// panel, so it needs no separate flavor line.
 		hexHim: "You close the Oracle's lips. His question dies unanswered — his turn with it.",
@@ -67,20 +69,18 @@
 	let skollAsking = $state(untrack(() => data.pendingReaction != null));
 	let heldScry = $state(untrack(() => data.pendingReaction?.held.Scry ?? true));
 	let heldHex = $state(untrack(() => data.pendingReaction?.held.Hex ?? true));
+	// His turn stalled (an Advance request failed). It's still his turn server-side, so the controls
+	// stay locked — surface a retry so the human can rouse him rather than being soft-locked.
+	let skollStalled = $state(false);
 
-	// Turn state mirrors the engine, hydrated from the load on mount and fed by each action
-	// response after. Hydrating (not guessing 'Human'/'active') is what keeps a resumed round —
-	// including one already won — truthful on load. The server's pre-Sköll shim hands play back
-	// to the human in v1, so activePlayer reads 'Human' in real play; the 'Sköll' branch goes
-	// live when S6 lands.
+	// Turn state mirrors the engine, hydrated from the load (not guessed) so a resumed round — incl.
+	// one already won, or one resumed on Sköll's turn — renders true on load, then fed by each action.
 	let activePlayer = $state<Player>(untrack(() => data.state.activePlayer));
 	let roundStatus = $state<'active' | 'won'>(untrack(() => data.state.status));
 	let turns = $state<number>(untrack(() => data.state.turns));
 	let winner = $state<Player | null>(untrack(() => data.state.winner));
 	let roundOver = $derived(roundStatus === 'won');
-	// A resolved round is a win for whoever cast true. The header swaps the moon for a risen sun
-	// on a human win and voices the resolution line (ux-copy.md §4); a Sköll win (mocked in v1,
-	// live in S6) keeps the moon under the defeat line.
+	// Header swaps the moon for a risen sun on a human win; a Sköll win keeps the moon, defeat line.
 	let humanWon = $derived(roundOver && winner === 'Human');
 	let skollWon = $derived(roundOver && winner === 'Sköll');
 	// Header carries the short tag; the Oracle panel carries the full resolution sentence.
@@ -111,15 +111,15 @@
 		winner = state.winner;
 	}
 
-	// Surface the wolf's turn: a cast voices his line (and a winning cast resolves to defeat); an
-	// Ask voices his taunt and opens the interrupt prompt with his question echo.
+	// Surface the wolf's turn: a cast voices his line, an Ask voices his taunt and opens the interrupt
+	// prompt with his echo. The defeat *line* is NOT set here — it derives from engine truth (winner)
+	// in advanceSkoll, so there's one source of "Sköll won," not two that can drift.
 	function applySkoll(skoll: SkollTurn | undefined) {
 		if (skoll === undefined) return;
 		if (skoll.cast) {
 			skollVoice = skoll.cast.line;
 			skollEcho = '';
 			skollAsking = false;
-			if (skoll.cast.won) answer = RITE.skollTakesSun;
 		} else if (skoll.asks) {
 			skollVoice = skoll.taunt;
 			skollEcho = skoll.asks.echo;
@@ -185,8 +185,15 @@
 			const { skoll, state } = (await res.json()) as { skoll?: SkollTurn; state: GameState };
 			applyState(state);
 			applySkoll(skoll);
+			// Defeat line is sourced from engine truth (winner), not the cast DTO — one source, no drift.
+			if (winner === 'Sköll') answer = RITE.skollTakesSun;
+			skollStalled = false;
 		} catch (err) {
+			// A failed Advance leaves the turn with Sköll, so the controls stay locked. Surface an
+			// in-world line AND a retry, or the human is soft-locked with only a console trace.
 			console.error('[ui] Sköll advance failed:', err);
+			answer = RITE.wolfStalled;
+			skollStalled = true;
 		}
 	}
 
@@ -474,6 +481,18 @@
 						Hex
 					</button>
 				</div>
+			{/if}
+
+			{#if skollStalled}
+				<button
+					class="ghost rouse-wolf"
+					type="button"
+					data-testid="rouse-wolf"
+					onclick={advanceSkoll}
+					disabled={pending}
+				>
+					Rouse the wolf
+				</button>
 			{/if}
 
 			<form
