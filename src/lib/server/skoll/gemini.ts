@@ -1,8 +1,8 @@
 // Sköll's Gemini brain (S6) — the LLM seam that decides his move. Excluded from coverage:
 // skoll.ts re-validates everything it returns and drops to the deterministic floor on any
-// failure. gemini-3.5-flash (GA), MINIMAL thinking, structured JSON out (his function-calling tools).
+// failure. gemini-3-flash-preview, MINIMAL thinking, structured JSON out (his function-calling tools).
 //
-// Prompts are tuned for Flash 3.5 (directness over verbosity): XML-tagged sections, explicit
+// Prompts are tuned for Gemini 3 Flash (directness over verbosity): XML-tagged sections, explicit
 // negative constraints, a few-shot anchor, data-before-task ordering. The challenge here is the
 // reverse of the usual one — Flash is capable enough to play optimally, so the prompt's job is to
 // keep him playing DOWN to a ~12-year-old: hunches, one clue at a time, no probability math, no
@@ -21,13 +21,13 @@ import type {
 	SkollReactionView
 } from './skoll';
 
-const MODEL = 'gemini-3.5-flash';
+const MODEL = 'gemini-3-flash-preview';
 
 const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
 const COLORS: string[] = [...new Set(runes.map((r) => r.color))];
 const NAMES: string[] = runes.map((r) => r.name);
 
-// Flash 3.5 favors directness over verbosity: tight XML sections, explicit negative constraints,
+// Gemini 3 Flash favors directness over verbosity: tight XML sections, explicit negative constraints,
 // and a few-shot anchor — the strongest lever to keep a capable model playing DOWN to the persona
 // instead of opening on the information-optimal split.
 const SYSTEM_INSTRUCTION = `<role>
