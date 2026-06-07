@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { load } from '$routes/+page.server';
 
 // load is synchronous and returns { boardSeed }; the PageServerLoad signature widens the
-// return to MaybePromise<…>, so narrow it for the assertions.
-const runLoad = () => load({} as never) as { boardSeed: number };
+// return to MaybePromise<…>, so narrow it for the assertions. load reseeds the session's
+// engine, so it needs a sessionId on locals.
+const runLoad = () =>
+	load({ locals: { sessionId: 'page-session' } } as never) as { boardSeed: number };
 
 describe('+page.server load — board seed', () => {
 	it('returns a uint32 integer seed', () => {
