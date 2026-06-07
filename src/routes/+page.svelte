@@ -451,11 +451,13 @@
 			{#if skollVoice || skollAsking}
 				<div class="skoll-frame" data-testid="skoll-frame">
 					<h2 class="skoll-title">Sköll</h2>
-					{#if skollVoice}
-						<p class="frame-text skoll-voice" data-testid="skoll-voice">{skollVoice}</p>
-					{/if}
+					<!-- His question is the actionable line (you Scry/Hex/Pass it), so it leads; the taunt
+					     is flavor and sits beneath, set off by a blank line. -->
 					{#if skollEcho}
 						<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
+					{/if}
+					{#if skollVoice}
+						<p class="frame-text skoll-voice" data-testid="skoll-voice">{skollVoice}</p>
 					{/if}
 				</div>
 			{/if}
@@ -745,6 +747,11 @@
 		margin: 0;
 		font-style: italic;
 		color: #cdd2dd;
+	}
+
+	/* Blank line between his question (lead) and the taunt beneath it — only when both are present. */
+	.skoll-echo + .skoll-voice {
+		margin-top: 0.6rem;
 	}
 
 	/* His Ask, echoed so the human knows what they're choosing to Scry, Hex, or let pass. */
