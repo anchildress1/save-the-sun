@@ -400,6 +400,8 @@ describe('Save the Sun page', () => {
 		await humanAsks(screen);
 		// Your answer landed from the Ask; his cast arrives on the follow-up Advance.
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('No. Sól is not reaching');
+		// He gets his own framed box, distinct from the Oracle's.
+		await expect.element(screen.getByTestId('skoll-frame')).toHaveTextContent('Sköll');
 		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
 	});
 

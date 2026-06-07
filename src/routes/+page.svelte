@@ -448,14 +448,19 @@
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
-			{#if skollVoice}
-				<p class="skoll-voice" data-testid="skoll-voice">{skollVoice}</p>
+			{#if skollVoice || skollAsking}
+				<div class="skoll-frame" data-testid="skoll-frame">
+					<h2 class="skoll-title">Sköll</h2>
+					{#if skollVoice}
+						<p class="frame-text skoll-voice" data-testid="skoll-voice">{skollVoice}</p>
+					{/if}
+					{#if skollEcho}
+						<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
+					{/if}
+				</div>
 			{/if}
 
 			{#if skollAsking}
-				{#if skollEcho}
-					<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
-				{/if}
 				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
 			{:else}
 				<div class="reactions">
@@ -712,14 +717,34 @@
 		color: var(--gold-bright);
 	}
 
-	/* Sköll's voice — colder than the Oracle's gold; his presence on the panel. */
+	/* Sköll's own frame — cold steel to the Oracle's gold, so the duel reads as two voices. */
+	.skoll-frame {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		padding: 0.55rem 0.7rem;
+		border: 1px solid rgba(139, 147, 166, 0.32);
+		border-radius: 6px;
+		background:
+			radial-gradient(circle at 50% 0%, rgba(139, 147, 166, 0.08) 0%, transparent 60%),
+			rgba(0, 0, 0, 0.28);
+	}
+
+	.skoll-title {
+		margin: 0;
+		text-align: center;
+		font-family: var(--font-display);
+		font-size: 0.92rem;
+		letter-spacing: 0.32em;
+		text-transform: uppercase;
+		color: #c2cad8; /* moon-cold, deliberately not the Oracle's gold */
+	}
+
+	/* His voice — colder than the Oracle's gold; his presence on the panel. */
 	.skoll-voice {
 		margin: 0;
-		font-family: var(--font-display);
 		font-style: italic;
-		font-size: 0.86rem;
-		line-height: 1.4;
-		color: var(--ink-muted);
+		color: #cdd2dd;
 	}
 
 	/* His Ask, echoed so the human knows what they're choosing to Scry, Hex, or let pass. */
