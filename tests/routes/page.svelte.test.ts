@@ -1,10 +1,17 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import Page from '$routes/+page.svelte';
+import type { GameState } from '$lib/server/engine/actions';
 
 // Full page props (data normally comes from +page.server.ts). A fixed seed keeps the
-// board order deterministic across these behavioural tests.
-const pageProps = { data: { boardSeed: 0 }, params: {}, form: null };
+// board order deterministic across these behavioural tests; the hydrated state opens the
+// page human-first on a live round.
+const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null };
+const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner: null };
+const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human' };
+
+const pageProps = { data: { boardSeed: 0, state: HUMAN_TURN }, params: {}, form: null };
+const propsWith = (state: GameState) => ({ data: { boardSeed: 0, state }, params: {}, form: null });
 
 afterEach(() => {
 	vi.unstubAllGlobals();
@@ -20,10 +27,6 @@ const respond = (body: object) => stubFetch(async () => new Response(JSON.string
 
 // Every action response carries the post-shim turn snapshot. Default: the human is back on
 // the clock with the round still live (the v1 pre-Sköll shim hands play straight back).
-const HUMAN_TURN = { activePlayer: 'Human', status: 'active', winner: null };
-const SKOLL_TURN = { activePlayer: 'Sköll', status: 'active', winner: null };
-const HUMAN_WON = { activePlayer: 'Human', status: 'won', winner: 'Human' };
-
 const askResult = (oracle: object, state: object = HUMAN_TURN) =>
 	respond({ type: 'Ask', oracle, state });
 const castResult = (cast: object, state: object = HUMAN_TURN) =>
@@ -199,6 +202,15 @@ describe('Save the Sun page', () => {
 		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
 		await expect.element(screen.getByRole('button', { name: 'Ask the Oracle' })).toBeEnabled();
 		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
+	});
+
+	it('opens a resumed won round on its win state — no phantom "Your move."', async () => {
+		const screen = render(Page, propsWith(HUMAN_WON));
+		// Hydrated from the load: the pill and panel agree, and play is locked until replay.
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('The rune is true.');
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rune is true.');
+		await expect.element(screen.getByRole('button', { name: 'Ask the Oracle' })).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
 	});
 
 	it('hands the turn to Sköll — pill flips and Ask + Cast disable', async () => {

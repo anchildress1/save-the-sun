@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import RuneGrid from '$lib/components/RuneGrid.svelte';
 	import { runes } from '$lib/board';
 	import type { GameAction, ActionResponse, GameState, Player } from '$lib/server/engine/actions';
@@ -13,11 +14,13 @@
 	let askValue = $state('');
 	let pending = $state(false);
 
-	// Turn state mirrors the engine, fed by each action response. Human-first, round active
-	// until a correct Cast. The server's pre-Sköll shim hands play back to the human in v1, so
-	// activePlayer reads 'Human' here today; the 'Sköll' branch goes live when S6 lands.
-	let activePlayer = $state<Player>('Human');
-	let roundStatus = $state<'active' | 'won'>('active');
+	// Turn state mirrors the engine, hydrated from the load on mount and fed by each action
+	// response after. Hydrating (not guessing 'Human'/'active') is what keeps a resumed round —
+	// including one already won — truthful on load. The server's pre-Sköll shim hands play back
+	// to the human in v1, so activePlayer reads 'Human' in real play; the 'Sköll' branch goes
+	// live when S6 lands.
+	let activePlayer = $state<Player>(untrack(() => data.state.activePlayer));
+	let roundStatus = $state<'active' | 'won'>(untrack(() => data.state.status));
 	let roundOver = $derived(roundStatus === 'won');
 	// Ask and Cast are turn-gated; cross-off is a private aid and is never gated (RuneGrid owns
 	// it and stays enabled through Sköll's turn — game-spec "private aid").
@@ -42,10 +45,11 @@
 	let boardSeed = $derived(seedOverride ?? data.boardSeed);
 
 	// The Oracle surface — one response at a time. Defaults read as ready, not blank (prd.md
-	// S3). Your Ask shows the answer, which restates the trait. The interpretation echo is
-	// reserved for the rival's Ask (you'd see his question, not his answer) — wired in S5/S6,
-	// so it is deliberately not rendered for your own Ask today.
-	let answer = $state(READY);
+	// S3); a resumed won round opens on its victory line so the panel and pill agree. Your Ask
+	// shows the answer, which restates the trait. The interpretation echo is reserved for the
+	// rival's Ask (you'd see his question, not his answer) — wired in S5/S6, so it is
+	// deliberately not rendered for your own Ask today.
+	let answer = $state(untrack(() => (data.state.status === 'won' ? 'The rune is true.' : READY)));
 
 	let selectedRune = $derived(
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)

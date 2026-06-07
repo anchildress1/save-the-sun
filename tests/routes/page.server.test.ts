@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { load } from '$routes/+page.server';
 import { getEngine, resetEngine } from '$lib/server/engine/session';
 import { selectSecret } from '$lib/server/engine/engine';
+import type { GameState } from '$lib/server/engine/actions';
 
-// load is synchronous and returns { boardSeed }; the PageServerLoad signature widens the
-// return to MaybePromise<…>, so narrow it for the assertions.
+// load is synchronous and returns { boardSeed, state }; the PageServerLoad signature widens
+// the return to MaybePromise<…>, so narrow it for the assertions.
 const runLoad = (sessionId: string) =>
-	load({ locals: { sessionId } } as never) as { boardSeed: number };
+	load({ locals: { sessionId } } as never) as { boardSeed: number; state: GameState };
 
 const SEED = 1;
 
@@ -30,6 +31,22 @@ describe('+page.server load — engine lifetime', () => {
 		const engine = getEngine('fresh-session');
 		expect(engine.status).toBe('active');
 		expect(engine.activePlayer).toBe('Human');
+	});
+
+	it('hydrates the live turn state — fresh round is human-first and active', () => {
+		const { state } = runLoad('hydrate-fresh');
+		expect(state).toEqual({ activePlayer: 'Human', status: 'active', winner: null });
+	});
+
+	it('reports a resumed won round so the UI does not open on a phantom turn', () => {
+		resetEngine('hydrate-won', SEED);
+		getEngine('hydrate-won').cast('Human', selectSecret(SEED).name);
+		// The reload after a win must surface 'won', not guess 'active'.
+		expect(runLoad('hydrate-won').state).toEqual({
+			activePlayer: 'Human',
+			status: 'won',
+			winner: 'Human'
+		});
 	});
 
 	it('a refresh resumes the same round — the secret does NOT change', () => {
