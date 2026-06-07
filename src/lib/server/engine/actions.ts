@@ -76,6 +76,11 @@ export interface SkollReaction {
 	scried?: { answer: string };
 }
 
+/** How Sköll reacted to the *human's* Ask (S6, R12 reverse): Hex kills it, Scry overhears it. */
+export interface SkollVsYou {
+	reaction: 'Scry' | 'Hex' | 'Pass';
+}
+
 /** Read the engine's public turn state into a wire DTO. */
 export function gameState(engine: GameEngine): GameState {
 	return {
@@ -95,7 +100,7 @@ export function gameState(engine: GameEngine): GameState {
 export type ActionResponse<T extends ActionResult['type'] = ActionResult['type']> = Extract<
 	ActionResult,
 	{ type: T }
-> & { state: GameState; skoll?: SkollTurn; skollReaction?: SkollReaction };
+> & { state: GameState; skoll?: SkollTurn; skollReaction?: SkollReaction; skollVsYou?: SkollVsYou };
 
 /** Route one action to the engine/Oracle. */
 export async function handleAction(action: GameAction, deps: ActionDeps): Promise<ActionResult> {

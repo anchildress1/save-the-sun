@@ -8,15 +8,16 @@ import {
 } from '$lib/server/engine/actions';
 import { getEngine, getSkoll } from '$lib/server/engine/session';
 import { interpret } from '$lib/server/oracle/gemini';
-import { voiceAnswer } from '$lib/server/oracle/oracle';
+import { voiceAnswer, prepareAsk, answerAsk } from '$lib/server/oracle/oracle';
 import { resolveReaction } from '$lib/server/engine/reactions';
 import {
 	takeSkollTurn,
 	resolveSkollAsk,
+	reactToHumanAsk,
 	type SkollOutcome,
 	type SkollState
 } from '$lib/server/skoll/skoll';
-import { decideSkollMove } from '$lib/server/skoll/gemini';
+import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
 import { castLine, tauntAt } from '$lib/server/skoll/taunts';
 import { mulberry32 } from '$lib/prng';
 import type { GameEngine } from '$lib/server/engine/engine';
@@ -110,6 +111,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ type: 'React', outcome: reaction, skollReaction, state: gameState(engine) });
 	}
 
+	// The human's Ask: Sköll may interrupt it (R12 reverse) before the answer — Hex kills it, Scry
+	// overhears it. Handled here (not in handleAction) because the reaction must land between the
+	// interpreted query and its answer, then Sköll still takes his own turn.
+	if (body.type === 'Ask') return askWithSkollReaction(engine, skoll, body.question);
+
 	const result = await handleAction(body, { engine, interpret });
 
 	// The human's action handed the turn to Sköll → the wolf plays through the same interface.
@@ -118,6 +124,32 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	return json({ ...result, ...(skollTurn && { skoll: skollTurn }), state: gameState(engine) });
 };
+
+async function askWithSkollReaction(engine: GameEngine, skoll: SkollState, question: string) {
+	const prepared = await prepareAsk(question, interpret);
+	// A refusal never opens a window, spends a turn, or rouses Sköll — it just bounces back.
+	if (!prepared.ok) return json({ type: 'Ask', oracle: prepared.result, state: gameState(engine) });
+
+	const vs = await reactToHumanAsk(engine, skoll, prepared.query, decideSkollReaction);
+	let oracle;
+	if (vs.killed) {
+		engine.passTurn(); // her question dies; her turn is spent with no answer
+	} else {
+		oracle = answerAsk(engine, 'Human', prepared.query, prepared.paraphrase);
+		// A Scry lets Sköll overhear her truthful answer — his earned fact, his to use.
+		if (vs.scried && oracle.ok)
+			skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
+	}
+
+	const skollTurn = await playSkollIfActive(engine, skoll);
+	return json({
+		type: 'Ask',
+		...(oracle && { oracle }),
+		skollVsYou: { reaction: vs.choice },
+		...(skollTurn && { skoll: skollTurn }),
+		state: gameState(engine)
+	});
+}
 
 async function playSkollIfActive(
 	engine: GameEngine,

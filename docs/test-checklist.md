@@ -91,7 +91,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [I] Scry → rival also receives private answer
 - [x] [I] Hex → question dies, no answer to anyone _(kill + no-answer tested in S5; the asker's turn-spend on a hexed Ask lands with S6's hexed-Ask orchestration — the window now precedes the answer, so the Ask is never resolved on a Hex)_
 - [x] [C] Human prompt "Sköll asks. Answer it?" → Scry / Hex / Let it pass per `ux-copy.md`
-- [ ] [I] Sköll's reaction is refereed Gemini response with deterministic-floor fallback _(reverse direction — Sköll reacting to the human's Ask — deferred; engine/reactions already support it. His live **Ask** + the human's reaction to it landed in S6.)_
+- [x] [I] Sköll's reaction is refereed Gemini response with deterministic-floor fallback _(both directions live: the human reacts to his Ask, and Sköll (Gemini, floor = Pass) reacts to hers — Hex before any answer, Scry as his earned fact)_
 
 ## 6. UI / graphics presentation
 

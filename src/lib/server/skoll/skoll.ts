@@ -12,7 +12,11 @@ import { runes } from '$lib/board';
 import { parseQuery, type Query } from '$lib/server/engine/queries';
 import { valuePhrase } from '$lib/server/oracle/oracle';
 import type { GameEngine, CastResult } from '$lib/server/engine/engine';
-import type { ReactionOutcome } from '$lib/server/engine/reactions';
+import {
+	resolveReaction,
+	type ReactionChoice,
+	type ReactionOutcome
+} from '$lib/server/engine/reactions';
 import { chooseFloorMove, type EarnedFact } from './floor';
 
 /** Sköll's private, per-round memory. Holds no secret and no read of the human's crossings. */
@@ -202,4 +206,81 @@ export function resolveSkollAsk(
 	state.facts.push({ query, answer: result.answer });
 	const shared = reaction.ok && reaction.choice === 'Scry';
 	return { hexed: false, affirmative: result.answer, shared };
+}
+
+// --- Sköll reacting to the human's Ask (R12 reverse direction) ---
+
+/** The earned-only view for a reaction decision: his state + the trait the human just asked. */
+export interface SkollReactionView {
+	askedTrait: string;
+	answers: { trait: string; holds: boolean }[];
+	crossedOff: number[];
+	canScry: boolean;
+	canHex: boolean;
+}
+
+/** The Gemini reaction seam: a reaction view in, an (untrusted) choice out. */
+export type SkollReactionDecide = (view: SkollReactionView) => Promise<{ reaction?: string }>;
+
+/** What Sköll did to the human's Ask — `killed` means his Hex landed; `scried` means he overheard. */
+export interface SkollVsHuman {
+	choice: ReactionChoice;
+	killed: boolean;
+	scried: boolean;
+}
+
+function validateReaction(raw: unknown, canScry: boolean, canHex: boolean): ReactionChoice | null {
+	if (raw === 'Scry') return canScry ? 'Scry' : null;
+	if (raw === 'Hex') return canHex ? 'Hex' : null;
+	if (raw === 'Pass') return 'Pass';
+	return null;
+}
+
+async function planReaction(
+	engine: GameEngine,
+	state: SkollState,
+	query: Query,
+	decide: SkollReactionDecide
+): Promise<ReactionChoice> {
+	const canScry = engine.reactionAvailable('Sköll', 'Scry');
+	const canHex = engine.reactionAvailable('Sköll', 'Hex');
+	if (!canScry && !canHex) return 'Pass'; // nothing left to spend — never bluff a reaction
+	try {
+		const raw = await decide({
+			askedTrait: valuePhrase(query),
+			answers: state.facts.map((f) => ({ trait: valuePhrase(f.query), holds: f.answer })),
+			crossedOff: [...state.crossed],
+			canScry,
+			canHex
+		});
+		const choice = validateReaction(raw.reaction, canScry, canHex);
+		if (choice) return choice;
+		console.warn(`[skoll] illegal/unavailable reaction, passing: ${JSON.stringify(raw)}`);
+	} catch (err) {
+		console.error('[skoll] reaction decision failed, passing:', err);
+	}
+	return 'Pass'; // the safe floor — never spends a charge, never kills
+}
+
+/**
+ * Let Sköll react to the human's *pending* Ask, before its answer (the S5 window, reverse
+ * direction). Opens the window on the human's Ask, asks Gemini whether to Scry/Hex/Pass (floor =
+ * Pass on any failure), and resolves it. The caller answers the Ask afterward — unless `killed`,
+ * in which case the question dies and the human's turn is spent with no answer.
+ */
+export async function reactToHumanAsk(
+	engine: GameEngine,
+	state: SkollState,
+	query: Query,
+	decide: SkollReactionDecide
+): Promise<SkollVsHuman> {
+	engine.openReactionWindow('Human');
+	const choice = await planReaction(engine, state, query, decide);
+	const outcome = resolveReaction(engine, 'Sköll', choice);
+	if (dev) console.debug(`[skoll] reacts to the human's Ask: ${choice} (landed=${outcome.ok})`);
+	return {
+		choice,
+		killed: outcome.ok && outcome.choice === 'Hex',
+		scried: outcome.ok && outcome.choice === 'Scry'
+	};
 }

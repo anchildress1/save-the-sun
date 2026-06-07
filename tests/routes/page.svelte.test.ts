@@ -426,6 +426,38 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('His question dies unanswered');
 	});
 
+	it('shows the silenced line when Sköll Hexes the human Ask', async () => {
+		respond({
+			type: 'Ask',
+			// No oracle line — the question was silenced before any answer.
+			skollVsYou: { reaction: 'Hex' },
+			skoll: { taunt: 'You circle. I close.', cast: { line: 'I name it. Dagaz.', won: false } },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent("The Oracle's lips close.");
+		// His own move still surfaces in his voice slot.
+		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
+	});
+
+	it('shows the answer when Sköll Scries the human Ask (covert — no extra line)', async () => {
+		respond({
+			type: 'Ask',
+			oracle: { ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+			skollVsYou: { reaction: 'Scry' },
+			skoll: { taunt: 'You circle. I close.', cast: { line: 'I name it. Dagaz.', won: false } },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
+	});
+
 	it('falls to defeat when Sköll casts true on his turn', async () => {
 		respond({
 			type: 'Ask',

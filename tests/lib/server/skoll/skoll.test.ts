@@ -2,11 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import {
 	buildPayload,
 	freshSkollState,
+	reactToHumanAsk,
 	resolveSkollAsk,
 	takeSkollTurn,
 	type RawSkollDecision,
 	type SkollDecide,
 	type SkollPayload,
+	type SkollReactionDecide,
 	type SkollState
 } from '$lib/server/skoll/skoll';
 import { GameEngine, selectSecret } from '$lib/server/engine/engine';
@@ -218,5 +220,57 @@ describe('resolveSkollAsk — closing his Ask after the human reacts', () => {
 		const engine = skollsTurn();
 		const reaction = resolveReaction(engine, 'Human', 'Pass');
 		expect(() => resolveSkollAsk(engine, freshSkollState(SEED), reaction)).toThrow();
+	});
+});
+
+describe('reactToHumanAsk — Sköll reacting to the human (R12 reverse)', () => {
+	const HUMAN_QUERY = { axis: 'fill', value: 'Light' } as const;
+	const reacts = (reaction: string): SkollReactionDecide => vi.fn(async () => ({ reaction }));
+
+	it('Pass: lets her Ask stand and spends nothing', async () => {
+		const engine = new GameEngine(SEED); // human's turn
+		const vs = await reactToHumanAsk(engine, freshSkollState(SEED), HUMAN_QUERY, reacts('Pass'));
+		expect(vs).toEqual({ choice: 'Pass', killed: false, scried: false });
+		expect(engine.reactionAvailable('Sköll', 'Scry')).toBe(true);
+		expect(engine.reactionWindow).toBeNull();
+	});
+
+	it('Hex: kills her Ask and spends the charge', async () => {
+		const engine = new GameEngine(SEED);
+		const vs = await reactToHumanAsk(engine, freshSkollState(SEED), HUMAN_QUERY, reacts('Hex'));
+		expect(vs).toMatchObject({ choice: 'Hex', killed: true });
+		expect(engine.reactionAvailable('Sköll', 'Hex')).toBe(false);
+	});
+
+	it('Scry: overhears her answer and spends the charge', async () => {
+		const engine = new GameEngine(SEED);
+		const vs = await reactToHumanAsk(engine, freshSkollState(SEED), HUMAN_QUERY, reacts('Scry'));
+		expect(vs).toMatchObject({ choice: 'Scry', scried: true });
+		expect(engine.reactionAvailable('Sköll', 'Scry')).toBe(false);
+	});
+
+	it('passes (floor) when the reaction decision throws', async () => {
+		const engine = new GameEngine(SEED);
+		const decide: SkollReactionDecide = vi.fn(async () => {
+			throw new Error('timeout');
+		});
+		const vs = await reactToHumanAsk(engine, freshSkollState(SEED), HUMAN_QUERY, decide);
+		expect(vs.choice).toBe('Pass');
+	});
+
+	it('passes (floor) on an illegal reaction value', async () => {
+		const engine = new GameEngine(SEED);
+		const vs = await reactToHumanAsk(engine, freshSkollState(SEED), HUMAN_QUERY, reacts('Howl'));
+		expect(vs.choice).toBe('Pass');
+	});
+
+	it('never bluffs a reaction with no charges left — passes without asking', async () => {
+		const engine = new GameEngine(SEED);
+		engine.consumeReaction('Sköll', 'Scry');
+		engine.consumeReaction('Sköll', 'Hex');
+		const decide = reacts('Hex');
+		const vs = await reactToHumanAsk(engine, freshSkollState(SEED), HUMAN_QUERY, decide);
+		expect(vs.choice).toBe('Pass');
+		expect(decide).not.toHaveBeenCalled();
 	});
 });

@@ -34,6 +34,9 @@
 		scryHim: 'You lean into the dark and listen. His answer is yours too.',
 		hexHim: "You close the Oracle's lips. His question dies unanswered — his turn with it.",
 		passHim: 'You hold your hand. Let him have his answer.',
+		// Sköll hexing your Ask (ux-copy.md §3). A Scry stays covert — he overhears in silence; his
+		// gain is intel, surfaced only by how he plays next, so there is no scry-on-you line to show.
+		hexYou: "The Oracle's lips close. My doing.",
 		// Resolution lines (ux-copy.md §4) — voiced in the header when a round ends. A human win
 		// raises the sun under sunCrests; a Sköll win keeps the moon under the defeat line.
 		sunCrests: 'Sól crests the rim of the world.',
@@ -171,9 +174,17 @@
 		}
 		pending = true;
 		try {
-			const { oracle, state, skoll } = await dispatch({ type: 'Ask', player: 'Human', question });
+			const { oracle, state, skoll, skollVsYou } = await dispatch({
+				type: 'Ask',
+				player: 'Human',
+				question
+			});
 			applyState(state);
-			if (oracle.ok) {
+			if (skollVsYou?.reaction === 'Hex') {
+				// The wolf silenced the Ask before any answer — no oracle line comes back.
+				answer = RITE.hexYou;
+				askValue = '';
+			} else if (oracle.ok) {
 				answer = oracle.answer;
 				askValue = '';
 			} else if (oracle.reason === 'refusal') {

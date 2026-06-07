@@ -9,7 +9,13 @@ import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
 import { runes } from '$lib/board';
 import type { PowerOp, Query } from '$lib/server/engine/queries';
-import type { RawSkollDecision, SkollDecide, SkollPayload } from './skoll';
+import type {
+	RawSkollDecision,
+	SkollDecide,
+	SkollPayload,
+	SkollReactionDecide,
+	SkollReactionView
+} from './skoll';
 
 const MODEL = 'gemini-3.5-flash';
 
@@ -121,4 +127,28 @@ export const decideSkollMove: SkollDecide = async (payload: SkollPayload) => {
 		}
 	});
 	return normalize(JSON.parse(response.text ?? '{}') as RawResponse);
+};
+
+const REACTION_INSTRUCTION = `You are Sköll, the wolf, playing the rite against a witch. She has just asked the Oracle a question. You get ONE interrupt: Scry (you hear her answer too — useful intel), Hex (the Oracle falls silent, her question dies and her turn with it — denies her a clue), or Pass (let it go). Each is one-use for the whole game; spend them when they matter. A person playing — no probability math. Decide in character.`;
+
+const REACTION_SCHEMA = {
+	type: Type.OBJECT,
+	properties: { reaction: { type: Type.STRING, enum: ['Scry', 'Hex', 'Pass'] } },
+	required: ['reaction']
+};
+
+// Throws on transport/parse failure — skoll.ts catches it and passes (the reaction floor).
+export const decideSkollReaction: SkollReactionDecide = async (view: SkollReactionView) => {
+	const response = await ai().models.generateContent({
+		model: MODEL,
+		contents: JSON.stringify(view),
+		config: {
+			systemInstruction: REACTION_INSTRUCTION,
+			responseMimeType: 'application/json',
+			responseSchema: REACTION_SCHEMA,
+			thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+			temperature: 1
+		}
+	});
+	return JSON.parse(response.text ?? '{}') as { reaction?: string };
 };
