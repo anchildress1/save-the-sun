@@ -63,12 +63,13 @@ export function splitScore(query: Query, live: Rune[]): number | null {
 function weightedSample(scored: { query: Query; score: number }[], rng: () => number): Query {
 	const total = scored.reduce((sum, s) => sum + s.score, 0);
 	let r = rng() * total;
+	let last = scored[0].query; // scored is non-empty (caller casts when there's nothing to sample)
 	for (const s of scored) {
 		r -= s.score;
 		if (r < 0) return s.query;
+		last = s.query;
 	}
-	// Floating-point slack: rng() can land at the very top of the range. Fall to the last.
-	return scored[scored.length - 1].query;
+	return last; // floating-point slack: rng() can land at the very top of the range — fall to the last
 }
 
 /**
