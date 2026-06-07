@@ -30,6 +30,8 @@ function isAction(body: Partial<GameAction>): body is GameAction {
 			return (
 				'reaction' in body && typeof body.reaction === 'string' && REACTIONS.has(body.reaction)
 			);
+		default:
+			return false;
 	}
 }
 
