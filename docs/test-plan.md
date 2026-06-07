@@ -40,7 +40,7 @@ Covers R1, R3, R4, R12 truth resolution, and the Architecture contract. Pure, de
 
 **Example cases**
 
-- `secret = Mannaz (Spirit, 2, Black)` → query "earth?" → No; "two power?" → Yes; "at least 2?" → Yes; "is it Algiz?" → No; cast Mannaz → win.
+- `secret = Eihwaz (Spirit, 2, Red)` → query "earth?" → No; "two power?" → Yes; "at least 2?" → Yes; "is it Algiz?" → No; cast Eihwaz → win.
 - Cast `Isa` when `Isa` is crossed off and `secret = Isa` → win (crossings ignored).
 - Ask "is it a red fire rune?" → invalid (mixed-type), turn **not** consumed.
 - Hex on opponent Ask → no answer emitted to anyone; active turn spent.
