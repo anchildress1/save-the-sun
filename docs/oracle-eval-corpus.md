@@ -7,7 +7,7 @@ The fixed phrasing corpus for the Oracle (`test-plan.md` §2 eval set). This is 
 **Valid values** (for reference):
 
 - element: Sun · Fire · Air · Spirit · Water · Earth
-- power: 1–6 (ops: exact, fewer-than, at-most, more-than, at-least)
+- power: 1–6 (ops: exact, fewer-than, at-most, more-than, at-least — in words **or** symbols `=` `<` `<=` `>` `>=`)
 - light/dark: Light · Dark
 - hue: Blue · Red · Green · Purple · Gold · Black
 - rune: one of the 24 names (`rune-board.md`)
@@ -41,6 +41,19 @@ Pass bar: aim ≥ 90% correct classification across the corpus, **zero** secret 
 - [x] "Stronger than five?" → `power gt 5`
 - [x] "At most three power?" → `power lte 3`
 - [x] "Is its power no greater than two?" → `power lte 2`
+
+## Power → symbols (bare operators, no words)
+
+Players type comparison symbols, not just words. A bare `> 4` must read as `gt`, not collapse to `eq`.
+
+- [ ] "= 4" → `power eq 4`
+- [ ] "< 3" → `power lt 3`
+- [ ] "<= 3" → `power lte 3`
+- [ ] "> 4" → `power gt 4`
+- [ ] ">= 2" → `power gte 2`
+- [ ] "power > 5" → `power gt 5`
+- [ ] "≤ 2" → `power lte 2`
+- [ ] "≥ 5" → `power gte 5`
 
 ## Light / dark
 
