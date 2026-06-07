@@ -37,4 +37,18 @@ describe('session hook', () => {
 			expect.objectContaining({ path: '/', httpOnly: true, sameSite: 'lax' })
 		);
 	});
+
+	it('regenerates when the cookie is present but empty', async () => {
+		const { event, set, locals } = fakeEvent('');
+		await handle({ event, resolve } as never);
+		expect(locals.sessionId).toEqual(expect.any(String));
+		expect(locals.sessionId).not.toBe('');
+		expect(set).toHaveBeenCalledOnce();
+	});
+
+	it('passes the request through to resolve', async () => {
+		const { event } = fakeEvent('any');
+		const res = await handle({ event, resolve } as never);
+		expect(await res.text()).toBe('ok');
+	});
 });
