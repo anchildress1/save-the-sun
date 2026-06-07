@@ -216,6 +216,7 @@ Tiered by blast radius. The engine owns truth, so it carries the hardest bar; UI
 | **Engine** (board, query resolution, win/cast, legality, reaction resolution, secret handling) | **100%** | **95%** | Single source of truth. Untested branches here are unfair rounds. Non-negotiable. |
 | **Deterministic fallback policy** | **95%** | **90%** | The demo's no-hard-fail floor; must behave under every failure path. |
 | **Action interface** (shared Ask/Cast/cross-off/react routing) | **90%** | **85%** | Both players route through it; a gap is a gap for both. |
+| **Round lifecycle** (session isolation, new-game reset endpoint) | **90%** | **85%** | Mutates the session engine like the action interface; same blast radius. |
 | **Oracle pipeline** (parse, query-build, refusal, turn accounting) | **90%** | **85%** | Parsing/guardrail logic is deterministic; LLM voicing is eval-verified, not line-gated. |
 | **Reactions** (Scry/Hex state machine) | **95%** | **90%** | Small, sharp, easy to break silently. |
 | **UI / interaction** (cards, arming flow, chrome, error states) | **80%** | **70%** | Behavior-tested; rendering pixels covered by visual regression instead. |
