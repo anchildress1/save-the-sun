@@ -13,8 +13,8 @@ describe('Rune Board Data Source', () => {
 		expect(sowilo?.glyph).toBe('ᛋ');
 		expect(sowilo?.element).toBe('Sun');
 		expect(sowilo?.power).toBe(1);
-		expect(sowilo?.fill).toBe('Light');
-		expect(sowilo?.color).toBe('Blue');
+		expect(sowilo?.fill).toBe('Dark');
+		expect(sowilo?.color).toBe('Red');
 	});
 
 	it('maintains the fixed on-screen order (id 1 to 24)', () => {

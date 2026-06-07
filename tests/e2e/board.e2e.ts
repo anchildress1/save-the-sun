@@ -10,7 +10,7 @@ test('renders all 24 rune cards with visible trait text', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('.rune-card')).toHaveCount(24);
 	// No color alone: the color name itself is visible text on the board.
-	await expect(page.locator('.rune-card[data-rune-name="Sowilo"]').getByText('Blue')).toBeVisible();
+	await expect(page.locator('.rune-card[data-rune-name="Sowilo"]').getByText('Red')).toBeVisible();
 });
 
 test('crosses a rune off and restores it', async ({ page }) => {

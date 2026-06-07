@@ -6,8 +6,8 @@
 		"meaning": "sun",
 		"element": "Sun",
 		"power": 1,
-		"fill": "Light",
-		"color": "Blue"
+		"fill": "Dark",
+		"color": "Red"
 	},
 	{
 		"id": 2,
@@ -15,9 +15,9 @@
 		"glyph": "ᛞ",
 		"meaning": "day, dawn",
 		"element": "Sun",
-		"power": 2,
+		"power": 4,
 		"fill": "Light",
-		"color": "Red"
+		"color": "Purple"
 	},
 	{
 		"id": 3,
@@ -25,7 +25,7 @@
 		"glyph": "ᚲ",
 		"meaning": "torch",
 		"element": "Sun",
-		"power": 2,
+		"power": 5,
 		"fill": "Light",
 		"color": "Green"
 	},
@@ -35,9 +35,9 @@
 		"glyph": "ᚹ",
 		"meaning": "joy",
 		"element": "Sun",
-		"power": 1,
-		"fill": "Light",
-		"color": "Red"
+		"power": 6,
+		"fill": "Dark",
+		"color": "Blue"
 	},
 	{
 		"id": 5,
@@ -45,9 +45,9 @@
 		"glyph": "ᚠ",
 		"meaning": "cattle, wealth",
 		"element": "Fire",
-		"power": 3,
+		"power": 1,
 		"fill": "Light",
-		"color": "Green"
+		"color": "Purple"
 	},
 	{
 		"id": 6,
@@ -55,9 +55,9 @@
 		"glyph": "ᚢ",
 		"meaning": "aurochs, strength",
 		"element": "Fire",
-		"power": 4,
-		"fill": "Light",
-		"color": "Purple"
+		"power": 2,
+		"fill": "Dark",
+		"color": "Green"
 	},
 	{
 		"id": 7,
@@ -65,9 +65,9 @@
 		"glyph": "ᚦ",
 		"meaning": "thorn, giant",
 		"element": "Fire",
-		"power": 4,
-		"fill": "Light",
-		"color": "Red"
+		"power": 5,
+		"fill": "Dark",
+		"color": "Blue"
 	},
 	{
 		"id": 8,
@@ -75,9 +75,9 @@
 		"glyph": "ᛏ",
 		"meaning": "the god Tyr",
 		"element": "Fire",
-		"power": 3,
+		"power": 6,
 		"fill": "Light",
-		"color": "Blue"
+		"color": "Black"
 	},
 	{
 		"id": 9,
@@ -85,9 +85,9 @@
 		"glyph": "ᚨ",
 		"meaning": "god, breath",
 		"element": "Air",
-		"power": 5,
+		"power": 1,
 		"fill": "Light",
-		"color": "Red"
+		"color": "Gold"
 	},
 	{
 		"id": 10,
@@ -95,9 +95,9 @@
 		"glyph": "ᚱ",
 		"meaning": "ride, journey",
 		"element": "Air",
-		"power": 6,
-		"fill": "Light",
-		"color": "Blue"
+		"power": 2,
+		"fill": "Dark",
+		"color": "Green"
 	},
 	{
 		"id": 11,
@@ -105,7 +105,7 @@
 		"glyph": "ᛖ",
 		"meaning": "horse",
 		"element": "Air",
-		"power": 5,
+		"power": 3,
 		"fill": "Light",
 		"color": "Blue"
 	},
@@ -116,8 +116,8 @@
 		"meaning": "gift",
 		"element": "Air",
 		"power": 6,
-		"fill": "Light",
-		"color": "Green"
+		"fill": "Dark",
+		"color": "Black"
 	},
 	{
 		"id": 13,
@@ -135,9 +135,9 @@
 		"glyph": "ᛇ",
 		"meaning": "yew tree",
 		"element": "Spirit",
-		"power": 1,
-		"fill": "Dark",
-		"color": "Purple"
+		"power": 2,
+		"fill": "Light",
+		"color": "Red"
 	},
 	{
 		"id": 15,
@@ -145,9 +145,9 @@
 		"glyph": "ᛉ",
 		"meaning": "elk, protection",
 		"element": "Spirit",
-		"power": 2,
-		"fill": "Dark",
-		"color": "Green"
+		"power": 3,
+		"fill": "Light",
+		"color": "Blue"
 	},
 	{
 		"id": 16,
@@ -155,7 +155,7 @@
 		"glyph": "ᛗ",
 		"meaning": "humanity",
 		"element": "Spirit",
-		"power": 2,
+		"power": 4,
 		"fill": "Dark",
 		"color": "Black"
 	},
@@ -165,9 +165,9 @@
 		"glyph": "ᛚ",
 		"meaning": "water, lake",
 		"element": "Water",
-		"power": 3,
-		"fill": "Dark",
-		"color": "Black"
+		"power": 2,
+		"fill": "Light",
+		"color": "Gold"
 	},
 	{
 		"id": 18,
@@ -177,7 +177,7 @@
 		"element": "Water",
 		"power": 3,
 		"fill": "Dark",
-		"color": "Gold"
+		"color": "Red"
 	},
 	{
 		"id": 19,
@@ -187,7 +187,7 @@
 		"element": "Water",
 		"power": 4,
 		"fill": "Dark",
-		"color": "Black"
+		"color": "Purple"
 	},
 	{
 		"id": 20,
@@ -195,9 +195,9 @@
 		"glyph": "ᚾ",
 		"meaning": "need",
 		"element": "Water",
-		"power": 4,
-		"fill": "Dark",
-		"color": "Gold"
+		"power": 5,
+		"fill": "Light",
+		"color": "Black"
 	},
 	{
 		"id": 21,
@@ -205,9 +205,9 @@
 		"glyph": "ᛃ",
 		"meaning": "year, harvest",
 		"element": "Earth",
-		"power": 5,
+		"power": 3,
 		"fill": "Dark",
-		"color": "Black"
+		"color": "Gold"
 	},
 	{
 		"id": 22,
@@ -215,9 +215,9 @@
 		"glyph": "ᛒ",
 		"meaning": "birch",
 		"element": "Earth",
-		"power": 5,
-		"fill": "Dark",
-		"color": "Purple"
+		"power": 4,
+		"fill": "Light",
+		"color": "Red"
 	},
 	{
 		"id": 23,
@@ -225,9 +225,9 @@
 		"glyph": "ᛜ",
 		"meaning": "the god Ing, fertility",
 		"element": "Earth",
-		"power": 6,
+		"power": 5,
 		"fill": "Dark",
-		"color": "Gold"
+		"color": "Purple"
 	},
 	{
 		"id": 24,
@@ -236,7 +236,7 @@
 		"meaning": "heritage, estate",
 		"element": "Earth",
 		"power": 6,
-		"fill": "Dark",
-		"color": "Purple"
+		"fill": "Light",
+		"color": "Green"
 	}
 ]
