@@ -129,12 +129,14 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *Real-time reaction is core to a responding opponent — pulled into v1. Depends on: S3 (action interface), S4 (reactions panel UI).*
 
-- [ ] One charge of each per player per round; spent reaction vanishes (no "spent" copy)
-- [ ] Both trigger on an **Ask** only; a Cast resolves uninterrupted (the win check is sacred)
-- [ ] Interrupt window: at most one reaction per window; if Hex is used there is no answer left to Scry
-- [ ] Scry → rival also receives the private answer
-- [ ] Hex → question dies, no answer to anyone, active player's turn spent
-- [ ] Human-side prompt on Sköll's Ask: "Sköll asks. Answer it?" → Scry / Hex / Let it pass (`ux-copy.md` §3)
+- [x] One charge of each per player per round; spent reaction vanishes (no "spent" copy)
+- [x] Both trigger on an **Ask** only; a Cast resolves uninterrupted (the win check is sacred)
+- [x] Interrupt window: at most one reaction per window; if Hex is used there is no answer left to Scry
+- [x] Scry → rival also receives the private answer
+- [x] Hex → question dies, no answer to anyone, active player's turn spent
+- [x] Human-side prompt on Sköll's Ask: "Sköll asks. Answer it?" → Scry / Hex / Let it pass (`ux-copy.md` §3)
+
+**Implementation (S5):** the engine owns the reaction *state* — one Scry + one Hex per player, plus the **interrupt window** (the asker whose just-resolved Ask the rival may answer). A resolved Ask opens the window; a resolved Cast closes it, so a Cast is structurally never interruptible (the win check stays sacred); a reaction or a decline closes it, so at most one reaction lands per window — once Hex silences a question there is no answer left for Scry. The reaction *policy* lives in `reactions.ts` (`resolveReaction`): Pass lets the Ask stand and spends nothing; Scry/Hex need an open window owned by the **rival** and an unspent charge, then either spends it and resolves (`shareAnswer` / `killAnswer`). Hex's "no answer to anyone" is the action layer withholding the asker's answer, not the engine — the engine still consumes the asker's turn at Ask time, so the turn is spent either way. The human-side prompt is `ReactionPrompt.svelte` (held reactions only, so a spent one simply vanishes). The **live trigger is S6**: Sköll has no Ask yet, so the prompt — like the Sköll turn pill — is built and tested but lit up when the Gemini opponent Asks through the same interface.
 
 **Tests to land:** [I] one-use-each, trigger-on-Ask-only (never Cast), interrupt window, Scry effect, Hex effect · [C] human prompt copy · [U] reaction resolution in engine.
 
