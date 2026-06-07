@@ -180,7 +180,7 @@ A mood feature that can't degrade to the tier below doesn't ship — so each tie
 |---|---|---|
 | Connection / engine error | Integration + E2E | Shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**. |
 | Empty submit | Component | Refused with "Speak your question, witch." |
-| Best-on-desktop notice | Component | Small screens get the notice — no responsive reflow attempted. |
+| Best-on-desktop notice | Component | Below the 1280px minimum the notice shows — no responsive reflow attempted (1024px support is v2). |
 | Malformed Ask recovery | Integration | Invalid Ask costs only the rephrase, never a false answer (ties to §2). |
 | Round solvability | Property | Every seeded round is winnable through legal Asks alone; Oracle never lies (fuzz across many secrets/seeds). |
 

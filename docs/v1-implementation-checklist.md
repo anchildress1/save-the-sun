@@ -221,7 +221,7 @@ Legend for test tags matches `test-checklist.md`: \[U\] unit · \[I\] integratio
 - [ ] No information by color alone (cross-check S4)
 - [ ] `prefers-reduced-motion` → motion instant, audio muted, still reflects live state changes
 - [ ] Fully operable at 200% zoom
-- [ ] Best-on-desktop notice on small screens — **no** responsive reflow attempted
+- [ ] Best-on-desktop notice below the **1280px** minimum — **no** responsive reflow attempted (1024px support is v2)
 - [ ] Degradation: Plain (v1) round fully winnable on the static grid, audio muted by default; Reduced tier (reduced-motion OR WebGL/audio unavailable) stays unaffected and fair
 
 **Tests to land:** \[E\]\[manual\] keyboard round + full keyboard cast path · \[A\] axe names/roles, contrast, color-independence · \[C\] reduced-motion · \[manual\] 200% zoom · \[E\] Plain + Reduced degradation, \[S\] fairness invariant · \[C\] best-on-desktop notice.
@@ -277,6 +277,7 @@ Legend for test tags matches `test-checklist.md`: \[U\] unit · \[I\] integratio
 3. Cast win animation — glyph carves into stone + luminous Sól beat; honors reduced motion
 4. Voice interaction with Gemini — speak the Ask, hear the Oracle/Sköll (TTS)
 5. Wrong-cast penalty — cap ≈2 wrong casts per player (threshold on the v1 counter; alternation unaffected)
+6. Small-desktop support down to 1024px — a responsive board below the v1 1280px floor (v1 just shows the best-on-desktop notice there)
 
 ---
 

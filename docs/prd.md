@@ -170,7 +170,7 @@ Deterministic fallback (acceptance criteria — this is the floor that fires **o
 
 **R9. Accessibility basics (screen reader deferred to v1.5).** v1 must cover keyboard operability with visible focus, semantic labels for controls, no information by color alone (the color name accompanies every swatch and element carries text), WCAG 2.1 AA contrast including the dark palette, `prefers-reduced-motion` cutting motion to instant and keeping audio muted while responding to live changes, operability at 200% zoom, and a Lighthouse a11y pass in CI. Full screen-reader narration/navigation is v1.5.
 
-**R10. Best-on-desktop notice** on small screens — no responsive reflow.
+**R10. Best-on-desktop notice** below the 1280px minimum — no responsive reflow. (Small-desktop/1024px support is deferred to v2.)
 
 **R11. End screen** — win/lose lines and in-world replay.
 

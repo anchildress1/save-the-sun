@@ -27,7 +27,7 @@ Legend: **\[U\]** unit · **\[I\]** integration · **\[C\]** component · **\[E\
 
 ## 2. Oracle pipeline (Gemini, Role 1)
 
-- [ ] \[I\] Free-text maps to exactly one query type; multi-type intent rejected, not split _(the free-text→query mapping is eval-gated — see the `\[Eval\]` row; structural mixed-type rejection is CI-proven in `queries`)_
+- [x] \[I\] Free-text maps to exactly one query type; multi-type intent rejected, not split _(the free-text→query mapping is eval-gated — see the `\[Eval\]` row; structural mixed-type rejection is CI-proven in `queries`)_
 - [x] \[C\] Echo matches the resolved query, shown **before** the answer; interpreted query stands (no do-over)
 - [x] \[C\] Both verdicts restate the trait (Yes "is reaching for", No "is not reaching for"); `{value-phrase}` fills per axis
 - [x] \[C\] Mixed-type refusal returns `ux-copy.md` line; turn not consumed
@@ -37,7 +37,7 @@ Legend: **\[U\]** unit · **\[I\]** integration · **\[C\]** component · **\[E\
 - [x] \[C\] Unparseable / not-a-question refusal; turn not consumed
 - [x] \[C\] Empty submit refused with "Speak your question, witch." (nothing sent)
 - [x] \[I\] Resolved Ask consumes turn; every refusal class does not
-- [ ] \[Eval\] ~40-phrasing corpus scored for correct query-type / refusal-class _(live Gemini — manual/offline, intentionally out of deterministic CI; phrases in `oracle-eval-corpus.md`)_
+- [x] \[Eval\] ~40-phrasing corpus scored for correct query-type / refusal-class _(live Gemini — manual/offline, intentionally out of deterministic CI; phrases in `oracle-eval-corpus.md`)_
 
 ## 3. Sköll — opponent + deterministic floor
 
@@ -116,7 +116,7 @@ Legend: **\[U\]** unit · **\[I\]** integration · **\[C\]** component · **\[E\
 
 - [ ] \[I\]\[E\] Connection/engine error shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**
 - [x] \[C\] Empty submit refused with "Speak your question, witch."
-- [ ] \[C\] Small screens get best-on-desktop notice — no responsive reflow
+- [ ] \[C\] Below the 1280px minimum: best-on-desktop notice — no responsive reflow (1024px support is v2)
 - [x] \[I\] Invalid Ask costs only the rephrase, never a false answer
 - [ ] \[S\] Every seeded round winnable through legal Asks; Oracle never lies (fuzz across secrets/seeds)
 
