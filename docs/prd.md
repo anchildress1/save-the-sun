@@ -47,7 +47,7 @@ Audience: the jam judge / dev.to reader who plays a round or two and needs to *f
 ### Mood spine — tide and stingers
 This layer is the **v2** target. v1 ships the graphics rune grid and the playable race; the atmospheric mood below is what v2 adds on top. Mood runs on two synchronized layers, the way *Carbon Trace* ran ambient beds under one-shot narration. Mood and voice intensity follow the dials already set in `ux-copy.md` (the Cast Voice Charter and the night-progress chrome) — this doesn't redefine them.
 
-- **Continuous tide (the night→dawn arc).** Keyed to the night-progress chrome in `ux-copy.md`: *"The dark holds" → "The dark thins" → "Dawn is close,"* driven by elapsed turns. Ambient bed, background luminance, and Sköll's presence shift continuously along it. Sköll closing in darkens the tide; the player narrowing brightens it.
+- **Continuous tide (the night→dawn arc).** Keyed to the night-progress chrome in `ux-copy.md`: *"The night lies deep and unbroken" → "Gray bleeds into the dark" → "Dawn gathers at the edge of the world,"* driven by elapsed turns. Ambient bed, background luminance, and Sköll's presence shift continuously along it. Sköll closing in darkens the tide; the player narrowing brightens it.
 - **Event stingers (discrete one-shots) over the tide.** Short spikes on specific beats — a resolved Ask, a Sköll taunt, a Cast arming, a wrong cast, the win or loss — that resolve back into the tide without disturbing it.
 - **Characters embody the arc.** Sköll is a visible character — the hunting wolf whose presence darkens the tide — paired with Sól, the dawn the brightening resolves toward (she appears fully only at victory, per `ux-copy.md`). The arc belongs to them, not to abstract weather.
 

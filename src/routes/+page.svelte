@@ -23,9 +23,9 @@
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
 		// Night-progress chrome (ux-copy.md §6), keyed to elapsed turns — cosmetic, no timer.
-		nightHolds: 'The dark holds.',
-		nightThins: 'The dark thins.',
-		nightDawn: 'Dawn is close.',
+		nightHolds: 'The night lies deep and unbroken.',
+		nightThins: 'Gray bleeds into the dark.',
+		nightDawn: 'Dawn gathers at the edge of the world.',
 		chooseTarget: 'Choose a rune from the board.',
 		castPrompt: (name: string) => `Cast ${name}?`
 	};

@@ -200,17 +200,23 @@ describe('Save the Sun page', () => {
 
 	it('opens on the early-night progress line before any turn is spent', async () => {
 		const screen = render(Page, pageProps);
-		await expect.element(screen.getByTestId('night-progress')).toHaveTextContent('The dark holds.');
+		await expect
+			.element(screen.getByTestId('night-progress'))
+			.toHaveTextContent('The night lies deep and unbroken.');
 	});
 
 	it('hydrates the mid-night progress phase from the loaded turn count', async () => {
 		const screen = render(Page, propsWith({ ...HUMAN_TURN, turns: 4 }));
-		await expect.element(screen.getByTestId('night-progress')).toHaveTextContent('The dark thins.');
+		await expect
+			.element(screen.getByTestId('night-progress'))
+			.toHaveTextContent('Gray bleeds into the dark.');
 	});
 
 	it('hydrates the late-night progress phase from the loaded turn count', async () => {
 		const screen = render(Page, propsWith({ ...HUMAN_TURN, turns: 6 }));
-		await expect.element(screen.getByTestId('night-progress')).toHaveTextContent('Dawn is close.');
+		await expect
+			.element(screen.getByTestId('night-progress'))
+			.toHaveTextContent('Dawn gathers at the edge of the world.');
 	});
 
 	it('advances the night-progress as turns are spent on an Ask', async () => {
@@ -222,10 +228,14 @@ describe('Save the Sun page', () => {
 			}
 		);
 		const screen = render(Page, pageProps);
-		await expect.element(screen.getByTestId('night-progress')).toHaveTextContent('The dark holds.');
+		await expect
+			.element(screen.getByTestId('night-progress'))
+			.toHaveTextContent('The night lies deep and unbroken.');
 		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
-		await expect.element(screen.getByTestId('night-progress')).toHaveTextContent('Dawn is close.');
+		await expect
+			.element(screen.getByTestId('night-progress'))
+			.toHaveTextContent('Dawn gathers at the edge of the world.');
 	});
 
 	it('opens on the human turn — "Your move." and controls live', async () => {

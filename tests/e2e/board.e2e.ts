@@ -8,7 +8,7 @@ test('renders the rite header', async ({ page }) => {
 
 test('shows the night-progress chrome holding early in the night', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByTestId('night-progress')).toHaveText('The dark holds.');
+	await expect(page.getByTestId('night-progress')).toHaveText('The night lies deep and unbroken.');
 });
 
 test('renders all 24 rune cards with visible trait text', async ({ page }) => {

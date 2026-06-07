@@ -98,7 +98,7 @@ Templated. **Both verdicts restate the trait** — `Yes. Sól is reaching for {v
 
 **Negation is not asked.** The Oracle speaks of what *is*, never what is not, so a negated Ask ("is it not fire?", "isn't it light?", "anything but gold?") is refused — there is no not-equal operator. The witch asks plainly and reads the verdict; a `No` already tells them what Sól is not reaching for.
 
-> Voice-guard: never "I think," "maybe," "it seems," and no mood-only answers ("the dark thins"). State the verdict (Yes/No) and the trait clause — what Sól is or is not reaching for — and nothing more; never hedge or invent a reason.
+> Voice-guard: never "I think," "maybe," "it seems," and no mood-only answers ("Gray bleeds into the dark"). State the verdict (Yes/No) and the trait clause — what Sól is or is not reaching for — and nothing more; never hedge or invent a reason.
 
 ### Refusals
 | Trigger | Line |
@@ -205,7 +205,7 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 |---|---|
 | Whose turn — you | **"Your move."** |
 | Whose turn — Sköll | **"Sköll moves."** |
-| Night's progress (cosmetic, by elapsed turns — no timer mechanic) | early: **"The dark holds."** → mid: **"The dark thins."** → late: **"Dawn is close."** |
+| Night's progress (cosmetic, by elapsed turns — no timer mechanic) | early: **"The night lies deep and unbroken."** → mid: **"Gray bleeds into the dark."** → late: **"Dawn gathers at the edge of the world."** |
 | Cast armed (player believes one remains) | **"Cast?"** |
 
 ### Empty & error states (stay at the fire)
