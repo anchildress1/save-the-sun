@@ -88,14 +88,16 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *The playable core, text-only is fine here — graphics arrive in S4. Depends on: S1, S2.*
 
-- [ ] Ask and Cast are two distinct actions (Ask never wins, Cast never asks)
-- [ ] Cross-off is a private aid: cross/restore anytime, **including Sköll's turn**; persists across turns
-- [ ] During Sköll's turn: Ask + Cast disabled, cross-off stays enabled; acting shows "The wolf is moving. Hold."
-- [ ] Cast arming flow: "Cast the rune" arms Cast mode; while armed a card select **chooses target** (no cross-off), chrome reads "Cast?"; "Name it" commits; "Not yet" cancels with **no turn spent**
-- [ ] Two scoped card behaviors (cross-off normally, select-target while armed) never collide
-- [ ] Wrong cast costs the turn only; crossings + round state preserved
-- [ ] Pre-Ask panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle." (not blank)
-- [ ] Win on correct cast resolves the round
+- [x] Ask and Cast are two distinct actions (Ask never wins, Cast never asks)
+- [x] Cross-off is a private aid: cross/restore anytime, **including Sköll's turn**; persists across turns
+- [x] During Sköll's turn: Ask + Cast disabled, cross-off stays enabled; acting shows "The wolf is moving. Hold."
+- [x] Cast arming flow: "Cast the rune" arms Cast mode; while armed a card select **chooses target** (no cross-off), chrome reads "Cast?"; "Name it" commits; "Not yet" cancels with **no turn spent**
+- [x] Two scoped card behaviors (cross-off normally, select-target while armed) never collide
+- [x] Wrong cast costs the turn only; crossings + round state preserved
+- [x] Pre-Ask panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle." (not blank)
+- [x] Win on correct cast resolves the round
+
+**Implementation (S3):** every `api/action` response carries a `state` snapshot (`activePlayer`, `status`, `winner`) read from the engine **after** the route's pre-Sköll shim (`actions.ts` → `gameState`). The page drives the turn pill, the Ask/Cast disabling, and the round-over lock from it; cross-off lives in `RuneGrid` and is never turn-gated. In v1 the shim hands play back to the human every turn, so `activePlayer` reads `Human` in real play — the `Sköll` branch (pill flip, Ask/Cast disabled, "The wolf is moving. Hold.") is the same machinery S6 lights up when the shim is removed, exercised today via mocked responses. A resolved round flips the turn pill to the victory line ("The rune is true.") and locks Ask/Cast, leaving "Begin another night" as the next step — the full S9 victory sequence (Sól's line, defeat, choreography) builds on this minimal win state.
 
 **Tests to land:** [I] Ask/Cast distinct · [C] cross-off anytime, disabled-during-Sköll, arming flow, two-behavior isolation, starting Rite state · [E] wrong-cast continues.
 
