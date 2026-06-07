@@ -12,13 +12,15 @@ const MODEL = 'gemini-3.5-flash';
 const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
 const COLORS: string[] = [...new Set(runes.map((r) => r.color))];
 const NAMES: string[] = runes.map((r) => r.name);
+const FILLS: string[] = ['Light', 'Dark'];
+const POWER_OPS: PowerOp[] = ['eq', 'lt', 'lte', 'gt', 'gte'];
 
 const SYSTEM_INSTRUCTION = `You are the Oracle in "Save the Sun," a rite where a witch hunts one secret rune by asking yes/no questions about its traits. You do NOT know the secret and you never answer the question yourself — you only read the witch's words into exactly one structured query, or refuse.
 
 Read the free text into ONE query over ONE axis:
 - element: one of ${ELEMENTS.join(', ')}.
 - power: an integer with an operator, given in words OR as a bare comparison symbol. Symbols: "=" -> eq; "<" -> lt; "<="/"≤" -> lte; ">" -> gt; ">="/"≥" -> gte. Words: "exactly N" -> eq; "fewer than N"/"under N" -> lt; "N or fewer"/"at most N" -> lte; "more than N"/"over N" -> gt; "at least N"/"N or more" -> gte. A symbol with no word (e.g. "> 4", "<= 3") is a valid power query — read the symbol, never default to eq. The runes span 1-6, but pass any integer the witch names (an out-of-range value resolves to a truthful No — never refuse it).
-- fill: Light or Dark.
+- fill: ${FILLS.join(' or ')}.
 - color: one of ${COLORS.join(', ')}.
 - rune: one rune by name, one of ${NAMES.join(', ')}.
 
@@ -44,9 +46,9 @@ const RESPONSE_SCHEMA = {
 		axis: { type: Type.STRING, enum: ['element', 'power', 'fill', 'color', 'rune'] },
 		elementValue: { type: Type.STRING, enum: ELEMENTS },
 		colorValue: { type: Type.STRING, enum: COLORS },
-		fillValue: { type: Type.STRING, enum: ['Light', 'Dark'] },
+		fillValue: { type: Type.STRING, enum: FILLS },
 		runeName: { type: Type.STRING, enum: NAMES },
-		powerOp: { type: Type.STRING, enum: ['eq', 'lt', 'lte', 'gt', 'gte'] },
+		powerOp: { type: Type.STRING, enum: POWER_OPS },
 		powerValue: { type: Type.INTEGER }
 	},
 	required: ['kind'],

@@ -26,6 +26,8 @@ const MODEL = 'gemini-3.5-flash';
 const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
 const COLORS: string[] = [...new Set(runes.map((r) => r.color))];
 const NAMES: string[] = runes.map((r) => r.name);
+const FILLS: string[] = ['Light', 'Dark'];
+const POWER_OPS: PowerOp[] = ['eq', 'lt', 'lte', 'gt', 'gte'];
 
 // Gemini 3.5 Flash favors directness over verbosity: tight XML sections, explicit negative constraints,
 // and a few-shot anchor — the strongest lever to keep a capable model playing DOWN to the persona
@@ -57,8 +59,8 @@ You are Sköll, the wolf who hunts the sun, racing a witch to name one secret ru
 Return exactly ONE move, plus any crossOff ids:
 - ask — set axis and its value:
   - element: ${ELEMENTS.join(', ')}
-  - power: an integer 1-6 with an operator (eq, lt, lte, gt, gte)
-  - fill: Light or Dark
+  - power: an integer 1-6 with an operator (${POWER_OPS.join(', ')})
+  - fill: ${FILLS.join(' or ')}
   - color: ${COLORS.join(', ')}
   - rune: one of ${NAMES.join(', ')}
 - cast — set runeName to the one rune you believe is secret.
@@ -71,9 +73,9 @@ const RESPONSE_SCHEMA = {
 		axis: { type: Type.STRING, enum: ['element', 'power', 'fill', 'color', 'rune'] },
 		elementValue: { type: Type.STRING, enum: ELEMENTS },
 		colorValue: { type: Type.STRING, enum: COLORS },
-		fillValue: { type: Type.STRING, enum: ['Light', 'Dark'] },
+		fillValue: { type: Type.STRING, enum: FILLS },
 		runeName: { type: Type.STRING, enum: NAMES },
-		powerOp: { type: Type.STRING, enum: ['eq', 'lt', 'lte', 'gt', 'gte'] },
+		powerOp: { type: Type.STRING, enum: POWER_OPS },
 		powerValue: { type: Type.INTEGER },
 		crossOff: { type: Type.ARRAY, items: { type: Type.INTEGER } }
 	},
