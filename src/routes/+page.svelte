@@ -68,7 +68,7 @@
 	// it and stays enabled through Sköll's turn — game-spec "private aid").
 	let canAct = $derived(activePlayer === 'Human' && !roundOver);
 	// Won rounds read as resolved, not as a phantom turn. A human win lights the victory line; a
-	// Sköll win reads the defeat (the header carries the fuller resolution line).
+	// Sköll win reads the defeat (the Oracle panel carries the fuller resolution line).
 	let turnPill = $derived(
 		humanWon
 			? RITE.runeTrue
