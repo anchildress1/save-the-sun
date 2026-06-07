@@ -58,7 +58,7 @@
 
 	<footer class="traits">
 		<!-- Pips are aria-hidden, so they carry power for sighted players only: pip count =
-		     power, pip fill = light/dark (hollow ring = light, solid disc = dark). The numeric
+		     power, pip fill = light/dark (white fill = light, black fill = dark). The numeric
 		     value is never written; screen-reader players get it from the button's accessible
 		     name ("{n} {light|dark} power"). The label beside the pips names the trait. -->
 		<span class="trait power">
@@ -258,23 +258,27 @@
 		font-size: 0.82rem;
 	}
 
+	/* Gray "stone" tray behind the pips so BOTH a white (light) and a black (dark) pip read.
+	   On the navy card a black pip would vanish; the neutral ground gives each one contrast. */
 	.pips {
 		display: inline-flex;
-		gap: 2px;
+		gap: 3px;
+		padding: 3px 5px;
+		border-radius: 999px;
+		background: #7c818c;
 	}
 
-	/* Pips show power count; fill encodes light/dark by the rune convention — ○ light is
-	   hollow (a ring), ● dark is filled (a solid disc). Filledness carries the trait, not
-	   colour, so it reads on the dark card: a dark rune is unmistakably "filled". */
+	/* Pips show power count; fill encodes light/dark literally — white fill = light, black
+	   fill = dark — both legible on the gray tray above. */
 	.pip {
 		width: 8px;
 		height: 8px;
 		border-radius: 50%;
-		background: transparent;
-		box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+		background: #ffffff;
+		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
 	}
 	.pip.dark {
-		background: rgba(255, 255, 255, 0.92);
+		background: #111115;
 		box-shadow: none;
 	}
 
