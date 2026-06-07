@@ -135,7 +135,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	// The human's Ask: Sköll may interrupt it (R12 reverse) before the answer — Hex kills it, Scry
 	// overhears it. The reaction must land between the interpreted query and its answer, so it lives
 	// here; Sköll's OWN turn that follows is a separate Advance request, not folded in.
-	if (body.type === 'Ask') return askWithSkollReaction(engine, skoll, body.question);
+	if (body.type === 'Ask' && body.player === 'Human' && engine.activePlayer === 'Human')
+		return askWithSkollReaction(engine, skoll, body.question);
 
 	const result = await handleAction(body, { engine, interpret });
 	return json({ ...result, state: gameState(engine) });

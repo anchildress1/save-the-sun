@@ -17,7 +17,7 @@ vi.mock('$lib/server/skoll/gemini', () => ({
 
 import { POST } from '$routes/api/action/+server';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
-import { resetEngine, getSkoll } from '$lib/server/engine/session';
+import { resetEngine, getEngine, getSkoll } from '$lib/server/engine/session';
 import { selectSecret } from '$lib/server/engine/engine';
 import { runes } from '$lib/board';
 
@@ -51,6 +51,7 @@ const json = (res: Awaited<ReturnType<typeof call>>) => res.json();
 
 describe('POST /api/action', () => {
 	beforeEach(() => {
+		vi.clearAllMocks();
 		resetEngine(SID, SEED);
 		skollDecides(async () => ({ kind: 'cast', runeName: WRONG })); // default: Sköll misplays a cast
 		skollReacts(async () => ({ reaction: 'Pass' })); // default: Sköll lets the human's Ask pass
@@ -89,6 +90,26 @@ describe('POST /api/action', () => {
 		// And the wolf can take another turn.
 		const next = await json(await advance());
 		expect(next.skoll).toBeDefined();
+	});
+
+	it('rejects a stale Human Ask on Sköll’s turn before he can react', async () => {
+		await ask(); // turn now sits with Sköll
+		const reactionCalls = (decideSkollReaction as ReturnType<typeof vi.fn>).mock.calls.length;
+		skollReacts(async () => ({ reaction: 'Hex' }));
+		getSkoll(SID).seed = GATE_OPEN_SEED; // would open the reaction gate if the path ran
+
+		const stale = await json(await ask());
+
+		expect(stale).toMatchObject({
+			type: 'Ask',
+			oracle: { ok: false, reason: 'engine', engineReason: 'not-your-turn' },
+			state: { activePlayer: 'Sköll' }
+		});
+		expect(stale.skollVsYou).toBeUndefined();
+		expect((decideSkollReaction as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(
+			reactionCalls
+		);
+		expect(getEngine(SID).reactionAvailable('Sköll', 'Hex')).toBe(true);
 	});
 
 	it('is a harmless no-op when Advance is called on the human’s turn', async () => {
