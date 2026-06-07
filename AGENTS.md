@@ -6,3 +6,4 @@
 - No CJS shims.
 - Config files may be modified **only to add to or raise coverage limits** — never to remove, lower, or weaken an existing coverage threshold.
 - Keep inline code comments only when value is added to future dev work. Never bloat with useless info.
+- Make atomic commits with gpg key and signed off by footer
