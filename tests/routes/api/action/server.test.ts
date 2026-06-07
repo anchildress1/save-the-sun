@@ -43,6 +43,8 @@ function callAs(sessionId: string, body: string | object) {
 
 const call = (body: string | object) => callAs(SID, body);
 const ask = () => call({ type: 'Ask', player: 'Human', question: 'is it light?' });
+const advance = () => call({ type: 'Advance' });
+const json = (res: Awaited<ReturnType<typeof call>>) => res.json();
 
 describe('POST /api/action', () => {
 	beforeEach(() => {
@@ -51,29 +53,96 @@ describe('POST /api/action', () => {
 		skollReacts(async () => ({ reaction: 'Pass' })); // default: Sköll lets the human's Ask pass
 	});
 
-	it('answers the human Ask, then lets Sköll take his turn', async () => {
-		const data = await (await ask()).json();
+	it('answers the human Ask and hands the turn to Sköll — without taking it', async () => {
+		const data = await json(await ask());
 		expect(data).toMatchObject({
 			type: 'Ask',
 			oracle: { ok: true },
 			skollVsYou: { reaction: 'Pass' }
 		});
-		// Sköll played (a wrong cast by default) and handed the turn back; the round continues.
-		expect(data.skoll).toMatchObject({ cast: { line: `I name it. ${WRONG}.`, won: false } });
+		// The wolf's move is a SEPARATE request, so the answer comes back alone, his turn pending.
+		expect(data.skoll).toBeUndefined();
+		expect(data.state).toMatchObject({ activePlayer: 'Sköll', status: 'active' });
+	});
+
+	it('runs Sköll’s turn only on Advance, handing play back after a wrong cast', async () => {
+		await ask(); // turn now sits with Sköll
+		const data = await json(await advance());
+		expect(data).toMatchObject({
+			type: 'Advance',
+			skoll: { cast: { line: `I name it. ${WRONG}.`, won: false } }
+		});
 		expect(data.state).toMatchObject({ activePlayer: 'Human', status: 'active' });
+	});
+
+	it('is a harmless no-op when Advance is called on the human’s turn', async () => {
+		const data = await json(await advance()); // fresh round — still the human's move
+		expect(data.skoll).toBeUndefined();
+		expect(data.state).toMatchObject({ activePlayer: 'Human' });
+	});
+
+	it('parks Sköll on an Ask (via Advance) and prompts the human to react', async () => {
+		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+		await ask();
+		const data = await json(await advance());
+		expect(data.skoll.asks.echo).toContain('Sköll asks after');
+		expect(data.state.activePlayer).toBe('Sköll'); // unanswered — still his turn, window open
+	});
+
+	it('resolves Sköll Ask when the human lets it pass', async () => {
+		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+		await ask();
+		await advance(); // Sköll now has a parked Ask
+		const data = await json(await call({ type: 'React', player: 'Human', reaction: 'Pass' }));
+		expect(data.skollReaction).toEqual({ hexed: false });
+		expect(data.state.activePlayer).toBe('Human');
+	});
+
+	it('shares the answer when the human Scries Sköll Ask', async () => {
+		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+		await ask();
+		await advance();
+		const data = await json(await call({ type: 'React', player: 'Human', reaction: 'Scry' }));
+		expect(data.skollReaction.scried.answer).toMatch(/Sól is (not )?reaching for a gold rune\./);
+	});
+
+	it('kills the question when the human Hexes Sköll Ask', async () => {
+		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+		await ask();
+		await advance();
+		const data = await json(await call({ type: 'React', player: 'Human', reaction: 'Hex' }));
+		expect(data.skollReaction).toEqual({ hexed: true });
+		expect(data.state.activePlayer).toBe('Human');
+	});
+
+	it('ends the round in defeat when Sköll casts true on Advance', async () => {
+		skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
+		await ask();
+		const data = await json(await advance());
+		expect(data.skoll.cast).toEqual({ line: `The hunt ends. ${SECRET}.`, won: true });
+		expect(data.state).toMatchObject({ status: 'won', winner: 'Sköll' });
+	});
+
+	it('falls to the floor on Advance when Sköll Gemini fails — he still moves', async () => {
+		skollDecides(async () => {
+			throw new Error('timeout');
+		});
+		await ask();
+		const data = await json(await advance());
+		expect(data.skoll.asks ?? data.skoll.cast).toBeDefined();
 	});
 
 	it('lets Sköll Hex the human Ask — no answer comes back, her turn is spent', async () => {
 		skollReacts(async () => ({ reaction: 'Hex' }));
-		const data = await (await ask()).json();
+		const data = await json(await ask());
 		expect(data.skollVsYou).toEqual({ reaction: 'Hex' });
 		expect(data.oracle).toBeUndefined(); // silenced — no Oracle line
-		expect(data.skoll).toBeDefined(); // her turn spent → the wolf plays on
+		expect(data.state.activePlayer).toBe('Sköll'); // her turn spent → his to take on Advance
 	});
 
 	it('lets Sköll Scry the human Ask — she still gets her answer, he overhears it', async () => {
 		skollReacts(async () => ({ reaction: 'Scry' }));
-		const data = await (await ask()).json();
+		const data = await json(await ask());
 		expect(data.skollVsYou).toEqual({ reaction: 'Scry' });
 		expect(data.oracle).toMatchObject({ ok: true });
 	});
@@ -84,80 +153,30 @@ describe('POST /api/action', () => {
 			kind: 'refusal',
 			refusal: 'mixed-type'
 		}));
-		const data = await (await ask()).json();
+		const data = await json(await ask());
 		expect(data.oracle).toMatchObject({ ok: false, reason: 'refusal' });
 		expect(data.skollVsYou).toBeUndefined();
-		expect(data.skoll).toBeUndefined();
-	});
-
-	it('parks Sköll on an Ask and prompts the human to react', async () => {
-		skollDecides(async () => ({
-			kind: 'ask',
-			axis: 'fill',
-			query: { axis: 'color', value: 'Gold' }
-		}));
-		const data = await (await ask()).json();
-		expect(data.skoll.asks.echo).toContain('Sköll asks after');
-		// His Ask is unanswered — the window is open and it is still his turn.
-		expect(data.state.activePlayer).toBe('Sköll');
-	});
-
-	it('resolves Sköll Ask when the human lets it pass', async () => {
-		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
-		await ask(); // Sköll now has a parked Ask
-		const data = await (await call({ type: 'React', player: 'Human', reaction: 'Pass' })).json();
-		expect(data.skollReaction).toEqual({ hexed: false });
-		expect(data.state.activePlayer).toBe('Human'); // his turn spent, play returns
-	});
-
-	it('shares the answer when the human Scries Sköll Ask', async () => {
-		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
-		await ask();
-		const data = await (await call({ type: 'React', player: 'Human', reaction: 'Scry' })).json();
-		expect(data.skollReaction.hexed).toBe(false);
-		expect(data.skollReaction.scried.answer).toMatch(/Sól is (not )?reaching for a gold rune\./);
-	});
-
-	it('kills the question when the human Hexes Sköll Ask', async () => {
-		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
-		await ask();
-		const data = await (await call({ type: 'React', player: 'Human', reaction: 'Hex' })).json();
-		expect(data.skollReaction).toEqual({ hexed: true });
 		expect(data.state.activePlayer).toBe('Human');
 	});
 
-	it('ends the round in defeat when Sköll casts true', async () => {
-		skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
-		const data = await (await ask()).json();
-		expect(data.skoll.cast).toEqual({ line: `The hunt ends. ${SECRET}.`, won: true });
-		expect(data.state).toMatchObject({ status: 'won', winner: 'Sköll' });
-	});
-
-	it('falls to the floor when Sköll Gemini fails — he still moves', async () => {
-		skollDecides(async () => {
-			throw new Error('timeout');
-		});
-		const data = await (await ask()).json();
-		// The floor played a legal move (an Ask or a Cast); the round never stalled.
-		expect(data.skoll).toBeDefined();
-		expect(data.skoll.asks ?? data.skoll.cast).toBeDefined();
-	});
-
 	it('wins on the human cast — Sköll never gets a turn', async () => {
-		const data = await (await call({ type: 'Cast', player: 'Human', runeName: SECRET })).json();
+		const data = await json(await call({ type: 'Cast', player: 'Human', runeName: SECRET }));
 		expect(data).toMatchObject({ type: 'Cast', cast: { won: true } });
 		expect(data.state).toEqual({ activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 });
 		expect(data.skoll).toBeUndefined();
 	});
 
-	it('lets Sköll answer a wrong human cast', async () => {
-		const data = await (await call({ type: 'Cast', player: 'Human', runeName: WRONG })).json();
-		expect(data).toMatchObject({ type: 'Cast', cast: { ok: true, won: false } });
-		expect(data.skoll).toBeDefined(); // the wolf takes his turn after the miss
+	it('hands the wolf his turn after a wrong human cast (taken on Advance)', async () => {
+		const wrong = await json(await call({ type: 'Cast', player: 'Human', runeName: WRONG }));
+		expect(wrong).toMatchObject({ type: 'Cast', cast: { ok: true, won: false } });
+		expect(wrong.skoll).toBeUndefined(); // not folded in
+		expect(wrong.state.activePlayer).toBe('Sköll');
+		const data = await json(await advance());
+		expect(data.skoll).toBeDefined();
 	});
 
 	it('routes a bare React (no Sköll Ask pending) as a harmless no-window pass', async () => {
-		const data = await (await call({ type: 'React', player: 'Human', reaction: 'Pass' })).json();
+		const data = await json(await call({ type: 'React', player: 'Human', reaction: 'Pass' }));
 		expect(data).toEqual({
 			type: 'React',
 			outcome: { ok: true, choice: 'Pass' },
@@ -166,9 +185,9 @@ describe('POST /api/action', () => {
 	});
 
 	it('routes a CrossOff without a turn — Sköll does not move', async () => {
-		const data = await (
+		const data = await json(
 			await call({ type: 'CrossOff', player: 'Human', runeId: 1, crossed: true })
-		).json();
+		);
 		expect(data).toEqual({ type: 'CrossOff', ok: true, state: { ...HUMAN_TURN } });
 	});
 
@@ -218,14 +237,14 @@ describe('POST /api/action', () => {
 		resetEngine('player-one', SEED);
 		resetEngine('player-two', SEED);
 
-		const win = await (
+		const win = await json(
 			await callAs('player-one', { type: 'Cast', player: 'Human', runeName: SECRET })
-		).json();
+		);
 		expect(win).toMatchObject({ type: 'Cast', cast: { won: true } });
 
-		const stillWinnable = await (
+		const stillWinnable = await json(
 			await callAs('player-two', { type: 'Cast', player: 'Human', runeName: SECRET })
-		).json();
+		);
 		expect(stillWinnable).toMatchObject({ type: 'Cast', cast: { won: true } });
 	});
 });

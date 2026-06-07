@@ -35,41 +35,44 @@ const castResult = (cast: object, state: GameState = HUMAN_TURN) =>
 
 // --- S6: Sköll's surfaced turn + the human's reactions ---
 
-// A fetch stub that answers an Ask with a Sköll turn, then resolves the human's React.
-function skollFlow(skoll: object, askState: GameState, reaction: object, reactState: GameState) {
+// Sköll's move arrives on a SEPARATE Advance request now, so the stub routes by action type:
+// the Ask returns the human's answer (turn handed to Sköll), Advance returns the wolf's move, and
+// React resolves his parked Ask. Unset branches fall back to a turn-handed-back no-op.
+function gameStub(opts: { ask?: object; advance?: object; react?: object }) {
 	return stubFetch(async (_url: string, init?: { body?: string }) => {
 		const body = init?.body ? JSON.parse(init.body) : {};
-		if (body.type === 'React')
-			return new Response(
-				JSON.stringify({
-					type: 'React',
-					outcome: { ok: true },
-					skollReaction: reaction,
-					state: reactState
-				})
-			);
-		return new Response(
-			JSON.stringify({
-				type: 'Ask',
-				oracle: {
-					ok: true,
-					answer: 'No. Sól is not reaching for a fire rune.',
-					turnConsumed: true
-				},
-				skoll,
-				state: askState
-			})
-		);
+		const pick =
+			body.type === 'Advance'
+				? (opts.advance ?? { type: 'Advance', state: HUMAN_TURN })
+				: body.type === 'React'
+					? (opts.react ?? { type: 'React', outcome: { ok: true }, state: HUMAN_TURN })
+					: (opts.ask ?? defaultAsk());
+		return new Response(JSON.stringify(pick));
 	});
 }
 
-const askThenSkollAsks = (echo = 'Sköll asks after a gold rune.') =>
-	skollFlow(
-		{ taunt: 'You circle. I close.', asks: { echo } },
-		SKOLL_TURN,
-		{ hexed: false },
-		HUMAN_TURN
-	);
+const defaultAsk = (skollVsYou: object = { reaction: 'Pass' }) => ({
+	type: 'Ask',
+	oracle: { ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+	skollVsYou,
+	state: SKOLL_TURN
+});
+const advanceCast = (line: string, won: boolean, state: GameState = HUMAN_TURN) => ({
+	type: 'Advance',
+	skoll: { taunt: 'You circle. I close.', cast: { line, won } },
+	state
+});
+const advanceAsk = (echo = 'Sköll asks after a gold rune.') => ({
+	type: 'Advance',
+	skoll: { taunt: 'You circle. I close.', asks: { echo } },
+	state: SKOLL_TURN
+});
+const reactResult = (skollReaction: object) => ({
+	type: 'React',
+	outcome: { ok: true },
+	skollReaction,
+	state: HUMAN_TURN
+});
 
 async function humanAsks(screen: ReturnType<typeof render>) {
 	await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
@@ -356,20 +359,17 @@ describe('Save the Sun page', () => {
 			.toBeInTheDocument();
 	});
 
-	it("voices Sköll's cast on his turn", async () => {
-		respond({
-			type: 'Ask',
-			oracle: { ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
-			skoll: { taunt: 'You circle. I close.', cast: { line: 'I name it. Dagaz.', won: false } },
-			state: HUMAN_TURN
-		});
+	it("voices Sköll's cast on his Advance turn", async () => {
+		gameStub({ advance: advanceCast('I name it. Dagaz.', false) });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
+		// Your answer landed from the Ask; his cast arrives on the follow-up Advance.
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('No. Sól is not reaching');
 		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
 	});
 
-	it('prompts the human to react when Sköll Asks', async () => {
-		askThenSkollAsks();
+	it('prompts the human to react when Sköll Asks (on Advance)', async () => {
+		gameStub({ advance: advanceAsk() });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
 		await expect
@@ -382,7 +382,7 @@ describe('Save the Sun page', () => {
 	});
 
 	it('lets the human let Sköll Ask pass', async () => {
-		askThenSkollAsks();
+		gameStub({ advance: advanceAsk(), react: reactResult({ hexed: false }) });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
 		await screen.getByRole('button', { name: 'Let it pass' }).click();
@@ -394,12 +394,13 @@ describe('Save the Sun page', () => {
 	});
 
 	it('shares the answer when the human Scries Sköll Ask', async () => {
-		skollFlow(
-			{ taunt: 'You circle. I close.', asks: { echo: 'Sköll asks after a gold rune.' } },
-			SKOLL_TURN,
-			{ hexed: false, scried: { answer: 'Yes. Sól is reaching for a gold rune.' } },
-			HUMAN_TURN
-		);
+		gameStub({
+			advance: advanceAsk(),
+			react: reactResult({
+				hexed: false,
+				scried: { answer: 'Yes. Sól is reaching for a gold rune.' }
+			})
+		});
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
 		await screen.getByRole('button', { name: 'Scry' }).click();
@@ -410,12 +411,7 @@ describe('Save the Sun page', () => {
 	});
 
 	it('kills the question when the human Hexes Sköll Ask', async () => {
-		skollFlow(
-			{ taunt: 'You circle. I close.', asks: { echo: 'Sköll asks after a gold rune.' } },
-			SKOLL_TURN,
-			{ hexed: true },
-			HUMAN_TURN
-		);
+		gameStub({ advance: advanceAsk(), react: reactResult({ hexed: true }) });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
 		await screen.getByRole('button', { name: 'Hex' }).click();
@@ -427,12 +423,10 @@ describe('Save the Sun page', () => {
 	});
 
 	it('shows the silenced line when Sköll Hexes the human Ask', async () => {
-		respond({
-			type: 'Ask',
-			// No oracle line — the question was silenced before any answer.
-			skollVsYou: { reaction: 'Hex' },
-			skoll: { taunt: 'You circle. I close.', cast: { line: 'I name it. Dagaz.', won: false } },
-			state: HUMAN_TURN
+		gameStub({
+			// No oracle line — the question was silenced before any answer; then his own Advance move.
+			ask: { type: 'Ask', skollVsYou: { reaction: 'Hex' }, state: SKOLL_TURN },
+			advance: advanceCast('I name it. Dagaz.', false)
 		});
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
@@ -444,12 +438,9 @@ describe('Save the Sun page', () => {
 	});
 
 	it('shows the answer when Sköll Scries the human Ask (covert — no extra line)', async () => {
-		respond({
-			type: 'Ask',
-			oracle: { ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
-			skollVsYou: { reaction: 'Scry' },
-			skoll: { taunt: 'You circle. I close.', cast: { line: 'I name it. Dagaz.', won: false } },
-			state: HUMAN_TURN
+		gameStub({
+			ask: defaultAsk({ reaction: 'Scry' }),
+			advance: advanceCast('I name it. Dagaz.', false)
 		});
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
@@ -458,13 +449,8 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
 	});
 
-	it('falls to defeat when Sköll casts true on his turn', async () => {
-		respond({
-			type: 'Ask',
-			oracle: { ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
-			skoll: { taunt: 'You circle. I close.', cast: { line: 'The hunt ends. Dagaz.', won: true } },
-			state: SKOLL_WON
-		});
+	it('falls to defeat when Sköll casts true on his Advance turn', async () => {
+		gameStub({ advance: advanceCast('The hunt ends. Dagaz.', true, SKOLL_WON) });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
 		await expect

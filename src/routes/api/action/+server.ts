@@ -23,7 +23,9 @@ import { mulberry32 } from '$lib/prng';
 import type { GameEngine } from '$lib/server/engine/engine';
 import type { RequestHandler } from './$types';
 
-const ACTION_TYPES = new Set(['Ask', 'Cast', 'CrossOff', 'React']);
+// 'Advance' is not a player action — it's the client asking the engine to run Sköll's pending turn
+// as its own request, so the human's answer never waits behind the wolf's move.
+const ACTION_TYPES = new Set(['Ask', 'Cast', 'CrossOff', 'React', 'Advance']);
 const PLAYERS = new Set(['Human', 'Sköll']);
 const REACTIONS = new Set(['Scry', 'Hex', 'Pass']);
 
@@ -88,12 +90,25 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		error(400, 'Unknown action type.');
 	}
 
+	const engine = getEngine(locals.sessionId);
+	const skoll = getSkoll(locals.sessionId);
+
+	// Sköll's turn is its own request: the client fires this after any action that hands him the
+	// turn, so the human's answer lands first and his move shows under a live "Sköll moves." pill.
+	// A no-op if it isn't his turn (or his Ask is already parked), so a stray Advance is harmless.
+	// 'Advance' is outside the GameAction union (not a player move), so compare as a plain string.
+	if ((body.type as string) === 'Advance') {
+		const skollTurn = await playSkollIfActive(engine, skoll);
+		return json({
+			type: 'Advance',
+			...(skollTurn && { skoll: skollTurn }),
+			state: gameState(engine)
+		});
+	}
+
 	if (!isAction(body)) {
 		error(400, 'Malformed action payload.');
 	}
-
-	const engine = getEngine(locals.sessionId);
-	const skoll = getSkoll(locals.sessionId);
 
 	// The human reacting to Sköll's open Ask: resolve the reaction, then close his Ask (Hex kills
 	// it before any answer; Pass/Scry answers it, Scry shares it back). This is a distinct path
@@ -112,17 +127,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	// The human's Ask: Sköll may interrupt it (R12 reverse) before the answer — Hex kills it, Scry
-	// overhears it. Handled here (not in handleAction) because the reaction must land between the
-	// interpreted query and its answer, then Sköll still takes his own turn.
+	// overhears it. The reaction must land between the interpreted query and its answer, so it lives
+	// here; Sköll's OWN turn that follows is a separate Advance request, not folded in.
 	if (body.type === 'Ask') return askWithSkollReaction(engine, skoll, body.question);
 
 	const result = await handleAction(body, { engine, interpret });
-
-	// The human's action handed the turn to Sköll → the wolf plays through the same interface.
-	// He casts (the round may end) or opens his own reaction window (the client then prompts).
-	const skollTurn = await playSkollIfActive(engine, skoll);
-
-	return json({ ...result, ...(skollTurn && { skoll: skollTurn }), state: gameState(engine) });
+	return json({ ...result, state: gameState(engine) });
 };
 
 async function askWithSkollReaction(engine: GameEngine, skoll: SkollState, question: string) {
@@ -141,12 +151,11 @@ async function askWithSkollReaction(engine: GameEngine, skoll: SkollState, quest
 			skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
 	}
 
-	const skollTurn = await playSkollIfActive(engine, skoll);
+	// The turn now sits with Sköll; the client advances him in a follow-up request.
 	return json({
 		type: 'Ask',
 		...(oracle && { oracle }),
 		skollVsYou: { reaction: vs.choice },
-		...(skollTurn && { skoll: skollTurn }),
 		state: gameState(engine)
 	});
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { untrack, tick } from 'svelte';
 	import RuneGrid from '$lib/components/RuneGrid.svelte';
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 	import { runes } from '$lib/board';
@@ -165,6 +165,28 @@
 		return res.json() as Promise<ActionResponse<T>>;
 	}
 
+	// Sköll's move is its own request, fired after any action that hands him the turn — so the
+	// human's answer paints first (the `tick`), then his move loads under a live "Sköll moves."
+	// pill. Self-contained error handling: a failed Advance must never clobber the answer the human
+	// just earned, so it logs and leaves the turn with Sköll rather than throwing to the caller.
+	async function advanceSkoll() {
+		if (roundStatus !== 'active' || activePlayer !== 'Sköll') return;
+		await tick();
+		try {
+			const res = await fetch('/api/action', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ type: 'Advance' })
+			});
+			if (!res.ok) throw new Error(`Advance rejected (${res.status})`);
+			const { skoll, state } = (await res.json()) as { skoll?: SkollTurn; state: GameState };
+			applyState(state);
+			applySkoll(skoll);
+		} catch (err) {
+			console.error('[ui] Sköll advance failed:', err);
+		}
+	}
+
 	async function submitAsk() {
 		const question = askValue.trim();
 		if (question === '') {
@@ -174,7 +196,7 @@
 		}
 		pending = true;
 		try {
-			const { oracle, state, skoll, skollVsYou } = await dispatch({
+			const { oracle, state, skollVsYou } = await dispatch({
 				type: 'Ask',
 				player: 'Human',
 				question
@@ -193,7 +215,7 @@
 				// not-your-turn means the engine has handed the turn to Sköll.
 				answer = oracle.engineReason === 'not-your-turn' ? RITE.wolfMoving : RITE.oracleSilent;
 			}
-			applySkoll(skoll); // the wolf answers the human's turn — cast, or his own Ask to react to
+			await advanceSkoll(); // your answer shows first, then the wolf takes his turn in his own request
 		} catch (err) {
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
@@ -288,7 +310,7 @@
 		if (selectedRune === null) return;
 		pending = true;
 		try {
-			const { cast, state, skoll } = await dispatch({
+			const { cast, state } = await dispatch({
 				type: 'Cast',
 				player: 'Human',
 				runeName: selectedRune.name
@@ -300,7 +322,7 @@
 				console.warn('[ui] Cast rejected by engine:', cast.reason);
 				answer = RITE.castFalters;
 			}
-			applySkoll(skoll); // a wrong cast hands the wolf his turn; a winning cast ends the round
+			await advanceSkoll(); // a wrong cast hands the wolf his turn (his own request); a win ends it
 		} catch (err) {
 			console.error('[ui] Cast dispatch failed:', err);
 			answer = RITE.castFalters;
