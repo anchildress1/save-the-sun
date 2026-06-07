@@ -134,16 +134,17 @@
 		try {
 			res = await fetch('/api/new-game', { method: 'POST' });
 			if (!res.ok) throw new Error(`New game rejected (${res.status})`);
-			const { boardSeed: seed } = (await res.json()) as { boardSeed: number };
+			const { boardSeed: seed, state } = (await res.json()) as {
+				boardSeed: number;
+				state: GameState;
+			};
 			// A 200 with no usable seed would leave the board un-remounted while the server
 			// reset — treat it as a hard failure, not a silent no-op.
 			if (!Number.isFinite(seed)) throw new Error('New game response missing boardSeed');
 			seedOverride = seed; // remounts RuneGrid → crossings + highlight clear
 			answer = RITE.ready;
 			askValue = '';
-			// Fresh round: human-first, active again.
-			activePlayer = 'Human';
-			roundStatus = 'active';
+			applyState(state); // reset from engine truth, same as every other action
 			cancelCast();
 		} catch (err) {
 			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);

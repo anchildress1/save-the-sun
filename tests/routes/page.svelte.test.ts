@@ -27,9 +27,9 @@ const respond = (body: object) => stubFetch(async () => new Response(JSON.string
 
 // Every action response carries the post-shim turn snapshot. Default: the human is back on
 // the clock with the round still live (the v1 pre-Sköll shim hands play straight back).
-const askResult = (oracle: object, state: object = HUMAN_TURN) =>
+const askResult = (oracle: object, state: GameState = HUMAN_TURN) =>
 	respond({ type: 'Ask', oracle, state });
-const castResult = (cast: object, state: object = HUMAN_TURN) =>
+const castResult = (cast: object, state: GameState = HUMAN_TURN) =>
 	respond({ type: 'Cast', cast, state });
 
 describe('Save the Sun page', () => {
@@ -156,7 +156,8 @@ describe('Save the Sun page', () => {
 
 	it('begins another night — resets the panel and pulls a fresh board', async () => {
 		const spy = stubFetch(async (url) => {
-			if (url.includes('/api/new-game')) return new Response(JSON.stringify({ boardSeed: 99 }));
+			if (url.includes('/api/new-game'))
+				return new Response(JSON.stringify({ boardSeed: 99, state: HUMAN_TURN }));
 			return new Response(
 				JSON.stringify({
 					type: 'Ask',
