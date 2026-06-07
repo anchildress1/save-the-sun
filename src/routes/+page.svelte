@@ -34,11 +34,9 @@
 		// panel, so it needs no separate flavor line.
 		hexHim: "You close the Oracle's lips. His question dies unanswered — his turn with it.",
 		passHim: 'You hold your hand. Let him have his answer.',
-		// Sköll hexing your Ask (ux-copy.md §3). The Oracle box gets the silence in the rite's own
-		// voice (askSilenced); the gloat is Sköll's, so it goes in his voice slot — never the Oracle's
-		// mouth. A Scry stays covert — he overhears in silence, surfaced only by how he plays next.
-		askSilenced: 'The question dies unanswered.',
-		hexYou: "The Oracle's lips close. My doing.",
+		// Sköll hexing your Ask (ux-copy.md §3). Named in the rite's voice (third person) so the
+		// Oracle frame says who silenced you — without putting Sköll's first-person gloat in its mouth.
+		askSilenced: 'Sköll Hexes your question. It dies unanswered.',
 		// Resolution lines (ux-copy.md §4) — voiced in the header when a round ends. A human win
 		// raises the sun under sunCrests; a Sköll win keeps the moon under the defeat line.
 		sunCrests: 'Sól crests the rim of the world.',
@@ -216,10 +214,9 @@
 			});
 			applyState(state);
 			if (skollVsYou?.reaction === 'Hex') {
-				// Silenced before any answer: the Oracle box states it in the rite's voice; Sköll's
-				// gloat sits in his own slot (his following Advance move replaces it).
+				// Silenced before any answer: the Oracle frame names Sköll as the cause; his own
+				// following Advance move fills his box.
 				answer = RITE.askSilenced;
-				skollVoice = RITE.hexYou;
 				askValue = '';
 			} else if (oracle.ok) {
 				answer = oracle.answer;
