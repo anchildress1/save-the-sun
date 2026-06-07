@@ -1,8 +1,16 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import RuneGrid from '$lib/components/RuneGrid.svelte';
+	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 	import { runes } from '$lib/board';
-	import type { GameAction, ActionResponse, GameState, Player } from '$lib/server/engine/actions';
+	import type {
+		GameAction,
+		ActionResponse,
+		GameState,
+		Player,
+		SkollTurn
+	} from '$lib/server/engine/actions';
+	import type { ReactionChoice } from '$lib/server/engine/reactions';
 	import type { PageProps } from './$types';
 
 	// data (incl. boardSeed) comes from +page.server.ts. No default — a missing load
@@ -22,6 +30,10 @@
 		runeTrue: 'The rune is true.',
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
+		// Reaction outcomes on Sköll's Ask (ux-copy.md §3).
+		scryHim: 'You lean into the dark and listen. His answer is yours too.',
+		hexHim: "You close the Oracle's lips. His question dies unanswered — his turn with it.",
+		passHim: 'You hold your hand. Let him have his answer.',
 		// Resolution lines (ux-copy.md §4) — voiced in the header when a round ends. A human win
 		// raises the sun under sunCrests; a Sköll win keeps the moon under the defeat line.
 		sunCrests: 'Sól crests the rim of the world.',
@@ -42,6 +54,15 @@
 	let selectedTargetId: number | null = $state(null);
 	let askValue = $state('');
 	let pending = $state(false);
+
+	// Sköll's surfaced turn (S6): his voice this turn, his Ask echo, and whether his Ask is open
+	// for the human to react to. The human's held reactions are tracked client-side; the engine is
+	// authoritative, so a refresh that resets these to held can never spend a charge twice.
+	let skollVoice = $state('');
+	let skollEcho = $state('');
+	let skollAsking = $state(false);
+	let heldScry = $state(true);
+	let heldHex = $state(true);
 
 	// Turn state mirrors the engine, hydrated from the load on mount and fed by each action
 	// response after. Hydrating (not guessing 'Human'/'active') is what keeps a resumed round —
@@ -84,6 +105,22 @@
 		roundStatus = state.status;
 		turns = state.turns;
 		winner = state.winner;
+	}
+
+	// Surface the wolf's turn: a cast voices his line (and a winning cast resolves to defeat); an
+	// Ask voices his taunt and opens the interrupt prompt with his question echo.
+	function applySkoll(skoll: SkollTurn | undefined) {
+		if (skoll === undefined) return;
+		if (skoll.cast) {
+			skollVoice = skoll.cast.line;
+			skollEcho = '';
+			skollAsking = false;
+			if (skoll.cast.won) answer = RITE.skollTakesSun;
+		} else if (skoll.asks) {
+			skollVoice = skoll.taunt;
+			skollEcho = skoll.asks.echo;
+			skollAsking = true;
+		}
 	}
 
 	// Tracks the loaded seed until a new game overrides it. A changed seed remounts RuneGrid
@@ -134,7 +171,7 @@
 		}
 		pending = true;
 		try {
-			const { oracle, state } = await dispatch({ type: 'Ask', player: 'Human', question });
+			const { oracle, state, skoll } = await dispatch({ type: 'Ask', player: 'Human', question });
 			applyState(state);
 			if (oracle.ok) {
 				answer = oracle.answer;
@@ -145,10 +182,42 @@
 				// not-your-turn means the engine has handed the turn to Sköll.
 				answer = oracle.engineReason === 'not-your-turn' ? RITE.wolfMoving : RITE.oracleSilent;
 			}
+			applySkoll(skoll); // the wolf answers the human's turn — cast, or his own Ask to react to
 		} catch (err) {
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
 			console.error('[ui] Ask dispatch failed:', err);
+			answer = RITE.oracleSilent;
+		} finally {
+			pending = false;
+		}
+	}
+
+	// The human reacts to Sköll's open Ask: Scry (hear it too), Hex (kill it), or let it pass.
+	// Held charges are spent client-side for the prompt; the engine enforces the real charge.
+	async function submitReact(choice: ReactionChoice) {
+		pending = true;
+		try {
+			const { state, skollReaction } = await dispatch({
+				type: 'React',
+				player: 'Human',
+				reaction: choice
+			});
+			applyState(state);
+			if (choice === 'Scry') heldScry = false;
+			else if (choice === 'Hex') heldHex = false;
+			skollAsking = false;
+			skollEcho = '';
+			if (skollReaction?.hexed) {
+				skollVoice = RITE.hexHim;
+			} else if (skollReaction?.scried) {
+				answer = skollReaction.scried.answer; // you hear his answer too
+				skollVoice = RITE.scryHim;
+			} else {
+				skollVoice = RITE.passHim;
+			}
+		} catch (err) {
+			console.error('[ui] React dispatch failed:', err);
 			answer = RITE.oracleSilent;
 		} finally {
 			pending = false;
@@ -185,6 +254,12 @@
 			seedOverride = seed; // remounts RuneGrid → crossings + highlight clear
 			answer = RITE.ready;
 			askValue = '';
+			// The wolf's surfaced turn + the human's reactions reset with the round.
+			skollVoice = '';
+			skollEcho = '';
+			skollAsking = false;
+			heldScry = true;
+			heldHex = true;
 			applyState(state); // reset from engine truth, same as every other action
 			cancelCast();
 		} catch (err) {
@@ -199,7 +274,7 @@
 		if (selectedRune === null) return;
 		pending = true;
 		try {
-			const { cast, state } = await dispatch({
+			const { cast, state, skoll } = await dispatch({
 				type: 'Cast',
 				player: 'Human',
 				runeName: selectedRune.name
@@ -211,6 +286,7 @@
 				console.warn('[ui] Cast rejected by engine:', cast.reason);
 				answer = RITE.castFalters;
 			}
+			applySkoll(skoll); // a wrong cast hands the wolf his turn; a winning cast ends the round
 		} catch (err) {
 			console.error('[ui] Cast dispatch failed:', err);
 			answer = RITE.castFalters;
@@ -321,18 +397,29 @@
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
-			<div class="reactions">
-				<button type="button" disabled title="When your rival asks, hear the answer too.">
-					Scry
-				</button>
-				<button
-					type="button"
-					disabled
-					title="When your rival asks, silence the Oracle — their question dies."
-				>
-					Hex
-				</button>
-			</div>
+			{#if skollVoice}
+				<p class="skoll-voice" data-testid="skoll-voice">{skollVoice}</p>
+			{/if}
+
+			{#if skollAsking}
+				{#if skollEcho}
+					<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
+				{/if}
+				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
+			{:else}
+				<div class="reactions">
+					<button type="button" disabled title="When your rival asks, hear the answer too.">
+						Scry
+					</button>
+					<button
+						type="button"
+						disabled
+						title="When your rival asks, silence the Oracle — their question dies."
+					>
+						Hex
+					</button>
+				</div>
+			{/if}
 
 			<form
 				class="ask"
@@ -572,6 +659,24 @@
 
 	.frame-text.answer {
 		color: var(--gold-bright);
+	}
+
+	/* Sköll's voice — colder than the Oracle's gold; his presence on the panel. */
+	.skoll-voice {
+		margin: 0;
+		font-family: var(--font-display);
+		font-style: italic;
+		font-size: 0.86rem;
+		line-height: 1.4;
+		color: var(--ink-muted);
+	}
+
+	/* His Ask, echoed so the human knows what they're choosing to Scry, Hex, or let pass. */
+	.skoll-echo {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: 0.88rem;
+		color: var(--ink);
 	}
 
 	.reactions {

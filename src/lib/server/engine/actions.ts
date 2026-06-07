@@ -89,11 +89,13 @@ export function gameState(engine: GameEngine): GameState {
 /**
  * What the action endpoint returns: the action's own result plus the turn snapshot taken
  * after the request settles (so the client reflects whose move it is and a resolved round).
+ * `skoll` rides along when the wolf took his turn in response; `skollReaction` when this
+ * response closed his parked Ask (the human's React path).
  */
 export type ActionResponse<T extends ActionResult['type'] = ActionResult['type']> = Extract<
 	ActionResult,
 	{ type: T }
-> & { state: GameState };
+> & { state: GameState; skoll?: SkollTurn; skollReaction?: SkollReaction };
 
 /** Route one action to the engine/Oracle. */
 export async function handleAction(action: GameAction, deps: ActionDeps): Promise<ActionResult> {
