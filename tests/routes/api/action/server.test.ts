@@ -75,6 +75,19 @@ describe('POST /api/action', () => {
 		expect(data.state).toMatchObject({ activePlayer: 'Human', status: 'active' });
 	});
 
+	it('keeps play going after Sköll casts wrong — the human can Ask again', async () => {
+		await ask(); // turn → Sköll
+		const afterCast = await json(await advance()); // Sköll casts wrong → turn back to Human
+		expect(afterCast.state.activePlayer).toBe('Human');
+		// The human's next Ask must resolve (it really is their turn), not bounce as not-your-turn.
+		const again = await json(await ask());
+		expect(again.oracle).toMatchObject({ ok: true });
+		expect(again.state.activePlayer).toBe('Sköll');
+		// And the wolf can take another turn.
+		const next = await json(await advance());
+		expect(next.skoll).toBeDefined();
+	});
+
 	it('is a harmless no-op when Advance is called on the human’s turn', async () => {
 		const data = await json(await advance()); // fresh round — still the human's move
 		expect(data.skoll).toBeUndefined();
