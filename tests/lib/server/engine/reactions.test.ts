@@ -38,6 +38,19 @@ describe('resolveReaction — Scry & Hex over a rival Ask (S5)', () => {
 		expect(engine.reactionWindow).toBeNull();
 	});
 
+	it('does not let the asker Pass away their own window — only the rival may decline', () => {
+		const engine = afterHumanAsk(); // window owned by Human
+		const outcome = resolveReaction(engine, 'Human', 'Pass');
+		expect(outcome).toEqual({ ok: true, choice: 'Pass' });
+		// The window stays open: the rival (Sköll) can still react to the Human's Ask.
+		expect(engine.reactionWindow).toBe('Human');
+		expect(resolveReaction(engine, 'Sköll', 'Scry')).toEqual({
+			ok: true,
+			choice: 'Scry',
+			shareAnswer: true
+		});
+	});
+
 	it('allows one of each reaction per round, never a second', () => {
 		const engine = afterHumanAsk();
 		expect(resolveReaction(engine, 'Sköll', 'Scry').ok).toBe(true);

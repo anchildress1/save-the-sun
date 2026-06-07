@@ -27,13 +27,16 @@ export function resolveReaction(
 	reactor: Player,
 	choice: ReactionChoice
 ): ReactionOutcome {
+	// A window opens only on an Ask, and you react to the *rival's* Ask, never your own.
+	const asker = engine.reactionWindow;
+
 	if (choice === 'Pass') {
-		engine.declineReaction();
+		// Only the rival may let an Ask pass — the asker can't slam their own window shut and
+		// deny the rival a reaction. Passing with no rival window to close is a harmless no-op.
+		if (asker !== null && asker !== reactor) engine.declineReaction();
 		return { ok: true, choice: 'Pass' };
 	}
 
-	// A window opens only on an Ask, and you react to the *rival's* Ask, never your own.
-	const asker = engine.reactionWindow;
 	if (asker === null || asker === reactor) return { ok: false, reason: 'no-window' };
 	if (!engine.reactionAvailable(reactor, choice)) return { ok: false, reason: 'no-charge' };
 
