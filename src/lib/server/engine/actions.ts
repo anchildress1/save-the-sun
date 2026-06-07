@@ -1,6 +1,7 @@
 // Shared action interface — the single entry point for game actions (Human + Sköll).
 
 import type { GameEngine, CastResult } from './engine';
+import { resolveReaction, type ReactionChoice, type ReactionOutcome } from './reactions';
 import { runOracle } from '$lib/server/oracle/oracle';
 import type { Interpret, OracleResult } from '$lib/server/oracle/types';
 
@@ -28,7 +29,7 @@ export interface CrossOffAction extends ActionRequest {
 
 export interface ReactAction extends ActionRequest {
 	type: 'React';
-	reaction: 'Scry' | 'Hex' | 'Pass';
+	reaction: ReactionChoice;
 }
 
 export type GameAction = AskAction | CastAction | CrossOffAction | ReactAction;
@@ -43,7 +44,7 @@ export type ActionResult =
 	| { type: 'Ask'; oracle: OracleResult }
 	| { type: 'Cast'; cast: CastResult }
 	| { type: 'CrossOff'; ok: true }
-	| { type: 'React'; ok: true };
+	| { type: 'React'; outcome: ReactionOutcome };
 
 /**
  * Public turn snapshot the client needs to know whose move it is and whether the round
@@ -91,7 +92,9 @@ export async function handleAction(action: GameAction, deps: ActionDeps): Promis
 			// Private aid; the engine never referees crossings.
 			return { type: 'CrossOff', ok: true };
 		case 'React':
-			// Reactions resolve in S5.
-			return { type: 'React', ok: true };
+			return {
+				type: 'React',
+				outcome: resolveReaction(deps.engine, action.player, action.reaction)
+			};
 	}
 }

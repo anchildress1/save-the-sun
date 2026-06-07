@@ -39,9 +39,32 @@ describe('Shared Action Interface — the single routing point', () => {
 		expect(res).toEqual({ type: 'CrossOff', ok: true });
 	});
 
-	it('acknowledges a React (resolves in S5)', async () => {
+	it('resolves a rival Scry over an open Ask window', async () => {
+		const d = deps();
+		// The Human Asks, opening a window the wolf may react to.
+		await handleAction({ type: 'Ask', player: 'Human', question: 'is it light?' }, d);
+		const res = await handleAction({ type: 'React', player: 'Sköll', reaction: 'Scry' }, d);
+		expect(res).toEqual({
+			type: 'React',
+			outcome: { ok: true, choice: 'Scry', shareAnswer: true }
+		});
+	});
+
+	it('resolves a rival Hex over an open Ask window', async () => {
+		const d = deps();
+		await handleAction({ type: 'Ask', player: 'Human', question: 'is it light?' }, d);
+		const res = await handleAction({ type: 'React', player: 'Sköll', reaction: 'Hex' }, d);
+		expect(res).toEqual({ type: 'React', outcome: { ok: true, choice: 'Hex', killAnswer: true } });
+	});
+
+	it('refuses a reaction with no open window — reactions trigger on an Ask only', async () => {
 		const res = await handleAction({ type: 'React', player: 'Sköll', reaction: 'Scry' }, deps());
-		expect(res).toEqual({ type: 'React', ok: true });
+		expect(res).toEqual({ type: 'React', outcome: { ok: false, reason: 'no-window' } });
+	});
+
+	it('routes a Pass through without spending a charge', async () => {
+		const res = await handleAction({ type: 'React', player: 'Human', reaction: 'Pass' }, deps());
+		expect(res).toEqual({ type: 'React', outcome: { ok: true, choice: 'Pass' } });
 	});
 
 	it('keeps Ask and Cast distinct — an Ask never wins the round', async () => {

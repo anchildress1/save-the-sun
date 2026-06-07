@@ -93,10 +93,15 @@ describe('POST /api/action', () => {
 		expect(data).toEqual({ type: 'CrossOff', ok: true, state: { ...HUMAN_TURN } });
 	});
 
-	it('routes a React placeholder through the shared interface', async () => {
+	it('routes a React through the shared interface, carrying its outcome and the turn state', async () => {
 		const res = await call({ type: 'React', player: 'Human', reaction: 'Pass' });
 		const data = await res.json();
-		expect(data).toEqual({ type: 'React', ok: true, state: { ...HUMAN_TURN } });
+		// Pass spends no charge and takes no turn, so the human stays on the clock.
+		expect(data).toEqual({
+			type: 'React',
+			outcome: { ok: true, choice: 'Pass' },
+			state: { ...HUMAN_TURN }
+		});
 	});
 
 	it('rejects an unknown action type with 400', async () => {

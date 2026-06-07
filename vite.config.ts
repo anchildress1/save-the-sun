@@ -35,6 +35,7 @@ export default defineConfig({
 				'src/lib/server/engine/engine.ts': { lines: 100, branches: 95 },
 				'src/lib/server/engine/queries.ts': { lines: 100, branches: 95 },
 				'src/lib/server/engine/actions.ts': { lines: 90, branches: 85 },
+				'src/lib/server/engine/reactions.ts': { lines: 95, branches: 90 },
 				'src/lib/server/oracle/oracle.ts': { lines: 90, branches: 85 },
 				'src/lib/server/engine/session.ts': { lines: 90, branches: 85 },
 				'src/routes/api/action/+server.ts': { lines: 90, branches: 85 },
