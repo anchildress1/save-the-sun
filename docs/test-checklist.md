@@ -65,15 +65,15 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 4. Human loop & action interface
 
-- [ ] [I] Ask vs Cast distinct (Ask never wins, Cast never asks)
-- [ ] [C] Cross/restore works during player's turn **and** Sköll's turn; persists across turns
-- [ ] [C] Ask + Cast disabled during Sköll's turn; cross-off stays enabled; acting shows "The wolf is moving. Hold."
-- [ ] [C][E] Arm flow: "Cast the rune" arms mode; armed tap **selects target** (no cross-off); chrome "Cast?"
-- [ ] [C][E] "Name it" commits; "Not yet" cancels with **no turn spent**
-- [ ] [C] Two scoped card behaviors (cross-off vs select-target) never collide
-- [ ] [E] Wrong cast costs turn only; crossings + round state preserved
-- [ ] [E][A] Full keyboard cast path: arm → arrow → select → "Name it"
-- [ ] [C] Pre-Ask panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle."
+- [x] [I] Ask vs Cast distinct (Ask never wins, Cast never asks)
+- [x] [C] Cross/restore works during player's turn **and** Sköll's turn; persists across turns
+- [x] [C] Ask + Cast disabled during Sköll's turn; cross-off stays enabled; acting shows "The wolf is moving. Hold."
+- [x] [C][E] Arm flow: "Cast the rune" arms mode; armed tap **selects target** (no cross-off); chrome "Cast?"
+- [x] [C][E] "Name it" commits; "Not yet" cancels with **no turn spent**
+- [x] [C] Two scoped card behaviors (cross-off vs select-target) never collide
+- [x] [E] Wrong cast costs turn only; crossings + round state preserved
+- [ ] [E][A] Full keyboard cast path: arm → arrow → select → "Name it" _(S10 a11y)_
+- [x] [C] Pre-Ask panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle."
 
 ## 4.5 Round lifecycle & session isolation (S2.5)
 
@@ -175,7 +175,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 - [x] Engine suite lands with engine
 - [x] Oracle suite lands with Oracle
-- [ ] Human-loop + win/cast suites land with that module
+- [x] Human-loop + win/cast suites land with that module
 - [ ] Reactions suite lands with reactions
 - [ ] Opponent (Gemini + floor) suite lands with opponent
 - [ ] Integration + E2E follow once action interface is stable
