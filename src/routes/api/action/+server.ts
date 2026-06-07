@@ -6,7 +6,7 @@ import {
 	type SkollTurn,
 	type SkollReaction
 } from '$lib/server/engine/actions';
-import { getEngine, getSkoll } from '$lib/server/engine/session';
+import { getEngine, getSkoll, withSessionLock } from '$lib/server/engine/session';
 import { interpret } from '$lib/server/oracle/gemini';
 import { voiceAnswer, prepareAsk, answerAsk } from '$lib/server/oracle/oracle';
 import { resolveReaction } from '$lib/server/engine/reactions';
@@ -19,7 +19,6 @@ import {
 } from '$lib/server/skoll/skoll';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
 import { castLine, tauntAt } from '$lib/server/skoll/taunts';
-import { mulberry32 } from '$lib/prng';
 import type { GameEngine } from '$lib/server/engine/engine';
 import type { RequestHandler } from './$types';
 
@@ -56,18 +55,6 @@ function isAction(body: Partial<GameAction>): body is GameAction {
 	}
 }
 
-// Same seed + same accumulated state → same fallback move (reproducible for the demo). Mix the
-// fact count in via a golden-ratio multiply so distinct states can't collide on a bare sum.
-function floorRng(skoll: SkollState): () => number {
-	return mulberry32((skoll.seed ^ (skoll.facts.length * 0x9e3779b1)) >>> 0);
-}
-
-// A separate seeded stream for the reaction gate (a different mix constant) so it doesn't track
-// the floor's choices in lockstep.
-function reactRng(skoll: SkollState): () => number {
-	return mulberry32((skoll.seed ^ (skoll.facts.length * 0x85ebca6b)) >>> 0);
-}
-
 // Map his resolved turn into the wire DTO the client voices and reacts to.
 function describeTurn(out: SkollOutcome, taunt: string): SkollTurn {
 	return out.kind === 'cast'
@@ -81,9 +68,10 @@ function describeTurn(out: SkollOutcome, taunt: string): SkollTurn {
 		: { taunt, asks: { echo: out.echo } };
 }
 
-// Single server entry point for game actions. Both the human UI and the Gemini-driven Sköll
-// route through the engine here — no second path. The client's single `pending` flag serializes
-// a session's requests, so one Sköll turn never overlaps the next action.
+// Single server entry point for game actions. Both the human UI and the Gemini-driven Sköll route
+// through the engine here — no second path. Validation is pure (no session state) and runs before
+// the lock; everything that touches the shared engine/Sköll memory runs UNDER the per-session lock,
+// so a duplicate tab / retry / direct POST can't interleave while a turn awaits Gemini.
 export const POST: RequestHandler = async ({ request, locals }) => {
 	let body: Partial<GameAction>;
 	try {
@@ -96,13 +84,21 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		error(400, 'Unknown action type.');
 	}
 
-	const engine = getEngine(locals.sessionId);
-	const skoll = getSkoll(locals.sessionId);
+	// Advance carries no payload; every other type must be a well-formed action.
+	if ((body.type as string) !== 'Advance' && !isAction(body)) {
+		error(400, 'Malformed action payload.');
+	}
+
+	return withSessionLock(locals.sessionId, () => resolveAction(body, locals.sessionId));
+};
+
+async function resolveAction(body: Partial<GameAction>, sessionId: string): Promise<Response> {
+	const engine = getEngine(sessionId);
+	const skoll = getSkoll(sessionId);
 
 	// Sköll's turn is its own request: the client fires this after any action that hands him the
 	// turn, so the human's answer lands first and his move shows under a live "Sköll moves." pill.
 	// A no-op if it isn't his turn (or his Ask is already parked), so a stray Advance is harmless.
-	// 'Advance' is outside the GameAction union (not a player move), so compare as a plain string.
 	if ((body.type as string) === 'Advance') {
 		const skollTurn = await playSkollIfActive(engine, skoll);
 		return json({
@@ -112,16 +108,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		});
 	}
 
-	if (!isAction(body)) {
-		error(400, 'Malformed action payload.');
-	}
+	// Past Advance, validation in POST guarantees a well-formed player action.
+	const action = body as GameAction;
 
 	// The human reacting to Sköll's open Ask: resolve the reaction, then close his Ask (Hex kills
-	// it before any answer; Pass/Scry answers it, Scry shares it back). This is a distinct path
-	// because it completes a turn Sköll already opened, rather than starting a fresh action.
-	if (body.type === 'React' && skoll.pendingAsk !== null && engine.reactionWindow === 'Sköll') {
+	// it before any answer; Pass/Scry answers it, Scry shares it back). A distinct path because it
+	// completes a turn Sköll already opened, rather than starting a fresh action.
+	if (action.type === 'React' && skoll.pendingAsk !== null && engine.reactionWindow === 'Sköll') {
 		const askedQuery = skoll.pendingAsk;
-		const reaction = resolveReaction(engine, 'Human', body.reaction);
+		const reaction = resolveReaction(engine, 'Human', action.reaction);
 		const answer = resolveSkollAsk(engine, skoll, reaction);
 		const skollReaction: SkollReaction = answer.hexed
 			? { hexed: true }
@@ -133,27 +128,22 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	// The human's Ask: Sköll may interrupt it (R12 reverse) before the answer — Hex kills it, Scry
-	// overhears it. The reaction must land between the interpreted query and its answer, so it lives
-	// here; Sköll's OWN turn that follows is a separate Advance request, not folded in.
-	if (body.type === 'Ask' && body.player === 'Human' && engine.activePlayer === 'Human')
-		return askWithSkollReaction(engine, skoll, body.question);
+	// overhears it. Gated on it actually being the human's turn so a stale Ask on Sköll's turn falls
+	// through to a clean not-your-turn instead of opening a 'Human' window that desyncs his.
+	if (action.type === 'Ask' && action.player === 'Human' && engine.activePlayer === 'Human') {
+		return askWithSkollReaction(engine, skoll, action.question);
+	}
 
-	const result = await handleAction(body, { engine, interpret });
+	const result = await handleAction(action, { engine, interpret });
 	return json({ ...result, state: gameState(engine) });
-};
+}
 
 async function askWithSkollReaction(engine: GameEngine, skoll: SkollState, question: string) {
 	const prepared = await prepareAsk(question, interpret);
 	// A refusal never opens a window, spends a turn, or rouses Sköll — it just bounces back.
 	if (!prepared.ok) return json({ type: 'Ask', oracle: prepared.result, state: gameState(engine) });
 
-	const vs = await reactToHumanAsk(
-		engine,
-		skoll,
-		prepared.query,
-		decideSkollReaction,
-		reactRng(skoll)
-	);
+	const vs = await reactToHumanAsk(engine, skoll, prepared.query, decideSkollReaction, skoll.rng);
 	let oracle;
 	if (vs.killed) {
 		engine.passTurn(); // her question dies; her turn is spent with no answer
@@ -180,7 +170,7 @@ async function playSkollIfActive(
 	if (engine.status !== 'active' || engine.activePlayer !== 'Sköll') return undefined;
 	// He already has an Ask parked, waiting on the human's reaction — never start a second turn.
 	if (skoll.pendingAsk !== null) return undefined;
-	const out = await takeSkollTurn(engine, skoll, decideSkollMove, floorRng(skoll));
+	const out = await takeSkollTurn(engine, skoll, decideSkollMove, skoll.rng);
 	const turn = describeTurn(out, tauntAt(skoll.tauntIndex));
 	skoll.tauntIndex += 1;
 	return turn;

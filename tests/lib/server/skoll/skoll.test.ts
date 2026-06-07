@@ -114,6 +114,19 @@ describe('takeSkollTurn — Gemini plays, engine referees', () => {
 		expect([...state.crossed]).toEqual([2]); // 99 (no such rune) and 1.5 (non-integer) dropped
 	});
 
+	it('ignores a non-array crossOff and keeps the move', async () => {
+		const engine = skollsTurn();
+		const state = freshSkollState(SEED);
+		const decide: SkollDecide = vi.fn(async () => ({
+			kind: 'ask',
+			query: { axis: 'fill', value: 'Light' },
+			crossOff: 'nope'
+		}));
+		const out = await takeSkollTurn(engine, state, decide, mulberry32(1));
+		expect(out.kind).toBe('ask');
+		expect([...state.crossed]).toEqual([]);
+	});
+
 	it('resolves a Cast immediately — a wrong cast wastes only his turn', async () => {
 		const engine = skollsTurn();
 		const out = await takeSkollTurn(

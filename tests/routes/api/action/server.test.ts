@@ -26,9 +26,9 @@ const SID = 'route-session';
 const SECRET = selectSecret(SEED).name;
 const WRONG = runes.find((r) => r.name !== selectSecret(SEED).name)!.name;
 const HUMAN_TURN = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
-// Sköll only *considers* reacting ~half the time, gated on his (random) seed. Pin it to a value
-// whose first sample falls under REACTION_CHANCE so the reaction-wiring tests fire deterministically.
-const GATE_OPEN_SEED = 7;
+// Sköll only *considers* reacting when his RNG draw falls under REACTION_CHANCE. Inject a stream
+// that always draws 0 so the reaction-wiring tests fire deterministically (no magic seed).
+const openGate = (sessionId = SID) => (getSkoll(sessionId).rng = () => 0);
 
 const skollDecides = (impl: () => Promise<unknown>) =>
 	(decideSkollMove as ReturnType<typeof vi.fn>).mockImplementation(impl);
@@ -96,7 +96,7 @@ describe('POST /api/action', () => {
 		await ask(); // turn now sits with Sköll
 		const reactionCalls = (decideSkollReaction as ReturnType<typeof vi.fn>).mock.calls.length;
 		skollReacts(async () => ({ reaction: 'Hex' }));
-		getSkoll(SID).seed = GATE_OPEN_SEED; // would open the reaction gate if the path ran
+		openGate(); // would open the reaction gate if the React path even ran
 
 		const stale = await json(await ask());
 
@@ -171,7 +171,7 @@ describe('POST /api/action', () => {
 
 	it('lets Sköll Hex the human Ask — no answer comes back, her turn is spent', async () => {
 		skollReacts(async () => ({ reaction: 'Hex' }));
-		getSkoll(SID).seed = GATE_OPEN_SEED; // open the reaction gate deterministically
+		openGate(); // open the reaction gate deterministically
 		const data = await json(await ask());
 		expect(data.skollVsYou).toEqual({ reaction: 'Hex' });
 		expect(data.oracle).toBeUndefined(); // silenced — no Oracle line
@@ -180,7 +180,7 @@ describe('POST /api/action', () => {
 
 	it('lets Sköll Scry the human Ask — she still gets her answer, he overhears it', async () => {
 		skollReacts(async () => ({ reaction: 'Scry' }));
-		getSkoll(SID).seed = GATE_OPEN_SEED; // open the reaction gate deterministically
+		openGate(); // open the reaction gate deterministically
 		const data = await json(await ask());
 		expect(data.skollVsYou).toEqual({ reaction: 'Scry' });
 		expect(data.oracle).toMatchObject({ ok: true });

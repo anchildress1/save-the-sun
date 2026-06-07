@@ -9,6 +9,7 @@
 
 import { dev } from '$app/environment';
 import { runes } from '$lib/board';
+import { mulberry32 } from '$lib/prng';
 import { parseQuery, type Query } from '$lib/server/engine/queries';
 import { valuePhrase } from '$lib/server/oracle/oracle';
 import type { GameEngine, CastResult } from '$lib/server/engine/engine';
@@ -31,13 +32,14 @@ export interface SkollState {
 	pendingAsk: Query | null;
 	// Rotates the taunt pool; no repeat within a round.
 	tauntIndex: number;
-	// Base seed for the floor's PRNG — same seed + same state → same fallback move.
-	seed: number;
+	// One persistent PRNG for the round — floor and reaction gate both draw from it, so variety comes
+	// from the advancing stream, not from re-seeding off a state counter each call.
+	rng: () => number;
 }
 
-/** A fresh Sköll memory for a new round. */
+/** A fresh Sköll memory for a new round. The seed is crypto-sourced upstream (session.ts). */
 export function freshSkollState(seed: number): SkollState {
-	return { facts: [], crossed: new Set(), pendingAsk: null, tauntIndex: 0, seed };
+	return { facts: [], crossed: new Set(), pendingAsk: null, tauntIndex: 0, rng: mulberry32(seed) };
 }
 
 /** The earned-only view handed to Gemini. Built from state alone — never the secret. */
@@ -97,10 +99,17 @@ export function buildPayload(state: SkollState): SkollPayload {
 const RUNE_IDS = new Set(runes.map((r) => r.id));
 const RUNE_NAMES = new Set(runes.map((r) => r.name));
 
-/** Keep only legal rune ids from an untrusted cross-off list; malformed ids are dropped. */
+/** Keep only legal rune ids from an untrusted cross-off list; malformed ids are dropped (logged). */
 function legalCrossOffs(ids: unknown): number[] {
-	if (!Array.isArray(ids)) return [];
-	return ids.filter((id): id is number => Number.isInteger(id) && RUNE_IDS.has(id));
+	if (ids === undefined) return [];
+	if (!Array.isArray(ids)) {
+		console.warn(`[skoll] ignoring non-array crossOff: ${JSON.stringify(ids)}`);
+		return [];
+	}
+	const legal = ids.filter((id): id is number => Number.isInteger(id) && RUNE_IDS.has(id));
+	if (legal.length !== ids.length)
+		console.warn(`[skoll] dropped malformed crossOff ids: ${JSON.stringify(ids)} → ${legal}`);
+	return legal;
 }
 
 /** Validate Gemini's move into a canonical one, or null if illegal/malformed (→ floor). */

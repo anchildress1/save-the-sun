@@ -78,3 +78,24 @@ export function getSkoll(sessionId: string): SkollState {
 export function sessionCount(): number {
 	return engines.size;
 }
+
+// Per-session single-flight: a request can yield mid-action (takeSkollTurn awaits Gemini) on shared
+// engine/Sköll state, so without this a duplicate tab / retry / direct POST could interleave and
+// double-call Gemini, overwrite the parked Ask, or return a stale response. One action per session.
+const locks = new Map<string, Promise<unknown>>();
+
+/** Run `fn` after any in-flight action for this session settles — serializing per-session mutation. */
+export function withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
+	requireId(sessionId);
+	const prev = locks.get(sessionId) ?? Promise.resolve();
+	const result = prev.then(fn); // prev is a tail that never rejects, so a failure can't wedge the queue
+	const tail = result.then(
+		() => undefined,
+		() => undefined
+	);
+	locks.set(sessionId, tail);
+	void tail.finally(() => {
+		if (locks.get(sessionId) === tail) locks.delete(sessionId); // drop drained sessions
+	});
+	return result;
+}
