@@ -33,6 +33,49 @@ const askResult = (oracle: object, state: GameState = HUMAN_TURN) =>
 const castResult = (cast: object, state: GameState = HUMAN_TURN) =>
 	respond({ type: 'Cast', cast, state });
 
+// --- S6: Sköll's surfaced turn + the human's reactions ---
+
+// A fetch stub that answers an Ask with a Sköll turn, then resolves the human's React.
+function skollFlow(skoll: object, askState: GameState, reaction: object, reactState: GameState) {
+	return stubFetch(async (_url: string, init?: { body?: string }) => {
+		const body = init?.body ? JSON.parse(init.body) : {};
+		if (body.type === 'React')
+			return new Response(
+				JSON.stringify({
+					type: 'React',
+					outcome: { ok: true },
+					skollReaction: reaction,
+					state: reactState
+				})
+			);
+		return new Response(
+			JSON.stringify({
+				type: 'Ask',
+				oracle: {
+					ok: true,
+					answer: 'No. Sól is not reaching for a fire rune.',
+					turnConsumed: true
+				},
+				skoll,
+				state: askState
+			})
+		);
+	});
+}
+
+const askThenSkollAsks = (echo = 'Sköll asks after a gold rune.') =>
+	skollFlow(
+		{ taunt: 'You circle. I close.', asks: { echo } },
+		SKOLL_TURN,
+		{ hexed: false },
+		HUMAN_TURN
+	);
+
+async function humanAsks(screen: ReturnType<typeof render>) {
+	await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
+	await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+}
+
 describe('Save the Sun page', () => {
 	it('starts with a ready Rite state, not a blank panel', async () => {
 		const screen = render(Page, pageProps);
@@ -312,49 +355,6 @@ describe('Save the Sun page', () => {
 			.element(screen.getByRole('button', { name: /restore sowilo/i }))
 			.toBeInTheDocument();
 	});
-
-	// --- S6: Sköll's surfaced turn + the human's reactions ---
-
-	// A fetch stub that answers an Ask with a Sköll turn, then resolves the human's React.
-	function skollFlow(skoll: object, askState: GameState, reaction: object, reactState: GameState) {
-		return stubFetch(async (_url: string, init?: { body?: string }) => {
-			const body = init?.body ? JSON.parse(init.body) : {};
-			if (body.type === 'React')
-				return new Response(
-					JSON.stringify({
-						type: 'React',
-						outcome: { ok: true },
-						skollReaction: reaction,
-						state: reactState
-					})
-				);
-			return new Response(
-				JSON.stringify({
-					type: 'Ask',
-					oracle: {
-						ok: true,
-						answer: 'No. Sól is not reaching for a fire rune.',
-						turnConsumed: true
-					},
-					skoll,
-					state: askState
-				})
-			);
-		});
-	}
-
-	const askThenSkollAsks = (echo = 'Sköll asks after a gold rune.') =>
-		skollFlow(
-			{ taunt: 'You circle. I close.', asks: { echo } },
-			SKOLL_TURN,
-			{ hexed: false },
-			HUMAN_TURN
-		);
-
-	async function humanAsks(screen: ReturnType<typeof render>) {
-		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
-		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
-	}
 
 	it("voices Sköll's cast on his turn", async () => {
 		respond({
