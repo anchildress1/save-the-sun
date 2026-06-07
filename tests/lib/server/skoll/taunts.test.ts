@@ -3,7 +3,7 @@ import { castLine, tauntAt } from '$lib/server/skoll/taunts';
 
 describe('tauntAt', () => {
 	it('returns a line and wraps around the pool', () => {
-		expect(tauntAt(0)).toBe('You circle. I close.');
+		expect(tauntAt(0)).toBe('I have chased the sun across every sky there is. It tires. I do not.');
 		// Wrap: index 8 lands back on the first of the 8-line pool.
 		expect(tauntAt(8)).toBe(tauntAt(0));
 	});

@@ -113,14 +113,14 @@ Templated. **Both verdicts restate the trait** — `Yes. Sól is reaching for {v
 ## 2. Sköll
 
 ### Idle / turn taunts (rotate, no repeat within a game)
-- "You circle. I close."
-- "So little dark, witch. Spend it asking. I'll spend it winning."
-- "Another question. I prefer answers."
-- "You spend a turn asking. I spend mine narrowing."
-- "The night is short. I waste none of it."
-- "Two of us hunt one rune. Only one of us is hungry."
-- "Ask. Cross your little runes off. Dawn comes regardless."
-- "Every sign you read, I read the shadow of."
+- "I have chased the sun across every sky there is. It tires. I do not."
+- "The sun already knows my teeth. You are only late to the news."
+- "Spend the night talking. I will spend it swallowing the dawn."
+- "Cross them off, one by one. I will cross off the morning in a single bite."
+- "You count runes, witch. I count the breaths left in the night."
+- "Every sign you read, I have already devoured its shadow."
+- "Two of us hunt one rune. Only one of us has tasted a star."
+- "Run for the dawn. I am the night that runs faster."
 
 ### Escalation tier (P2 — copy ready; Medium Sköll already tracks candidates, so the narrowing signal exists. P2 by priority, not capability — wire to candidate-count when time allows.)
 - "I can almost taste the dawn I mean to swallow."

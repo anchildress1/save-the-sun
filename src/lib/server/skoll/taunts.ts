@@ -3,14 +3,14 @@
 // (deferred) — these are the v1 idle/turn taunts only.
 
 const TAUNTS = [
-	'You circle. I close.',
-	"So little dark, witch. Spend it asking. I'll spend it winning.",
-	'Another question. I prefer answers.',
-	'You spend a turn asking. I spend mine narrowing.',
-	'The night is short. I waste none of it.',
-	'Two of us hunt one rune. Only one of us is hungry.',
-	'Ask. Cross your little runes off. Dawn comes regardless.',
-	'Every sign you read, I read the shadow of.'
+	'I have chased the sun across every sky there is. It tires. I do not.',
+	'The sun already knows my teeth. You are only late to the news.',
+	'Spend the night talking. I will spend it swallowing the dawn.',
+	'Cross them off, one by one. I will cross off the morning in a single bite.',
+	'You count runes, witch. I count the breaths left in the night.',
+	'Every sign you read, I have already devoured its shadow.',
+	'Two of us hunt one rune. Only one of us has tasted a star.',
+	'Run for the dawn. I am the night that runs faster.'
 ];
 
 /** The taunt at a rotation index (wraps); pair with a per-round counter for no in-round repeat. */
