@@ -1,10 +1,17 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import Page from '$routes/+page.svelte';
+import type { GameState } from '$lib/server/engine/actions';
 
 // Full page props (data normally comes from +page.server.ts). A fixed seed keeps the
-// board order deterministic across these behavioural tests.
-const pageProps = { data: { boardSeed: 0 }, params: {}, form: null };
+// board order deterministic across these behavioural tests; the hydrated state opens the
+// page human-first on a live round.
+const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null };
+const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner: null };
+const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human' };
+
+const pageProps = { data: { boardSeed: 0, state: HUMAN_TURN }, params: {}, form: null };
+const propsWith = (state: GameState) => ({ data: { boardSeed: 0, state }, params: {}, form: null });
 
 afterEach(() => {
 	vi.unstubAllGlobals();
@@ -18,8 +25,12 @@ function stubFetch(impl: (input: string) => Promise<Response>) {
 
 const respond = (body: object) => stubFetch(async () => new Response(JSON.stringify(body)));
 
-const askResult = (oracle: object) => respond({ type: 'Ask', oracle });
-const castResult = (cast: object) => respond({ type: 'Cast', cast });
+// Every action response carries the post-shim turn snapshot. Default: the human is back on
+// the clock with the round still live (the v1 pre-Sköll shim hands play straight back).
+const askResult = (oracle: object, state: GameState = HUMAN_TURN) =>
+	respond({ type: 'Ask', oracle, state });
+const castResult = (cast: object, state: GameState = HUMAN_TURN) =>
+	respond({ type: 'Cast', cast, state });
 
 describe('Save the Sun page', () => {
 	it('starts with a ready Rite state, not a blank panel', async () => {
@@ -145,7 +156,8 @@ describe('Save the Sun page', () => {
 
 	it('begins another night — resets the panel and pulls a fresh board', async () => {
 		const spy = stubFetch(async (url) => {
-			if (url.includes('/api/new-game')) return new Response(JSON.stringify({ boardSeed: 99 }));
+			if (url.includes('/api/new-game'))
+				return new Response(JSON.stringify({ boardSeed: 99, state: HUMAN_TURN }));
 			return new Response(
 				JSON.stringify({
 					type: 'Ask',
@@ -153,7 +165,8 @@ describe('Save the Sun page', () => {
 						ok: true,
 						answer: 'No. Sól is not reaching for a fire rune.',
 						turnConsumed: true
-					}
+					},
+					state: HUMAN_TURN
 				})
 			);
 		});
@@ -183,5 +196,68 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+	});
+
+	it('opens on the human turn — "Your move." and controls live', async () => {
+		const screen = render(Page, pageProps);
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
+		await expect.element(screen.getByRole('button', { name: 'Ask the Oracle' })).toBeEnabled();
+		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
+	});
+
+	it('opens a resumed won round on its win state — no phantom "Your move."', async () => {
+		const screen = render(Page, propsWith(HUMAN_WON));
+		// Hydrated from the load: the pill and panel agree, and play is locked until replay.
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('The rune is true.');
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rune is true.');
+		await expect.element(screen.getByRole('button', { name: 'Ask the Oracle' })).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
+	});
+
+	it('hands the turn to Sköll — pill flips and Ask + Cast disable', async () => {
+		askResult(
+			{ ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+			SKOLL_TURN
+		);
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll moves.');
+		await expect.element(screen.getByRole('button', { name: 'Ask the Oracle' })).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
+	});
+
+	it('keeps cross-off live during Sköll’s turn — the reading is always yours', async () => {
+		askResult(
+			{ ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+			SKOLL_TURN
+		);
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
+		// Cross-off is a private aid — never turn-gated. Sowilo's card stays interactive and
+		// crosses off even while it is the wolf's move.
+		const sowilo = screen.getByRole('button', { name: /cross off sowilo/i });
+		await sowilo.click();
+		await expect
+			.element(screen.getByRole('button', { name: /restore sowilo/i }))
+			.toBeInTheDocument();
+	});
+
+	it('resolves the round on a correct cast — Ask + Cast lock until a new night', async () => {
+		castResult({ ok: true, won: true, rune: { name: 'Sowilo' }, turnConsumed: true }, HUMAN_WON);
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await screen.getByRole('button', { name: 'Name it' }).click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rune is true.');
+		// The pill stops reading as a turn and becomes the resolved-round indicator.
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('The rune is true.');
+		// Round is resolved: no further asking or casting until "Begin another night".
+		await expect.element(screen.getByRole('button', { name: 'Ask the Oracle' })).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
+		// Replay stays the live next step.
+		await expect.element(screen.getByRole('button', { name: 'Begin another night' })).toBeEnabled();
 	});
 });

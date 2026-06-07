@@ -1,19 +1,57 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import RuneGrid from '$lib/components/RuneGrid.svelte';
 	import { runes } from '$lib/board';
-	import type { GameAction, ActionResult } from '$lib/server/engine/actions';
+	import type { GameAction, ActionResponse, GameState, Player } from '$lib/server/engine/actions';
 	import type { PageProps } from './$types';
 
 	// data (incl. boardSeed) comes from +page.server.ts. No default — a missing load
 	// should fail loudly, not silently fall back to a frozen board.
 	let { data }: PageProps = $props();
 
+	// Every in-world line the Rite swaps in at runtime, in one place (ux-copy.md). Static chrome
+	// (title, button labels) stays inline in the template; these are the lines the Oracle panel,
+	// the turn pill, and the cast prompt show as play resolves.
+	const RITE = {
+		ready: 'Twenty-four runes stand. None ruled out. Ask the Oracle.',
+		emptyAsk: 'Speak your question, witch.',
+		wolfMoving: 'The wolf is moving. Hold.',
+		oracleSilent: 'The Oracle falls silent. Draw breath and try again.',
+		castFalters: 'The rite falters. The rune slips away.',
+		wrongCast: 'The rune is not the one. The night holds.',
+		runeTrue: 'The rune is true.',
+		yourMove: 'Your move.',
+		skollMoves: 'Sköll moves.',
+		chooseTarget: 'Choose a rune from the board.',
+		castPrompt: (name: string) => `Cast ${name}?`
+	};
+
 	let castMode = $state(false);
 	let selectedTargetId: number | null = $state(null);
 	let askValue = $state('');
 	let pending = $state(false);
 
-	const READY = 'Twenty-four runes stand. None ruled out. Ask the Oracle.';
+	// Turn state mirrors the engine, hydrated from the load on mount and fed by each action
+	// response after. Hydrating (not guessing 'Human'/'active') is what keeps a resumed round —
+	// including one already won — truthful on load. The server's pre-Sköll shim hands play back
+	// to the human in v1, so activePlayer reads 'Human' in real play; the 'Sköll' branch goes
+	// live when S6 lands.
+	let activePlayer = $state<Player>(untrack(() => data.state.activePlayer));
+	let roundStatus = $state<'active' | 'won'>(untrack(() => data.state.status));
+	let roundOver = $derived(roundStatus === 'won');
+	// Ask and Cast are turn-gated; cross-off is a private aid and is never gated (RuneGrid owns
+	// it and stays enabled through Sköll's turn — game-spec "private aid").
+	let canAct = $derived(activePlayer === 'Human' && !roundOver);
+	// Won rounds read as resolved, not as a phantom turn. Defeat (Sköll's win) arrives with the
+	// opponent in S6; in v1 only the human can win, so a resolved round is always the true rune.
+	let turnPill = $derived(
+		roundOver ? RITE.runeTrue : activePlayer === 'Human' ? RITE.yourMove : RITE.skollMoves
+	);
+
+	function applyState(state: GameState) {
+		activePlayer = state.activePlayer;
+		roundStatus = state.status;
+	}
 
 	// Tracks the loaded seed until a new game overrides it. A changed seed remounts RuneGrid
 	// (via {#key}), discarding its crossings and highlight; the parent's cast arming is
@@ -22,10 +60,11 @@
 	let boardSeed = $derived(seedOverride ?? data.boardSeed);
 
 	// The Oracle surface — one response at a time. Defaults read as ready, not blank (prd.md
-	// S3). Your Ask shows the answer, which restates the trait. The interpretation echo is
-	// reserved for the rival's Ask (you'd see his question, not his answer) — wired in S5/S6,
-	// so it is deliberately not rendered for your own Ask today.
-	let answer = $state(READY);
+	// S3); a resumed won round opens on its victory line so the panel and pill agree. Your Ask
+	// shows the answer, which restates the trait. The interpretation echo is reserved for the
+	// rival's Ask (you'd see his question, not his answer) — wired in S5/S6, so it is
+	// deliberately not rendered for your own Ask today.
+	let answer = $state(untrack(() => (data.state.status === 'won' ? RITE.runeTrue : RITE.ready)));
 
 	let selectedRune = $derived(
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
@@ -33,28 +72,29 @@
 
 	// Return type is derived from the action's `type`, so a caller can't request a
 	// mismatched result shape.
-	async function dispatch<T extends ActionResult['type']>(
+	async function dispatch<T extends GameAction['type']>(
 		action: Extract<GameAction, { type: T }>
-	): Promise<Extract<ActionResult, { type: T }>> {
+	): Promise<ActionResponse<T>> {
 		const res = await fetch('/api/action', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(action)
 		});
 		if (!res.ok) throw new Error(`Action rejected (${res.status})`);
-		return res.json() as Promise<Extract<ActionResult, { type: T }>>;
+		return res.json() as Promise<ActionResponse<T>>;
 	}
 
 	async function submitAsk() {
 		const question = askValue.trim();
 		if (question === '') {
 			// Refusal does not consume a turn (game-spec). Client-side gate, no dispatch.
-			answer = 'Speak your question, witch.';
+			answer = RITE.emptyAsk;
 			return;
 		}
 		pending = true;
 		try {
-			const { oracle } = await dispatch({ type: 'Ask', player: 'Human', question });
+			const { oracle, state } = await dispatch({ type: 'Ask', player: 'Human', question });
+			applyState(state);
 			if (oracle.ok) {
 				answer = oracle.answer;
 				askValue = '';
@@ -62,16 +102,13 @@
 				answer = oracle.line;
 			} else {
 				// not-your-turn means the engine has handed the turn to Sköll.
-				answer =
-					oracle.engineReason === 'not-your-turn'
-						? 'The wolf is moving. Hold.'
-						: 'The Oracle falls silent. Draw breath and try again.';
+				answer = oracle.engineReason === 'not-your-turn' ? RITE.wolfMoving : RITE.oracleSilent;
 			}
 		} catch (err) {
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
 			console.error('[ui] Ask dispatch failed:', err);
-			answer = 'The Oracle falls silent. Draw breath and try again.';
+			answer = RITE.oracleSilent;
 		} finally {
 			pending = false;
 		}
@@ -97,17 +134,21 @@
 		try {
 			res = await fetch('/api/new-game', { method: 'POST' });
 			if (!res.ok) throw new Error(`New game rejected (${res.status})`);
-			const { boardSeed: seed } = (await res.json()) as { boardSeed: number };
+			const { boardSeed: seed, state } = (await res.json()) as {
+				boardSeed: number;
+				state: GameState;
+			};
 			// A 200 with no usable seed would leave the board un-remounted while the server
 			// reset — treat it as a hard failure, not a silent no-op.
 			if (!Number.isFinite(seed)) throw new Error('New game response missing boardSeed');
 			seedOverride = seed; // remounts RuneGrid → crossings + highlight clear
-			answer = READY;
+			answer = RITE.ready;
 			askValue = '';
+			applyState(state); // reset from engine truth, same as every other action
 			cancelCast();
 		} catch (err) {
 			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
-			answer = 'The Oracle falls silent. Draw breath and try again.';
+			answer = RITE.oracleSilent;
 		} finally {
 			pending = false;
 		}
@@ -117,20 +158,21 @@
 		if (selectedRune === null) return;
 		pending = true;
 		try {
-			const { cast } = await dispatch({
+			const { cast, state } = await dispatch({
 				type: 'Cast',
 				player: 'Human',
 				runeName: selectedRune.name
 			});
+			applyState(state);
 			if (cast.ok) {
-				answer = cast.won ? 'The rune is true.' : 'The rune is not the one. The night holds.';
+				answer = cast.won ? RITE.runeTrue : RITE.wrongCast;
 			} else {
 				console.warn('[ui] Cast rejected by engine:', cast.reason);
-				answer = 'The rite falters. The rune slips away.';
+				answer = RITE.castFalters;
 			}
 		} catch (err) {
 			console.error('[ui] Cast dispatch failed:', err);
-			answer = 'The rite falters. The rune slips away.';
+			answer = RITE.castFalters;
 		} finally {
 			pending = false;
 			cancelCast();
@@ -180,11 +222,9 @@
 			<button class="ghost new-game" type="button" onclick={newGame} disabled={pending}>
 				Begin another night
 			</button>
-			<div class="turn-pill">Your move.</div>
+			<div class="turn-pill" class:won={roundOver} data-testid="turn-pill">{turnPill}</div>
 		</div>
 	</header>
-
-	<p class="explainer">Ask. Cross off what it can't be. Cast when you're ready.</p>
 
 	<div class="game-layout">
 		<section class="board-section">
@@ -226,16 +266,18 @@
 					type="text"
 					placeholder="Type your question…"
 					bind:value={askValue}
-					disabled={castMode || pending}
+					disabled={castMode || pending || !canAct}
 				/>
-				<button class="primary" type="submit" disabled={castMode || pending}>Ask the Oracle</button>
+				<button class="primary" type="submit" disabled={castMode || pending || !canAct}>
+					Ask the Oracle
+				</button>
 			</form>
 
 			<div class="cast">
 				<span class="cast-label">Cast a Rune</span>
 				{#if castMode}
 					<p class="cast-hint" data-testid="cast-hint">
-						{selectedRune ? `Cast ${selectedRune.name}?` : 'Choose a rune from the board.'}
+						{selectedRune ? RITE.castPrompt(selectedRune.name) : RITE.chooseTarget}
 					</p>
 					<div class="cast-actions">
 						<button
@@ -249,7 +291,12 @@
 						<button class="ghost" type="button" onclick={cancelCast}>Not yet</button>
 					</div>
 				{:else}
-					<button class="primary cast-arm" type="button" onclick={armCast} disabled={pending}>
+					<button
+						class="primary cast-arm"
+						type="button"
+						onclick={armCast}
+						disabled={pending || !canAct}
+					>
 						Cast the rune
 					</button>
 				{/if}
@@ -340,16 +387,12 @@
 		font-size: 0.85rem;
 	}
 
-	.explainer {
-		margin: 0;
-		text-align: center;
-		color: var(--ink-muted);
-		font-style: italic;
-		font-size: 0.85rem;
-		letter-spacing: 0.02em;
-		border-top: 1px solid var(--gold-faint);
-		border-bottom: 1px solid var(--gold-faint);
-		padding: 0.45rem 0;
+	/* Resolved round: the pill stops reading as a turn and lights up as the victory state. */
+	.turn-pill.won {
+		color: var(--bg-deep);
+		background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+		border-color: var(--gold-bright);
+		box-shadow: 0 0 18px rgba(217, 169, 74, 0.4);
 	}
 
 	.game-layout {

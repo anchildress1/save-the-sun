@@ -17,9 +17,11 @@ describe('POST /api/new-game', () => {
 		expect(boardSeed).toBeLessThan(2 ** 32);
 	});
 
-	it('returns only a board seed — no secret-bearing fields', async () => {
+	it('returns the board seed and a fresh turn snapshot — no secret-bearing fields', async () => {
 		const body = await (await call('shape-session')).json();
-		expect(Object.keys(body)).toEqual(['boardSeed']);
+		expect(Object.keys(body).sort()).toEqual(['boardSeed', 'state']);
+		// The snapshot is the public turn state only — winner is null pre-cast, never the secret.
+		expect(body.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null });
 	});
 
 	it('resets the session to a fresh active round', async () => {

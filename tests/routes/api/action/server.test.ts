@@ -13,9 +13,11 @@ vi.mock('$lib/server/oracle/gemini', () => ({
 import { POST } from '$routes/api/action/+server';
 import { resetEngine } from '$lib/server/engine/session';
 import { selectSecret } from '$lib/server/engine/engine';
+import { runes } from '$lib/board';
 
 const SEED = 1;
 const SID = 'route-session';
+const HUMAN_TURN = { activePlayer: 'Human', status: 'active', winner: null };
 
 function call(body: string | object) {
 	return callAs(SID, body);
@@ -60,16 +62,40 @@ describe('POST /api/action', () => {
 		expect(data).toMatchObject({ type: 'Cast', cast: { won: true } });
 	});
 
+	it('attaches the post-shim turn state to every response', async () => {
+		const data = await (
+			await call({ type: 'Ask', player: 'Human', question: 'is it light?' })
+		).json();
+		// The engine handed the turn to Sköll; the pre-Sköll shim hands it straight back, so
+		// the client sees its own turn again — round still active.
+		expect(data.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null });
+	});
+
+	it('reports the resolved round in the state after a winning cast', async () => {
+		const data = await (
+			await call({ type: 'Cast', player: 'Human', runeName: selectSecret(SEED).name })
+		).json();
+		expect(data.state).toEqual({ activePlayer: 'Human', status: 'won', winner: 'Human' });
+	});
+
+	it('keeps the human on the clock after a wrong cast — round continues', async () => {
+		const wrong = runes.find((r) => r.name !== selectSecret(SEED).name)!.name;
+		const data = await (await call({ type: 'Cast', player: 'Human', runeName: wrong })).json();
+		expect(data).toMatchObject({ type: 'Cast', cast: { ok: true, won: false } });
+		expect(data.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null });
+	});
+
 	it('routes a CrossOff without asking the engine to referee it', async () => {
 		const res = await call({ type: 'CrossOff', player: 'Human', runeId: 1, crossed: true });
 		const data = await res.json();
-		expect(data).toEqual({ type: 'CrossOff', ok: true });
+		// Cross-off never consumes a turn, so the snapshot still shows the human on the clock.
+		expect(data).toEqual({ type: 'CrossOff', ok: true, state: { ...HUMAN_TURN } });
 	});
 
 	it('routes a React placeholder through the shared interface', async () => {
 		const res = await call({ type: 'React', player: 'Human', reaction: 'Pass' });
 		const data = await res.json();
-		expect(data).toEqual({ type: 'React', ok: true });
+		expect(data).toEqual({ type: 'React', ok: true, state: { ...HUMAN_TURN } });
 	});
 
 	it('rejects an unknown action type with 400', async () => {
