@@ -36,7 +36,7 @@ describe('Gemini Sköll adapter', () => {
 		sdk.generateContent.mockReset();
 	});
 
-	it('requests a Gemini 3 Flash move with structured JSON and minimal thinking', async () => {
+	it('requests a Gemini 3.5 Flash move with structured JSON and minimal thinking', async () => {
 		geminiJson({ kind: 'ask', axis: 'fill', fillValue: 'Light', crossOff: [1] });
 
 		const result = await decideSkollMove({ board: [], answers: [], crossedOff: [] });
@@ -48,7 +48,7 @@ describe('Gemini Sköll adapter', () => {
 		});
 		expect(sdk.generateContent).toHaveBeenCalledWith(
 			expect.objectContaining({
-				model: 'gemini-3-flash-preview',
+				model: 'gemini-3.5-flash',
 				config: expect.objectContaining({
 					responseMimeType: 'application/json',
 					thinkingConfig: { thinkingLevel: 'MINIMAL' },
@@ -58,7 +58,7 @@ describe('Gemini Sköll adapter', () => {
 		);
 	});
 
-	it('requests Sköll reactions from the same Gemini 3 Flash model', async () => {
+	it('requests Sköll reactions from the same Gemini 3.5 Flash model', async () => {
 		geminiJson({ reaction: 'Hex' });
 
 		const result = await decideSkollReaction({
@@ -72,7 +72,7 @@ describe('Gemini Sköll adapter', () => {
 		expect(result).toEqual({ reaction: 'Hex' });
 		expect(sdk.generateContent).toHaveBeenCalledWith(
 			expect.objectContaining({
-				model: 'gemini-3-flash-preview',
+				model: 'gemini-3.5-flash',
 				config: expect.objectContaining({
 					responseMimeType: 'application/json',
 					thinkingConfig: { thinkingLevel: 'MINIMAL' },

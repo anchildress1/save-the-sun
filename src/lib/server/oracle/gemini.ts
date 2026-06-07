@@ -1,5 +1,5 @@
 // Gemini adapter — the Oracle's LLM seam (S2). Excluded from coverage: oracle.ts
-// re-validates everything it returns. gemini-3-flash-preview, MINIMAL thinking, JSON out.
+// re-validates everything it returns. gemini-3.5-flash, MINIMAL thinking, JSON out.
 
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
@@ -7,7 +7,7 @@ import { runes } from '$lib/board';
 import type { PowerOp, Query } from '$lib/server/engine/queries';
 import type { Interpretation, Interpret, RefusalClass } from './types';
 
-const MODEL = 'gemini-3-flash-preview';
+const MODEL = 'gemini-3.5-flash';
 
 const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
 const COLORS: string[] = [...new Set(runes.map((r) => r.color))];
