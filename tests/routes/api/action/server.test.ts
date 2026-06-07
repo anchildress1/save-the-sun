@@ -15,19 +15,24 @@ import { resetEngine } from '$lib/server/engine/session';
 import { selectSecret } from '$lib/server/engine/engine';
 
 const SEED = 1;
+const SID = 'route-session';
 
 function call(body: string | object) {
+	return callAs(SID, body);
+}
+
+function callAs(sessionId: string, body: string | object) {
 	const request = new Request('http://localhost/api/action', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
 		body: typeof body === 'string' ? body : JSON.stringify(body)
 	});
-	return POST({ request } as unknown as Parameters<typeof POST>[0]);
+	return POST({ request, locals: { sessionId } } as unknown as Parameters<typeof POST>[0]);
 }
 
 describe('POST /api/action', () => {
 	beforeEach(() => {
-		resetEngine(SEED);
+		resetEngine(SID, SEED);
 	});
 
 	it('routes a valid Ask through the Oracle', async () => {
@@ -107,5 +112,23 @@ describe('POST /api/action', () => {
 			status: 400,
 			body: expect.objectContaining({ message: 'Malformed action payload.' })
 		});
+	});
+
+	it('keeps two sessions independent through the endpoint', async () => {
+		resetEngine('player-one', SEED);
+		resetEngine('player-two', SEED);
+		const secret = selectSecret(SEED).name;
+
+		// player-one wins their round.
+		const win = await (
+			await callAs('player-one', { type: 'Cast', player: 'Human', runeName: secret })
+		).json();
+		expect(win).toMatchObject({ type: 'Cast', cast: { won: true } });
+
+		// player-two's round is untouched — the same winning cast still works.
+		const stillWinnable = await (
+			await callAs('player-two', { type: 'Cast', player: 'Human', runeName: secret })
+		).json();
+		expect(stillWinnable).toMatchObject({ type: 'Cast', cast: { won: true } });
 	});
 });

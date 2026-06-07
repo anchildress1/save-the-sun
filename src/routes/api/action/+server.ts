@@ -37,7 +37,7 @@ function isAction(body: Partial<GameAction>): body is GameAction {
 
 // Single server entry point for game actions. Both the human UI and (later) the
 // Gemini-driven Sköll route through handleAction — no second path.
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
 	let body: Partial<GameAction>;
 	try {
 		body = await request.json();
@@ -53,7 +53,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		error(400, 'Malformed action payload.');
 	}
 
-	const engine = getEngine();
+	// One session's engine is shared mutable state. Today the client's single `pending` flag
+	// serializes a session's turns; when Sköll moves async (S6) this needs per-session
+	// single-flight so a concurrent action (or /api/new-game) can't interleave mid-Ask.
+	const engine = getEngine(locals.sessionId);
 	const result = await handleAction(body, { engine, interpret });
 
 	// Pre-Sköll shim (S6): the opponent has no mover yet, so skip his turn and hand

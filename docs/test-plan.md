@@ -26,7 +26,7 @@ Covers R1, R3, R4, R12 truth resolution, and the Architecture contract. Pure, de
 | Area | Test type | What to test |
 |---|---|---|
 | Board integrity | Unit | All 24 Elder Futhark runes load; every rune is a unique (element, power, color) combination; trait counts match `rune-board.md` (element 4 each, power 4 each, fill 12/12, color 4 each). |
-| Secret selection | Unit | Exactly one secret rune per round; secret is drawn from the 24; refresh/new round reseeds. |
+| Secret selection | Unit | Exactly one secret rune per round; secret is drawn from the 24; a new round reseeds (a refresh resumes the same round — see S2.5). |
 | Trait resolution — truth | Unit (table-driven, all 24 × all axes) | Element, power, fill, hue queries each resolve truthfully against the known secret. |
 | Power ranges | Unit | "fewer than N", "at least N", "N or more", exact N resolve correctly at boundaries (1 and 6 inclusive). |
 | Single-rune query | Unit | "is it Sowilo?" eliminates exactly that one; correct yes only for the secret. |
@@ -216,6 +216,7 @@ Tiered by blast radius. The engine owns truth, so it carries the hardest bar; UI
 | **Engine** (board, query resolution, win/cast, legality, reaction resolution, secret handling) | **100%** | **95%** | Single source of truth. Untested branches here are unfair rounds. Non-negotiable. |
 | **Deterministic fallback policy** | **95%** | **90%** | The demo's no-hard-fail floor; must behave under every failure path. |
 | **Action interface** (shared Ask/Cast/cross-off/react routing) | **90%** | **85%** | Both players route through it; a gap is a gap for both. |
+| **Round lifecycle** (session isolation, new-game reset endpoint) | **90%** | **85%** | Mutates the session engine like the action interface; same blast radius. |
 | **Oracle pipeline** (parse, query-build, refusal, turn accounting) | **90%** | **85%** | Parsing/guardrail logic is deterministic; LLM voicing is eval-verified, not line-gated. |
 | **Reactions** (Scry/Hex state machine) | **95%** | **90%** | Small, sharp, easy to break silently. |
 | **UI / interaction** (cards, arming flow, chrome, error states) | **80%** | **70%** | Behavior-tested; rendering pixels covered by visual regression instead. |

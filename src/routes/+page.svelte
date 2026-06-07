@@ -13,11 +13,19 @@
 	let askValue = $state('');
 	let pending = $state(false);
 
+	const READY = 'Twenty-four runes stand. None ruled out. Ask the Oracle.';
+
+	// Tracks the loaded seed until a new game overrides it. A changed seed remounts RuneGrid
+	// (via {#key}), discarding its crossings and highlight; the parent's cast arming is
+	// cleared separately by cancelCast().
+	let seedOverride: number | null = $state(null);
+	let boardSeed = $derived(seedOverride ?? data.boardSeed);
+
 	// The Oracle surface — one response at a time. Defaults read as ready, not blank (prd.md
 	// S3). Your Ask shows the answer, which restates the trait. The interpretation echo is
 	// reserved for the rival's Ask (you'd see his question, not his answer) — wired in S5/S6,
 	// so it is deliberately not rendered for your own Ask today.
-	let answer = $state('Twenty-four runes stand. None ruled out. Ask the Oracle.');
+	let answer = $state(READY);
 
 	let selectedRune = $derived(
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
@@ -83,6 +91,28 @@
 		selectedTargetId = id;
 	}
 
+	async function newGame() {
+		pending = true;
+		let res: Response | undefined;
+		try {
+			res = await fetch('/api/new-game', { method: 'POST' });
+			if (!res.ok) throw new Error(`New game rejected (${res.status})`);
+			const { boardSeed: seed } = (await res.json()) as { boardSeed: number };
+			// A 200 with no usable seed would leave the board un-remounted while the server
+			// reset — treat it as a hard failure, not a silent no-op.
+			if (!Number.isFinite(seed)) throw new Error('New game response missing boardSeed');
+			seedOverride = seed; // remounts RuneGrid → crossings + highlight clear
+			answer = READY;
+			askValue = '';
+			cancelCast();
+		} catch (err) {
+			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
+			answer = 'The Oracle falls silent. Draw breath and try again.';
+		} finally {
+			pending = false;
+		}
+	}
+
 	async function commitCast() {
 		if (selectedRune === null) return;
 		pending = true;
@@ -146,14 +176,21 @@
 			<circle cx="30" cy="40" r="1.8" fill="#b9bdc8" opacity="0.5" />
 		</svg>
 
-		<div class="turn-pill">Your move.</div>
+		<div class="header-controls">
+			<button class="ghost new-game" type="button" onclick={newGame} disabled={pending}>
+				Begin another night
+			</button>
+			<div class="turn-pill">Your move.</div>
+		</div>
 	</header>
 
 	<p class="explainer">Ask. Cross off what it can't be. Cast when you're ready.</p>
 
 	<div class="game-layout">
 		<section class="board-section">
-			<RuneGrid {castMode} boardSeed={data.boardSeed} onSelectTarget={handleTargetSelect} />
+			{#key boardSeed}
+				<RuneGrid {castMode} {boardSeed} onSelectTarget={handleTargetSelect} />
+			{/key}
 		</section>
 
 		<aside class="oracle-panel">
@@ -285,8 +322,14 @@
 		filter: drop-shadow(0 0 16px rgba(220, 226, 240, 0.4));
 	}
 
-	.turn-pill {
+	.header-controls {
 		justify-self: end;
+		display: flex;
+		align-items: center;
+		gap: 0.8rem;
+	}
+
+	.turn-pill {
 		font-family: var(--font-display);
 		letter-spacing: 0.08em;
 		color: var(--gold-bright);
@@ -438,7 +481,9 @@
 		gap: 0.6rem;
 	}
 
-	.cast-actions .primary {
+	/* The cast row splits its width evenly; flex: 1 lives here, not on the .ghost variant. */
+	.cast-actions .primary,
+	.cast-actions .ghost {
 		flex: 1;
 	}
 
@@ -468,7 +513,6 @@
 	}
 
 	button.ghost {
-		flex: 1;
 		padding: 0.65rem 0.9rem;
 		font-family: var(--font-display);
 		letter-spacing: 0.12em;

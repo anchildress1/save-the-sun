@@ -27,7 +27,7 @@ A two-player race to name one hidden rune before Sköll, the wolf who hunts the 
 ## Non-Goals
 
 1. **Multiplayer / human-vs-human.** Sköll is the only opponent.
-2. **Accounts, persistence, leaderboards, matchmaking.** Single-session play; a refresh starts a new night.
+2. **Accounts, persistence, leaderboards, matchmaking.** Single-session play; a refresh resumes the in-memory round, and "Begin another night" starts a fresh one. No accounts or durable storage.
 3. **Adaptive Sköll difficulty or profiling.** Sköll responds only to the current round state. There is no cross-round learning, player profile, or rubber-banding; the deterministic policy is a fallback floor, not the opponent.
 4. **Any literal card mechanic** — deck, hand, draw, discard, or drag-to-cast. Runes are cards visually; the only action is cross-off. Scry/Hex are one-use reactions, not cards.
 5. **Original recorded voiceover.** Audio is ambient beds, not authored narration.

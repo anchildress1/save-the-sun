@@ -11,7 +11,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [U] All 24 Elder Futhark runes load
 - [x] [U] Every rune is a unique (element, power, color) combination
 - [x] [U] Trait counts match `rune-board.md` (element 4 each · power 4 each · fill 12/12 · color 4 each)
-- [x] [U] Exactly one secret rune per round; refresh/new round reseeds
+- [x] [U] Exactly one secret rune per round; a new round reseeds (a refresh resumes the same round — see S2.5)
 - [x] [U] Element / power / fill / hue queries resolve truthfully (table-driven, all 24 × all axes)
 - [x] [U] Power ranges correct at boundaries — "fewer than N", "at least N", "N or more", exact (1 and 6 inclusive)
 - [x] [U] Single-rune query eliminates exactly that rune; yes only for the secret
@@ -74,6 +74,14 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [ ] [E] Wrong cast costs turn only; crossings + round state preserved
 - [ ] [E][A] Full keyboard cast path: arm → arrow → select → "Name it"
 - [ ] [C] Pre-Ask panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle."
+
+## 4.5 Round lifecycle & session isolation (S2.5)
+
+- [x] [U] Parallel sessions isolated — one session's round never moves another's (engine + `api/action` endpoint)
+- [x] [U] A refresh resumes the same round (same secret); resume is isolated per session
+- [x] [U] `POST /api/new-game` resets **only** the calling session to a fresh active round + new board seed
+- [x] [U] Session registry LRU-capped — never grows past the cap; an idle round is evicted, a touched (active) one survives
+- [x] [U] Session cookie reused when present, generated when absent, regenerated when empty; `secure` outside dev
 
 ## 5. Reactions — Scry & Hex
 

@@ -30,7 +30,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 - [x] Load all 24 Elder Futhark runes; assert every rune is a unique (element, power, color) combo
 - [x] Trait counts enforced: element 4 each · power 4 each · fill 12/12 · color 4 each
-- [x] Secret selection: exactly one secret rune per round; refresh/new round reseeds
+- [x] Secret selection: exactly one secret rune per round; a new round reseeds (a refresh resumes the same round — see S2.5)
 - [x] Truthful trait resolution for all axes — element, power, fill (light/dark), hue
 - [x] Power ranges: "fewer than N", "at least N", "N or more", exact N — correct at boundaries (1 and 6 inclusive)
 - [x] Single-rune query eliminates exactly that rune; yes only for the secret
@@ -73,10 +73,10 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *Bridges the gap between the server-side engine and the client UI. Depends on: S1, S2.*
 
-- [ ] Implement `sessionId` extraction or generation in `src/routes/api/action/+server.ts`
-- [ ] Refactor `src/lib/server/engine/session.ts` to map `sessionId` to isolated `GameEngine` instances
-- [ ] Eliminate shared global engine state to prevent race conditions during concurrent plays
-- [ ] Update `session.test.ts` to assert isolation between parallel sessions
+- [x] Implement `sessionId` extraction or generation (assigned in `src/hooks.server.ts` → `locals.sessionId`; the page-load reset and `api/action` both read it, so the id lives in the one seam that runs before both rather than duplicated in `+server.ts`)
+- [x] Refactor `src/lib/server/engine/session.ts` to map `sessionId` to isolated `GameEngine` instances
+- [x] Eliminate shared global engine state to prevent race conditions during concurrent plays
+- [x] Update `session.test.ts` to assert isolation between parallel sessions
 
 **Tests to land:** [U] parallel session isolation.
 
