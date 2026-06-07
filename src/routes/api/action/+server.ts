@@ -53,9 +53,10 @@ function isAction(body: Partial<GameAction>): body is GameAction {
 	}
 }
 
-// Same seed + same accumulated state → same fallback move (reproducible for the demo).
+// Same seed + same accumulated state → same fallback move (reproducible for the demo). Mix the
+// fact count in via a golden-ratio multiply so distinct states can't collide on a bare sum.
 function floorRng(skoll: SkollState): () => number {
-	return mulberry32((skoll.seed + skoll.facts.length) >>> 0);
+	return mulberry32((skoll.seed ^ (skoll.facts.length * 0x9e3779b1)) >>> 0);
 }
 
 // Map his resolved turn into the wire DTO the client voices and reacts to.
@@ -123,6 +124,8 @@ async function playSkollIfActive(
 	skoll: SkollState
 ): Promise<SkollTurn | undefined> {
 	if (engine.status !== 'active' || engine.activePlayer !== 'Sköll') return undefined;
+	// He already has an Ask parked, waiting on the human's reaction — never start a second turn.
+	if (skoll.pendingAsk !== null) return undefined;
 	const out = await takeSkollTurn(engine, skoll, decideSkollMove, floorRng(skoll));
 	const turn = describeTurn(out, tauntAt(skoll.tauntIndex));
 	skoll.tauntIndex += 1;

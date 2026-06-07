@@ -191,6 +191,12 @@ export function resolveSkollAsk(
 		return { hexed: true };
 	}
 
+	// A failed reaction (no charge) is a no-op by the engine's contract — the Ask proceeds as a
+	// Pass. The client gates spent charges, so this is unreachable in normal play; log it loudly
+	// rather than let an intended Scry/Hex vanish into a silent Pass.
+	if (!reaction.ok)
+		console.warn(`[skoll] reaction did not land (${reaction.reason}); Ask proceeds`);
+
 	const result = engine.ask('Sköll', query);
 	if (!result.ok) throw new Error(`engine rejected Sköll's parked Ask: ${result.reason}`);
 	state.facts.push({ query, answer: result.answer });

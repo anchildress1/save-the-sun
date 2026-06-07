@@ -208,9 +208,11 @@
 			else if (choice === 'Hex') heldHex = false;
 			skollAsking = false;
 			skollEcho = '';
-			if (skollReaction?.hexed) {
+			// Key on the human's own choice, not the payload — `hexed: false` is falsy, so branching
+			// on it would conflate Pass and Scry. A scried answer surfaces when the engine shared one.
+			if (choice === 'Hex') {
 				skollVoice = RITE.hexHim;
-			} else if (skollReaction?.scried) {
+			} else if (choice === 'Scry' && skollReaction?.scried) {
 				answer = skollReaction.scried.answer; // you hear his answer too
 				skollVoice = RITE.scryHim;
 			} else {

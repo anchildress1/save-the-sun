@@ -203,6 +203,17 @@ describe('resolveSkollAsk — closing his Ask after the human reacts', () => {
 		expect(engine.activePlayer).toBe('Human'); // his turn spent, unanswered
 	});
 
+	it('a failed reaction (no charge) is a no-op — the Ask proceeds as a Pass', () => {
+		const { engine, state } = parkedAsk();
+		engine.consumeReaction('Human', 'Hex'); // spend it first, then try to Hex again
+		engine.openReactionWindow('Sköll'); // consumeReaction closed the window; reopen for the retry
+		const reaction = resolveReaction(engine, 'Human', 'Hex'); // → { ok: false, reason: 'no-charge' }
+		expect(reaction.ok).toBe(false);
+		const answer = resolveSkollAsk(engine, state, reaction);
+		expect(answer).toMatchObject({ hexed: false, shared: false });
+		expect(state.facts).toHaveLength(1); // the question was answered, not killed
+	});
+
 	it('throws if called with no parked Ask', () => {
 		const engine = skollsTurn();
 		const reaction = resolveReaction(engine, 'Human', 'Pass');
