@@ -73,10 +73,10 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *Bridges the gap between the server-side engine and the client UI. Depends on: S1, S2.*
 
-- [ ] Implement `sessionId` extraction or generation in `src/routes/api/action/+server.ts`
-- [ ] Refactor `src/lib/server/engine/session.ts` to map `sessionId` to isolated `GameEngine` instances
-- [ ] Eliminate shared global engine state to prevent race conditions during concurrent plays
-- [ ] Update `session.test.ts` to assert isolation between parallel sessions
+- [x] Implement `sessionId` extraction or generation (assigned in `src/hooks.server.ts` → `locals.sessionId`; the page-load reset and `api/action` both read it, so the id lives in the one seam that runs before both rather than duplicated in `+server.ts`)
+- [x] Refactor `src/lib/server/engine/session.ts` to map `sessionId` to isolated `GameEngine` instances
+- [x] Eliminate shared global engine state to prevent race conditions during concurrent plays
+- [x] Update `session.test.ts` to assert isolation between parallel sessions
 
 **Tests to land:** [U] parallel session isolation.
 
