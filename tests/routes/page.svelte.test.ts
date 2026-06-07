@@ -11,8 +11,14 @@ const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner
 const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 };
 const SKOLL_WON: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 5 };
 
-const pageProps = { data: { boardSeed: 0, state: HUMAN_TURN }, params: {}, form: null };
-const propsWith = (state: GameState) => ({ data: { boardSeed: 0, state }, params: {}, form: null });
+type PendingReaction = { echo: string; held: { Scry: boolean; Hex: boolean } } | null;
+const props = (state: GameState, pendingReaction: PendingReaction = null) => ({
+	data: { boardSeed: 0, state, pendingReaction },
+	params: {},
+	form: null
+});
+const pageProps = props(HUMAN_TURN);
+const propsWith = (state: GameState) => props(state);
 
 afterEach(() => {
 	vi.unstubAllGlobals();
@@ -366,6 +372,26 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, propsWith(SKOLL_TURN));
 		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
 		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
+	});
+
+	it('rehydrates the reaction prompt when a round resumes on Sköll’s parked Ask', async () => {
+		// The window lives server-side; the load carries it so a refresh mid-interrupt isn't stuck.
+		const spy = gameStub({ react: reactResult({ hexed: true }) });
+		const screen = render(
+			Page,
+			props(SKOLL_TURN, { echo: 'Sköll asks after a gold rune.', held: { Scry: true, Hex: true } })
+		);
+		await expect
+			.element(screen.getByTestId('reaction-prompt'))
+			.toHaveTextContent('Sköll asks. Answer it?');
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('a gold rune');
+		// A parked Ask must NOT fire an Advance on mount — the human owes a reaction first.
+		expect(spy).not.toHaveBeenCalled();
+		// And reacting still resolves it.
+		await screen.getByRole('button', { name: 'Hex' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('His question dies unanswered');
 	});
 
 	it("voices Sköll's cast on his Advance turn", async () => {

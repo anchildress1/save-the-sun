@@ -117,8 +117,9 @@ function validateMove(raw: RawSkollDecision): SkollMove | null {
 	return null;
 }
 
-/** Sköll's Ask echo, shown to the human so they can judge whether to Scry or Hex it. */
-function echoFor(query: Query): string {
+/** Sköll's Ask echo, shown to the human so they can judge whether to Scry or Hex it. Exported so
+ *  a page load can rehydrate the interrupt prompt when a round resumes on his parked Ask. */
+export function skollAskEcho(query: Query): string {
 	return `Sköll asks after ${valuePhrase(query)}.`;
 }
 
@@ -146,7 +147,7 @@ export async function takeSkollTurn(
 	engine.openReactionWindow('Sköll');
 	state.pendingAsk = move.query;
 	if (dev) console.debug(`[skoll] asks ${JSON.stringify(move.query)} via ${source}`);
-	return { kind: 'ask', source, query: move.query, echo: echoFor(move.query) };
+	return { kind: 'ask', source, query: move.query, echo: skollAskEcho(move.query) };
 }
 
 async function planMove(

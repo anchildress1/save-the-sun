@@ -58,14 +58,15 @@
 	let askValue = $state('');
 	let pending = $state(false);
 
-	// Sköll's surfaced turn (S6): his voice this turn, his Ask echo, and whether his Ask is open
-	// for the human to react to. The human's held reactions are tracked client-side; the engine is
-	// authoritative, so a refresh that resets these to held can never spend a charge twice.
+	// Sköll's surfaced turn (S6): his voice this turn, his Ask echo, and whether his Ask is open for
+	// the human to react to. A round can resume on his parked Ask, so the prompt + the human's still-
+	// held charges hydrate from the load (the reaction window lives server-side); otherwise they
+	// start fresh. The engine stays authoritative on charges, so the hydrated values can't over-grant.
 	let skollVoice = $state('');
-	let skollEcho = $state('');
-	let skollAsking = $state(false);
-	let heldScry = $state(true);
-	let heldHex = $state(true);
+	let skollEcho = $state(untrack(() => data.pendingReaction?.echo ?? ''));
+	let skollAsking = $state(untrack(() => data.pendingReaction != null));
+	let heldScry = $state(untrack(() => data.pendingReaction?.held.Scry ?? true));
+	let heldHex = $state(untrack(() => data.pendingReaction?.held.Hex ?? true));
 
 	// Turn state mirrors the engine, hydrated from the load on mount and fed by each action
 	// response after. Hydrating (not guessing 'Human'/'active') is what keeps a resumed round —
@@ -170,7 +171,9 @@
 	// pill. Self-contained error handling: a failed Advance must never clobber the answer the human
 	// just earned, so it logs and leaves the turn with Sköll rather than throwing to the caller.
 	async function advanceSkoll() {
-		if (roundStatus !== 'active' || activePlayer !== 'Sköll') return;
+		// Skip when it isn't his turn, or when his Ask is already parked awaiting the human's
+		// reaction — advancing then is a server no-op, and the prompt is already up.
+		if (roundStatus !== 'active' || activePlayer !== 'Sköll' || skollAsking) return;
 		await tick();
 		try {
 			const res = await fetch('/api/action', {
@@ -189,8 +192,11 @@
 
 	// A round resumes on whichever turn it was left on (one engine per session). Since Sköll's move
 	// is now its own request, a load can land on his turn — drive it so the game never opens stuck on
-	// "Sköll moves." A no-op (via advanceSkoll's own guard) whenever it's the human's turn.
-	onMount(advanceSkoll);
+	// "Sköll moves." Its own guard makes it a no-op on the human's turn or a parked Ask (prompt shown).
+	// Wrapped so the async return is never mistaken for an onMount cleanup.
+	onMount(() => {
+		advanceSkoll();
+	});
 
 	async function submitAsk() {
 		const question = askValue.trim();
