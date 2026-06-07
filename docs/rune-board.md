@@ -15,7 +15,7 @@ The runes are the complete Elder Futhark, all 24, in plain spellings.
 
 Power (the count) and fill (light/dark) are each askable on their own turn. Glyph mapping: hollow ○ = Light, solid ● = Dark. Engine/data field names: element, power, fill, color. Player-facing axis names: element, power, light, hue.
 
-All four traits are independent — each value splits 2/2 across every other trait, so no trait predicts another. Knowing the color tells you nothing about element, fill, or power, and vice versa.
+Fill is balanced 2/2 within every element, power, and color value — a light/dark answer never just echoes a trait you've already pinned. Every rune is a unique combination of all four traits, so the axes always narrow to exactly one. (The other axes do correlate — colour clusters by power, for instance — by design; fill is the evenly-split one.)
 
 ## The 24 Runes
 
@@ -49,7 +49,7 @@ All four traits are independent — each value splits 2/2 across every other tra
 ## Notes
 
 - Every rune is a unique combination of element, power, fill, and color.
-- All four traits are independent — no trait predicts another; each only narrows by its own elimination.
+- Fill is balanced 2/2 within every element, power, and color value; every rune is a unique four-trait combination, so each axis narrows by its own elimination.
 - All 24 runes stay visible all game, traits and all. The secret is which one you're racing to name.
 - Meanings group to element as flavor (sun → Sun, fierce → Fire, movement → Air, mystical → Spirit, cold/flowing → Water, growth/land → Earth). Mechanics run on traits.
 - All names, glyphs, and meanings are the historically attested Elder Futhark.
