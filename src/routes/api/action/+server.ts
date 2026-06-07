@@ -1,5 +1,5 @@
 import { json, error } from '@sveltejs/kit';
-import { handleAction, type GameAction } from '$lib/server/engine/actions';
+import { handleAction, gameState, type GameAction } from '$lib/server/engine/actions';
 import { getEngine } from '$lib/server/engine/session';
 import { interpret } from '$lib/server/oracle/gemini';
 import type { RequestHandler } from './$types';
@@ -63,5 +63,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	// play straight back to the human. Remove once the Gemini opponent is wired.
 	if (engine.status === 'active' && engine.activePlayer === 'Sköll') engine.passTurn();
 
-	return json(result);
+	// Snapshot AFTER the shim so the client sees the turn it actually has. In S6 the shim
+	// is gone and this same snapshot reports Sköll's turn, lighting up the disabled UI.
+	return json({ ...result, state: gameState(engine) });
 };

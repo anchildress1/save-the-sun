@@ -45,6 +45,34 @@ export type ActionResult =
 	| { type: 'CrossOff'; ok: true }
 	| { type: 'React'; ok: true };
 
+/**
+ * Public turn snapshot the client needs to know whose move it is and whether the round
+ * resolved. Never carries the secret — only the winner once a Cast has already revealed it.
+ */
+export interface GameState {
+	activePlayer: Player;
+	status: 'active' | 'won';
+	winner: Player | null;
+}
+
+/** Read the engine's public turn state into a wire DTO. */
+export function gameState(engine: GameEngine): GameState {
+	return {
+		activePlayer: engine.activePlayer,
+		status: engine.status,
+		winner: engine.winner
+	};
+}
+
+/**
+ * What the action endpoint returns: the action's own result plus the turn snapshot taken
+ * after the request settles (so the client reflects whose move it is and a resolved round).
+ */
+export type ActionResponse<T extends ActionResult['type'] = ActionResult['type']> = Extract<
+	ActionResult,
+	{ type: T }
+> & { state: GameState };
+
 /** Route one action to the engine/Oracle. */
 export async function handleAction(action: GameAction, deps: ActionDeps): Promise<ActionResult> {
 	switch (action.type) {
