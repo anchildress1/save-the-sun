@@ -28,7 +28,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## 2. Oracle pipeline (Gemini, Role 1)
 
 - [x] [I] Free-text maps to exactly one query type; multi-type intent rejected, not split _(the free-text→query mapping is eval-gated — see the `[Eval]` row; structural mixed-type rejection is CI-proven in `queries`)_
-- [x] [C] Echo matches the resolved query, shown **before** the answer; interpreted query stands (no do-over)
+- [ ] [C] Echo matches the resolved query, shown **before** the answer; interpreted query stands (no do-over) _(echo string is produced + tested in `oracle.test` [I]; no UI renders it yet — the echo is the rival's-Ask surface, S5/S6)_
 - [x] [C] Both verdicts restate the trait (Yes "is reaching for", No "is not reaching for"); `{value-phrase}` fills per axis
 - [x] [C] Mixed-type refusal returns `ux-copy.md` line; turn not consumed
 - [x] [Sec] Secret-seeking Ask refused; secret never leaks

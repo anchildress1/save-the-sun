@@ -53,7 +53,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 *Turns free text into one engine query and voices the truthful answer. Depends on: S1.*
 
 - [x] Free-text → exactly one structured query type (element / power / fill / hue / single rune); multi-type intent **rejected**, never silently split
-- [x] Interpretation echo shown **before** the answer; the interpreted query stands (no do-over) — `You ask after {paraphrase}.` (paraphrase is Gemini-generated; the frame is fixed)
+- [x] Interpretation echo **produced** before the answer — `You ask after {paraphrase}.` (Gemini paraphrase, fixed frame); the interpreted query stands (no do-over). Displayed on the rival's Ask in S5/S6, not the human's own — your Ask shows the answer, which restates the trait.
 - [x] Answer voicing: both verdicts restate the trait — `Yes. Sól is reaching for {value-phrase}.` / `No. Sól is not reaching for {value-phrase}.`
 - [x] `{value-phrase}` fills correctly per axis (`ux-copy.md` §1)
 - [x] Refusals wired to exact `ux-copy.md` lines: mixed-type, secret-seeking, prompt-injection/override, negation, unparseable, empty submit
