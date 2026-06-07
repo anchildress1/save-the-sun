@@ -221,18 +221,19 @@
 			});
 			applyState(state);
 			if (skollVsYou?.reaction === 'Hex') {
-				// Silenced before any answer: the Oracle frame names Sköll as the cause; his own
-				// following Advance move fills his box.
+				// Silenced before any answer: no oracle comes back; the frame names Sköll as the cause.
 				answer = RITE.askSilenced;
 				askValue = '';
-			} else if (oracle.ok) {
+			} else if (oracle?.ok) {
 				answer = oracle.answer;
 				askValue = '';
-			} else if (oracle.reason === 'refusal') {
+			} else if (oracle?.reason === 'refusal') {
 				answer = oracle.line;
-			} else {
+			} else if (oracle) {
 				// not-your-turn means the engine has handed the turn to Sköll.
 				answer = oracle.engineReason === 'not-your-turn' ? RITE.wolfMoving : RITE.oracleSilent;
+			} else {
+				answer = RITE.oracleSilent; // no oracle and not a Hex — unexpected; fail to a safe line
 			}
 			await advanceSkoll(); // your answer shows first, then the wolf takes his turn in his own request
 		} catch (err) {
@@ -246,7 +247,6 @@
 	}
 
 	// The human reacts to Sköll's open Ask: Scry (hear it too), Hex (kill it), or let it pass.
-	// Held charges are spent client-side for the prompt; the engine enforces the real charge.
 	async function submitReact(choice: ReactionChoice) {
 		pending = true;
 		try {
@@ -256,20 +256,20 @@
 				reaction: choice
 			});
 			applyState(state);
-			if (choice === 'Scry') heldScry = false;
-			else if (choice === 'Hex') heldHex = false;
 			skollAsking = false;
 			skollEcho = '';
-			// The exchange is over — the outcome is the single primary line; clear his stale voice so
-			// it doesn't stack a near-duplicate beneath. Key on the choice, not the payload's falsy
-			// `hexed: false`, which would conflate Pass and Scry.
 			skollVoice = '';
-			if (choice === 'Hex') {
+			// Key on what the engine actually DID (skollReaction), not what was requested — a Scry/Hex
+			// can fail (e.g. no charge after a desync), which the server resolves as a Pass. Spend the
+			// charge only when the reaction truly landed, so the UI never diverges from engine truth.
+			if (skollReaction?.hexed) {
 				answer = RITE.hexHim;
-			} else if (choice === 'Scry' && skollReaction?.scried) {
+				heldHex = false;
+			} else if (skollReaction?.scried) {
 				answer = skollReaction.scried.answer; // you hear his answer too
+				heldScry = false;
 			} else {
-				answer = RITE.passHim;
+				answer = RITE.passHim; // a Pass, or a reaction that didn't land
 			}
 		} catch (err) {
 			console.error('[ui] React dispatch failed:', err);

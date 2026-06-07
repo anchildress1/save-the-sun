@@ -128,9 +128,15 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 	}
 
 	// The human's Ask: Sköll may interrupt it (R12 reverse) before the answer — Hex kills it, Scry
-	// overhears it. Gated on it actually being the human's turn so a stale Ask on Sköll's turn falls
-	// through to a clean not-your-turn instead of opening a 'Human' window that desyncs his.
-	if (action.type === 'Ask' && action.player === 'Human' && engine.activePlayer === 'Human') {
+	// overhears it. Gated on it actually being the human's live turn, so a stale Ask (Sköll's turn, or
+	// a resolved round) falls through to a clean not-your-turn / round-over with NO side effects —
+	// rather than opening a 'Human' window, spending Sköll's charge, or flipping the turn.
+	if (
+		action.type === 'Ask' &&
+		action.player === 'Human' &&
+		engine.status === 'active' &&
+		engine.activePlayer === 'Human'
+	) {
 		return askWithSkollReaction(engine, skoll, action.question);
 	}
 

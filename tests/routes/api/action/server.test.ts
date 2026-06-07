@@ -112,6 +112,18 @@ describe('POST /api/action', () => {
 		expect(getEngine(SID).reactionAvailable('Sköll', 'Hex')).toBe(true);
 	});
 
+	it('rejects an Ask after the round is won — round-over, no side effects', async () => {
+		await call({ type: 'Cast', player: 'Human', runeName: SECRET }); // human wins
+		skollReacts(async () => ({ reaction: 'Hex' }));
+		openGate(); // would open the gate if the reaction path ran — it must not
+
+		const data = await json(await ask());
+
+		expect(data.oracle).toMatchObject({ ok: false, reason: 'engine', engineReason: 'round-over' });
+		expect(data.skollVsYou).toBeUndefined();
+		expect(getEngine(SID).reactionAvailable('Sköll', 'Hex')).toBe(true); // charge untouched
+	});
+
 	it('is a harmless no-op when Advance is called on the human’s turn', async () => {
 		const data = await json(await advance()); // fresh round — still the human's move
 		expect(data.skoll).toBeUndefined();

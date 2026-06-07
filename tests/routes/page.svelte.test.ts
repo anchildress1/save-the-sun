@@ -459,6 +459,18 @@ describe('Save the Sun page', () => {
 		expect(screen.container.querySelector('[data-testid="skoll-voice"]')).toBeNull();
 	});
 
+	it('shows the pass outcome when a Hex did not land (server resolved it as a pass)', async () => {
+		// The server can reject a reaction (e.g. no charge) and resolve it as a Pass. The UI must key
+		// on what actually landed, not the requested choice — so a "Hex" that didn't fire reads as a pass.
+		gameStub({ advance: advanceAsk(), react: reactResult({ hexed: false }) });
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Hex' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('You hold your hand. Let him have his answer.');
+	});
+
 	it('shows the silenced line when Sköll Hexes the human Ask', async () => {
 		gameStub({
 			// No oracle line — the question was silenced before any answer; then his own Advance move.

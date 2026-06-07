@@ -41,7 +41,9 @@ export interface ActionDeps {
 }
 
 export type ActionResult =
-	| { type: 'Ask'; oracle: OracleResult }
+	// `oracle` is optional: the route omits it when Sköll Hexes the human's Ask (silenced before any
+	// answer) — the wire then carries only `skollVsYou`. handleAction always sets it; the hex path doesn't.
+	| { type: 'Ask'; oracle?: OracleResult }
 	| { type: 'Cast'; cast: CastResult }
 	| { type: 'CrossOff'; ok: true }
 	| { type: 'React'; outcome: ReactionOutcome };
