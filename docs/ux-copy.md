@@ -98,7 +98,7 @@ Templated. **Both verdicts restate the trait** — `Yes. Sól is reaching for {v
 
 **Negation is not asked.** The Oracle speaks of what *is*, never what is not, so a negated Ask ("is it not fire?", "isn't it light?", "anything but gold?") is refused — there is no not-equal operator. The witch asks plainly and reads the verdict; a `No` already tells them what Sól is not reaching for.
 
-> Voice-guard: never "I think," "maybe," "it seems," and no mood-only answers ("the dark thins"). State the verdict (Yes/No) and the trait clause — what Sól is or is not reaching for — and nothing more; never hedge or invent a reason.
+> Voice-guard: never "I think," "maybe," "it seems," and no mood-only answers ("Gray bleeds into the dark"). State the verdict (Yes/No) and the trait clause — what Sól is or is not reaching for — and nothing more; never hedge or invent a reason.
 
 ### Refusals
 | Trigger | Line |
@@ -173,7 +173,7 @@ Sól speaks only at victory — the goddess's rarity is the power.
 
 ### Title screen
 - **Title:** Save the Sun
-- **Tagline:** *"A rite for the longest day."*
+- **Tagline:** *"A race to beat Sköll and save the light."*
 - **Primary CTA:** **"Light the fire."**
 - **Secondary:** **"How the rite works"** (opens onboarding)
 
@@ -205,7 +205,8 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 |---|---|
 | Whose turn — you | **"Your move."** |
 | Whose turn — Sköll | **"Sköll moves."** |
-| Night's progress (cosmetic, by elapsed turns — no timer mechanic) | early: **"The dark holds."** → mid: **"The dark thins."** → late: **"Dawn is close."** |
+| Night's progress (cosmetic, by elapsed turns — no timer mechanic) | early: **"The night lies deep and unbroken."** → mid: **"Gray bleeds into the dark."** → late: **"Dawn gathers at the edge of the world."** |
+| Round resolved — header tag beside the celestial body (full resolution line lives in the Oracle panel, §4) | human win (moon → risen sun): **"Sól crests the rim of the world."** · Sköll win (moon holds): **"Sköll takes the sun."** |
 | Cast armed (player believes one remains) | **"Cast?"** |
 
 ### Empty & error states (stay at the fire)
@@ -214,6 +215,7 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 | Board, before any Ask | "Twenty-four runes stand. None ruled out. Ask the Oracle." |
 | Connection / engine error | "The Oracle falls silent — the rite can't reach Sól. Draw breath and try again." |
 | Action while it's Sköll's move | "The wolf is moving. Hold." |
+| Below the desktop minimum (1280px) — best-on-desktop notice, no reflow (R10) | "The rite needs a wider sky. Save the Sun is cast on a desktop — return on a larger screen to take up the runes." |
 
 ---
 

@@ -47,6 +47,21 @@ describe('RuneCard', () => {
 		await expect.element(screen.getByText('Purple')).toBeInTheDocument();
 	});
 
+	it('never conveys a trait by color alone — every icon carries its name as text (a11y)', async () => {
+		// The color swatch and the element mark are both decorative (aria-hidden); the trait must
+		// reach the player as text beside each, for every rune, so color is never load-bearing alone.
+		// Scoped to each render's container — the locators stay unambiguous across the loop.
+		for (const rune of [uruz, perthro, othala]) {
+			const { container } = render(RuneCard, { rune, onAction: vi.fn() });
+			// Decorative marks present...
+			expect(container.querySelector('.gem[aria-hidden="true"]')).not.toBeNull();
+			expect(container.querySelector('.element .ic[aria-hidden="true"]')).not.toBeNull();
+			// ...and each is named in visible text on the card.
+			expect(container.textContent).toContain(rune.color);
+			expect(container.textContent).toContain(rune.element);
+		}
+	});
+
 	it('displays the meaning under the name', async () => {
 		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		await expect.element(screen.getByText('aurochs, strength')).toBeInTheDocument();

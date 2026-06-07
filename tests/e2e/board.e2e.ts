@@ -3,7 +3,29 @@ import { expect, test } from '@playwright/test';
 test('renders the rite header', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('h1', { hasText: 'Save the Sun' })).toBeVisible();
-	await expect(page.locator('p.tagline', { hasText: 'A rite for the longest day.' })).toBeVisible();
+	await expect(
+		page.locator('p.tagline', { hasText: 'A race to beat Sköll and save the light.' })
+	).toBeVisible();
+});
+
+test('shows the night-progress chrome holding early in the night', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByTestId('night-progress')).toHaveText('The night lies deep and unbroken.');
+});
+
+test('steps aside for the best-on-desktop notice below the 1280px minimum', async ({ page }) => {
+	await page.setViewportSize({ width: 1024, height: 800 });
+	await page.goto('/');
+	await expect(page.getByTestId('desktop-notice')).toBeVisible();
+	await expect(page.getByText('The rite needs a wider sky.')).toBeVisible();
+	await expect(page.locator('main')).toBeHidden();
+});
+
+test('shows the rite, not the notice, at desktop width', async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await page.goto('/');
+	await expect(page.locator('main')).toBeVisible();
+	await expect(page.getByTestId('desktop-notice')).toBeHidden();
 });
 
 test('renders all 24 rune cards with visible trait text', async ({ page }) => {
@@ -29,7 +51,7 @@ test('arms a cast, names a rune, and routes it through the action interface', as
 			json: {
 				type: 'Cast',
 				cast: { ok: true, won: true, rune: { name: 'Sowilo' }, turnConsumed: true },
-				state: { activePlayer: 'Human', status: 'won', winner: 'Human' }
+				state: { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 }
 			}
 		})
 	);
@@ -50,7 +72,7 @@ test('a wrong cast costs the turn only — crossings and round survive', async (
 			json: {
 				type: 'Cast',
 				cast: { ok: true, won: false, turnConsumed: true },
-				state: { activePlayer: 'Human', status: 'active', winner: null }
+				state: { activePlayer: 'Human', status: 'active', winner: null, turns: 1 }
 			}
 		})
 	);
@@ -96,7 +118,7 @@ test('dispatches a non-empty Ask and shows the voiced answer', async ({ page }) 
 					affirmative: false,
 					turnConsumed: true
 				},
-				state: { activePlayer: 'Human', status: 'active', winner: null }
+				state: { activePlayer: 'Human', status: 'active', winner: null, turns: 1 }
 			}
 		})
 	);
@@ -114,4 +136,25 @@ test('board screenshot for POC comparison', async ({ page }, testInfo) => {
 	await expect(page.locator('.rune-card-wrapper').last()).toHaveCSS('opacity', '1');
 	await page.screenshot({ path: testInfo.outputPath('board.png'), fullPage: true });
 	expect(testInfo.outputPath('board.png')).toContain('board.png');
+});
+
+// Visual artifacts for the crossed + armed board states (the [V] grid-state coverage). Kept as
+// smoke artifacts rather than pixel-diff baselines, which flake across Mac↔Linux until CI pins a
+// matched runner; the structural assertions live in the RuneGrid component suite.
+test('crossed + armed state screenshots', async ({ page }, testInfo) => {
+	await page.goto('/');
+	await expect(page.locator('.rune-card-wrapper').last()).toHaveCSS('opacity', '1');
+
+	// Crossed state: dim a card in place and capture the chalk X.
+	await page.getByRole('button', { name: /cross off sowilo/i }).click();
+	await expect(page.locator('.rune-card[data-rune-name="Sowilo"].crossed')).toBeVisible();
+	await page.screenshot({ path: testInfo.outputPath('board-crossed.png'), fullPage: true });
+
+	// Armed state: arm the cast and select a target so the gold halo shows.
+	await page.getByRole('button', { name: 'Cast the rune' }).click();
+	await page.getByRole('button', { name: /select dagaz as cast target/i }).click();
+	await expect(page.locator('.rune-card[data-rune-name="Dagaz"].selected')).toBeVisible();
+	await page.screenshot({ path: testInfo.outputPath('board-armed.png'), fullPage: true });
+
+	expect(testInfo.outputPath('board-armed.png')).toContain('board-armed.png');
 });

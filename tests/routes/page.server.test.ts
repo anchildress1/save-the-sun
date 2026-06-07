@@ -35,7 +35,7 @@ describe('+page.server load — engine lifetime', () => {
 
 	it('hydrates the live turn state — fresh round is human-first and active', () => {
 		const { state } = runLoad('hydrate-fresh');
-		expect(state).toEqual({ activePlayer: 'Human', status: 'active', winner: null });
+		expect(state).toEqual({ activePlayer: 'Human', status: 'active', winner: null, turns: 0 });
 	});
 
 	it('reports a resumed won round so the UI does not open on a phantom turn', () => {
@@ -45,7 +45,8 @@ describe('+page.server load — engine lifetime', () => {
 		expect(runLoad('hydrate-won').state).toEqual({
 			activePlayer: 'Human',
 			status: 'won',
-			winner: 'Human'
+			winner: 'Human',
+			turns: 1
 		});
 	});
 

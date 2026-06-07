@@ -135,12 +135,13 @@ Covers R3, R4, and the casting flow. One shared action interface serves both the
 
 | Area | Test type | What to test |
 |---|---|---|
-| Graphics layer | Smoke / visual | Rune grid renders as high-fidelity DOM components orchestrated by GSAP; 24 cards, 6×4. |
+| Functional grid (v1) | Component / e2e | Rune grid renders as DOM components orchestrated by GSAP; 24 cards in a 6×4 layout (column count verified by geometry, not by parsing `gridTemplateColumns`). |
 | Card content | Component | Each card shows glyph, color swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name. Rune id not shown. Light/dark encoded by pip color (white light / black dark); pip count + fill spoken together in the accessible name as "{n} light/dark power", never as visible text; light/dark still a queryable Oracle axis. |
 | No color alone | a11y assertion | Color name and element name always accompany their icons — nothing conveyed by color alone. |
 | Cross-off affordance | Component | Card dims in place when crossed; restore affordance present and works. |
-| Header chrome | Component | Title, tagline, night-progress indicator, turn pill ("Your move." / "Sköll moves."). |
-| Visual regression | Visual | Snapshot the grid and crossed/armed states to catch unintended drift. |
+| Header chrome | Component | Title, tagline ("A race to beat Sköll and save the light."), night-progress indicator, turn pill ("Your move." / "Sköll moves."). |
+| Round resolved | Component | Header swaps the moon → risen sun on a human win, holds the moon on a Sköll win, with the short resolution tag; the outcome pill flips and the Oracle panel carries the full resolution line. |
+| High-fidelity art + visual regression (v1.5) | Smoke / visual | The image/art presentation and its visual-regression baselines are split to v1.5 — out of v1 scope (no image assets yet). |
 
 ---
 
@@ -180,7 +181,7 @@ A mood feature that can't degrade to the tier below doesn't ship — so each tie
 |---|---|---|
 | Connection / engine error | Integration + E2E | Shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**. |
 | Empty submit | Component | Refused with "Speak your question, witch." |
-| Best-on-desktop notice | Component | Below the 1280px minimum the notice shows — no responsive reflow attempted (1024px support is v2). |
+| Best-on-desktop notice | e2e | Below the 1280px minimum the notice shows and the rite is hidden — no responsive reflow attempted (asserted at 1024px and 1440px; 1024px support is v2). |
 | Malformed Ask recovery | Integration | Invalid Ask costs only the rephrase, never a false answer (ties to §2). |
 | Round solvability | Property | Every seeded round is winnable through legal Asks alone; Oracle never lies (fuzz across many secrets/seeds). |
 
@@ -220,7 +221,7 @@ Tiered by blast radius. The engine owns truth, so it carries the hardest bar; UI
 | **Oracle pipeline** (parse, query-build, refusal, turn accounting) | **90%** | **85%** | Parsing/guardrail logic is deterministic; LLM voicing is eval-verified, not line-gated. |
 | **Reactions** (Scry/Hex state machine) | **95%** | **90%** | Small, sharp, easy to break silently. |
 | **UI / interaction** (cards, arming flow, chrome, error states) | **80%** | **70%** | Behavior-tested; rendering pixels covered by visual regression instead. |
-| **Graphics render layer** | **60%** | n/a | Smoke + visual regression carry this; line coverage is a weak signal for animated DOM. |
+| **Graphics render layer** _(v1.5)_ | **60%** | n/a | Split to v1.5 with the image layer — not a v1 gate. The functional render is covered under the UI / interaction gate. |
 | **Project overall gate** | **85%** | **80%** | Hard floor for the whole repo. |
 
 **Non-coverage gates also enforced in CI:**

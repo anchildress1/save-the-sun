@@ -28,6 +28,10 @@ interface Round {
 	status: 'active' | 'won';
 	winner: Player | null;
 	wrongCasts: Record<Player, number>;
+	// Turns consumed this round — a resolved Ask or a resolved Cast each spend one. The shim's
+	// courtesy passTurn does NOT, so this counts real plays, not alternation flips. Drives the
+	// cosmetic night-progress chrome and stays S6-stable (Sköll's plays bump it too).
+	turns: number;
 }
 
 /** Pick the secret rune for a seed. Deterministic; the production round path. */
@@ -49,7 +53,8 @@ export class GameEngine {
 			active: 'Human', // strict alternation, human moves first
 			status: 'active',
 			winner: null,
-			wrongCasts: { Human: 0, Sköll: 0 }
+			wrongCasts: { Human: 0, Sköll: 0 },
+			turns: 0
 		};
 	}
 
@@ -73,6 +78,11 @@ export class GameEngine {
 	/** Per-player wrong-cast count. v1 exposes it; the v2 forfeit threshold reads it later. */
 	wrongCastCount(player: Player): number {
 		return this.#round.wrongCasts[player];
+	}
+
+	/** Turns consumed this round (resolved Asks + resolved Casts). Drives night-progress chrome. */
+	get turns(): number {
+		return this.#round.turns;
 	}
 
 	#advance(): void {
@@ -99,6 +109,7 @@ export class GameEngine {
 		if (query === null) return { ok: false, reason: 'malformed-query', turnConsumed: false };
 
 		const answer = resolveQuery(this.#round.secret, query);
+		this.#round.turns += 1;
 		this.#advance();
 		return { ok: true, answer, turnConsumed: true };
 	}
@@ -116,6 +127,8 @@ export class GameEngine {
 
 		const rune = runes.find((r) => r.name === runeName);
 		if (rune === undefined) return { ok: false, reason: 'unknown-rune', turnConsumed: false };
+
+		this.#round.turns += 1;
 
 		if (rune.name === this.#round.secret.name) {
 			this.#round.status = 'won';

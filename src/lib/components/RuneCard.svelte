@@ -19,7 +19,7 @@
 	let gem = $derived(gemColor(rune.color));
 	let icon = $derived(elementIcon(rune.element));
 	let pips = $derived(Array.from({ length: rune.power }, (_, i) => i));
-	let fillWord = $derived(rune.fill === 'Light' ? 'light' : 'dark');
+	let fillWord = $derived(rune.fill.toLowerCase());
 </script>
 
 <button

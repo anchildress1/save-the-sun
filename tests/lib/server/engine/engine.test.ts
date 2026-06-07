@@ -258,6 +258,52 @@ describe('GameEngine — passTurn skips a player with no mover', () => {
 	});
 });
 
+describe('GameEngine.turns — consumed-turn count (drives night-progress chrome)', () => {
+	it('starts at zero on a fresh round', () => {
+		expect(new GameEngine(7).turns).toBe(0);
+	});
+
+	it('counts a resolved Ask but never a refused one', () => {
+		const engine = new GameEngine(7);
+		engine.ask('Human', { axis: 'fill', value: 'Light' }); // resolved → 1
+		expect(engine.turns).toBe(1);
+		// Out-of-turn (Human already passed to Sköll) and malformed Asks are refused — no count.
+		engine.ask('Human', { axis: 'fill', value: 'Light' }); // not-your-turn
+		engine.ask('Sköll', { axis: 'element', value: 'Shadow' }); // malformed
+		expect(engine.turns).toBe(1);
+	});
+
+	it('counts a wrong cast and the winning cast alike (both consume a turn)', () => {
+		const seed = 7;
+		const secret = selectSecret(seed);
+		const engine = new GameEngine(seed);
+		engine.cast('Human', otherRune(secret).name); // wrong → 1, Human → Sköll
+		expect(engine.turns).toBe(1);
+		engine.cast('Sköll', secret.name); // win → 2
+		expect(engine.turns).toBe(2);
+	});
+
+	it('does not count an unknown-rune cast (refused, no turn spent)', () => {
+		const engine = new GameEngine(7);
+		engine.cast('Human', 'Definitely-Not-A-Rune');
+		expect(engine.turns).toBe(0);
+	});
+
+	it('is not bumped by the courtesy passTurn — only real plays count', () => {
+		const engine = new GameEngine(1);
+		engine.ask('Human', { axis: 'fill', value: 'Light' }); // → 1, Human → Sköll
+		engine.passTurn(); // shim hands play back without spending a turn
+		expect(engine.turns).toBe(1);
+	});
+
+	it('resets to zero on a new round', () => {
+		const engine = new GameEngine(7);
+		engine.ask('Human', { axis: 'fill', value: 'Light' });
+		engine.newRound(8);
+		expect(engine.turns).toBe(0);
+	});
+});
+
 describe('GameEngine — round solvability (every secret winnable through legal Asks; Oracle never lies)', () => {
 	it('reaches every one of the 24 secrets by some seed', () => {
 		const seedFor = new Map<string, number>();

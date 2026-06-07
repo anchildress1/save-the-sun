@@ -109,17 +109,19 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *The Plain tier — the v1 surface. Built as high-fidelity DOM components orchestrated by GSAP, with a native focusable layer for controls (`prd.md` UI Direction). Depends on: S3.*
 
-- [ ] Rune grid rendered as high-fidelity DOM components orchestrated by GSAP; 24 cards, 6×4, in a per-round seeded shuffle (stable within a round, not the sorted data order). The seed is a server-generated Web Crypto uint32 — display-only and public (shared with Sköll for the same layout); the secret rune is the engine's own and is never derived from it
-- [ ] Each card shows: glyph, color swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken together in the accessible name as "{n} light/dark power", never as visible text; light/dark still a queryable Oracle axis)
-- [ ] Nothing conveyed by color alone — color name and element name always accompany their icons
-- [ ] Card dims in place when crossed; restore affordance present and works
-- [ ] Header: title "Save the Sun", tagline "A rite for the longest day," night-progress indicator, turn pill ("Your move." / "Sköll moves.")
-- [ ] Right column order: Rite transcript → Reactions panel (Scry · Hex) → Ask input with suggestion chips → "Cast the rune"
-- [ ] Native focusable DOM elements carry the controls so rendering never blocks keyboard play
+- [x] Rune grid rendered as DOM components orchestrated by GSAP; 24 cards, 6×4, in a per-round seeded shuffle (stable within a round, not the sorted data order). The seed is a server-generated Web Crypto uint32 — display-only and public (shared with Sköll for the same layout); the secret rune is the engine's own and is never derived from it _(functional accessible DOM grid, 6×4 layout, seeded shuffle, and seed security are built and tested; image/art elements split to v1.5 — see Deferred)_
+- [x] Each card shows: glyph, color swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken together in the accessible name as "{n} light/dark power", never as visible text; light/dark still a queryable Oracle axis)
+- [x] Nothing conveyed by color alone — color name and element name always accompany their icons
+- [x] Card dims in place when crossed; restore affordance present and works
+- [x] Header: title "Save the Sun", tagline "A race to beat Sköll and save the light," night-progress indicator, turn pill ("Your move." / "Sköll moves.")
+- [x] Right column order: Rite transcript → Reactions panel (Scry · Hex) → Ask input → "Cast the rune" (no suggestion chips — pre-filled questions would do the player's deduction)
+- [x] Native focusable DOM elements carry the controls so rendering never blocks keyboard play
 
-**Tests to land:** [V] grid renders, visual-regression snapshots for grid + crossed/armed states · [C] card content, cross-off affordance, header chrome · [A] no-color-alone assertion.
+**Implementation (S4):** the rune grid (`RuneGrid` + `RuneCard`), header chrome, and right column were built across S0–S3; S4 lands the night-progress chrome and the component / a11y test suite — the functional accessible DOM layer is complete. **Image/art elements (the high-fidelity graphics presentation) and their `[V]` visual-regression baselines are split to v1.5** ("Graphic elements in UI" / "Splash screen" in Deferred), so they are out of v1 scope. The **night-progress indicator** is keyed to consumed turns owned by the engine — a `turns` counter incremented on a resolved Ask or Cast (the shim's courtesy `passTurn` does not count), exposed through `GameState.turns` and hydrated on load, so the phase (holds 0–2 / thins 3–5 / dawn 6+) survives a refresh and stays correct once Sköll spends turns too (S6). Suggestion chips were cut: a chip that pre-writes a question does the player's deduction for them, and the deduction is the game.
 
-**Done when:** the grid is fully playable by mouse and keyboard with the DOM grid rendered, controls live; UI CI floor (line 80% / branch 70%) + graphics smoke (line 60%) met.
+**Tests to land:** [V] grid renders (6×4 layout + crossed/armed state artifacts) · [C] card content, cross-off affordance, header chrome (incl. night-progress) · [A] no-color-alone assertion.
+
+**Done when:** the grid is fully playable by mouse and keyboard with the DOM grid rendered, controls live; UI CI floor (line 80% / branch 70%) met. (Graphics smoke / line-60% gate moved to v1.5 with the image layer.)
 
 ---
 
@@ -205,7 +207,9 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 - [ ] Victory sequence (`ux-copy.md` §4): "The rune is true." → "Sól crests the rim of the world." → Sól's only line → CTAs "Begin another night" / "Leave the fire."
 - [ ] Defeat sequence: Sköll's winning cast → "Sköll takes the sun…" → CTAs "Stand against him again" / "Leave the fire."
-- [ ] Replay starts a fresh round (new secret reseed)
+- [x] Replay starts a fresh round (new secret reseed)
+
+**Partial (landed early with the round-end header):** the moon → risen sun swap, the short victory/defeat header tags, the outcome turn pill, and the full resolution line in the Oracle panel are built and tested. **Still open:** Sól's only victory line, the "Leave the fire." / "Stand against him again" CTAs, and the S6 defeat choreography.
 
 **Tests to land:** [C] win/lose copy, replay reseeds.
 
@@ -223,7 +227,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] No information by color alone (cross-check S4)
 - [ ] `prefers-reduced-motion` → motion instant, audio muted, still reflects live state changes
 - [ ] Fully operable at 200% zoom
-- [ ] Best-on-desktop notice below the **1280px** minimum — **no** responsive reflow attempted (1024px support is v2)
+- [x] Best-on-desktop notice below the **1280px** minimum — **no** responsive reflow attempted (1024px support is v2)
 - [ ] Degradation: Plain (v1) round fully winnable on the static grid, audio muted by default; Reduced tier (reduced-motion OR WebGL/audio unavailable) stays unaffected and fair
 
 **Tests to land:** [E][manual] keyboard round + full keyboard cast path · [A] axe names/roles, contrast, color-independence · [C] reduced-motion · [manual] 200% zoom · [E] Plain + Reduced degradation, [S] fairness invariant · [C] best-on-desktop notice.
@@ -252,7 +256,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *Final gate before June 21. Depends on: all above.*
 
-- [ ] Coverage floors pass: Engine 100/95 · Fallback 95/90 · Action interface 90/85 · Oracle 90/85 · Reactions 95/90 · UI 80/70 · Graphics 60 · Project overall 85/80
+- [ ] Coverage floors pass: Engine 100/95 · Fallback 95/90 · Action interface 90/85 · Oracle 90/85 · Reactions 95/90 · UI 80/70 · Project overall 85/80 (Graphics 60 moved to v1.5 with the image layer)
 - [ ] Lighthouse a11y ≥ 0.95 in CI
 - [ ] Round-solvability property test passes across all seeds (no unwinnable rounds; Oracle never lies)
 - [ ] Secret-leak security assertion passes (engine API + Sköll payload)
@@ -269,8 +273,9 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 **v1.5 (fast follow), in order:**
 
 1. Screen-reader narration & navigation — `aria-live="polite"` on the Rite transcript and every Oracle answer/refusal; per-card full trait + crossed-state exposure; turn-change announcements
-2. Splash screen
-3. Sköll escalation taunts wired to candidate-count
+2. Graphic elements in UI
+3. Splash screen
+4. Sköll escalation taunts wired to candidate-count
 
 **v2 (immersion build), in order:**
 

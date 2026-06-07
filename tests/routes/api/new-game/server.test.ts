@@ -21,7 +21,7 @@ describe('POST /api/new-game', () => {
 		const body = await (await call('shape-session')).json();
 		expect(Object.keys(body).sort()).toEqual(['boardSeed', 'state']);
 		// The snapshot is the public turn state only — winner is null pre-cast, never the secret.
-		expect(body.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null });
+		expect(body.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null, turns: 0 });
 	});
 
 	it('resets the session to a fresh active round', async () => {

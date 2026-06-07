@@ -42,6 +42,38 @@ describe('RuneGrid', () => {
 		expect(first.classList.contains('crossed')).toBe(false);
 	});
 
+	it('lays the 24 cards out in a 6-column grid (6×4)', async () => {
+		const screen = render(RuneGrid, { boardSeed: 42, onSelectTarget: vi.fn() });
+		const cards = [...screen.container.querySelectorAll<HTMLElement>('.rune-card')];
+		expect(cards).toHaveLength(24);
+		// Count columns by geometry, not by parsing gridTemplateColumns: getComputedStyle can
+		// return the declared `minmax(0, 1fr)` (with internal spaces) when layout is unresolved,
+		// which makes string-splitting flaky. Cards sharing the first row's top give the column
+		// count — `repeat(6, …)` is always 6 tracks, so 24 cards resolve to 6×4.
+		const firstRowTop = cards[0].offsetTop;
+		const firstRow = cards.filter((card) => card.offsetTop === firstRowTop);
+		expect(firstRow).toHaveLength(6);
+	});
+
+	it('renders the crossed visual state in place — dimmed card keeps its chalk X', async () => {
+		const screen = render(RuneGrid, { boardSeed: 0, onSelectTarget: vi.fn() });
+		const card = screen.container.querySelector('.rune-card[data-rune-id="1"]')!;
+		await screen.getByRole('button', { name: /cross off sowilo/i }).click();
+		expect(card.classList.contains('crossed')).toBe(true);
+		expect(card.querySelectorAll('.strikeout line')).toHaveLength(2);
+	});
+
+	it('renders the armed visual state — only the chosen target wears the halo', async () => {
+		const screen = render(RuneGrid, { boardSeed: 0, castMode: true, onSelectTarget: vi.fn() });
+		// Armed: every card offers a select-target affordance instead of cross-off.
+		const cards = screen.container.querySelectorAll('.rune-card');
+		expect(cards).toHaveLength(24);
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		const selected = screen.container.querySelectorAll('.rune-card.selected');
+		expect(selected).toHaveLength(1);
+		expect((selected[0] as HTMLElement).dataset.runeId).toBe('1');
+	});
+
 	it('routes a tap to onSelectTarget in cast mode without crossing off', async () => {
 		const onSelectTarget = vi.fn();
 		const screen = render(RuneGrid, { boardSeed: 0, castMode: true, onSelectTarget });

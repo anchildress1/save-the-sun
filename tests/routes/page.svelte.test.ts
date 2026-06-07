@@ -6,9 +6,10 @@ import type { GameState } from '$lib/server/engine/actions';
 // Full page props (data normally comes from +page.server.ts). A fixed seed keeps the
 // board order deterministic across these behavioural tests; the hydrated state opens the
 // page human-first on a live round.
-const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null };
-const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner: null };
-const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human' };
+const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
+const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 };
+const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 };
+const SKOLL_WON: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 5 };
 
 const pageProps = { data: { boardSeed: 0, state: HUMAN_TURN }, params: {}, form: null };
 const propsWith = (state: GameState) => ({ data: { boardSeed: 0, state }, params: {}, form: null });
@@ -198,6 +199,46 @@ describe('Save the Sun page', () => {
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
 	});
 
+	it('opens on the early-night progress line before any turn is spent', async () => {
+		const screen = render(Page, pageProps);
+		await expect
+			.element(screen.getByTestId('night-progress'))
+			.toHaveTextContent('The night lies deep and unbroken.');
+	});
+
+	it('hydrates the mid-night progress phase from the loaded turn count', async () => {
+		const screen = render(Page, propsWith({ ...HUMAN_TURN, turns: 4 }));
+		await expect
+			.element(screen.getByTestId('night-progress'))
+			.toHaveTextContent('Gray bleeds into the dark.');
+	});
+
+	it('hydrates the late-night progress phase from the loaded turn count', async () => {
+		const screen = render(Page, propsWith({ ...HUMAN_TURN, turns: 6 }));
+		await expect
+			.element(screen.getByTestId('night-progress'))
+			.toHaveTextContent('Dawn gathers at the edge of the world.');
+	});
+
+	it('advances the night-progress as turns are spent on an Ask', async () => {
+		askResult(
+			{ ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+			{
+				...HUMAN_TURN,
+				turns: 6
+			}
+		);
+		const screen = render(Page, pageProps);
+		await expect
+			.element(screen.getByTestId('night-progress'))
+			.toHaveTextContent('The night lies deep and unbroken.');
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect
+			.element(screen.getByTestId('night-progress'))
+			.toHaveTextContent('Dawn gathers at the edge of the world.');
+	});
+
 	it('opens on the human turn — "Your move." and controls live', async () => {
 		const screen = render(Page, pageProps);
 		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
@@ -212,6 +253,33 @@ describe('Save the Sun page', () => {
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rune is true.');
 		await expect.element(screen.getByRole('button', { name: 'Ask the Oracle' })).toBeDisabled();
 		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
+	});
+
+	it('raises the sun and voices the victory line in the header on a human win', async () => {
+		const screen = render(Page, propsWith(HUMAN_WON));
+		// Moon gives way to the risen sun; the resolution line replaces the night-progress phase.
+		expect(screen.container.querySelector('.sun-risen')).not.toBeNull();
+		expect(screen.container.querySelector('.moon')).toBeNull();
+		await expect
+			.element(screen.getByTestId('outcome-line'))
+			.toHaveTextContent('Sól crests the rim of the world.');
+	});
+
+	it('keeps the moon on a Sköll win — short tag in the header, full line in the Oracle panel', async () => {
+		const screen = render(Page, propsWith(SKOLL_WON));
+		// No sunrise for a loss — the moon holds. The header carries only the short tag; the full
+		// resolution sentence lives in the Oracle panel, which wraps responsively on its own.
+		expect(screen.container.querySelector('.moon')).not.toBeNull();
+		expect(screen.container.querySelector('.sun-risen')).toBeNull();
+		await expect
+			.element(screen.getByTestId('outcome-line'))
+			.toHaveTextContent('Sköll takes the sun.');
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll takes the sun.');
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent(
+				'Sköll takes the sun. The longest day never breaks. The year falls to dark.'
+			);
 	});
 
 	it('hands the turn to Sköll — pill flips and Ask + Cast disable', async () => {
