@@ -8,7 +8,8 @@
 		ActionResponse,
 		GameState,
 		Player,
-		SkollTurn
+		SkollTurn,
+		AdvanceResponse
 	} from '$lib/server/engine/actions';
 	import type { ReactionChoice } from '$lib/server/engine/reactions';
 	import type { PageProps } from './$types';
@@ -182,7 +183,7 @@
 				body: JSON.stringify({ type: 'Advance' })
 			});
 			if (!res.ok) throw new Error(`Advance rejected (${res.status})`);
-			const { skoll, state } = (await res.json()) as { skoll?: SkollTurn; state: GameState };
+			const { skoll, state } = (await res.json()) as AdvanceResponse;
 			applyState(state);
 			applySkoll(skoll);
 			// Defeat line is sourced from engine truth (winner), not the cast DTO — one source, no drift.

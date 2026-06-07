@@ -4,7 +4,8 @@ import {
 	gameState,
 	type GameAction,
 	type SkollTurn,
-	type SkollReaction
+	type SkollReaction,
+	type AdvanceResponse
 } from '$lib/server/engine/actions';
 import { getEngine, getSkoll, withSessionLock } from '$lib/server/engine/session';
 import { interpret } from '$lib/server/oracle/gemini';
@@ -101,11 +102,12 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 	// A no-op if it isn't his turn (or his Ask is already parked), so a stray Advance is harmless.
 	if ((body.type as string) === 'Advance') {
 		const skollTurn = await playSkollIfActive(engine, skoll);
-		return json({
+		const response: AdvanceResponse = {
 			type: 'Advance',
 			...(skollTurn && { skoll: skollTurn }),
 			state: gameState(engine)
-		});
+		};
+		return json(response);
 	}
 
 	// Past Advance, validation in POST guarantees a well-formed player action.

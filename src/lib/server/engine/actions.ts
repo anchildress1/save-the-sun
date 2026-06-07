@@ -83,6 +83,25 @@ export interface SkollVsYou {
 	reaction: 'Scry' | 'Hex' | 'Pass';
 }
 
+/**
+ * A parked Sköll Ask carried by the page load (`+page.server.ts`) so a refresh mid-interrupt
+ * rehydrates the prompt — the reaction window lives server-side and would otherwise vanish.
+ */
+export interface PendingReaction {
+	echo: string;
+	held: { Scry: boolean; Hex: boolean };
+}
+
+/**
+ * The `Advance` wire response — Sköll's own turn, run as its own request (not a player ActionResult,
+ * so it's modeled separately). `skoll` is absent when it wasn't his turn to take.
+ */
+export interface AdvanceResponse {
+	type: 'Advance';
+	skoll?: SkollTurn;
+	state: GameState;
+}
+
 /** Read the engine's public turn state into a wire DTO. */
 export function gameState(engine: GameEngine): GameState {
 	return {

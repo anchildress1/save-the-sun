@@ -1,5 +1,5 @@
 import { getEngine, getSkoll } from '$lib/server/engine/session';
-import { gameState } from '$lib/server/engine/actions';
+import { gameState, type PendingReaction } from '$lib/server/engine/actions';
 import { skollAskEcho } from '$lib/server/skoll/skoll';
 import type { PageServerLoad } from './$types';
 
@@ -19,7 +19,8 @@ export const load: PageServerLoad = ({ locals }) => {
 	// reaction. The reaction window lives only on the server, so without this the prompt would
 	// vanish on refresh and the round would soft-lock (his move can't advance past a parked Ask).
 	// Rehydrate the prompt + the human's still-held charges so the interrupt survives a reload.
-	let pendingReaction = null;
+	// Explicitly typed (not an inferred evolving-`any`) so PageData.pendingReaction stays sound.
+	let pendingReaction: PendingReaction | null = null;
 	if (engine.reactionWindow === 'Sköll') {
 		const skoll = getSkoll(locals.sessionId);
 		if (skoll.pendingAsk !== null) {
