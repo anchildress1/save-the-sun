@@ -50,5 +50,9 @@
 	"dependencies": {
 		"@google/genai": "^2.8.0",
 		"gsap": "^3.15.0"
+	},
+	"volta": {
+		"node": "26.3.0",
+		"pnpm": "10.33.1"
 	}
 }
