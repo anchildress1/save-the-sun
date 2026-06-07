@@ -63,19 +63,21 @@ describe('Gemini Oracle adapter', () => {
 		);
 	});
 
-	it('maps a power range query', async () => {
+	// Every operator must survive the adapter unchanged — the symbol prompt (= < <= > >=)
+	// leans on this passthrough, so a dropped or remapped op would silently mis-answer.
+	it.each(['eq', 'lt', 'lte', 'gt', 'gte'] as const)('maps a power %s query', async (op) => {
 		geminiJson({
 			kind: 'query',
 			axis: 'power',
-			powerOp: 'lt',
+			powerOp: op,
 			powerValue: 3,
-			paraphrase: 'fewer than three power'
+			paraphrase: 'three power'
 		});
 
-		await expect(interpret('Fewer than three power?')).resolves.toEqual({
+		await expect(interpret('three power?')).resolves.toEqual({
 			kind: 'query',
-			query: { axis: 'power', op: 'lt', value: 3 },
-			paraphrase: 'fewer than three power'
+			query: { axis: 'power', op, value: 3 },
+			paraphrase: 'three power'
 		});
 		expect(sdk.generateContent).toHaveBeenCalledOnce();
 	});
