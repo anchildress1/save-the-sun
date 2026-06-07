@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack, tick } from 'svelte';
+	import { untrack, tick, onMount } from 'svelte';
 	import RuneGrid from '$lib/components/RuneGrid.svelte';
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 	import { runes } from '$lib/board';
@@ -186,6 +186,11 @@
 			console.error('[ui] Sköll advance failed:', err);
 		}
 	}
+
+	// A round resumes on whichever turn it was left on (one engine per session). Since Sköll's move
+	// is now its own request, a load can land on his turn — drive it so the game never opens stuck on
+	// "Sköll moves." A no-op (via advanceSkoll's own guard) whenever it's the human's turn.
+	onMount(advanceSkoll);
 
 	async function submitAsk() {
 		const question = askValue.trim();

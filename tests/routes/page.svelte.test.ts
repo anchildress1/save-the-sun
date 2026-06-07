@@ -359,6 +359,15 @@ describe('Save the Sun page', () => {
 			.toBeInTheDocument();
 	});
 
+	it('drives Sköll on load when the round resumes on his turn — never opens stuck', async () => {
+		gameStub({ advance: advanceCast('I name it. Dagaz.', false) });
+		// One engine per session: a refresh can land on his turn. The page must advance him, not
+		// open frozen on "Sköll moves."
+		const screen = render(Page, propsWith(SKOLL_TURN));
+		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
+	});
+
 	it("voices Sköll's cast on his Advance turn", async () => {
 		gameStub({ advance: advanceCast('I name it. Dagaz.', false) });
 		const screen = render(Page, pageProps);
