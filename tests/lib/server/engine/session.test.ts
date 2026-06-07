@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine, selectSecret } from '$lib/server/engine/engine';
-import { getEngine, resetEngine, sessionCount, MAX_SESSIONS } from '$lib/server/engine/session';
+import {
+	getEngine,
+	getSkoll,
+	resetEngine,
+	sessionCount,
+	MAX_SESSIONS
+} from '$lib/server/engine/session';
 
 const SEED = 1;
 const A = 'session-a';
@@ -49,6 +55,33 @@ describe('session engine registry', () => {
 	it('throws if called without a sessionId', () => {
 		expect(() => getEngine('')).toThrow(/sessionId/);
 		expect(() => resetEngine('')).toThrow(/sessionId/);
+		expect(() => getSkoll('')).toThrow(/sessionId/);
+	});
+
+	it('lazily creates one Sköll memory per session and memoizes it', () => {
+		const skoll = getSkoll('wolf-session');
+		expect(skoll.facts).toEqual([]);
+		expect(getSkoll('wolf-session')).toBe(skoll);
+	});
+
+	it('wipes the wolf memory on a new round, but resumes it on a refresh', () => {
+		const skoll = getSkoll('wolf-reset');
+		skoll.facts.push({ query: { axis: 'fill', value: 'Light' }, answer: true });
+		// A bare getEngine (refresh) keeps his accumulated facts...
+		getEngine('wolf-reset');
+		expect(getSkoll('wolf-reset').facts).toHaveLength(1);
+		// ...but a new round clears them.
+		resetEngine('wolf-reset', SEED);
+		expect(getSkoll('wolf-reset').facts).toEqual([]);
+	});
+
+	it('evicts the wolf memory with its engine', () => {
+		const skoll = getSkoll('wolf-victim');
+		skoll.facts.push({ query: { axis: 'fill', value: 'Light' }, answer: true });
+		getEngine('wolf-victim');
+		for (let i = 0; i <= MAX_SESSIONS; i++) getEngine(`wolf-flood-${i}`);
+		// Evicted alongside the engine → a fresh, empty memory on next access.
+		expect(getSkoll('wolf-victim').facts).toEqual([]);
 	});
 
 	it('never grows past the session cap', () => {

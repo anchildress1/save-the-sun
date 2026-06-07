@@ -16,13 +16,14 @@ export default defineConfig({
 			reporter: ['text-summary', 'lcov'],
 			reportsDirectory: 'coverage',
 			include: ['src/**/*.{ts,svelte}'],
-			// +layout.svelte is framework boilerplate; index.ts is a re-export barrel;
-			// gemini.ts is the untestable network seam (oracle.ts re-validates its output).
+			// +layout.svelte is framework boilerplate; index.ts is a re-export barrel; the gemini.ts
+			// files are the untestable network seams (oracle.ts / skoll.ts re-validate their output).
 			exclude: [
 				'src/**/*.d.ts',
 				'src/lib/index.ts',
 				'src/routes/+layout.svelte',
-				'src/lib/server/oracle/gemini.ts'
+				'src/lib/server/oracle/gemini.ts',
+				'src/lib/server/skoll/gemini.ts'
 			],
 			// CI coverage floors (test-plan.md §coverage). Globs gate per module — the engine
 			// is the referee and carries the strictest bar. Raise these as modules land;
