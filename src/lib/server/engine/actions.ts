@@ -41,7 +41,9 @@ export interface ActionDeps {
 }
 
 export type ActionResult =
-	| { type: 'Ask'; oracle: OracleResult }
+	// `oracle` is optional: the route omits it when Sköll Hexes the human's Ask (silenced before any
+	// answer) — the wire then carries only `skollVsYou`. handleAction always sets it; the hex path doesn't.
+	| { type: 'Ask'; oracle?: OracleResult }
 	| { type: 'Cast'; cast: CastResult }
 	| { type: 'CrossOff'; ok: true }
 	| { type: 'React'; outcome: ReactionOutcome };
@@ -59,6 +61,47 @@ export interface GameState {
 	turns: number;
 }
 
+/**
+ * What Sköll did on his turn, attached to the response after the human's action (S6). He either
+ * casts (round may end) or opens a reaction window with his Ask — `asks` present means the client
+ * must show the interrupt prompt; his answer is produced only once the human reacts.
+ */
+export interface SkollTurn {
+	taunt: string;
+	asks?: { echo: string };
+	cast?: { line: string; won: boolean };
+}
+
+/** How Sköll's parked Ask resolved after the human reacted (S6). A Hex kills it; a Scry shares it. */
+export interface SkollReaction {
+	hexed: boolean;
+	scried?: { answer: string };
+}
+
+/** How Sköll reacted to the *human's* Ask (S6, R12 reverse): Hex kills it, Scry overhears it. */
+export interface SkollVsYou {
+	reaction: 'Scry' | 'Hex' | 'Pass';
+}
+
+/**
+ * A parked Sköll Ask carried by the page load (`+page.server.ts`) so a refresh mid-interrupt
+ * rehydrates the prompt — the reaction window lives server-side and would otherwise vanish.
+ */
+export interface PendingReaction {
+	echo: string;
+	held: { Scry: boolean; Hex: boolean };
+}
+
+/**
+ * The `Advance` wire response — Sköll's own turn, run as its own request (not a player ActionResult,
+ * so it's modeled separately). `skoll` is absent when it wasn't his turn to take.
+ */
+export interface AdvanceResponse {
+	type: 'Advance';
+	skoll?: SkollTurn;
+	state: GameState;
+}
+
 /** Read the engine's public turn state into a wire DTO. */
 export function gameState(engine: GameEngine): GameState {
 	return {
@@ -72,11 +115,13 @@ export function gameState(engine: GameEngine): GameState {
 /**
  * What the action endpoint returns: the action's own result plus the turn snapshot taken
  * after the request settles (so the client reflects whose move it is and a resolved round).
+ * `skoll` rides along when the wolf took his turn in response; `skollReaction` when this
+ * response closed his parked Ask (the human's React path).
  */
 export type ActionResponse<T extends ActionResult['type'] = ActionResult['type']> = Extract<
 	ActionResult,
 	{ type: T }
-> & { state: GameState };
+> & { state: GameState; skoll?: SkollTurn; skollReaction?: SkollReaction; skollVsYou?: SkollVsYou };
 
 /** Route one action to the engine/Oracle. */
 export async function handleAction(action: GameAction, deps: ActionDeps): Promise<ActionResult> {

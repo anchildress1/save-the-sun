@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mock the Gemini seam so the route test is deterministic and never touches the
-// network or $env. The route is the only place the real adapter is imported.
+// Mock both Gemini seams so the route test is deterministic and never touches the network or
+// $env. The route is the only place the real adapters are imported.
 vi.mock('$lib/server/oracle/gemini', () => ({
 	interpret: vi.fn(async () => ({
 		kind: 'query',
@@ -10,19 +10,30 @@ vi.mock('$lib/server/oracle/gemini', () => ({
 	}))
 }));
 
+vi.mock('$lib/server/skoll/gemini', () => ({
+	decideSkollMove: vi.fn(async () => ({ kind: 'cast', runeName: WRONG })),
+	decideSkollReaction: vi.fn(async () => ({ reaction: 'Pass' }))
+}));
+
 import { POST } from '$routes/api/action/+server';
-import { resetEngine } from '$lib/server/engine/session';
+import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
+import { resetEngine, getEngine, getSkoll } from '$lib/server/engine/session';
 import { selectSecret } from '$lib/server/engine/engine';
 import { runes } from '$lib/board';
 
 const SEED = 1;
 const SID = 'route-session';
-// turns: 0 — the actions this const checks (CrossOff/React) never consume a turn.
+const SECRET = selectSecret(SEED).name;
+const WRONG = runes.find((r) => r.name !== selectSecret(SEED).name)!.name;
 const HUMAN_TURN = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
+// Sköll only *considers* reacting when his RNG draw falls under REACTION_CHANCE. Inject a stream
+// that always draws 0 so the reaction-wiring tests fire deterministically (no magic seed).
+const openGate = (sessionId = SID) => (getSkoll(sessionId).rng = () => 0);
 
-function call(body: string | object) {
-	return callAs(SID, body);
-}
+const skollDecides = (impl: () => Promise<unknown>) =>
+	(decideSkollMove as ReturnType<typeof vi.fn>).mockImplementation(impl);
+const skollReacts = (impl: () => Promise<unknown>) =>
+	(decideSkollReaction as ReturnType<typeof vi.fn>).mockImplementation(impl);
 
 function callAs(sessionId: string, body: string | object) {
 	const request = new Request('http://localhost/api/action', {
@@ -33,75 +44,202 @@ function callAs(sessionId: string, body: string | object) {
 	return POST({ request, locals: { sessionId } } as unknown as Parameters<typeof POST>[0]);
 }
 
+const call = (body: string | object) => callAs(SID, body);
+const ask = () => call({ type: 'Ask', player: 'Human', question: 'is it light?' });
+const advance = () => call({ type: 'Advance' });
+const json = (res: Awaited<ReturnType<typeof call>>) => res.json();
+
 describe('POST /api/action', () => {
 	beforeEach(() => {
+		vi.clearAllMocks();
 		resetEngine(SID, SEED);
+		skollDecides(async () => ({ kind: 'cast', runeName: WRONG })); // default: Sköll misplays a cast
+		skollReacts(async () => ({ reaction: 'Pass' })); // default: Sköll lets the human's Ask pass
 	});
 
-	it('routes a valid Ask through the Oracle', async () => {
-		const res = await call({ type: 'Ask', player: 'Human', question: 'is it light?' });
-		expect(res.status).toBe(200);
-		const data = await res.json();
-		expect(data).toMatchObject({ type: 'Ask', oracle: { ok: true } });
+	it('answers the human Ask and hands the turn to Sköll — without taking it', async () => {
+		const data = await json(await ask());
+		expect(data).toMatchObject({
+			type: 'Ask',
+			oracle: { ok: true },
+			skollVsYou: { reaction: 'Pass' }
+		});
+		// The wolf's move is a SEPARATE request, so the answer comes back alone, his turn pending.
+		expect(data.skoll).toBeUndefined();
+		expect(data.state).toMatchObject({ activePlayer: 'Sköll', status: 'active' });
 	});
 
-	it('lets the human Ask again — the absent Sköll turn is skipped', async () => {
-		const first = await (
-			await call({ type: 'Ask', player: 'Human', question: 'is it light?' })
-		).json();
-		expect(first).toMatchObject({ type: 'Ask', oracle: { ok: true } });
-		// Without the pre-Sköll skip this second Ask would be rejected as not-your-turn.
-		const second = await (
-			await call({ type: 'Ask', player: 'Human', question: 'is it dark?' })
-		).json();
-		expect(second).toMatchObject({ type: 'Ask', oracle: { ok: true } });
+	it('runs Sköll’s turn only on Advance, handing play back after a wrong cast', async () => {
+		await ask(); // turn now sits with Sköll
+		const data = await json(await advance());
+		expect(data).toMatchObject({
+			type: 'Advance',
+			skoll: { cast: { line: `I name it. ${WRONG}.`, won: false } }
+		});
+		expect(data.state).toMatchObject({ activePlayer: 'Human', status: 'active' });
 	});
 
-	it('routes a Cast to the engine', async () => {
-		const res = await call({ type: 'Cast', player: 'Human', runeName: selectSecret(SEED).name });
-		const data = await res.json();
+	it('keeps play going after Sköll casts wrong — the human can Ask again', async () => {
+		await ask(); // turn → Sköll
+		const afterCast = await json(await advance()); // Sköll casts wrong → turn back to Human
+		expect(afterCast.state.activePlayer).toBe('Human');
+		// The human's next Ask must resolve (it really is their turn), not bounce as not-your-turn.
+		const again = await json(await ask());
+		expect(again.oracle).toMatchObject({ ok: true });
+		expect(again.state.activePlayer).toBe('Sköll');
+		// And the wolf can take another turn.
+		const next = await json(await advance());
+		expect(next.skoll).toBeDefined();
+	});
+
+	it('rejects a stale Human Ask on Sköll’s turn before he can react', async () => {
+		await ask(); // turn now sits with Sköll
+		const reactionCalls = (decideSkollReaction as ReturnType<typeof vi.fn>).mock.calls.length;
+		skollReacts(async () => ({ reaction: 'Hex' }));
+		openGate(); // would open the reaction gate if the React path even ran
+
+		const stale = await json(await ask());
+
+		expect(stale).toMatchObject({
+			type: 'Ask',
+			oracle: { ok: false, reason: 'engine', engineReason: 'not-your-turn' },
+			state: { activePlayer: 'Sköll' }
+		});
+		expect(stale.skollVsYou).toBeUndefined();
+		expect((decideSkollReaction as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(
+			reactionCalls
+		);
+		expect(getEngine(SID).reactionAvailable('Sköll', 'Hex')).toBe(true);
+	});
+
+	it('rejects an Ask after the round is won — round-over, no side effects', async () => {
+		await call({ type: 'Cast', player: 'Human', runeName: SECRET }); // human wins
+		skollReacts(async () => ({ reaction: 'Hex' }));
+		openGate(); // would open the gate if the reaction path ran — it must not
+
+		const data = await json(await ask());
+
+		expect(data.oracle).toMatchObject({ ok: false, reason: 'engine', engineReason: 'round-over' });
+		expect(data.skollVsYou).toBeUndefined();
+		expect(getEngine(SID).reactionAvailable('Sköll', 'Hex')).toBe(true); // charge untouched
+	});
+
+	it('is a harmless no-op when Advance is called on the human’s turn', async () => {
+		const data = await json(await advance()); // fresh round — still the human's move
+		expect(data.skoll).toBeUndefined();
+		expect(data.state).toMatchObject({ activePlayer: 'Human' });
+	});
+
+	it('parks Sköll on an Ask (via Advance) and prompts the human to react', async () => {
+		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+		await ask();
+		const data = await json(await advance());
+		expect(data.skoll.asks.echo).toContain('Sköll asks after');
+		expect(data.state.activePlayer).toBe('Sköll'); // unanswered — still his turn, window open
+	});
+
+	it('resolves Sköll Ask when the human lets it pass', async () => {
+		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+		await ask();
+		await advance(); // Sköll now has a parked Ask
+		const data = await json(await call({ type: 'React', player: 'Human', reaction: 'Pass' }));
+		expect(data.skollReaction).toEqual({ hexed: false });
+		expect(data.state.activePlayer).toBe('Human');
+	});
+
+	it('shares the answer when the human Scries Sköll Ask', async () => {
+		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+		await ask();
+		await advance();
+		const data = await json(await call({ type: 'React', player: 'Human', reaction: 'Scry' }));
+		expect(data.skollReaction.scried.answer).toMatch(/Sól is (not )?reaching for a gold rune\./);
+	});
+
+	it('kills the question when the human Hexes Sköll Ask', async () => {
+		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+		await ask();
+		await advance();
+		const data = await json(await call({ type: 'React', player: 'Human', reaction: 'Hex' }));
+		expect(data.skollReaction).toEqual({ hexed: true });
+		expect(data.state.activePlayer).toBe('Human');
+	});
+
+	it('ends the round in defeat when Sköll casts true on Advance', async () => {
+		skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
+		await ask();
+		const data = await json(await advance());
+		expect(data.skoll.cast).toEqual({ line: `The hunt ends. ${SECRET}.`, won: true });
+		expect(data.state).toMatchObject({ status: 'won', winner: 'Sköll' });
+	});
+
+	it('falls to the floor on Advance when Sköll Gemini fails — he still moves', async () => {
+		skollDecides(async () => {
+			throw new Error('timeout');
+		});
+		await ask();
+		const data = await json(await advance());
+		expect(data.skoll.asks ?? data.skoll.cast).toBeDefined();
+	});
+
+	it('lets Sköll Hex the human Ask — no answer comes back, her turn is spent', async () => {
+		skollReacts(async () => ({ reaction: 'Hex' }));
+		openGate(); // open the reaction gate deterministically
+		const data = await json(await ask());
+		expect(data.skollVsYou).toEqual({ reaction: 'Hex' });
+		expect(data.oracle).toBeUndefined(); // silenced — no Oracle line
+		expect(data.state.activePlayer).toBe('Sköll'); // her turn spent → his to take on Advance
+	});
+
+	it('lets Sköll Scry the human Ask — she still gets her answer, he overhears it', async () => {
+		skollReacts(async () => ({ reaction: 'Scry' }));
+		openGate(); // open the reaction gate deterministically
+		const data = await json(await ask());
+		expect(data.skollVsYou).toEqual({ reaction: 'Scry' });
+		expect(data.oracle).toMatchObject({ ok: true });
+	});
+
+	it('does not rouse Sköll on a refused Ask — no window, no reaction, no turn', async () => {
+		const { interpret } = await import('$lib/server/oracle/gemini');
+		(interpret as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => ({
+			kind: 'refusal',
+			refusal: 'mixed-type'
+		}));
+		const data = await json(await ask());
+		expect(data.oracle).toMatchObject({ ok: false, reason: 'refusal' });
+		expect(data.skollVsYou).toBeUndefined();
+		expect(data.state.activePlayer).toBe('Human');
+	});
+
+	it('wins on the human cast — Sköll never gets a turn', async () => {
+		const data = await json(await call({ type: 'Cast', player: 'Human', runeName: SECRET }));
 		expect(data).toMatchObject({ type: 'Cast', cast: { won: true } });
-	});
-
-	it('attaches the post-shim turn state to every response', async () => {
-		const data = await (
-			await call({ type: 'Ask', player: 'Human', question: 'is it light?' })
-		).json();
-		// The engine handed the turn to Sköll; the pre-Sköll shim hands it straight back, so
-		// the client sees its own turn again — round still active. The resolved Ask spent one turn.
-		expect(data.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null, turns: 1 });
-	});
-
-	it('reports the resolved round in the state after a winning cast', async () => {
-		const data = await (
-			await call({ type: 'Cast', player: 'Human', runeName: selectSecret(SEED).name })
-		).json();
 		expect(data.state).toEqual({ activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 });
+		expect(data.skoll).toBeUndefined();
 	});
 
-	it('keeps the human on the clock after a wrong cast — round continues', async () => {
-		const wrong = runes.find((r) => r.name !== selectSecret(SEED).name)!.name;
-		const data = await (await call({ type: 'Cast', player: 'Human', runeName: wrong })).json();
-		expect(data).toMatchObject({ type: 'Cast', cast: { ok: true, won: false } });
-		expect(data.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null, turns: 1 });
+	it('hands the wolf his turn after a wrong human cast (taken on Advance)', async () => {
+		const wrong = await json(await call({ type: 'Cast', player: 'Human', runeName: WRONG }));
+		expect(wrong).toMatchObject({ type: 'Cast', cast: { ok: true, won: false } });
+		expect(wrong.skoll).toBeUndefined(); // not folded in
+		expect(wrong.state.activePlayer).toBe('Sköll');
+		const data = await json(await advance());
+		expect(data.skoll).toBeDefined();
 	});
 
-	it('routes a CrossOff without asking the engine to referee it', async () => {
-		const res = await call({ type: 'CrossOff', player: 'Human', runeId: 1, crossed: true });
-		const data = await res.json();
-		// Cross-off never consumes a turn, so the snapshot still shows the human on the clock.
-		expect(data).toEqual({ type: 'CrossOff', ok: true, state: { ...HUMAN_TURN } });
-	});
-
-	it('routes a React through the shared interface, carrying its outcome and the turn state', async () => {
-		const res = await call({ type: 'React', player: 'Human', reaction: 'Pass' });
-		const data = await res.json();
-		// Pass spends no charge and takes no turn, so the human stays on the clock.
+	it('routes a bare React (no Sköll Ask pending) as a harmless no-window pass', async () => {
+		const data = await json(await call({ type: 'React', player: 'Human', reaction: 'Pass' }));
 		expect(data).toEqual({
 			type: 'React',
 			outcome: { ok: true, choice: 'Pass' },
 			state: { ...HUMAN_TURN }
 		});
+	});
+
+	it('routes a CrossOff without a turn — Sköll does not move', async () => {
+		const data = await json(
+			await call({ type: 'CrossOff', player: 'Human', runeId: 1, crossed: true })
+		);
+		expect(data).toEqual({ type: 'CrossOff', ok: true, state: { ...HUMAN_TURN } });
 	});
 
 	it('rejects an unknown action type with 400', async () => {
@@ -149,18 +287,15 @@ describe('POST /api/action', () => {
 	it('keeps two sessions independent through the endpoint', async () => {
 		resetEngine('player-one', SEED);
 		resetEngine('player-two', SEED);
-		const secret = selectSecret(SEED).name;
 
-		// player-one wins their round.
-		const win = await (
-			await callAs('player-one', { type: 'Cast', player: 'Human', runeName: secret })
-		).json();
+		const win = await json(
+			await callAs('player-one', { type: 'Cast', player: 'Human', runeName: SECRET })
+		);
 		expect(win).toMatchObject({ type: 'Cast', cast: { won: true } });
 
-		// player-two's round is untouched — the same winning cast still works.
-		const stillWinnable = await (
-			await callAs('player-two', { type: 'Cast', player: 'Human', runeName: secret })
-		).json();
+		const stillWinnable = await json(
+			await callAs('player-two', { type: 'Cast', player: 'Human', runeName: SECRET })
+		);
 		expect(stillWinnable).toMatchObject({ type: 'Cast', cast: { won: true } });
 	});
 });

@@ -16,13 +16,14 @@ export default defineConfig({
 			reporter: ['text-summary', 'lcov'],
 			reportsDirectory: 'coverage',
 			include: ['src/**/*.{ts,svelte}'],
-			// +layout.svelte is framework boilerplate; index.ts is a re-export barrel;
-			// gemini.ts is the untestable network seam (oracle.ts re-validates its output).
+			// +layout.svelte is framework boilerplate; index.ts is a re-export barrel; the gemini.ts
+			// files are the untestable network seams (oracle.ts / skoll.ts re-validate their output).
 			exclude: [
 				'src/**/*.d.ts',
 				'src/lib/index.ts',
 				'src/routes/+layout.svelte',
-				'src/lib/server/oracle/gemini.ts'
+				'src/lib/server/oracle/gemini.ts',
+				'src/lib/server/skoll/gemini.ts'
 			],
 			// CI coverage floors (test-plan.md §coverage). Globs gate per module — the engine
 			// is the referee and carries the strictest bar. Raise these as modules land;
@@ -36,6 +37,10 @@ export default defineConfig({
 				'src/lib/server/engine/queries.ts': { lines: 100, branches: 95 },
 				'src/lib/server/engine/actions.ts': { lines: 90, branches: 85 },
 				'src/lib/server/engine/reactions.ts': { lines: 95, branches: 90 },
+				// S6 fallback-policy floor: the deterministic floor is the demo's safety net, held to
+				// the engine-adjacent bar; the orchestration carries the dev-only debug branches.
+				'src/lib/server/skoll/floor.ts': { lines: 95, branches: 90 },
+				'src/lib/server/skoll/skoll.ts': { lines: 95, branches: 85 },
 				'src/lib/server/oracle/oracle.ts': { lines: 90, branches: 85 },
 				'src/lib/server/engine/session.ts': { lines: 90, branches: 85 },
 				'src/routes/api/action/+server.ts': { lines: 90, branches: 85 },

@@ -1,13 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { load } from '$routes/+page.server';
-import { getEngine, resetEngine } from '$lib/server/engine/session';
+import { getEngine, getSkoll, resetEngine } from '$lib/server/engine/session';
 import { selectSecret } from '$lib/server/engine/engine';
 import type { GameState } from '$lib/server/engine/actions';
 
-// load is synchronous and returns { boardSeed, state }; the PageServerLoad signature widens
-// the return to MaybePromise<…>, so narrow it for the assertions.
+type PendingReaction = { echo: string; held: { Scry: boolean; Hex: boolean } } | null;
+// load is synchronous and returns { boardSeed, state, pendingReaction }; the PageServerLoad
+// signature widens the return to MaybePromise<…>, so narrow it for the assertions.
 const runLoad = (sessionId: string) =>
-	load({ locals: { sessionId } } as never) as { boardSeed: number; state: GameState };
+	load({ locals: { sessionId } } as never) as {
+		boardSeed: number;
+		state: GameState;
+		pendingReaction: PendingReaction;
+	};
 
 const SEED = 1;
 
@@ -34,8 +39,30 @@ describe('+page.server load — engine lifetime', () => {
 	});
 
 	it('hydrates the live turn state — fresh round is human-first and active', () => {
-		const { state } = runLoad('hydrate-fresh');
-		expect(state).toEqual({ activePlayer: 'Human', status: 'active', winner: null, turns: 0 });
+		const result = runLoad('hydrate-fresh');
+		expect(result.state).toEqual({
+			activePlayer: 'Human',
+			status: 'active',
+			winner: null,
+			turns: 0
+		});
+		// No interrupt pending on a fresh round.
+		expect(result.pendingReaction).toBeNull();
+	});
+
+	it('rehydrates Sköll’s parked Ask so a refresh mid-interrupt is not stuck', () => {
+		resetEngine('parked-session', SEED);
+		const engine = getEngine('parked-session');
+		const skoll = getSkoll('parked-session');
+		// Mirror the live state: Sköll has declared an Ask and the window is open for the human.
+		skoll.pendingAsk = { axis: 'color', value: 'Gold' };
+		engine.openReactionWindow('Sköll');
+
+		const { pendingReaction } = runLoad('parked-session');
+		expect(pendingReaction).toEqual({
+			echo: 'Sköll asks after a gold rune.',
+			held: { Scry: true, Hex: true }
+		});
 	});
 
 	it('reports a resumed won round so the UI does not open on a phantom turn', () => {

@@ -11,8 +11,14 @@ const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner
 const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 };
 const SKOLL_WON: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 5 };
 
-const pageProps = { data: { boardSeed: 0, state: HUMAN_TURN }, params: {}, form: null };
-const propsWith = (state: GameState) => ({ data: { boardSeed: 0, state }, params: {}, form: null });
+type PendingReaction = { echo: string; held: { Scry: boolean; Hex: boolean } } | null;
+const props = (state: GameState, pendingReaction: PendingReaction = null) => ({
+	data: { boardSeed: 0, state, pendingReaction },
+	params: {},
+	form: null
+});
+const pageProps = props(HUMAN_TURN);
+const propsWith = (state: GameState) => props(state);
 
 afterEach(() => {
 	vi.unstubAllGlobals();
@@ -32,6 +38,52 @@ const askResult = (oracle: object, state: GameState = HUMAN_TURN) =>
 	respond({ type: 'Ask', oracle, state });
 const castResult = (cast: object, state: GameState = HUMAN_TURN) =>
 	respond({ type: 'Cast', cast, state });
+
+// --- S6: Sköll's surfaced turn + the human's reactions ---
+
+// Sköll's move arrives on a SEPARATE Advance request now, so the stub routes by action type:
+// the Ask returns the human's answer (turn handed to Sköll), Advance returns the wolf's move, and
+// React resolves his parked Ask. Unset branches fall back to a turn-handed-back no-op.
+function gameStub(opts: { ask?: object; advance?: object; react?: object }) {
+	return stubFetch(async (_url: string, init?: { body?: string }) => {
+		const body = init?.body ? JSON.parse(init.body) : {};
+		const pick =
+			body.type === 'Advance'
+				? (opts.advance ?? { type: 'Advance', state: HUMAN_TURN })
+				: body.type === 'React'
+					? (opts.react ?? { type: 'React', outcome: { ok: true }, state: HUMAN_TURN })
+					: (opts.ask ?? defaultAsk());
+		return new Response(JSON.stringify(pick));
+	});
+}
+
+const defaultAsk = (skollVsYou: object = { reaction: 'Pass' }) => ({
+	type: 'Ask',
+	oracle: { ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+	skollVsYou,
+	state: SKOLL_TURN
+});
+const advanceCast = (line: string, won: boolean, state: GameState = HUMAN_TURN) => ({
+	type: 'Advance',
+	skoll: { taunt: 'You circle. I close.', cast: { line, won } },
+	state
+});
+const advanceAsk = (echo = 'Sköll asks after a gold rune.') => ({
+	type: 'Advance',
+	skoll: { taunt: 'You circle. I close.', asks: { echo } },
+	state: SKOLL_TURN
+});
+const reactResult = (skollReaction: object) => ({
+	type: 'React',
+	outcome: { ok: true },
+	skollReaction,
+	state: HUMAN_TURN
+});
+
+async function humanAsks(screen: ReturnType<typeof render>) {
+	await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
+	await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+}
 
 describe('Save the Sun page', () => {
 	it('starts with a ready Rite state, not a blank panel', async () => {
@@ -311,6 +363,154 @@ describe('Save the Sun page', () => {
 		await expect
 			.element(screen.getByRole('button', { name: /restore sowilo/i }))
 			.toBeInTheDocument();
+	});
+
+	it('drives Sköll on load when the round resumes on his turn — never opens stuck', async () => {
+		gameStub({ advance: advanceCast('I name it. Dagaz.', false) });
+		// One engine per session: a refresh can land on his turn. The page must advance him, not
+		// open frozen on "Sköll moves."
+		const screen = render(Page, propsWith(SKOLL_TURN));
+		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
+	});
+
+	it('rehydrates the reaction prompt when a round resumes on Sköll’s parked Ask', async () => {
+		// The window lives server-side; the load carries it so a refresh mid-interrupt isn't stuck.
+		const spy = gameStub({ react: reactResult({ hexed: true }) });
+		const screen = render(
+			Page,
+			props(SKOLL_TURN, { echo: 'Sköll asks after a gold rune.', held: { Scry: true, Hex: true } })
+		);
+		await expect
+			.element(screen.getByTestId('reaction-prompt'))
+			.toHaveTextContent('Sköll asks. Answer it?');
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('a gold rune');
+		// A parked Ask must NOT fire an Advance on mount — the human owes a reaction first.
+		expect(spy).not.toHaveBeenCalled();
+		// And reacting still resolves it.
+		await screen.getByRole('button', { name: 'Hex' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('His question dies unanswered');
+	});
+
+	it("voices Sköll's cast on his Advance turn", async () => {
+		gameStub({ advance: advanceCast('I name it. Dagaz.', false) });
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		// Your answer landed from the Ask; his cast arrives on the follow-up Advance.
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('No. Sól is not reaching');
+		// He gets his own framed box, distinct from the Oracle's.
+		await expect.element(screen.getByTestId('skoll-frame')).toHaveTextContent('Sköll');
+		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
+	});
+
+	it('prompts the human to react when Sköll Asks (on Advance)', async () => {
+		gameStub({ advance: advanceAsk() });
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await expect
+			.element(screen.getByTestId('skoll-echo'))
+			.toHaveTextContent('Sköll asks after a gold rune.');
+		await expect
+			.element(screen.getByTestId('reaction-prompt'))
+			.toHaveTextContent('Sköll asks. Answer it?');
+		await expect.element(screen.getByRole('button', { name: 'Let it pass' })).toBeInTheDocument();
+	});
+
+	it('lets the human let Sköll Ask pass', async () => {
+		gameStub({ advance: advanceAsk(), react: reactResult({ hexed: false }) });
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Let it pass' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('You hold your hand. Let him have his answer.');
+		// Prompt gone, the static reactions row is back.
+		expect(screen.container.querySelector('[data-testid="reaction-prompt"]')).toBeNull();
+	});
+
+	it('shares the answer when the human Scries Sköll Ask', async () => {
+		gameStub({
+			advance: advanceAsk(),
+			react: reactResult({
+				hexed: false,
+				scried: { answer: 'Yes. Sól is reaching for a gold rune.' }
+			})
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Scry' }).click();
+		// The scried answer is the payoff — it surfaces in the panel itself, no extra flavor line.
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Yes. Sól is reaching for a gold rune.');
+	});
+
+	it('kills the question when the human Hexes Sköll Ask', async () => {
+		gameStub({ advance: advanceAsk(), react: reactResult({ hexed: true }) });
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Hex' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('His question dies unanswered');
+		// No stale second line stacked beneath — the outcome is the single panel line.
+		expect(screen.container.querySelector('[data-testid="skoll-voice"]')).toBeNull();
+	});
+
+	it('shows the pass outcome when a Hex did not land (server resolved it as a pass)', async () => {
+		// The server can reject a reaction (e.g. no charge) and resolve it as a Pass. The UI must key
+		// on what actually landed, not the requested choice — so a "Hex" that didn't fire reads as a pass.
+		gameStub({ advance: advanceAsk(), react: reactResult({ hexed: false }) });
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Hex' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('You hold your hand. Let him have his answer.');
+	});
+
+	it('shows the silenced line when Sköll Hexes the human Ask', async () => {
+		gameStub({
+			// No oracle line — the question was silenced before any answer; then his own Advance move.
+			ask: { type: 'Ask', skollVsYou: { reaction: 'Hex' }, state: SKOLL_TURN },
+			advance: advanceCast('I name it. Dagaz.', false)
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		// The Oracle box names Sköll in the rite's voice — NOT his first-person gloat.
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Sköll Hexes your question. It dies unanswered.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain('My doing');
+		// His own move surfaces in his voice slot.
+		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
+	});
+
+	it('shows the answer when Sköll Scries the human Ask (covert — no extra line)', async () => {
+		gameStub({
+			ask: defaultAsk({ reaction: 'Scry' }),
+			advance: advanceCast('I name it. Dagaz.', false)
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
+	});
+
+	it('falls to defeat when Sköll casts true on his Advance turn', async () => {
+		gameStub({ advance: advanceCast('The hunt ends. Dagaz.', true, SKOLL_WON) });
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await expect
+			.element(screen.getByTestId('skoll-voice'))
+			.toHaveTextContent('The hunt ends. Dagaz.');
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Sköll takes the sun. The longest day never breaks.');
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll takes the sun.');
 	});
 
 	it('resolves the round on a correct cast — Ask + Cast lock until a new night', async () => {

@@ -2,6 +2,7 @@
 
 import { dev } from '$app/environment';
 import { GameEngine, selectSecret } from './engine';
+import { freshSkollState, type SkollState } from '$lib/server/skoll/skoll';
 
 // LRU-capped so abandoned rounds can't grow memory without bound. Map keeps insertion
 // order, so the first key is the least-recently-used; every access re-inserts to the end.
@@ -10,6 +11,9 @@ import { GameEngine, selectSecret } from './engine';
 // any plausible concurrent jam load while staying trivially small in memory.
 export const MAX_SESSIONS = 1000;
 const engines = new Map<string, GameEngine>();
+// Sköll's per-round memory, lifecycle-linked to the engine: reset on a new round, evicted with
+// it. Kept here so the two can never drift — one session, one secret, one wolf.
+const skolls = new Map<string, SkollState>();
 
 function randomSeed(): number {
 	return crypto.getRandomValues(new Uint32Array(1))[0];
@@ -38,6 +42,7 @@ function remember(sessionId: string, engine: GameEngine): GameEngine {
 		// size > cap ⇒ the registry is non-empty, so the first key always exists.
 		const [lru] = engines.keys();
 		engines.delete(lru);
+		skolls.delete(lru); // his memory dies with the round it belonged to
 		// Rare, but the resulting fresh-secret-on-next-access desync is otherwise invisible.
 		console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
 	}
@@ -54,10 +59,43 @@ export function getEngine(sessionId: string): GameEngine {
 /** Start a fresh round for one session; pass a seed for a deterministic secret. */
 export function resetEngine(sessionId: string, seed?: number): GameEngine {
 	requireId(sessionId);
+	skolls.delete(sessionId); // a new round wipes the wolf's memory; recreated lazily on his turn
 	return remember(sessionId, create(sessionId, seed ?? randomSeed()));
+}
+
+/** The session's Sköll memory, lazily created on his first move and reset with the round. */
+export function getSkoll(sessionId: string): SkollState {
+	requireId(sessionId);
+	let state = skolls.get(sessionId);
+	if (state === undefined) {
+		state = freshSkollState(randomSeed());
+		skolls.set(sessionId, state);
+	}
+	return state;
 }
 
 /** Live session count — bounded by MAX_SESSIONS. */
 export function sessionCount(): number {
 	return engines.size;
+}
+
+// Per-session single-flight: a request can yield mid-action (takeSkollTurn awaits Gemini) on shared
+// engine/Sköll state, so without this a duplicate tab / retry / direct POST could interleave and
+// double-call Gemini, overwrite the parked Ask, or return a stale response. One action per session.
+const locks = new Map<string, Promise<unknown>>();
+
+/** Run `fn` after any in-flight action for this session settles — serializing per-session mutation. */
+export function withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
+	requireId(sessionId);
+	const prev = locks.get(sessionId) ?? Promise.resolve();
+	const result = prev.then(fn); // prev is a tail that never rejects, so a failure can't wedge the queue
+	const tail = result.then(
+		() => undefined,
+		() => undefined
+	);
+	locks.set(sessionId, tail);
+	void tail.finally(() => {
+		if (locks.get(sessionId) === tail) locks.delete(sessionId); // drop drained sessions
+	});
+	return result;
 }

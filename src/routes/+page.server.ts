@@ -1,5 +1,6 @@
-import { getEngine } from '$lib/server/engine/session';
-import { gameState } from '$lib/server/engine/actions';
+import { getEngine, getSkoll } from '$lib/server/engine/session';
+import { gameState, type PendingReaction } from '$lib/server/engine/actions';
+import { skollAskEcho } from '$lib/server/skoll/skoll';
 import type { PageServerLoad } from './$types';
 
 // Seed for the on-screen board ORDER only — the shuffle that keeps element/light-dark
@@ -13,6 +14,26 @@ export const load: PageServerLoad = ({ locals }) => {
 	// reseed. The secret lives as long as the session; a fresh round comes from POST
 	// /api/new-game or a brand-new session (first visit / cleared cookie).
 	const engine = getEngine(locals.sessionId);
+
+	// A round can resume on Sköll's *parked* Ask — his question declared, awaiting the human's
+	// reaction. The reaction window lives only on the server, so without this the prompt would
+	// vanish on refresh and the round would soft-lock (his move can't advance past a parked Ask).
+	// Rehydrate the prompt + the human's still-held charges so the interrupt survives a reload.
+	// Explicitly typed (not an inferred evolving-`any`) so PageData.pendingReaction stays sound.
+	let pendingReaction: PendingReaction | null = null;
+	if (engine.reactionWindow === 'Sköll') {
+		const skoll = getSkoll(locals.sessionId);
+		if (skoll.pendingAsk !== null) {
+			pendingReaction = {
+				echo: skollAskEcho(skoll.pendingAsk),
+				held: {
+					Scry: engine.reactionAvailable('Human', 'Scry'),
+					Hex: engine.reactionAvailable('Human', 'Hex')
+				}
+			};
+		}
+	}
+
 	// Web Crypto rather than Math.random — harmless for a display seed and keeps a single
 	// secure RNG path (and clears the Sonar weak-PRNG hotspot). Returns a uint32, which
 	// mulberry32 consumes via seed >>> 0.
@@ -20,6 +41,7 @@ export const load: PageServerLoad = ({ locals }) => {
 		boardSeed: crypto.getRandomValues(new Uint32Array(1))[0],
 		// Hydrate the real turn/round state so a resumed round (incl. one already won) renders
 		// truthfully on load instead of guessing "Your move." and flipping on the first action.
-		state: gameState(engine)
+		state: gameState(engine),
+		pendingReaction
 	};
 };

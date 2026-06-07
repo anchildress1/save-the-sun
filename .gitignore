@@ -33,3 +33,4 @@ coverage
 
 # Ad-hoc screenshots / design refs dropped at the repo root
 /*.png
+.playwright-mcp/
