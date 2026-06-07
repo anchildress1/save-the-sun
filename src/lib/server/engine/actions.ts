@@ -53,6 +53,9 @@ export interface GameState {
 	activePlayer: Player;
 	status: 'active' | 'won';
 	winner: Player | null;
+	// Turns consumed this round — public, drives the cosmetic night-progress chrome. Carries no
+	// secret signal (it is just a count), and is hydrated on load so the indicator survives a refresh.
+	turns: number;
 }
 
 /** Read the engine's public turn state into a wire DTO. */
@@ -60,7 +63,8 @@ export function gameState(engine: GameEngine): GameState {
 	return {
 		activePlayer: engine.activePlayer,
 		status: engine.status,
-		winner: engine.winner
+		winner: engine.winner,
+		turns: engine.turns
 	};
 }
 

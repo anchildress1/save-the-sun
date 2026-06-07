@@ -70,7 +70,8 @@ describe('gameState — public turn snapshot', () => {
 		expect(gameState(new GameEngine(SEED))).toEqual({
 			activePlayer: 'Human',
 			status: 'active',
-			winner: null
+			winner: null,
+			turns: 0
 		});
 	});
 
@@ -80,7 +81,8 @@ describe('gameState — public turn snapshot', () => {
 		expect(gameState(engine)).toEqual({
 			activePlayer: 'Human',
 			status: 'won',
-			winner: 'Human'
+			winner: 'Human',
+			turns: 1
 		});
 	});
 

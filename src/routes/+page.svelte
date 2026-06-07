@@ -22,6 +22,10 @@
 		runeTrue: 'The rune is true.',
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
+		// Night-progress chrome (ux-copy.md §6), keyed to elapsed turns — cosmetic, no timer.
+		nightHolds: 'The dark holds.',
+		nightThins: 'The dark thins.',
+		nightDawn: 'Dawn is close.',
 		chooseTarget: 'Choose a rune from the board.',
 		castPrompt: (name: string) => `Cast ${name}?`
 	};
@@ -38,7 +42,12 @@
 	// live when S6 lands.
 	let activePlayer = $state<Player>(untrack(() => data.state.activePlayer));
 	let roundStatus = $state<'active' | 'won'>(untrack(() => data.state.status));
+	let turns = $state<number>(untrack(() => data.state.turns));
 	let roundOver = $derived(roundStatus === 'won');
+	// Night-progress phase by elapsed turns (cosmetic): holds 0–2, thins 3–5, dawn 6+.
+	let nightProgress = $derived(
+		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
+	);
 	// Ask and Cast are turn-gated; cross-off is a private aid and is never gated (RuneGrid owns
 	// it and stays enabled through Sköll's turn — game-spec "private aid").
 	let canAct = $derived(activePlayer === 'Human' && !roundOver);
@@ -51,6 +60,7 @@
 	function applyState(state: GameState) {
 		activePlayer = state.activePlayer;
 		roundStatus = state.status;
+		turns = state.turns;
 	}
 
 	// Tracks the loaded seed until a new game overrides it. A changed seed remounts RuneGrid
@@ -204,19 +214,22 @@
 			</div>
 		</div>
 
-		<svg class="moon" viewBox="0 0 64 64" aria-hidden="true">
-			<defs>
-				<radialGradient id="moonFace" cx="40%" cy="35%" r="75%">
-					<stop offset="0%" stop-color="#f4eede" />
-					<stop offset="70%" stop-color="#cdd2dd" />
-					<stop offset="100%" stop-color="#8b93a6" />
-				</radialGradient>
-			</defs>
-			<circle cx="32" cy="32" r="22" fill="url(#moonFace)" />
-			<circle cx="26" cy="24" r="3.4" fill="#b9bdc8" opacity="0.6" />
-			<circle cx="40" cy="34" r="2.4" fill="#b9bdc8" opacity="0.5" />
-			<circle cx="30" cy="40" r="1.8" fill="#b9bdc8" opacity="0.5" />
-		</svg>
+		<div class="night-block">
+			<svg class="moon" viewBox="0 0 64 64" aria-hidden="true">
+				<defs>
+					<radialGradient id="moonFace" cx="40%" cy="35%" r="75%">
+						<stop offset="0%" stop-color="#f4eede" />
+						<stop offset="70%" stop-color="#cdd2dd" />
+						<stop offset="100%" stop-color="#8b93a6" />
+					</radialGradient>
+				</defs>
+				<circle cx="32" cy="32" r="22" fill="url(#moonFace)" />
+				<circle cx="26" cy="24" r="3.4" fill="#b9bdc8" opacity="0.6" />
+				<circle cx="40" cy="34" r="2.4" fill="#b9bdc8" opacity="0.5" />
+				<circle cx="30" cy="40" r="1.8" fill="#b9bdc8" opacity="0.5" />
+			</svg>
+			<p class="night-progress" data-testid="night-progress">{nightProgress}</p>
+		</div>
 
 		<div class="header-controls">
 			<button class="ghost new-game" type="button" onclick={newGame} disabled={pending}>
@@ -362,11 +375,28 @@
 		font-size: 0.85rem;
 	}
 
+	.night-block {
+		justify-self: center;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.3rem;
+	}
+
 	.moon {
 		width: 58px;
 		height: 58px;
-		justify-self: center;
 		filter: drop-shadow(0 0 16px rgba(220, 226, 240, 0.4));
+	}
+
+	.night-progress {
+		margin: 0;
+		font-family: var(--font-display);
+		font-style: italic;
+		font-size: 0.78rem;
+		letter-spacing: 0.06em;
+		color: var(--ink-muted);
+		white-space: nowrap;
 	}
 
 	.header-controls {

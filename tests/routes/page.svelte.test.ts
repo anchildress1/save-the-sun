@@ -6,9 +6,9 @@ import type { GameState } from '$lib/server/engine/actions';
 // Full page props (data normally comes from +page.server.ts). A fixed seed keeps the
 // board order deterministic across these behavioural tests; the hydrated state opens the
 // page human-first on a live round.
-const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null };
-const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner: null };
-const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human' };
+const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
+const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 };
+const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 };
 
 const pageProps = { data: { boardSeed: 0, state: HUMAN_TURN }, params: {}, form: null };
 const propsWith = (state: GameState) => ({ data: { boardSeed: 0, state }, params: {}, form: null });
@@ -196,6 +196,36 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+	});
+
+	it('opens on the early-night progress line before any turn is spent', async () => {
+		const screen = render(Page, pageProps);
+		await expect.element(screen.getByTestId('night-progress')).toHaveTextContent('The dark holds.');
+	});
+
+	it('hydrates the mid-night progress phase from the loaded turn count', async () => {
+		const screen = render(Page, propsWith({ ...HUMAN_TURN, turns: 4 }));
+		await expect.element(screen.getByTestId('night-progress')).toHaveTextContent('The dark thins.');
+	});
+
+	it('hydrates the late-night progress phase from the loaded turn count', async () => {
+		const screen = render(Page, propsWith({ ...HUMAN_TURN, turns: 6 }));
+		await expect.element(screen.getByTestId('night-progress')).toHaveTextContent('Dawn is close.');
+	});
+
+	it('advances the night-progress as turns are spent on an Ask', async () => {
+		askResult(
+			{ ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+			{
+				...HUMAN_TURN,
+				turns: 6
+			}
+		);
+		const screen = render(Page, pageProps);
+		await expect.element(screen.getByTestId('night-progress')).toHaveTextContent('The dark holds.');
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect.element(screen.getByTestId('night-progress')).toHaveTextContent('Dawn is close.');
 	});
 
 	it('opens on the human turn — "Your move." and controls live', async () => {

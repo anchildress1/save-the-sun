@@ -6,6 +6,11 @@ test('renders the rite header', async ({ page }) => {
 	await expect(page.locator('p.tagline', { hasText: 'A rite for the longest day.' })).toBeVisible();
 });
 
+test('shows the night-progress chrome holding early in the night', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByTestId('night-progress')).toHaveText('The dark holds.');
+});
+
 test('renders all 24 rune cards with visible trait text', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('.rune-card')).toHaveCount(24);
@@ -29,7 +34,7 @@ test('arms a cast, names a rune, and routes it through the action interface', as
 			json: {
 				type: 'Cast',
 				cast: { ok: true, won: true, rune: { name: 'Sowilo' }, turnConsumed: true },
-				state: { activePlayer: 'Human', status: 'won', winner: 'Human' }
+				state: { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 }
 			}
 		})
 	);
@@ -50,7 +55,7 @@ test('a wrong cast costs the turn only — crossings and round survive', async (
 			json: {
 				type: 'Cast',
 				cast: { ok: true, won: false, turnConsumed: true },
-				state: { activePlayer: 'Human', status: 'active', winner: null }
+				state: { activePlayer: 'Human', status: 'active', winner: null, turns: 1 }
 			}
 		})
 	);
@@ -96,7 +101,7 @@ test('dispatches a non-empty Ask and shows the voiced answer', async ({ page }) 
 					affirmative: false,
 					turnConsumed: true
 				},
-				state: { activePlayer: 'Human', status: 'active', winner: null }
+				state: { activePlayer: 'Human', status: 'active', winner: null, turns: 1 }
 			}
 		})
 	);
@@ -114,4 +119,25 @@ test('board screenshot for POC comparison', async ({ page }, testInfo) => {
 	await expect(page.locator('.rune-card-wrapper').last()).toHaveCSS('opacity', '1');
 	await page.screenshot({ path: testInfo.outputPath('board.png'), fullPage: true });
 	expect(testInfo.outputPath('board.png')).toContain('board.png');
+});
+
+// Visual artifacts for the crossed + armed board states (the [V] grid-state coverage). Kept as
+// smoke artifacts rather than pixel-diff baselines, which flake across Mac↔Linux until CI pins a
+// matched runner; the structural assertions live in the RuneGrid component suite.
+test('crossed + armed state screenshots', async ({ page }, testInfo) => {
+	await page.goto('/');
+	await expect(page.locator('.rune-card-wrapper').last()).toHaveCSS('opacity', '1');
+
+	// Crossed state: dim a card in place and capture the chalk X.
+	await page.getByRole('button', { name: /cross off sowilo/i }).click();
+	await expect(page.locator('.rune-card[data-rune-name="Sowilo"].crossed')).toBeVisible();
+	await page.screenshot({ path: testInfo.outputPath('board-crossed.png'), fullPage: true });
+
+	// Armed state: arm the cast and select a target so the gold halo shows.
+	await page.getByRole('button', { name: 'Cast the rune' }).click();
+	await page.getByRole('button', { name: /select dagaz as cast target/i }).click();
+	await expect(page.locator('.rune-card[data-rune-name="Dagaz"].selected')).toBeVisible();
+	await page.screenshot({ path: testInfo.outputPath('board-armed.png'), fullPage: true });
+
+	expect(testInfo.outputPath('board-armed.png')).toContain('board-armed.png');
 });

@@ -17,7 +17,8 @@ import { runes } from '$lib/board';
 
 const SEED = 1;
 const SID = 'route-session';
-const HUMAN_TURN = { activePlayer: 'Human', status: 'active', winner: null };
+// turns: 0 — the actions this const checks (CrossOff/React) never consume a turn.
+const HUMAN_TURN = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
 
 function call(body: string | object) {
 	return callAs(SID, body);
@@ -67,22 +68,22 @@ describe('POST /api/action', () => {
 			await call({ type: 'Ask', player: 'Human', question: 'is it light?' })
 		).json();
 		// The engine handed the turn to Sköll; the pre-Sköll shim hands it straight back, so
-		// the client sees its own turn again — round still active.
-		expect(data.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null });
+		// the client sees its own turn again — round still active. The resolved Ask spent one turn.
+		expect(data.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null, turns: 1 });
 	});
 
 	it('reports the resolved round in the state after a winning cast', async () => {
 		const data = await (
 			await call({ type: 'Cast', player: 'Human', runeName: selectSecret(SEED).name })
 		).json();
-		expect(data.state).toEqual({ activePlayer: 'Human', status: 'won', winner: 'Human' });
+		expect(data.state).toEqual({ activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 });
 	});
 
 	it('keeps the human on the clock after a wrong cast — round continues', async () => {
 		const wrong = runes.find((r) => r.name !== selectSecret(SEED).name)!.name;
 		const data = await (await call({ type: 'Cast', player: 'Human', runeName: wrong })).json();
 		expect(data).toMatchObject({ type: 'Cast', cast: { ok: true, won: false } });
-		expect(data.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null });
+		expect(data.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null, turns: 1 });
 	});
 
 	it('routes a CrossOff without asking the engine to referee it', async () => {
