@@ -4,9 +4,10 @@ import { dev } from '$app/environment';
 import { GameEngine, selectSecret } from './engine';
 
 // LRU-capped so abandoned rounds can't grow memory without bound. Map keeps insertion
-// order, so the first key is the least-recently-used; every access re-inserts to the end,
-// which means an active game is never the eviction victim. 1000 is far above any plausible
-// concurrent jam load while staying trivially small in memory.
+// order, so the first key is the least-recently-used; every access re-inserts to the end.
+// Eviction is by access recency, not engine status — a game in active play is touched each
+// move so it stays warm, but a round nobody touches can still be evicted. 1000 is far above
+// any plausible concurrent jam load while staying trivially small in memory.
 export const MAX_SESSIONS = 1000;
 const engines = new Map<string, GameEngine>();
 

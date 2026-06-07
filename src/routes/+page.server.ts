@@ -9,7 +9,8 @@ import type { PageServerLoad } from './$types';
 // one order.
 export const load: PageServerLoad = ({ locals }) => {
 	// Lazily ensure the session's engine — a refresh resumes the same round, it does NOT
-	// reseed. The secret lives as long as the session; a new round comes from a new session.
+	// reseed. The secret lives as long as the session; a fresh round comes from POST
+	// /api/new-game or a brand-new session (first visit / cleared cookie).
 	getEngine(locals.sessionId);
 	// Web Crypto rather than Math.random — harmless for a display seed and keeps a single
 	// secure RNG path (and clears the Sonar weak-PRNG hotspot). Returns a uint32, which
