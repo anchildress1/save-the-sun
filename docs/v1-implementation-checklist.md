@@ -198,6 +198,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Every result logged tagged **deterministic-engine** vs **LLM-inference**
 - [ ] Any turn the deterministic floor fired is flagged
 - [ ] Engine truth shown beside Gemini's reasoning — the demo contrast holds
+- [ ] Surface Gemini's **reasoning output for Sköll's move** when available — the chain of deduction that led to his Ask/Cast — so the debug view shows *how* he reached the guess, not just the chosen tool call. (Needs the move seam to capture the model's reasoning/thinking trace; if the API returns none, show the earned-only payload it reasoned from as the fallback.)
 
 **Tests to land:** [I] result tagging, fallback flag, truth-vs-reasoning.
 
