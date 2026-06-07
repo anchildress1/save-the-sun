@@ -100,6 +100,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [A] Color name + element name accompany icons — nothing by color alone
 - [x] [C] Card dims in place when crossed; restore affordance works
 - [x] [C] Header: title, tagline, night-progress, turn pill ("Your move." / "Sköll moves.")
+- [x] [C] Round resolved: header swaps the moon → risen sun on a human win, holds the moon on a Sköll win, with the short resolution tag; the outcome pill flips and the Oracle panel carries the full resolution line
 - [ ] [V] Visual regression snapshots for grid + crossed/armed states _(→ v1.5 with the separate graphics layer; v1 captures state screenshots as e2e artifacts only — no pixel-diff baselines)_
 
 ## 7. Accessibility (v1; screen reader = v1.5)
