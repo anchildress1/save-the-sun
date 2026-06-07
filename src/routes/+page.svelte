@@ -16,7 +16,8 @@
 	const READY = 'Twenty-four runes stand. None ruled out. Ask the Oracle.';
 
 	// Tracks the loaded seed until a new game overrides it. A changed seed remounts RuneGrid
-	// (via {#key}), clearing crossings and the armed target with it.
+	// (via {#key}), discarding its crossings and highlight; the parent's cast arming is
+	// cleared separately by cancelCast().
 	let seedOverride: number | null = $state(null);
 	let boardSeed = $derived(seedOverride ?? data.boardSeed);
 
@@ -92,16 +93,20 @@
 
 	async function newGame() {
 		pending = true;
+		let res: Response | undefined;
 		try {
-			const res = await fetch('/api/new-game', { method: 'POST' });
+			res = await fetch('/api/new-game', { method: 'POST' });
 			if (!res.ok) throw new Error(`New game rejected (${res.status})`);
 			const { boardSeed: seed } = (await res.json()) as { boardSeed: number };
-			seedOverride = seed; // remounts RuneGrid → crossings + armed target clear
+			// A 200 with no usable seed would leave the board un-remounted while the server
+			// reset — treat it as a hard failure, not a silent no-op.
+			if (!Number.isFinite(seed)) throw new Error('New game response missing boardSeed');
+			seedOverride = seed; // remounts RuneGrid → crossings + highlight clear
 			answer = READY;
 			askValue = '';
 			cancelCast();
 		} catch (err) {
-			console.error('[ui] New game failed:', err);
+			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
 			answer = 'The Oracle falls silent. Draw breath and try again.';
 		} finally {
 			pending = false;

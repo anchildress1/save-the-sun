@@ -17,6 +17,11 @@ describe('POST /api/new-game', () => {
 		expect(boardSeed).toBeLessThan(2 ** 32);
 	});
 
+	it('returns only a board seed — no secret-bearing fields', async () => {
+		const body = await (await call('shape-session')).json();
+		expect(Object.keys(body)).toEqual(['boardSeed']);
+	});
+
 	it('resets the session to a fresh active round', async () => {
 		// Win the current round so its status is terminal...
 		resetEngine('reset-session', SEED);
@@ -29,10 +34,20 @@ describe('POST /api/new-game', () => {
 		expect(getEngine('reset-session').activePlayer).toBe('Human');
 	});
 
-	it('resets only the calling session', async () => {
+	it('resets the caller and leaves other sessions untouched', async () => {
+		// A: untouched bystander, parked with a known winning secret.
 		resetEngine('keep-a', SEED);
 		const a = getEngine('keep-a');
-		await call('keep-b'); // new game for B must not touch A
+		// B: a terminal round that the new game must actually reset.
+		resetEngine('keep-b', SEED);
+		getEngine('keep-b').cast('Human', selectSecret(SEED).name);
+		expect(getEngine('keep-b').status).toBe('won');
+
+		await call('keep-b');
+
+		// B was reset...
+		expect(getEngine('keep-b').status).toBe('active');
+		// ...and A is the same instance, still winnable with its secret.
 		expect(getEngine('keep-a')).toBe(a);
 		expect(getEngine('keep-a').cast('Human', selectSecret(SEED).name)).toMatchObject({
 			won: true

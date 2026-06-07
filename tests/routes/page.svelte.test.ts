@@ -177,4 +177,11 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
 	});
+
+	it('treats a 200 with no board seed as a failure, not a silent no-op', async () => {
+		stubFetch(async () => new Response(JSON.stringify({})));
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Begin another night' }).click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+	});
 });
