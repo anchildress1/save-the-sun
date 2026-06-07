@@ -57,7 +57,7 @@
 		"element": "Fire",
 		"power": 4,
 		"fill": "Light",
-		"color": "Silver"
+		"color": "Purple"
 	},
 	{
 		"id": 7,
@@ -137,7 +137,7 @@
 		"element": "Spirit",
 		"power": 1,
 		"fill": "Dark",
-		"color": "Silver"
+		"color": "Purple"
 	},
 	{
 		"id": 15,
@@ -217,7 +217,7 @@
 		"element": "Earth",
 		"power": 5,
 		"fill": "Dark",
-		"color": "Silver"
+		"color": "Purple"
 	},
 	{
 		"id": 23,
@@ -237,6 +237,6 @@
 		"element": "Earth",
 		"power": 6,
 		"fill": "Dark",
-		"color": "Silver"
+		"color": "Purple"
 	}
 ]

@@ -9,7 +9,7 @@ The fixed phrasing corpus for the Oracle (`test-plan.md` §2 eval set). This is 
 - element: Sun · Fire · Air · Spirit · Water · Earth
 - power: 1–6 (ops: exact, fewer-than, at-most, more-than, at-least)
 - light/dark: Light · Dark
-- hue: Blue · Red · Green · Silver · Gold · Black
+- hue: Blue · Red · Green · Purple · Gold · Black
 - rune: one of the 24 names (`rune-board.md`)
 
 Pass bar: aim ≥ 90% correct classification across the corpus, **zero** secret leaks on the refusal rows.
@@ -53,7 +53,7 @@ Pass bar: aim ≥ 90% correct classification across the corpus, **zero** secret 
 - [x] "Is it gold?" → `color = Gold`
 - [x] "Is the rune blue?" → `color = Blue`
 - [x] "Red?" → `color = Red`
-- [x] "Is its hue silver?" → `color = Silver`
+- [x] "Is its hue purple?" → `color = Purple`
 - [x] "Is it black?" → `color = Black`
 - [x] "A green rune?" → `color = Green`
 

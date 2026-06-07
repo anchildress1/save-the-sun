@@ -11,7 +11,7 @@ The runes are the complete Elder Futhark, all 24, in plain spellings.
 | **Element** | Sun, Fire, Air, Water, Earth, Spirit | 4 |
 | **Power** | 1, 2, 3, 4, 5, 6 | 4 |
 | **Fill** | Light ○, Dark ● | 12 |
-| **Color** | Gold, Red, Silver, Green, Blue, Black | 4 |
+| **Color** | Gold, Red, Purple, Green, Blue, Black | 4 |
 
 Power (the count) and fill (light/dark) are each askable on their own turn. Glyph mapping: hollow ○ = Light, solid ● = Dark. Engine/data field names: element, power, fill, color. Player-facing axis names: element, power, light, hue.
 
@@ -24,7 +24,7 @@ Power (the count) and fill (light/dark) are each askable on their own turn. Glyp
 | 3 | Kenaz | ᚲ | torch | Sun | 2 | Light ○ | Green |
 | 4 | Wunjo | ᚹ | joy | Sun | 1 | Light ○ | Red |
 | 5 | Fehu | ᚠ | cattle, wealth | Fire | 3 | Light ○ | Green |
-| 6 | Uruz | ᚢ | aurochs, strength | Fire | 4 | Light ○ | Silver |
+| 6 | Uruz | ᚢ | aurochs, strength | Fire | 4 | Light ○ | Purple |
 | 7 | Thurisaz | ᚦ | thorn, giant | Fire | 4 | Light ○ | Red |
 | 8 | Tiwaz | ᛏ | the god Tyr | Fire | 3 | Light ○ | Blue |
 | 9 | Ansuz | ᚨ | god, breath | Air | 5 | Light ○ | Red |
@@ -32,7 +32,7 @@ Power (the count) and fill (light/dark) are each askable on their own turn. Glyp
 | 11 | Ehwaz | ᛖ | horse | Air | 5 | Light ○ | Blue |
 | 12 | Gebo | ᚷ | gift | Air | 6 | Light ○ | Green |
 | 13 | Perthro | ᛈ | dice-cup, fate | Spirit | 1 | Dark ● | Gold |
-| 14 | Eihwaz | ᛇ | yew tree | Spirit | 1 | Dark ● | Silver |
+| 14 | Eihwaz | ᛇ | yew tree | Spirit | 1 | Dark ● | Purple |
 | 15 | Algiz | ᛉ | elk, protection | Spirit | 2 | Dark ● | Green |
 | 16 | Mannaz | ᛗ | humanity | Spirit | 2 | Dark ● | Black |
 | 17 | Laguz | ᛚ | water, lake | Water | 3 | Dark ● | Black |
@@ -40,9 +40,9 @@ Power (the count) and fill (light/dark) are each askable on their own turn. Glyp
 | 19 | Hagalaz | ᚺ | hail | Water | 4 | Dark ● | Black |
 | 20 | Naudiz | ᚾ | need | Water | 4 | Dark ● | Gold |
 | 21 | Jera | ᛃ | year, harvest | Earth | 5 | Dark ● | Black |
-| 22 | Berkana | ᛒ | birch | Earth | 5 | Dark ● | Silver |
+| 22 | Berkana | ᛒ | birch | Earth | 5 | Dark ● | Purple |
 | 23 | Ingwaz | ᛜ | the god Ing, fertility | Earth | 6 | Dark ● | Gold |
-| 24 | Othala | ᛟ | heritage, estate | Earth | 6 | Dark ● | Silver |
+| 24 | Othala | ᛟ | heritage, estate | Earth | 6 | Dark ● | Purple |
 
 ## Notes
 

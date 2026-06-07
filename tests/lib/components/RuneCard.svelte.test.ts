@@ -11,7 +11,7 @@ const uruz: Rune = {
 	element: 'Fire',
 	power: 4,
 	fill: 'Light',
-	color: 'Silver'
+	color: 'Purple'
 };
 
 // A Dark rune (power 1) to assert the dark-pip marker.
@@ -35,7 +35,7 @@ const othala: Rune = {
 	element: 'Earth',
 	power: 6,
 	fill: 'Dark',
-	color: 'Silver'
+	color: 'Purple'
 };
 
 describe('RuneCard', () => {
@@ -44,7 +44,7 @@ describe('RuneCard', () => {
 		await expect.element(screen.getByText('ᚢ')).toBeInTheDocument();
 		await expect.element(screen.getByText('Uruz')).toBeInTheDocument();
 		await expect.element(screen.getByText('Fire')).toBeInTheDocument();
-		await expect.element(screen.getByText('Silver')).toBeInTheDocument();
+		await expect.element(screen.getByText('Purple')).toBeInTheDocument();
 	});
 
 	it('displays the meaning under the name', async () => {

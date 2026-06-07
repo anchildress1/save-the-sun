@@ -171,8 +171,8 @@
 		line-height: 1;
 	}
 
-	/* Dark rim so every hue's silhouette reads on the light stone — including Silver, which
-	   would otherwise blend into the gray. */
+	/* Dark rim so every hue's silhouette reads on the light stone, including the lighter
+	   gems that would otherwise blend into the gray. */
 	.gem {
 		width: 13px;
 		height: 13px;

@@ -1,17 +1,16 @@
 // Pure trait -> visual mappings for the rune cards. Kept framework-free so the
 // completeness of every axis is unit-testable outside the Svelte component.
 
-export type RuneColor = 'Blue' | 'Red' | 'Green' | 'Silver' | 'Gold' | 'Black';
+export type RuneColor = 'Blue' | 'Red' | 'Green' | 'Purple' | 'Gold' | 'Black';
 export type RuneElement = 'Sun' | 'Fire' | 'Air' | 'Water' | 'Earth' | 'Spirit';
 
-// Jewel tones tuned to read on the midnight-navy ground. Black is a true dark
-// obsidian — kept visible by the orb's white highlight, not lightened toward grey
-// (a near-grey Black was indistinguishable from Silver).
+// Jewel tones tuned to read on the gray stone card (each orb also gets a dark rim
+// in RuneCard). Black is a true dark obsidian, kept visible by the orb's highlight.
 export const GEM_COLOR: Record<RuneColor, string> = {
 	Blue: '#6ea0e0',
 	Red: '#e06b63',
 	Green: '#5cbf8a',
-	Silver: '#c7d0dd',
+	Purple: '#8b5cf6',
 	Gold: '#e6c068',
 	Black: '#2e2c33'
 };
