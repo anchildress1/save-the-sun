@@ -1,7 +1,25 @@
 import { json, error } from '@sveltejs/kit';
-import { handleAction, gameState, type GameAction } from '$lib/server/engine/actions';
-import { getEngine } from '$lib/server/engine/session';
+import {
+	handleAction,
+	gameState,
+	type GameAction,
+	type SkollTurn,
+	type SkollReaction
+} from '$lib/server/engine/actions';
+import { getEngine, getSkoll } from '$lib/server/engine/session';
 import { interpret } from '$lib/server/oracle/gemini';
+import { voiceAnswer } from '$lib/server/oracle/oracle';
+import { resolveReaction } from '$lib/server/engine/reactions';
+import {
+	takeSkollTurn,
+	resolveSkollAsk,
+	type SkollOutcome,
+	type SkollState
+} from '$lib/server/skoll/skoll';
+import { decideSkollMove } from '$lib/server/skoll/gemini';
+import { castLine, tauntAt } from '$lib/server/skoll/taunts';
+import { mulberry32 } from '$lib/prng';
+import type { GameEngine } from '$lib/server/engine/engine';
 import type { RequestHandler } from './$types';
 
 const ACTION_TYPES = new Set(['Ask', 'Cast', 'CrossOff', 'React']);
@@ -35,8 +53,27 @@ function isAction(body: Partial<GameAction>): body is GameAction {
 	}
 }
 
-// Single server entry point for game actions. Both the human UI and (later) the
-// Gemini-driven Sköll route through handleAction — no second path.
+// Same seed + same accumulated state → same fallback move (reproducible for the demo).
+function floorRng(skoll: SkollState): () => number {
+	return mulberry32((skoll.seed + skoll.facts.length) >>> 0);
+}
+
+// Map his resolved turn into the wire DTO the client voices and reacts to.
+function describeTurn(out: SkollOutcome, taunt: string): SkollTurn {
+	return out.kind === 'cast'
+		? {
+				taunt,
+				cast: {
+					line: castLine(out.runeName, out.result.ok && out.result.won),
+					won: out.result.ok && out.result.won
+				}
+			}
+		: { taunt, asks: { echo: out.echo } };
+}
+
+// Single server entry point for game actions. Both the human UI and the Gemini-driven Sköll
+// route through the engine here — no second path. The client's single `pending` flag serializes
+// a session's requests, so one Sköll turn never overlaps the next action.
 export const POST: RequestHandler = async ({ request, locals }) => {
 	let body: Partial<GameAction>;
 	try {
@@ -53,17 +90,41 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		error(400, 'Malformed action payload.');
 	}
 
-	// One session's engine is shared mutable state. Today the client's single `pending` flag
-	// serializes a session's turns; when Sköll moves async (S6) this needs per-session
-	// single-flight so a concurrent action (or /api/new-game) can't interleave mid-Ask.
 	const engine = getEngine(locals.sessionId);
+	const skoll = getSkoll(locals.sessionId);
+
+	// The human reacting to Sköll's open Ask: resolve the reaction, then close his Ask (Hex kills
+	// it before any answer; Pass/Scry answers it, Scry shares it back). This is a distinct path
+	// because it completes a turn Sköll already opened, rather than starting a fresh action.
+	if (body.type === 'React' && skoll.pendingAsk !== null && engine.reactionWindow === 'Sköll') {
+		const askedQuery = skoll.pendingAsk;
+		const reaction = resolveReaction(engine, 'Human', body.reaction);
+		const answer = resolveSkollAsk(engine, skoll, reaction);
+		const skollReaction: SkollReaction = answer.hexed
+			? { hexed: true }
+			: {
+					hexed: false,
+					...(answer.shared && { scried: { answer: voiceAnswer(askedQuery, answer.affirmative) } })
+				};
+		return json({ type: 'React', outcome: reaction, skollReaction, state: gameState(engine) });
+	}
+
 	const result = await handleAction(body, { engine, interpret });
 
-	// Pre-Sköll shim (S6): the opponent has no mover yet, so skip his turn and hand
-	// play straight back to the human. Remove once the Gemini opponent is wired.
-	if (engine.status === 'active' && engine.activePlayer === 'Sköll') engine.passTurn();
+	// The human's action handed the turn to Sköll → the wolf plays through the same interface.
+	// He casts (the round may end) or opens his own reaction window (the client then prompts).
+	const skollTurn = await playSkollIfActive(engine, skoll);
 
-	// Snapshot AFTER the shim so the client sees the turn it actually has. In S6 the shim
-	// is gone and this same snapshot reports Sköll's turn, lighting up the disabled UI.
-	return json({ ...result, state: gameState(engine) });
+	return json({ ...result, ...(skollTurn && { skoll: skollTurn }), state: gameState(engine) });
 };
+
+async function playSkollIfActive(
+	engine: GameEngine,
+	skoll: SkollState
+): Promise<SkollTurn | undefined> {
+	if (engine.status !== 'active' || engine.activePlayer !== 'Sköll') return undefined;
+	const out = await takeSkollTurn(engine, skoll, decideSkollMove, floorRng(skoll));
+	const turn = describeTurn(out, tauntAt(skoll.tauntIndex));
+	skoll.tauntIndex += 1;
+	return turn;
+}

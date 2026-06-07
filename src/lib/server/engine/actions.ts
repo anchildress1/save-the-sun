@@ -59,6 +59,23 @@ export interface GameState {
 	turns: number;
 }
 
+/**
+ * What Sköll did on his turn, attached to the response after the human's action (S6). He either
+ * casts (round may end) or opens a reaction window with his Ask — `asks` present means the client
+ * must show the interrupt prompt; his answer is produced only once the human reacts.
+ */
+export interface SkollTurn {
+	taunt: string;
+	asks?: { echo: string };
+	cast?: { line: string; won: boolean };
+}
+
+/** How Sköll's parked Ask resolved after the human reacted (S6). A Hex kills it; a Scry shares it. */
+export interface SkollReaction {
+	hexed: boolean;
+	scried?: { answer: string };
+}
+
 /** Read the engine's public turn state into a wire DTO. */
 export function gameState(engine: GameEngine): GameState {
 	return {
