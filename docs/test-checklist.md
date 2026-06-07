@@ -95,12 +95,12 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 6. UI / graphics presentation
 
-- [ ] [V] Rune grid renders as high-fidelity DOM components orchestrated by GSAP; 24 cards 6×4
-- [ ] [C] Each card shows glyph, swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken in the accessible name as "{n} light/dark power", never as visible text)
-- [ ] [A] Color name + element name accompany icons — nothing by color alone
-- [ ] [C] Card dims in place when crossed; restore affordance works
-- [ ] [C] Header: title, tagline, night-progress, turn pill ("Your move." / "Sköll moves.")
-- [ ] [V] Visual regression snapshots for grid + crossed/armed states
+- [x] [V] Rune grid renders as DOM components orchestrated by GSAP; 24 cards 6×4 _(functional 6×4 render is [C]-covered in `RuneGrid.svelte.test` + [E] in `board.e2e`; high-fidelity art assets + visual-regression baselines split to v1.5)_
+- [x] [C] Each card shows glyph, swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken in the accessible name as "{n} light/dark power", never as visible text)
+- [x] [A] Color name + element name accompany icons — nothing by color alone
+- [x] [C] Card dims in place when crossed; restore affordance works
+- [x] [C] Header: title, tagline, night-progress, turn pill ("Your move." / "Sköll moves.")
+- [ ] [V] Visual regression snapshots for grid + crossed/armed states _(→ v1.5 with the separate graphics layer; v1 captures state screenshots as e2e artifacts only — no pixel-diff baselines)_
 
 ## 7. Accessibility (v1; screen reader = v1.5)
 
@@ -151,8 +151,8 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] **Action interface** — line **90%** / branch **85%**
 - [x] **Oracle pipeline** — line **90%** / branch **85%**
 - [ ] **Reactions** — line **95%** / branch **90%**
-- [ ] **UI / interaction** — line **80%** / branch **70%**
-- [ ] **Graphics render layer** — line **60%** (smoke + visual carry it)
+- [x] **UI / interaction** — line **80%** / branch **70%**
+- [ ] **Graphics render layer** — line **60%** _(→ v1.5: graphics is a separate layer; not a v1 gate. Functional render is covered under the components gate at 80/70)_
 - [x] **Project overall** — line **85%** / branch **80%**
 
 ## Enforced non-coverage gates (CI)
