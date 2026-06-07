@@ -1,10 +1,13 @@
-// Reaction resolution (S5) — the rules of Scry & Hex over a rival's Ask.
+// Reaction resolution (S5) — the rules of Scry & Hex over a rival's *pending* Ask.
 //
 // The engine owns the state (charges + the open window, tied to the round lifecycle); this
-// owns the policy. Both reactions trigger on an Ask only — a Cast leaves no window, so it can
-// never be interrupted (the win check is sacred). At most one reaction resolves per window:
-// the engine closes the window on the first one, so once Hex silences a question there is no
-// answer left for Scry to overhear.
+// owns the policy. The window is opened around a pending Ask, before it is answered, so a
+// reaction resolves *first*: Hex (killAnswer) means the orchestration never asks for the answer
+// — the question dies before it is produced, not after it has been handed back. Scry (shareAnswer)
+// means the orchestration, after resolving the Ask, hands the same answer to the reactor too.
+// Both trigger on an Ask only — a Cast leaves no window, so it can never be interrupted (the win
+// check is sacred). At most one reaction resolves per window: the engine closes it on the first,
+// so once Hex silences a question there is no answer left for Scry to overhear.
 
 import type { GameEngine, Reaction } from './engine';
 import type { Player } from './actions';
@@ -12,9 +15,9 @@ import type { Player } from './actions';
 export type ReactionChoice = Reaction | 'Pass';
 
 export type ReactionOutcome =
-	| { ok: true; choice: 'Scry'; shareAnswer: true } // the reactor overhears the rival's answer
-	| { ok: true; choice: 'Hex'; killAnswer: true } // the question dies; no answer to anyone
-	| { ok: true; choice: 'Pass' } // the rival keeps their answer; nothing spent
+	| { ok: true; choice: 'Scry'; shareAnswer: true } // resolve the Ask, hand the answer to the reactor too
+	| { ok: true; choice: 'Hex'; killAnswer: true } // don't ask — the question dies before any answer
+	| { ok: true; choice: 'Pass' } // resolve the Ask normally; nothing spent
 	| { ok: false; reason: 'no-window' | 'no-charge' };
 
 /**
@@ -27,7 +30,7 @@ export function resolveReaction(
 	reactor: Player,
 	choice: ReactionChoice
 ): ReactionOutcome {
-	// A window opens only on an Ask, and you react to the *rival's* Ask, never your own.
+	// The window names the rival's pending Ask; you react to the *rival's* Ask, never your own.
 	const asker = engine.reactionWindow;
 
 	if (choice === 'Pass') {

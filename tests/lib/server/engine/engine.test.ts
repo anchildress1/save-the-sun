@@ -316,29 +316,29 @@ describe('GameEngine — reaction charges & interrupt window (S5)', () => {
 		expect(engine.reactionWindow).toBeNull();
 	});
 
-	it('opens a window owned by the asker on a resolved Ask', () => {
+	it('opens a window named for the asker of a pending Ask', () => {
 		const engine = new GameEngine(7);
-		engine.ask('Human', LIGHT);
+		engine.openReactionWindow('Human');
 		expect(engine.reactionWindow).toBe('Human');
+	});
+
+	it('does not open a window from `ask` itself — the window precedes the answer', () => {
+		const engine = new GameEngine(7);
+		engine.ask('Human', LIGHT); // resolving an Ask never opens a window on its own
+		expect(engine.reactionWindow).toBeNull();
 	});
 
 	it('leaves no window open after a resolved Cast — casts are sacred', () => {
 		const seed = 7;
 		const engine = new GameEngine(seed);
-		engine.ask('Human', LIGHT); // opens a window
-		engine.cast('Sköll', otherRune(selectSecret(seed)).name); // wrong cast resolves, closes it
-		expect(engine.reactionWindow).toBeNull();
-	});
-
-	it('does not open a window on a refused Ask', () => {
-		const engine = new GameEngine(7);
-		engine.ask('Sköll', LIGHT); // out of turn — refused
+		engine.openReactionWindow('Human'); // a pending Ask
+		engine.cast('Human', otherRune(selectSecret(seed)).name); // a resolved Cast closes any window
 		expect(engine.reactionWindow).toBeNull();
 	});
 
 	it('spends a reaction and closes the window when consumed', () => {
 		const engine = new GameEngine(7);
-		engine.ask('Human', LIGHT);
+		engine.openReactionWindow('Human');
 		engine.consumeReaction('Sköll', 'Scry');
 		expect(engine.reactionAvailable('Sköll', 'Scry')).toBe(false);
 		expect(engine.reactionAvailable('Sköll', 'Hex')).toBe(true);
@@ -347,7 +347,7 @@ describe('GameEngine — reaction charges & interrupt window (S5)', () => {
 
 	it('closes the window without spending when declined', () => {
 		const engine = new GameEngine(7);
-		engine.ask('Human', LIGHT);
+		engine.openReactionWindow('Human');
 		engine.declineReaction();
 		expect(engine.reactionWindow).toBeNull();
 		expect(engine.reactionAvailable('Sköll', 'Scry')).toBe(true);
@@ -355,7 +355,7 @@ describe('GameEngine — reaction charges & interrupt window (S5)', () => {
 
 	it('restores both reactions and clears the window on a new round', () => {
 		const engine = new GameEngine(7);
-		engine.ask('Human', LIGHT);
+		engine.openReactionWindow('Human');
 		engine.consumeReaction('Sköll', 'Hex');
 		engine.newRound(8);
 		expect(engine.reactionAvailable('Sköll', 'Hex')).toBe(true);

@@ -89,7 +89,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [I] Offered on an Ask's window; **never** on a Cast _(cast-sacredness structural — a Cast leaves no window; the rival's-Ask echo surface lights up in S6)_
 - [x] [I] At most one reaction per interrupt window; Hex leaves no answer for Scry
 - [x] [I] Scry → rival also receives private answer
-- [x] [I] Hex → question dies, no answer to anyone, active turn spent
+- [x] [I] Hex → question dies, no answer to anyone _(kill + no-answer tested in S5; the asker's turn-spend on a hexed Ask lands with S6's hexed-Ask orchestration — the window now precedes the answer, so the Ask is never resolved on a Hex)_
 - [x] [C] Human prompt "Sköll asks. Answer it?" → Scry / Hex / Let it pass per `ux-copy.md`
 - [ ] [I] Sköll's reaction is refereed Gemini response with deterministic-floor fallback _(S6 — Sköll's live Ask/reaction)_
 

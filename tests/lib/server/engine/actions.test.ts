@@ -41,8 +41,8 @@ describe('Shared Action Interface — the single routing point', () => {
 
 	it('resolves a rival Scry over an open Ask window', async () => {
 		const d = deps();
-		// The Human Asks, opening a window the wolf may react to.
-		await handleAction({ type: 'Ask', player: 'Human', question: 'is it light?' }, d);
+		// A window is open on the Human's pending Ask (S6 opens this when Sköll Asks); the rival reacts.
+		d.engine.openReactionWindow('Human');
 		const res = await handleAction({ type: 'React', player: 'Sköll', reaction: 'Scry' }, d);
 		expect(res).toEqual({
 			type: 'React',
@@ -52,7 +52,7 @@ describe('Shared Action Interface — the single routing point', () => {
 
 	it('resolves a rival Hex over an open Ask window', async () => {
 		const d = deps();
-		await handleAction({ type: 'Ask', player: 'Human', question: 'is it light?' }, d);
+		d.engine.openReactionWindow('Human');
 		const res = await handleAction({ type: 'React', player: 'Sköll', reaction: 'Hex' }, d);
 		expect(res).toEqual({ type: 'React', outcome: { ok: true, choice: 'Hex', killAnswer: true } });
 	});

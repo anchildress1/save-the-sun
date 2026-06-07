@@ -37,9 +37,11 @@ interface Round {
 	turns: number;
 	// One Scry + one Hex per player, spent permanently within the round (S5).
 	reactions: Record<Player, Record<Reaction, boolean>>;
-	// The open reaction window: the asker whose just-resolved Ask the rival may react to, or
-	// null when none is open. Only an Ask opens it; a resolved Cast closes it (casts are sacred,
-	// never interruptible); a reaction (or a decline) closes it — at most one reaction per window.
+	// The open reaction window: the asker whose *pending* Ask the rival may react to before it is
+	// answered, or null when none is open. It is opened around a pending Ask (openReactionWindow),
+	// NOT as a side effect of a resolved one — so a Hex lands before any answer is produced, never
+	// after. A resolved Cast closes it (casts are sacred, never interruptible); a reaction or a
+	// decline closes it — at most one reaction per window.
 	window: Player | null;
 }
 
@@ -124,7 +126,6 @@ export class GameEngine {
 
 		const answer = resolveQuery(this.#round.secret, query);
 		this.#round.turns += 1;
-		this.#round.window = player; // the rival may now Scry/Hex this Ask (S5)
 		this.#advance();
 		return { ok: true, answer, turnConsumed: true };
 	}
@@ -155,6 +156,17 @@ export class GameEngine {
 		this.#round.wrongCasts[player] += 1;
 		this.#advance();
 		return { ok: true, won: false, turnConsumed: true };
+	}
+
+	/**
+	 * Open a reaction window around a *pending* Ask — the rival may Scry/Hex it before it is
+	 * answered. Opened by the orchestration when a player declares an Ask (the S6 seam where
+	 * Sköll Asks and the human reacts), not by `ask` itself, so a Hex resolves before any answer
+	 * is produced. On Hex the answer is never asked for; on Pass/Scry the orchestration resolves
+	 * the Ask after the window closes.
+	 */
+	openReactionWindow(asker: Player): void {
+		this.#round.window = asker;
 	}
 
 	/** Whether a player still holds a given reaction this round. */
