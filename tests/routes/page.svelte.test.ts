@@ -313,6 +313,137 @@ describe('Save the Sun page', () => {
 			.toBeInTheDocument();
 	});
 
+	// --- S6: Sköll's surfaced turn + the human's reactions ---
+
+	// A fetch stub that answers an Ask with a Sköll turn, then resolves the human's React.
+	function skollFlow(skoll: object, askState: GameState, reaction: object, reactState: GameState) {
+		return stubFetch(async (_url: string, init?: { body?: string }) => {
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (body.type === 'React')
+				return new Response(
+					JSON.stringify({
+						type: 'React',
+						outcome: { ok: true },
+						skollReaction: reaction,
+						state: reactState
+					})
+				);
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'No. Sól is not reaching for a fire rune.',
+						turnConsumed: true
+					},
+					skoll,
+					state: askState
+				})
+			);
+		});
+	}
+
+	const askThenSkollAsks = (echo = 'Sköll asks after a gold rune.') =>
+		skollFlow(
+			{ taunt: 'You circle. I close.', asks: { echo } },
+			SKOLL_TURN,
+			{ hexed: false },
+			HUMAN_TURN
+		);
+
+	async function humanAsks(screen: ReturnType<typeof render>) {
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+	}
+
+	it("voices Sköll's cast on his turn", async () => {
+		respond({
+			type: 'Ask',
+			oracle: { ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+			skoll: { taunt: 'You circle. I close.', cast: { line: 'I name it. Dagaz.', won: false } },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
+	});
+
+	it('prompts the human to react when Sköll Asks', async () => {
+		askThenSkollAsks();
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await expect
+			.element(screen.getByTestId('skoll-echo'))
+			.toHaveTextContent('Sköll asks after a gold rune.');
+		await expect
+			.element(screen.getByTestId('reaction-prompt'))
+			.toHaveTextContent('Sköll asks. Answer it?');
+		await expect.element(screen.getByRole('button', { name: 'Let it pass' })).toBeInTheDocument();
+	});
+
+	it('lets the human let Sköll Ask pass', async () => {
+		askThenSkollAsks();
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Let it pass' }).click();
+		await expect
+			.element(screen.getByTestId('skoll-voice'))
+			.toHaveTextContent('You hold your hand. Let him have his answer.');
+		// Prompt gone, the static reactions row is back.
+		expect(screen.container.querySelector('[data-testid="reaction-prompt"]')).toBeNull();
+	});
+
+	it('shares the answer when the human Scries Sköll Ask', async () => {
+		skollFlow(
+			{ taunt: 'You circle. I close.', asks: { echo: 'Sköll asks after a gold rune.' } },
+			SKOLL_TURN,
+			{ hexed: false, scried: { answer: 'Yes. Sól is reaching for a gold rune.' } },
+			HUMAN_TURN
+		);
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Scry' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Yes. Sól is reaching for a gold rune.');
+		await expect
+			.element(screen.getByTestId('skoll-voice'))
+			.toHaveTextContent('You lean into the dark and listen.');
+	});
+
+	it('kills the question when the human Hexes Sköll Ask', async () => {
+		skollFlow(
+			{ taunt: 'You circle. I close.', asks: { echo: 'Sköll asks after a gold rune.' } },
+			SKOLL_TURN,
+			{ hexed: true },
+			HUMAN_TURN
+		);
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Hex' }).click();
+		await expect
+			.element(screen.getByTestId('skoll-voice'))
+			.toHaveTextContent('His question dies unanswered');
+	});
+
+	it('falls to defeat when Sköll casts true on his turn', async () => {
+		respond({
+			type: 'Ask',
+			oracle: { ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+			skoll: { taunt: 'You circle. I close.', cast: { line: 'The hunt ends. Dagaz.', won: true } },
+			state: SKOLL_WON
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await expect
+			.element(screen.getByTestId('skoll-voice'))
+			.toHaveTextContent('The hunt ends. Dagaz.');
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Sköll takes the sun. The longest day never breaks.');
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll takes the sun.');
+	});
+
 	it('resolves the round on a correct cast — Ask + Cast lock until a new night', async () => {
 		castResult({ ok: true, won: true, rune: { name: 'Sowilo' }, turnConsumed: true }, HUMAN_WON);
 		const screen = render(Page, pageProps);
