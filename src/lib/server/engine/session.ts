@@ -24,6 +24,12 @@ function create(sessionId: string, seed: number): GameEngine {
 	return new GameEngine(seed);
 }
 
+// A falsy sessionId would key every caller to one shared engine — the isolation breach this
+// registry exists to prevent. Fail loud rather than poison the Map.
+function requireId(sessionId: string): void {
+	if (!sessionId) throw new Error('session registry called without a sessionId');
+}
+
 // Mark a session most-recently-used (re-insert at the end) and evict the LRU if over cap.
 function remember(sessionId: string, engine: GameEngine): GameEngine {
 	engines.delete(sessionId);
@@ -32,18 +38,22 @@ function remember(sessionId: string, engine: GameEngine): GameEngine {
 		// size > cap ⇒ the registry is non-empty, so the first key always exists.
 		const [lru] = engines.keys();
 		engines.delete(lru);
+		// Rare, but the resulting fresh-secret-on-next-access desync is otherwise invisible.
+		console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
 	}
 	return engine;
 }
 
 /** The session's engine, lazily created and memoized on first use. */
 export function getEngine(sessionId: string): GameEngine {
+	requireId(sessionId);
 	const existing = engines.get(sessionId);
 	return remember(sessionId, existing ?? create(sessionId, randomSeed()));
 }
 
 /** Start a fresh round for one session; pass a seed for a deterministic secret. */
 export function resetEngine(sessionId: string, seed?: number): GameEngine {
+	requireId(sessionId);
 	return remember(sessionId, create(sessionId, seed ?? randomSeed()));
 }
 

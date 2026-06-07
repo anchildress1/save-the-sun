@@ -46,6 +46,11 @@ describe('session engine registry', () => {
 		expect(after.activePlayer).toBe('Human');
 	});
 
+	it('throws if called without a sessionId', () => {
+		expect(() => getEngine('')).toThrow(/sessionId/);
+		expect(() => resetEngine('')).toThrow(/sessionId/);
+	});
+
 	it('never grows past the session cap', () => {
 		for (let i = 0; i <= MAX_SESSIONS + 10; i++) getEngine(`cap-${i}`);
 		expect(sessionCount()).toBe(MAX_SESSIONS);

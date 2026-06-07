@@ -53,6 +53,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		error(400, 'Malformed action payload.');
 	}
 
+	// One session's engine is shared mutable state. Today the client's single `pending` flag
+	// serializes a session's turns; when Sköll moves async (S6) this needs per-session
+	// single-flight so a concurrent action (or /api/new-game) can't interleave mid-Ask.
 	const engine = getEngine(locals.sessionId);
 	const result = await handleAction(body, { engine, interpret });
 
