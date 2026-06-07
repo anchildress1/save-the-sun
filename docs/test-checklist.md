@@ -11,7 +11,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [U] All 24 Elder Futhark runes load
 - [x] [U] Every rune is a unique (element, power, color) combination
 - [x] [U] Trait counts match `rune-board.md` (element 4 each · power 4 each · fill 12/12 · color 4 each)
-- [x] [U] Exactly one secret rune per round; refresh/new round reseeds
+- [x] [U] Exactly one secret rune per round; a new round reseeds (a refresh resumes the same round — see S2.5)
 - [x] [U] Element / power / fill / hue queries resolve truthfully (table-driven, all 24 × all axes)
 - [x] [U] Power ranges correct at boundaries — "fewer than N", "at least N", "N or more", exact (1 and 6 inclusive)
 - [x] [U] Single-rune query eliminates exactly that rune; yes only for the secret

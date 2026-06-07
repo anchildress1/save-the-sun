@@ -26,7 +26,7 @@ Covers R1, R3, R4, R12 truth resolution, and the Architecture contract. Pure, de
 | Area | Test type | What to test |
 |---|---|---|
 | Board integrity | Unit | All 24 Elder Futhark runes load; every rune is a unique (element, power, color) combination; trait counts match `rune-board.md` (element 4 each, power 4 each, fill 12/12, color 4 each). |
-| Secret selection | Unit | Exactly one secret rune per round; secret is drawn from the 24; refresh/new round reseeds. |
+| Secret selection | Unit | Exactly one secret rune per round; secret is drawn from the 24; a new round reseeds (a refresh resumes the same round — see S2.5). |
 | Trait resolution — truth | Unit (table-driven, all 24 × all axes) | Element, power, fill, hue queries each resolve truthfully against the known secret. |
 | Power ranges | Unit | "fewer than N", "at least N", "N or more", exact N resolve correctly at boundaries (1 and 6 inclusive). |
 | Single-rune query | Unit | "is it Sowilo?" eliminates exactly that one; correct yes only for the secret. |

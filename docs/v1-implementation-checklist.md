@@ -30,7 +30,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 - [x] Load all 24 Elder Futhark runes; assert every rune is a unique (element, power, color) combo
 - [x] Trait counts enforced: element 4 each · power 4 each · fill 12/12 · color 4 each
-- [x] Secret selection: exactly one secret rune per round; refresh/new round reseeds
+- [x] Secret selection: exactly one secret rune per round; a new round reseeds (a refresh resumes the same round — see S2.5)
 - [x] Truthful trait resolution for all axes — element, power, fill (light/dark), hue
 - [x] Power ranges: "fewer than N", "at least N", "N or more", exact N — correct at boundaries (1 and 6 inclusive)
 - [x] Single-rune query eliminates exactly that rune; yes only for the secret
