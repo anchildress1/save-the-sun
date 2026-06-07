@@ -1,7 +1,7 @@
 <script lang="ts">
 	import RuneGrid from '$lib/components/RuneGrid.svelte';
 	import { runes } from '$lib/board';
-	import type { GameAction, ActionResult } from '$lib/server/engine/actions';
+	import type { GameAction, ActionResponse, GameState, Player } from '$lib/server/engine/actions';
 	import type { PageProps } from './$types';
 
 	// data (incl. boardSeed) comes from +page.server.ts. No default — a missing load
@@ -12,6 +12,26 @@
 	let selectedTargetId: number | null = $state(null);
 	let askValue = $state('');
 	let pending = $state(false);
+
+	// Turn state mirrors the engine, fed by each action response. Human-first, round active
+	// until a correct Cast. The server's pre-Sköll shim hands play back to the human in v1, so
+	// activePlayer reads 'Human' here today; the 'Sköll' branch goes live when S6 lands.
+	let activePlayer = $state<Player>('Human');
+	let roundStatus = $state<'active' | 'won'>('active');
+	let roundOver = $derived(roundStatus === 'won');
+	// Ask and Cast are turn-gated; cross-off is a private aid and is never gated (RuneGrid owns
+	// it and stays enabled through Sköll's turn — game-spec "private aid").
+	let canAct = $derived(activePlayer === 'Human' && !roundOver);
+	// Won rounds read as resolved, not as a phantom turn. Defeat (Sköll's win) arrives with the
+	// opponent in S6; in v1 only the human can win, so a resolved round is always the true rune.
+	let turnPill = $derived(
+		roundOver ? 'The rune is true.' : activePlayer === 'Human' ? 'Your move.' : 'Sköll moves.'
+	);
+
+	function applyState(state: GameState) {
+		activePlayer = state.activePlayer;
+		roundStatus = state.status;
+	}
 
 	const READY = 'Twenty-four runes stand. None ruled out. Ask the Oracle.';
 
@@ -33,16 +53,16 @@
 
 	// Return type is derived from the action's `type`, so a caller can't request a
 	// mismatched result shape.
-	async function dispatch<T extends ActionResult['type']>(
+	async function dispatch<T extends GameAction['type']>(
 		action: Extract<GameAction, { type: T }>
-	): Promise<Extract<ActionResult, { type: T }>> {
+	): Promise<ActionResponse<T>> {
 		const res = await fetch('/api/action', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(action)
 		});
 		if (!res.ok) throw new Error(`Action rejected (${res.status})`);
-		return res.json() as Promise<Extract<ActionResult, { type: T }>>;
+		return res.json() as Promise<ActionResponse<T>>;
 	}
 
 	async function submitAsk() {
@@ -54,7 +74,8 @@
 		}
 		pending = true;
 		try {
-			const { oracle } = await dispatch({ type: 'Ask', player: 'Human', question });
+			const { oracle, state } = await dispatch({ type: 'Ask', player: 'Human', question });
+			applyState(state);
 			if (oracle.ok) {
 				answer = oracle.answer;
 				askValue = '';
@@ -104,6 +125,9 @@
 			seedOverride = seed; // remounts RuneGrid → crossings + highlight clear
 			answer = READY;
 			askValue = '';
+			// Fresh round: human-first, active again.
+			activePlayer = 'Human';
+			roundStatus = 'active';
 			cancelCast();
 		} catch (err) {
 			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
@@ -117,11 +141,12 @@
 		if (selectedRune === null) return;
 		pending = true;
 		try {
-			const { cast } = await dispatch({
+			const { cast, state } = await dispatch({
 				type: 'Cast',
 				player: 'Human',
 				runeName: selectedRune.name
 			});
+			applyState(state);
 			if (cast.ok) {
 				answer = cast.won ? 'The rune is true.' : 'The rune is not the one. The night holds.';
 			} else {
@@ -180,7 +205,7 @@
 			<button class="ghost new-game" type="button" onclick={newGame} disabled={pending}>
 				Begin another night
 			</button>
-			<div class="turn-pill">Your move.</div>
+			<div class="turn-pill" class:won={roundOver} data-testid="turn-pill">{turnPill}</div>
 		</div>
 	</header>
 
@@ -226,9 +251,11 @@
 					type="text"
 					placeholder="Type your question…"
 					bind:value={askValue}
-					disabled={castMode || pending}
+					disabled={castMode || pending || !canAct}
 				/>
-				<button class="primary" type="submit" disabled={castMode || pending}>Ask the Oracle</button>
+				<button class="primary" type="submit" disabled={castMode || pending || !canAct}>
+					Ask the Oracle
+				</button>
 			</form>
 
 			<div class="cast">
@@ -249,7 +276,12 @@
 						<button class="ghost" type="button" onclick={cancelCast}>Not yet</button>
 					</div>
 				{:else}
-					<button class="primary cast-arm" type="button" onclick={armCast} disabled={pending}>
+					<button
+						class="primary cast-arm"
+						type="button"
+						onclick={armCast}
+						disabled={pending || !canAct}
+					>
 						Cast the rune
 					</button>
 				{/if}
@@ -338,6 +370,14 @@
 		border-radius: 999px;
 		padding: 0.45rem 1.1rem;
 		font-size: 0.85rem;
+	}
+
+	/* Resolved round: the pill stops reading as a turn and lights up as the victory state. */
+	.turn-pill.won {
+		color: var(--bg-deep);
+		background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+		border-color: var(--gold-bright);
+		box-shadow: 0 0 18px rgba(217, 169, 74, 0.4);
 	}
 
 	.explainer {

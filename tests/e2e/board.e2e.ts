@@ -30,7 +30,8 @@ test('arms a cast, names a rune, and routes it through the action interface', as
 		route.fulfill({
 			json: {
 				type: 'Cast',
-				cast: { ok: true, won: true, rune: { name: 'Sowilo' }, turnConsumed: true }
+				cast: { ok: true, won: true, rune: { name: 'Sowilo' }, turnConsumed: true },
+				state: { activePlayer: 'Human', status: 'won', winner: 'Human' }
 			}
 		})
 	);
@@ -39,7 +40,35 @@ test('arms a cast, names a rune, and routes it through the action interface', as
 	await expect(page.getByTestId('cast-hint')).toHaveText('Cast Sowilo?');
 	await page.getByRole('button', { name: 'Name it' }).click();
 	await expect(page.getByTestId('answer')).toHaveText('The rune is true.');
-	await expect(page.getByRole('button', { name: 'Cast the rune' })).toBeVisible();
+	// Round resolves: the pill flips to the victory state and casting is locked.
+	await expect(page.getByTestId('turn-pill')).toHaveText('The rune is true.');
+	await expect(page.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
+});
+
+test('a wrong cast costs the turn only — crossings and round survive', async ({ page }) => {
+	await page.goto('/');
+	await page.route('**/api/action', (route) =>
+		route.fulfill({
+			json: {
+				type: 'Cast',
+				cast: { ok: true, won: false, turnConsumed: true },
+				state: { activePlayer: 'Human', status: 'active', winner: null }
+			}
+		})
+	);
+	// Cross a rune off first — its crossing must survive the wrong cast.
+	await page.getByRole('button', { name: /cross off sowilo/i }).click();
+	await expect(page.getByRole('button', { name: /restore sowilo/i })).toBeVisible();
+
+	// Cast a (crossed-off) rune and miss. Crossing the grid never bars a cast.
+	await page.getByRole('button', { name: 'Cast the rune' }).click();
+	await page.getByRole('button', { name: /select sowilo as cast target/i }).click();
+	await page.getByRole('button', { name: 'Name it' }).click();
+	await expect(page.getByTestId('answer')).toHaveText('The rune is not the one. The night holds.');
+
+	// Round continues: the crossing is intact and the human can ask again.
+	await expect(page.getByRole('button', { name: /restore sowilo/i })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Ask the Oracle' })).toBeEnabled();
 });
 
 test('cancels a cast with no commitment', async ({ page }) => {
@@ -68,7 +97,8 @@ test('dispatches a non-empty Ask and shows the voiced answer', async ({ page }) 
 					answer: 'No. Sól is not reaching for a fire rune.',
 					affirmative: false,
 					turnConsumed: true
-				}
+				},
+				state: { activePlayer: 'Human', status: 'active', winner: null }
 			}
 		})
 	);
