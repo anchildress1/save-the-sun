@@ -11,6 +11,21 @@ test('shows the night-progress chrome holding early in the night', async ({ page
 	await expect(page.getByTestId('night-progress')).toHaveText('The night lies deep and unbroken.');
 });
 
+test('steps aside for the best-on-desktop notice below the 1280px minimum', async ({ page }) => {
+	await page.setViewportSize({ width: 1024, height: 800 });
+	await page.goto('/');
+	await expect(page.getByTestId('desktop-notice')).toBeVisible();
+	await expect(page.getByText('The rite needs a wider sky.')).toBeVisible();
+	await expect(page.locator('main')).toBeHidden();
+});
+
+test('shows the rite, not the notice, at desktop width', async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await page.goto('/');
+	await expect(page.locator('main')).toBeVisible();
+	await expect(page.getByTestId('desktop-notice')).toBeHidden();
+});
+
 test('renders all 24 rune cards with visible trait text', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('.rune-card')).toHaveCount(24);

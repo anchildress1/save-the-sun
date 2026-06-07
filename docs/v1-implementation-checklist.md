@@ -225,7 +225,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] No information by color alone (cross-check S4)
 - [ ] `prefers-reduced-motion` → motion instant, audio muted, still reflects live state changes
 - [ ] Fully operable at 200% zoom
-- [ ] Best-on-desktop notice below the **1280px** minimum — **no** responsive reflow attempted (1024px support is v2)
+- [x] Best-on-desktop notice below the **1280px** minimum — **no** responsive reflow attempted (1024px support is v2)
 - [ ] Degradation: Plain (v1) round fully winnable on the static grid, audio muted by default; Reduced tier (reduced-motion OR WebGL/audio unavailable) stays unaffected and fair
 
 **Tests to land:** [E][manual] keyboard round + full keyboard cast path · [A] axe names/roles, contrast, color-independence · [C] reduced-motion · [manual] 200% zoom · [E] Plain + Reduced degradation, [S] fairness invariant · [C] best-on-desktop notice.

@@ -32,6 +32,9 @@
 		nightThins: 'Gray bleeds into the dark.',
 		nightDawn: 'Dawn gathers at the edge of the world.',
 		chooseTarget: 'Choose a rune from the board.',
+		// Best-on-desktop notice (R10) — shown below the 1280px minimum; the rite does not reflow.
+		desktopOnly:
+			'The rite needs a wider sky. Save the Sun is cast on a desktop — return on a larger screen to take up the runes.',
 		castPrompt: (name: string) => `Cast ${name}?`
 	};
 
@@ -217,6 +220,11 @@
 		}
 	}
 </script>
+
+<div class="desktop-notice" data-testid="desktop-notice">
+	<p class="notice-title">Save the Sun</p>
+	<p class="notice-line">{RITE.desktopOnly}</p>
+</div>
 
 <main>
 	<header class="rite-header">
@@ -689,5 +697,48 @@
 		height: auto;
 		margin-top: auto;
 		display: block;
+	}
+
+	/* Best-on-desktop notice (R10). Below the 1280px minimum the rite does not reflow — it steps
+	   aside for this notice. This is the one deliberate width breakpoint; the desktop layout itself
+	   stays intrinsic (no media queries above the floor). */
+	.desktop-notice {
+		display: none;
+	}
+
+	@media (max-width: 1279.98px) {
+		main {
+			display: none;
+		}
+
+		.desktop-notice {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 1rem;
+			min-height: 100vh;
+			padding: 2rem;
+			text-align: center;
+		}
+
+		.notice-title {
+			margin: 0;
+			font-family: var(--font-display);
+			font-size: 2rem;
+			letter-spacing: 0.06em;
+			color: var(--gold-bright);
+			text-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
+		}
+
+		.notice-line {
+			margin: 0;
+			max-width: 40ch;
+			font-family: var(--font-display);
+			font-style: italic;
+			font-size: 1rem;
+			line-height: 1.5;
+			color: var(--ink-muted);
+		}
 	}
 </style>

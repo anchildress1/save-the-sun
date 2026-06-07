@@ -124,7 +124,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 - [ ] [I][E] Connection/engine error shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**
 - [x] [C] Empty submit refused with "Speak your question, witch."
-- [ ] [C] Below the 1280px minimum: best-on-desktop notice — no responsive reflow (1024px support is v2)
+- [x] [E] Below the 1280px minimum: best-on-desktop notice — no responsive reflow (1024px support is v2) _(e2e at 1024px asserts the notice shows and the rite is hidden; 1440px asserts the reverse)_
 - [x] [I] Invalid Ask costs only the rephrase, never a false answer
 - [ ] [S] Every seeded round winnable through legal Asks; Oracle never lies (fuzz across secrets/seeds)
 
