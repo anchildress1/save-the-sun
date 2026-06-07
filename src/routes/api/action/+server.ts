@@ -62,6 +62,12 @@ function floorRng(skoll: SkollState): () => number {
 	return mulberry32((skoll.seed ^ (skoll.facts.length * 0x9e3779b1)) >>> 0);
 }
 
+// A separate seeded stream for the reaction gate (a different mix constant) so it doesn't track
+// the floor's choices in lockstep.
+function reactRng(skoll: SkollState): () => number {
+	return mulberry32((skoll.seed ^ (skoll.facts.length * 0x85ebca6b)) >>> 0);
+}
+
 // Map his resolved turn into the wire DTO the client voices and reacts to.
 function describeTurn(out: SkollOutcome, taunt: string): SkollTurn {
 	return out.kind === 'cast'
@@ -140,7 +146,13 @@ async function askWithSkollReaction(engine: GameEngine, skoll: SkollState, quest
 	// A refusal never opens a window, spends a turn, or rouses Sköll — it just bounces back.
 	if (!prepared.ok) return json({ type: 'Ask', oracle: prepared.result, state: gameState(engine) });
 
-	const vs = await reactToHumanAsk(engine, skoll, prepared.query, decideSkollReaction);
+	const vs = await reactToHumanAsk(
+		engine,
+		skoll,
+		prepared.query,
+		decideSkollReaction,
+		reactRng(skoll)
+	);
 	let oracle;
 	if (vs.killed) {
 		engine.passTurn(); // her question dies; her turn is spent with no answer

@@ -237,15 +237,24 @@ function validateReaction(raw: unknown, canScry: boolean, canHex: boolean): Reac
 	return null;
 }
 
+// How often Sköll even *considers* reacting to an Ask. Without this gate Gemini interrupts every
+// single Ask, far too cannily for a twelve-year-old; at 0.5 he only thinks to react half the time
+// (and may still Pass when he does), roughly halving his attempts. Tune up for a craftier wolf.
+const REACTION_CHANCE = 0.5;
+
 async function planReaction(
 	engine: GameEngine,
 	state: SkollState,
 	query: Query,
-	decide: SkollReactionDecide
+	decide: SkollReactionDecide,
+	rng: () => number
 ): Promise<ReactionChoice> {
 	const canScry = engine.reactionAvailable('Sköll', 'Scry');
 	const canHex = engine.reactionAvailable('Sköll', 'Hex');
 	if (!canScry && !canHex) return 'Pass'; // nothing left to spend — never bluff a reaction
+	// Dumb him down: most of the time he doesn't even think to react. Only on the occasional
+	// impulse does he consult his judgement (Gemini) at all.
+	if (rng() > REACTION_CHANCE) return 'Pass';
 	try {
 		const raw = await decide({
 			askedTrait: valuePhrase(query),
@@ -273,10 +282,11 @@ export async function reactToHumanAsk(
 	engine: GameEngine,
 	state: SkollState,
 	query: Query,
-	decide: SkollReactionDecide
+	decide: SkollReactionDecide,
+	rng: () => number
 ): Promise<SkollVsHuman> {
 	engine.openReactionWindow('Human');
-	const choice = await planReaction(engine, state, query, decide);
+	const choice = await planReaction(engine, state, query, decide, rng);
 	const outcome = resolveReaction(engine, 'Sköll', choice);
 	if (dev) console.debug(`[skoll] reacts to the human's Ask: ${choice} (landed=${outcome.ok})`);
 	return {
