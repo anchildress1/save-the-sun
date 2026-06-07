@@ -206,6 +206,7 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 | Whose turn — you | **"Your move."** |
 | Whose turn — Sköll | **"Sköll moves."** |
 | Night's progress (cosmetic, by elapsed turns — no timer mechanic) | early: **"The night lies deep and unbroken."** → mid: **"Gray bleeds into the dark."** → late: **"Dawn gathers at the edge of the world."** |
+| Round resolved — header tag beside the celestial body (full resolution line lives in the Oracle panel, §4) | human win (moon → risen sun): **"Sól crests the rim of the world."** · Sköll win (moon holds): **"Sköll takes the sun."** |
 | Cast armed (player believes one remains) | **"Cast?"** |
 
 ### Empty & error states (stay at the fire)

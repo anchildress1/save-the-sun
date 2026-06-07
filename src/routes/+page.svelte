@@ -22,6 +22,11 @@
 		runeTrue: 'The rune is true.',
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
+		// Resolution lines (ux-copy.md §4) — voiced in the header when a round ends. A human win
+		// raises the sun under sunCrests; a Sköll win keeps the moon under the defeat line.
+		sunCrests: 'Sól crests the rim of the world.',
+		skollTakesSun: 'Sköll takes the sun. The longest day never breaks. The year falls to dark.',
+		skollTakes: 'Sköll takes the sun.',
 		// Night-progress chrome (ux-copy.md §6), keyed to elapsed turns — cosmetic, no timer.
 		nightHolds: 'The night lies deep and unbroken.',
 		nightThins: 'Gray bleeds into the dark.',
@@ -43,7 +48,15 @@
 	let activePlayer = $state<Player>(untrack(() => data.state.activePlayer));
 	let roundStatus = $state<'active' | 'won'>(untrack(() => data.state.status));
 	let turns = $state<number>(untrack(() => data.state.turns));
+	let winner = $state<Player | null>(untrack(() => data.state.winner));
 	let roundOver = $derived(roundStatus === 'won');
+	// A resolved round is a win for whoever cast true. The header swaps the moon for a risen sun
+	// on a human win and voices the resolution line (ux-copy.md §4); a Sköll win (mocked in v1,
+	// live in S6) keeps the moon under the defeat line.
+	let humanWon = $derived(roundOver && winner === 'Human');
+	let skollWon = $derived(roundOver && winner === 'Sköll');
+	// Header carries the short tag; the Oracle panel carries the full resolution sentence.
+	let outcomeLine = $derived(humanWon ? RITE.sunCrests : RITE.skollTakes);
 	// Night-progress phase by elapsed turns (cosmetic): holds 0–2, thins 3–5, dawn 6+.
 	let nightProgress = $derived(
 		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
@@ -51,16 +64,23 @@
 	// Ask and Cast are turn-gated; cross-off is a private aid and is never gated (RuneGrid owns
 	// it and stays enabled through Sköll's turn — game-spec "private aid").
 	let canAct = $derived(activePlayer === 'Human' && !roundOver);
-	// Won rounds read as resolved, not as a phantom turn. Defeat (Sköll's win) arrives with the
-	// opponent in S6; in v1 only the human can win, so a resolved round is always the true rune.
+	// Won rounds read as resolved, not as a phantom turn. A human win lights the victory line; a
+	// Sköll win reads the defeat (the header carries the fuller resolution line).
 	let turnPill = $derived(
-		roundOver ? RITE.runeTrue : activePlayer === 'Human' ? RITE.yourMove : RITE.skollMoves
+		humanWon
+			? RITE.runeTrue
+			: skollWon
+				? RITE.skollTakes
+				: activePlayer === 'Human'
+					? RITE.yourMove
+					: RITE.skollMoves
 	);
 
 	function applyState(state: GameState) {
 		activePlayer = state.activePlayer;
 		roundStatus = state.status;
 		turns = state.turns;
+		winner = state.winner;
 	}
 
 	// Tracks the loaded seed until a new game overrides it. A changed seed remounts RuneGrid
@@ -74,7 +94,15 @@
 	// shows the answer, which restates the trait. The interpretation echo is reserved for the
 	// rival's Ask (you'd see his question, not his answer) — wired in S5/S6, so it is
 	// deliberately not rendered for your own Ask today.
-	let answer = $state(untrack(() => (data.state.status === 'won' ? RITE.runeTrue : RITE.ready)));
+	let answer = $state(
+		untrack(() =>
+			data.state.status !== 'won'
+				? RITE.ready
+				: data.state.winner === 'Sköll'
+					? RITE.skollTakesSun
+					: RITE.runeTrue
+		)
+	);
 
 	let selectedRune = $derived(
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
@@ -215,27 +243,59 @@
 		</div>
 
 		<div class="night-block">
-			<svg class="moon" viewBox="0 0 64 64" aria-hidden="true">
-				<defs>
-					<radialGradient id="moonFace" cx="40%" cy="35%" r="75%">
-						<stop offset="0%" stop-color="#f4eede" />
-						<stop offset="70%" stop-color="#cdd2dd" />
-						<stop offset="100%" stop-color="#8b93a6" />
-					</radialGradient>
-				</defs>
-				<circle cx="32" cy="32" r="22" fill="url(#moonFace)" />
-				<circle cx="26" cy="24" r="3.4" fill="#b9bdc8" opacity="0.6" />
-				<circle cx="40" cy="34" r="2.4" fill="#b9bdc8" opacity="0.5" />
-				<circle cx="30" cy="40" r="1.8" fill="#b9bdc8" opacity="0.5" />
-			</svg>
-			<p class="night-progress" data-testid="night-progress">{nightProgress}</p>
+			{#if humanWon}
+				<svg class="sun-risen" viewBox="0 0 64 64" aria-hidden="true">
+					<defs>
+						<radialGradient id="sunFace" cx="50%" cy="45%" r="60%">
+							<stop offset="0%" stop-color="#fff3cf" />
+							<stop offset="60%" stop-color="#f3c45a" />
+							<stop offset="100%" stop-color="#d9a94a" />
+						</radialGradient>
+					</defs>
+					<g stroke="#f3c45a" stroke-width="2.2" stroke-linecap="round">
+						{#each Array.from({ length: 12 }, (_, i) => i) as i (i)}
+							<line
+								x1={32 + 16 * Math.cos((i * Math.PI) / 6)}
+								y1={32 + 16 * Math.sin((i * Math.PI) / 6)}
+								x2={32 + 22 * Math.cos((i * Math.PI) / 6)}
+								y2={32 + 22 * Math.sin((i * Math.PI) / 6)}
+							/>
+						{/each}
+					</g>
+					<circle cx="32" cy="32" r="14" fill="url(#sunFace)" />
+				</svg>
+			{:else}
+				<svg class="moon" viewBox="0 0 64 64" aria-hidden="true">
+					<defs>
+						<radialGradient id="moonFace" cx="40%" cy="35%" r="75%">
+							<stop offset="0%" stop-color="#f4eede" />
+							<stop offset="70%" stop-color="#cdd2dd" />
+							<stop offset="100%" stop-color="#8b93a6" />
+						</radialGradient>
+					</defs>
+					<circle cx="32" cy="32" r="22" fill="url(#moonFace)" />
+					<circle cx="26" cy="24" r="3.4" fill="#b9bdc8" opacity="0.6" />
+					<circle cx="40" cy="34" r="2.4" fill="#b9bdc8" opacity="0.5" />
+					<circle cx="30" cy="40" r="1.8" fill="#b9bdc8" opacity="0.5" />
+				</svg>
+			{/if}
+			<p
+				class="night-progress"
+				class:won={humanWon}
+				class:lost={skollWon}
+				data-testid={roundOver ? 'outcome-line' : 'night-progress'}
+			>
+				{roundOver ? outcomeLine : nightProgress}
+			</p>
 		</div>
 
 		<div class="header-controls">
 			<button class="ghost new-game" type="button" onclick={newGame} disabled={pending}>
 				Begin another night
 			</button>
-			<div class="turn-pill" class:won={roundOver} data-testid="turn-pill">{turnPill}</div>
+			<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
+				{turnPill}
+			</div>
 		</div>
 	</header>
 
@@ -389,6 +449,13 @@
 		filter: drop-shadow(0 0 16px rgba(220, 226, 240, 0.4));
 	}
 
+	/* The risen sun replaces the moon on a human win — the saved sun, warm and radiant. */
+	.sun-risen {
+		width: 58px;
+		height: 58px;
+		filter: drop-shadow(0 0 20px rgba(243, 196, 90, 0.6));
+	}
+
 	.night-progress {
 		margin: 0;
 		font-family: var(--font-display);
@@ -397,6 +464,12 @@
 		letter-spacing: 0.06em;
 		color: var(--ink-muted);
 		white-space: nowrap;
+	}
+
+	/* Same slot, resolution register: gold for the win, the muted default holds for defeat. */
+	.night-progress.won {
+		color: var(--gold-bright);
+		text-shadow: 0 0 12px rgba(217, 169, 74, 0.4);
 	}
 
 	.header-controls {
@@ -423,6 +496,14 @@
 		background: linear-gradient(180deg, var(--gold-bright), var(--gold));
 		border-color: var(--gold-bright);
 		box-shadow: 0 0 18px rgba(217, 169, 74, 0.4);
+	}
+
+	/* Defeat: the pill goes cold — no gold, no glow. */
+	.turn-pill.lost {
+		color: var(--ink-muted);
+		background: rgba(120, 130, 150, 0.08);
+		border-color: var(--ink-faint);
+		box-shadow: none;
 	}
 
 	.game-layout {

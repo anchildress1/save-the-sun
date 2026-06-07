@@ -9,6 +9,7 @@ import type { GameState } from '$lib/server/engine/actions';
 const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
 const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 };
 const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 };
+const SKOLL_WON: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 5 };
 
 const pageProps = { data: { boardSeed: 0, state: HUMAN_TURN }, params: {}, form: null };
 const propsWith = (state: GameState) => ({ data: { boardSeed: 0, state }, params: {}, form: null });
@@ -252,6 +253,33 @@ describe('Save the Sun page', () => {
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rune is true.');
 		await expect.element(screen.getByRole('button', { name: 'Ask the Oracle' })).toBeDisabled();
 		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
+	});
+
+	it('raises the sun and voices the victory line in the header on a human win', async () => {
+		const screen = render(Page, propsWith(HUMAN_WON));
+		// Moon gives way to the risen sun; the resolution line replaces the night-progress phase.
+		expect(screen.container.querySelector('.sun-risen')).not.toBeNull();
+		expect(screen.container.querySelector('.moon')).toBeNull();
+		await expect
+			.element(screen.getByTestId('outcome-line'))
+			.toHaveTextContent('Sól crests the rim of the world.');
+	});
+
+	it('keeps the moon on a Sköll win — short tag in the header, full line in the Oracle panel', async () => {
+		const screen = render(Page, propsWith(SKOLL_WON));
+		// No sunrise for a loss — the moon holds. The header carries only the short tag; the full
+		// resolution sentence lives in the Oracle panel, which wraps responsively on its own.
+		expect(screen.container.querySelector('.moon')).not.toBeNull();
+		expect(screen.container.querySelector('.sun-risen')).toBeNull();
+		await expect
+			.element(screen.getByTestId('outcome-line'))
+			.toHaveTextContent('Sköll takes the sun.');
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll takes the sun.');
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent(
+				'Sköll takes the sun. The longest day never breaks. The year falls to dark.'
+			);
 	});
 
 	it('hands the turn to Sköll — pill flips and Ask + Cast disable', async () => {
