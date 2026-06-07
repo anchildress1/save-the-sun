@@ -152,7 +152,8 @@ One-use reactions, **not cards** — no deck, no hand. Both trigger on an **Ask*
 
 ### Sköll uses a reaction (on your Ask)
 - **Sköll Scries** (hears your answer): "I heard what the Oracle told you. Kind of her. Careless of you."
-- **Sköll Hexes** (silences your Ask): "The Oracle's lips close. My doing."
+- **Sköll Hexes** (silences your Ask): "The Oracle's lips close. My doing." *(Sköll's voice — shown in his line, never in the Oracle frame.)*
+  - The Oracle frame, having no answer to give, states the silence in the rite's own voice: **"The question dies unanswered."**
 
 ## 4. Win / Lose
 

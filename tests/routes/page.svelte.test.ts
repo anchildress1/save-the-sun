@@ -465,10 +465,12 @@ describe('Save the Sun page', () => {
 		});
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
+		// The Oracle box states the silence in the rite's voice — NOT Sköll's gloat.
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent("The Oracle's lips close.");
-		// His own move still surfaces in his voice slot.
+			.toHaveTextContent('The question dies unanswered.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain('My doing');
+		// His own move surfaces in his voice slot.
 		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
 	});
 
