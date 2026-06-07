@@ -30,8 +30,8 @@
 		runeTrue: 'The rune is true.',
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
-		// Reaction outcomes on Sköll's Ask (ux-copy.md §3).
-		scryHim: 'You lean into the dark and listen. His answer is yours too.',
+		// Reaction outcomes on Sköll's Ask (ux-copy.md §3). A Scry surfaces his answer itself in the
+		// panel, so it needs no separate flavor line.
 		hexHim: "You close the Oracle's lips. His question dies unanswered — his turn with it.",
 		passHim: 'You hold your hand. Let him have his answer.',
 		// Sköll hexing your Ask (ux-copy.md §3). A Scry stays covert — he overhears in silence; his
@@ -219,15 +219,16 @@
 			else if (choice === 'Hex') heldHex = false;
 			skollAsking = false;
 			skollEcho = '';
-			// Key on the human's own choice, not the payload — `hexed: false` is falsy, so branching
-			// on it would conflate Pass and Scry. A scried answer surfaces when the engine shared one.
+			// The exchange is over — the outcome is the single primary line; clear his stale voice so
+			// it doesn't stack a near-duplicate beneath. Key on the choice, not the payload's falsy
+			// `hexed: false`, which would conflate Pass and Scry.
+			skollVoice = '';
 			if (choice === 'Hex') {
-				skollVoice = RITE.hexHim;
+				answer = RITE.hexHim;
 			} else if (choice === 'Scry' && skollReaction?.scried) {
 				answer = skollReaction.scried.answer; // you hear his answer too
-				skollVoice = RITE.scryHim;
 			} else {
-				skollVoice = RITE.passHim;
+				answer = RITE.passHim;
 			}
 		} catch (err) {
 			console.error('[ui] React dispatch failed:', err);

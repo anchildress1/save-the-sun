@@ -387,7 +387,7 @@ describe('Save the Sun page', () => {
 		await humanAsks(screen);
 		await screen.getByRole('button', { name: 'Let it pass' }).click();
 		await expect
-			.element(screen.getByTestId('skoll-voice'))
+			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('You hold your hand. Let him have his answer.');
 		// Prompt gone, the static reactions row is back.
 		expect(screen.container.querySelector('[data-testid="reaction-prompt"]')).toBeNull();
@@ -403,12 +403,10 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
 		await screen.getByRole('button', { name: 'Scry' }).click();
+		// The scried answer is the payoff — it surfaces in the panel itself, no extra flavor line.
 		await expect
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('Yes. Sól is reaching for a gold rune.');
-		await expect
-			.element(screen.getByTestId('skoll-voice'))
-			.toHaveTextContent('You lean into the dark and listen.');
 	});
 
 	it('kills the question when the human Hexes Sköll Ask', async () => {
@@ -422,8 +420,10 @@ describe('Save the Sun page', () => {
 		await humanAsks(screen);
 		await screen.getByRole('button', { name: 'Hex' }).click();
 		await expect
-			.element(screen.getByTestId('skoll-voice'))
+			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('His question dies unanswered');
+		// No stale second line stacked beneath — the outcome is the single panel line.
+		expect(screen.container.querySelector('[data-testid="skoll-voice"]')).toBeNull();
 	});
 
 	it('shows the silenced line when Sköll Hexes the human Ask', async () => {
