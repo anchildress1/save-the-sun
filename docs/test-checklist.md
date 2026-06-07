@@ -75,6 +75,14 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [ ] [E][A] Full keyboard cast path: arm → arrow → select → "Name it"
 - [ ] [C] Pre-Ask panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle."
 
+## 4.5 Round lifecycle & session isolation (S2.5)
+
+- [x] [U] Parallel sessions isolated — one session's round never moves another's (engine + `api/action` endpoint)
+- [x] [U] A refresh resumes the same round (same secret); resume is isolated per session
+- [x] [U] `POST /api/new-game` resets **only** the calling session to a fresh active round + new board seed
+- [x] [U] Session registry LRU-capped — never grows past the cap; an idle round is evicted, a touched (active) one survives
+- [x] [U] Session cookie reused when present, generated when absent, regenerated when empty; `secure` outside dev
+
 ## 5. Reactions — Scry & Hex
 
 - [ ] [I] Each reaction once per player per round; spent reaction unavailable after (no "spent" copy)
