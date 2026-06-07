@@ -28,7 +28,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## 2. Oracle pipeline (Gemini, Role 1)
 
 - [x] [I] Free-text maps to exactly one query type; multi-type intent rejected, not split _(the free-text→query mapping is eval-gated — see the `[Eval]` row; structural mixed-type rejection is CI-proven in `queries`)_
-- [ ] [C] Echo matches the resolved query, shown **before** the answer; interpreted query stands (no do-over) _(echo string is produced + tested in `oracle.test` [I]; no UI renders it yet — the echo is the rival's-Ask surface, S5/S6)_
+- [x] [C] Echo matches the resolved query, shown **before** the answer; interpreted query stands (no do-over) _(the rival's-Ask echo surface lit up in S6 — Sköll's Ask renders `skoll-echo` before its post-reaction answer; the human's own Ask shows no echo by design)_
 - [x] [C] Both verdicts restate the trait (Yes "is reaching for", No "is not reaching for"); `{value-phrase}` fills per axis
 - [x] [C] Mixed-type refusal returns `ux-copy.md` line; turn not consumed
 - [x] [Sec] Secret-seeking Ask refused; secret never leaks
@@ -43,25 +43,25 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 **Referee / leash**
 
-- [ ] [Sec][I] Sköll's tool-call inputs contain only earned state — never the secret, never the human's crossings
-- [ ] [I] Illegal/malformed Sköll calls rejected (bad rune, mixed-type, out-of-turn); re-asking is legal play (not rejected) — the floor avoids redundant/non-splitting questions for move quality
-- [ ] [U] Board passed as JSON in fixed on-screen order; payload asserted not pre-sorted
-- [ ] [I] Sköll cross-off/restore mutates only his private sheet; traceable in debug log
-- [ ] [I] Wrong Sköll cast wastes only his turn; round continues
+- [x] [Sec][I] Sköll's tool-call inputs contain only earned state — never the secret, never the human's crossings _(payload built from his state, not the engine — secret structurally unreachable)_
+- [x] [I] Illegal/malformed Sköll calls rejected (bad rune, malformed query) → floor; re-asking is legal play (not rejected) — the floor avoids redundant/non-splitting questions for move quality
+- [x] [U] Board passed as JSON in fixed (canonical) order; payload asserted not pre-sorted
+- [x] [I] Sköll cross-off mutates only his private sheet; traceable in debug log _(restore unwired — he only accumulates)_
+- [x] [I] Wrong Sköll cast wastes only his turn; round continues
 
 **Deterministic fallback (weighted-random, NOT argmax)**
 
-- [ ] [I] Floor fires only on Gemini error/timeout/illegal — never on a legal-but-suboptimal move
-- [ ] [U] Candidate set = legal well-formed queries over live candidates; excludes asked + non-splitting (all-yes/all-no)
-- [ ] [U] Split score = `1 / (1 + |yes − n/2|)`, verified on hand-computed sets
-- [ ] [S] **Best splitter most frequent, every legal splitter non-zero — asserted NOT argmax**
-- [ ] [U] Medium peaking moderate/beatable; harder peaks toward optimal, easier toward uniform
-- [ ] [U] Casts when one candidate remains; else casts best remaining when no splitter exists
-- [ ] [U] Same seed + state → same sampled move (reproducible)
+- [x] [I] Floor fires only on Gemini error/timeout/illegal — never on a legal-but-suboptimal move
+- [x] [U] Candidate set = legal well-formed queries over live candidates; excludes asked + non-splitting (all-yes/all-no)
+- [x] [U] Split score = `1 / (1 + |yes − n/2|)`, verified on hand-computed sets
+- [x] [S] **Best splitter most frequent, every legal splitter non-zero — asserted NOT argmax**
+- [x] [U] Medium peaking — the score curve is the only peaking (no difficulty hardening in v1)
+- [x] [U] Casts when one candidate remains; else casts best remaining when no splitter exists
+- [x] [U] Same seed + state → same sampled move (reproducible)
 
 **Persona (eval, low gate)**
 
-- [ ] [Eval] ~12-year-old behavior: one clue at a time, works from board + own cross-offs, may overlook a legal elimination, casts on "sure enough"; computation tells flagged as failures
+- [ ] [Eval] ~12-year-old behavior: one clue at a time, works from board + own cross-offs, may overlook a legal elimination, casts on "sure enough"; computation tells flagged as failures _(live-LLM eval, not a CI gate — deferred with the Oracle's eval harness)_
 
 ## 4. Human loop & action interface
 
@@ -91,7 +91,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [I] Scry → rival also receives private answer
 - [x] [I] Hex → question dies, no answer to anyone _(kill + no-answer tested in S5; the asker's turn-spend on a hexed Ask lands with S6's hexed-Ask orchestration — the window now precedes the answer, so the Ask is never resolved on a Hex)_
 - [x] [C] Human prompt "Sköll asks. Answer it?" → Scry / Hex / Let it pass per `ux-copy.md`
-- [ ] [I] Sköll's reaction is refereed Gemini response with deterministic-floor fallback _(S6 — Sköll's live Ask/reaction)_
+- [ ] [I] Sköll's reaction is refereed Gemini response with deterministic-floor fallback _(reverse direction — Sköll reacting to the human's Ask — deferred; engine/reactions already support it. His live **Ask** + the human's reaction to it landed in S6.)_
 
 ## 6. UI / graphics presentation
 
@@ -141,14 +141,14 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [ ] [A] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
 - [ ] [A] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
 - [ ] [Eval] Sampled Oracle vs Sköll lines attributable to correct speaker
-- [ ] [I] Sköll taunt pool does not repeat within a game
+- [x] [I] Sköll taunt pool does not repeat within a game _(rotation by per-round index; one pass of the pool is distinct)_
 
 ---
 
 ## Enforced coverage gates (CI — PR fails below floor)
 
 - [x] **Engine** — line **100%** / branch **95%**
-- [ ] **Deterministic fallback policy** — line **95%** / branch **90%**
+- [x] **Deterministic fallback policy** — line **95%** / branch **90%**
 - [x] **Action interface** — line **90%** / branch **85%**
 - [x] **Oracle pipeline** — line **90%** / branch **85%**
 - [x] **Reactions** — line **95%** / branch **90%**
@@ -160,17 +160,17 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 - [ ] Lighthouse accessibility ≥ 0.95 (target ≈ 1.0)
 - [x] Round-solvability property test passes across all seeds
-- [ ] Secret-leak security assertion (engine API + Sköll payload)
+- [x] Secret-leak security assertion (engine API + Sköll payload)
 - [ ] Voice/terminology lint — zero diegetic violations
 
 ## High-risk gaps — do not skip
 
-- [ ] Weighted-random vs argmax statistical test present and passing (§3)
+- [x] Weighted-random vs argmax statistical test present and passing (§3)
 - [x] Turn-accounting-on-refusal covered for **every** refusal class (§2)
 - [x] Crossed-rune cast legality covered (§1)
 - [x] Cast sacredness: reactions never offered on a Cast (§5)
 - [ ] Degradation **fairness** (solvable), not just renders (§8)
-- [ ] Secret never present in Sköll's payload (§3)
+- [x] Secret never present in Sköll's payload (§3)
 
 ## Build-order alignment
 

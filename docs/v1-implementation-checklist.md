@@ -150,27 +150,29 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 **Gemini-driven Sköll (engine referees):**
 
-- [ ] Sköll is a bare LLM call reasoning in natural language, acting only through the game's function-calling tools (ask, cross-off/restore, cast, reactions) — not an agent, not code-driven
-- [ ] Prompt him as a *person* playing the rite, never as an AI; ~12-year-old deduction encoded explicitly (one clue at a time, no cross-product elimination, no probability math, no perfect play)
-- [ ] Sköll sees board as JSON in **fixed on-screen order**, told not to reorder/sort it
-- [ ] Earned-only state: his payload contains only his own candidates, his own answers, and anything Scried — **never** the secret, never the human's crossings
-- [ ] Every tool call validated for legality before the engine resolves it; illegal/malformed calls rejected
-- [ ] Sköll's cross-off/restore mutates only his private sheet; traceable in the debug log
-- [ ] Wrong Sköll cast wastes only his turn; round continues
+- [x] Sköll is a bare LLM call reasoning in natural language, acting only through the game's function-calling tools (ask, cross-off, cast) — not an agent, not code-driven
+- [x] Prompt him as a *person* playing the rite, never as an AI; ~12-year-old deduction encoded explicitly (one clue at a time, no cross-product elimination, no probability math, no perfect play)
+- [x] Sköll sees board as JSON in **fixed order**, told not to reorder/sort it
+- [x] Earned-only state: his payload contains only his own answers and his own sheet — **never** the secret, never the human's crossings
+- [x] Every tool call validated for legality before the engine resolves it; illegal/malformed calls rejected (→ floor)
+- [x] Sköll's cross-off mutates only his private sheet; traceable in the debug log
+- [x] Wrong Sköll cast wastes only his turn; round continues
 
 **Deterministic floor (weighted-random, NOT argmax):**
 
-- [ ] Fires **only** on Gemini error / timeout / illegal-or-malformed call — never as a quality filter on a legal-but-suboptimal move
-- [ ] Candidate set = legal, well-formed queries over still-live candidates; excludes already-asked and any non-splitting (all-yes/all-no) query
-- [ ] Split score = `1 / (1 + |yes − n/2|)`
-- [ ] Selection = weighted-random sampling over scores — best splitter most likely, every legal splitter non-zero. **Do not take the max.**
-- [ ] Medium difficulty = moderate peaking (clearly beatable)
-- [ ] Casts when exactly one candidate remains; if no splitter exists earlier, casts the best remaining candidate
-- [ ] Same seed + same state → same sampled move (reproducible for the demo)
+- [x] Fires **only** on Gemini error / timeout / illegal-or-malformed call — never as a quality filter on a legal-but-suboptimal move
+- [x] Candidate set = legal, well-formed queries over still-live candidates; excludes already-asked and any non-splitting (all-yes/all-no) query
+- [x] Split score = `1 / (1 + |yes − n/2|)`
+- [x] Selection = weighted-random sampling over scores — best splitter most likely, every legal splitter non-zero. **Do not take the max.**
+- [x] Medium difficulty = moderate peaking (the score curve is the only peaking; no hardening)
+- [x] Casts when exactly one candidate remains; if no splitter exists earlier, casts the best remaining candidate
+- [x] Same seed + same state → same sampled move (reproducible for the demo)
 
-**Tests to land:** [Sec][I] earned-only payload, no secret · [I] tool-call validation, cross-off tracing, wrong-cast · [U] board-order-not-presorted, candidate set, split score, cast condition, determinism-under-seed · [S] **non-argmax** statistical test · [Eval] ~12-year-old persona, computation tells flagged.
+**Tests landed:** [Sec][I] earned-only payload, no secret · [I] tool-call validation, cross-off tracing, wrong-cast · [U] board-order-not-presorted, candidate set, split score, cast condition, determinism-under-seed · [S] **non-argmax** statistical test. [Eval] (~12-year-old persona, computation tells) stays a live-LLM eval, not a CI gate — deferred with the Oracle's eval harness.
 
-**Done when:** Sköll plays a full round through the same interface as the human, the floor catches every injected failure, and the fallback-policy CI floor (line 95% / branch 90%) is met. **The non-argmax statistical test is non-negotiable** (`test-checklist.md` high-risk gaps).
+**Implementation (S6):** Sköll plays through the same `handleAction`/engine path as the human — no second path. `takeSkollTurn` (`skoll/skoll.ts`) builds an **earned-only** payload (public board in canonical order + his own truthful answers + his crossed sheet — the builder takes his *state*, not the engine, so the secret is structurally unreachable), hands it to the Gemini brain (`skoll/gemini.ts`, prompted as a person, coverage-excluded like the Oracle's seam), and **validates the returned tool call** before the engine resolves it. Any error / timeout / illegal-or-malformed call drops to the **deterministic floor** (`skoll/floor.ts`): live candidates from his facts, split-score, weighted-random sample — argmax is forbidden, gated by the `[S]` statistical test. A Cast resolves at once (a wrong one wastes only his turn); an Ask reuses the S5 seam — it **opens the reaction window and parks the query**, so the human's Scry/Hex/Pass resolves *before* any answer (Hex kills it unanswered). His memory is per-session, lifecycle-linked to the engine (reset on a new round, evicted with it). **Scope:** the documented S6 trigger — Sköll plays + the human reacts to *his* Ask. Sköll reacting to the *human's* Ask (PRD R12 reverse direction) and cross-off **restore** are unwired; the engine/reactions already support the former, so it is a trivial follow-up. The escalation-taunt tier stays P2.
+
+**Done when:** Sköll plays a full round through the same interface as the human, the floor catches every injected failure, and the fallback-policy CI floor (line 95% / branch 90%) is met. ✅ The non-argmax statistical test is in CI (`test-checklist.md` high-risk gaps).
 
 ---
 
