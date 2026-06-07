@@ -10,7 +10,7 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-function stubFetch(impl: () => Promise<Response>) {
+function stubFetch(impl: (input: string) => Promise<Response>) {
 	const spy = vi.fn(impl);
 	vi.stubGlobal('fetch', spy);
 	return spy;
@@ -141,5 +141,40 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
 		await screen.getByRole('button', { name: 'Name it' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rite falters');
+	});
+
+	it('begins another night — resets the panel and pulls a fresh board', async () => {
+		const spy = stubFetch(async (url) => {
+			if (url.includes('/api/new-game')) return new Response(JSON.stringify({ boardSeed: 99 }));
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'No. Sól is not reaching for a fire rune.',
+						turnConsumed: true
+					}
+				})
+			);
+		});
+		const screen = render(Page, pageProps);
+
+		// Dirty the panel so the reset is observable.
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('No. Sól is not reaching');
+
+		await screen.getByRole('button', { name: 'Begin another night' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Twenty-four runes stand. None ruled out. Ask the Oracle.');
+		expect(spy).toHaveBeenCalledWith('/api/new-game', expect.objectContaining({ method: 'POST' }));
+	});
+
+	it('shows an in-world error when starting a new game fails', async () => {
+		stubFetch(async () => new Response('nope', { status: 500 }));
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Begin another night' }).click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
 	});
 });
