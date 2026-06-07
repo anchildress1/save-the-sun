@@ -81,4 +81,41 @@ describe('Gemini Sköll adapter', () => {
 			})
 		);
 	});
+
+	// The flat-schema → Query mapping is the riskiest seam (a field drift silently dumps to the
+	// floor), so cover every axis, the cast shape, and the empty-response fallback.
+	it.each([
+		[
+			{ kind: 'ask', axis: 'element', elementValue: 'Fire' },
+			{ axis: 'element', value: 'Fire' }
+		],
+		[
+			{ kind: 'ask', axis: 'color', colorValue: 'Gold' },
+			{ axis: 'color', value: 'Gold' }
+		],
+		[
+			{ kind: 'ask', axis: 'rune', runeName: 'Sowilo' },
+			{ axis: 'rune', value: 'Sowilo' }
+		],
+		[
+			{ kind: 'ask', axis: 'power', powerOp: 'gte', powerValue: 4 },
+			{ axis: 'power', op: 'gte', value: 4 }
+		]
+	])('maps a %o response to its query', async (raw, query) => {
+		geminiJson(raw);
+		const result = await decideSkollMove({ board: [], answers: [], crossedOff: [] });
+		expect(result).toMatchObject({ kind: 'ask', query });
+	});
+
+	it('maps a cast response, carrying its cross-offs', async () => {
+		geminiJson({ kind: 'cast', runeName: 'Tiwaz', crossOff: [3, 7] });
+		const result = await decideSkollMove({ board: [], answers: [], crossedOff: [] });
+		expect(result).toEqual({ kind: 'cast', runeName: 'Tiwaz', crossOff: [3, 7] });
+	});
+
+	it('returns an unreadable ask on an empty response (skoll.ts then floors it)', async () => {
+		sdk.generateContent.mockResolvedValueOnce({ text: undefined });
+		const result = await decideSkollMove({ board: [], answers: [], crossedOff: [] });
+		expect(result).toEqual({ kind: 'ask', query: undefined, crossOff: undefined });
+	});
 });
