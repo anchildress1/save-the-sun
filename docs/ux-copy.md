@@ -54,7 +54,7 @@ Emoji in diegetic copy. Exclamation marks in Oracle/Sól lines (Sköll earns one
 
 ## Anti-patterns → fixes
 - "I think it might be a fire rune?" → "It is not a fire rune." *(Oracle never speculates.)*
-- "Great question! Let me check that for you." → "You ask after fire. — No." *(no service-desk voice.)*
+- "Great question! Let me check that for you." → "You ask after fire. — No. Sól is not reaching for a fire rune." *(no service-desk voice.)*
 - "You lost! Sköll got there first. Try again?" → "Sköll names the rune. The sun does not rise. The longest day never breaks." *(no arcade tone at the heaviest beat.)*
 - Sköll: "Ha! You're terrible at this!" → "You hesitate. I do not." *(punch at the play, not the person.)*
 
@@ -66,6 +66,8 @@ Emoji in diegetic copy. Exclamation marks in Oracle/Sól lines (Sköll earns one
 
 ### Interpretation echo (public, before the answer)
 Pattern: **`You ask after {paraphrase}.`** — then a held beat, then the answer.
+
+The echo is what the **rival** sees when you Ask — your answer stays private to you (and a Scry-er). You only see the echo on the **rival's** Ask, where it opens the Scry/Hex window; you never get his answer (unless you Scry). The asker themselves sees the answer, which already restates the trait, so the echo is not shown back to them.
 
 Slash-separated echo lines below are parser paraphrase examples, not rotation pools. Use the single paraphrase that matches the interpreted query.
 
@@ -79,22 +81,24 @@ Slash-separated echo lines below are parser paraphrase examples, not rotation po
 | Single rune | "You ask after Sowilo by name." |
 
 ### Answers (private to the asker; plus a Scry-er when the Scry reaction is in play)
-Templated. A **Yes restates the trait**, framing the target as the rune Sól reaches for. A **No is the bare verdict** — the Oracle affirms what *is* and stays silent on what isn't; the player does the excluding. The engine fills `{value-phrase}`.
+Templated. **Both verdicts restate the trait** — `Yes. Sól is reaching for {value-phrase}.` when her rune has it, `No. Sól is not reaching for {value-phrase}.` when it doesn't. Verdict and clause always agree, so a negated Ask never double-negates. The engine fills `{value-phrase}`.
 
-**Pattern:** Yes → `Yes. Sól is reaching for {value-phrase}.` · No → `No.`
+**Pattern:** Yes → `Yes. Sól is reaching for {value-phrase}.` · No → `No. Sól is not reaching for {value-phrase}.`
 
 | Asked | Answer — Yes | Answer — No |
 |---|---|---|
-| Element ("earth?") | "Yes. Sól is reaching for an earth rune." | "No." |
-| Power, exact ("three power?") | "Yes. Sól is reaching for a rune of three power." | "No." |
-| Power, range ("fewer than three?") | "Yes. Sól is reaching for a rune of fewer than three power." | "No." |
-| Light / dark ("light?") | "Yes. Sól is reaching for a light rune." | "No." |
-| Hue ("gold?") | "Yes. Sól is reaching for a gold rune." | "No." |
-| Single rune ("Sowilo?") | "Yes. Sól is reaching for Sowilo." | "No." |
+| Element ("earth?") | "Yes. Sól is reaching for an earth rune." | "No. Sól is not reaching for an earth rune." |
+| Power, exact ("three power?") | "Yes. Sól is reaching for a rune of three power." | "No. Sól is not reaching for a rune of three power." |
+| Power, range ("fewer than three?") | "Yes. Sól is reaching for a rune of fewer than three power." | "No. Sól is not reaching for a rune of fewer than three power." |
+| Light / dark ("light?") | "Yes. Sól is reaching for a light rune." | "No. Sól is not reaching for a light rune." |
+| Hue ("gold?") | "Yes. Sól is reaching for a gold rune." | "No. Sól is not reaching for a gold rune." |
+| Single rune ("Sowilo?") | "Yes. Sól is reaching for Sowilo." | "No. Sól is not reaching for Sowilo." |
 
-`{value-phrase}` by axis: element → "a/an {element} rune"; power → "a rune of {n} power" (ranges: "fewer than {n} power" / "{n} or more power"); light/dark → "a {light/dark} rune"; hue → "a/an {color} rune"; single rune → "{Rune}".
+`{value-phrase}` by axis: element → "a/an {element} rune"; power → "a rune of {n} power" (ranges: "fewer than {n} power" / "{n} or more power"); light/dark → "a {light/dark} rune"; hue → "a/an {color} rune"; single rune → "{Rune}". Element and hue read lowercase in the phrase ("an earth rune," "a gold rune").
 
-> Voice-guard: never "I think," "maybe," "it seems," and no mood-only answers ("the dark thins"). On a Yes, state the verdict and the trait; on a No, just "No" — omit the restatement, never narrate the exclusion.
+**Negation is not asked.** The Oracle speaks of what *is*, never what is not, so a negated Ask ("is it not fire?", "isn't it light?", "anything but gold?") is refused — there is no not-equal operator. The witch asks plainly and reads the verdict; a `No` already tells them what Sól is not reaching for.
+
+> Voice-guard: never "I think," "maybe," "it seems," and no mood-only answers ("the dark thins"). State the verdict (Yes/No) and the trait clause — what Sól is or is not reaching for — and nothing more; never hedge or invent a reason.
 
 ### Refusals
 | Trigger | Line |
@@ -102,6 +106,7 @@ Templated. A **Yes restates the trait**, framing the target as the rune Sól rea
 | Mixed-type ("is it a red fire rune?") | "I read one sign at a time. Ask of fire, or power, or light, or hue — not two at once." |
 | Asks for the secret | "That is Sól's to keep until you name it. I will not say." |
 | Prompt poking / override | "I answer the longest day, not you. Ask of the runes." |
+| Negated Ask ("is it not fire?") | "I speak of what is, not what is not. Ask it plainly." |
 | Unparseable / not a question | "I cannot read that sign. Ask of element, power, light, or hue." |
 | Empty submit | "Speak your question, witch." |
 
@@ -205,7 +210,7 @@ Sól speaks only at victory — the goddess's rarity is the power.
 | State | Copy |
 |---|---|
 | Board, before any Ask | "Twenty-four runes stand. None ruled out. Ask the Oracle." |
-| Connection / engine error | "The fire gutters — the rite can't reach Sól. Draw breath and try again." |
+| Connection / engine error | "The Oracle falls silent — the rite can't reach Sól. Draw breath and try again." |
 | Action while it's Sköll's move | "The wolf is moving. Hold." |
 
 ---

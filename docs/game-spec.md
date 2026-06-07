@@ -39,8 +39,8 @@ Winning happens only through Cast; asking is always information. The game runs u
 - Translates the player's natural language into a structured engine query, then voices the engine's answer in character.
 - The engine owns all truth; the Oracle voices it truthfully for the structured query it produced.
 - Echoes its interpretation before the answer. The echo is the player's warning: if the Ask resolves, the interpreted query stands, even when it differs from what the player meant.
-- One query type per Ask: element, power, fill/light, hue, or one rune name. Ranges and comparisons are allowed for power ("fewer than 3?", "at least 2?"). Refuses mixed-type questions, secret reveals, and instruction overrides. Refused Asks do not consume the turn; a resolved Ask does.
-- Gemini Flash / Flash-Lite. Answer voicing may be templated. Lines in `ux-copy.md`.
+- One query type per Ask: element, power, fill/light, hue, or one rune name. Ranges and comparisons are allowed for power ("fewer than 3?", "at least 2?"). There is no negation operator — the Oracle speaks of what is, so a negated Ask ("is it not fire?") is refused, not turned into a query. Refuses mixed-type questions, secret reveals, instruction overrides, and negations. Refused Asks do not consume the turn; a resolved Ask does.
+- Gemini `gemini-3.5-flash`, thinking pinned to MINIMAL (single-axis classification needs no deliberation), structured-JSON output. Gemini reads the text into one query plus its own echo paraphrase; answer voicing is templated by the deterministic core (it never trusts the LLM to hand the engine a clean query). Lines in `ux-copy.md`.
 
 ## Opponent — Sköll (Gemini plays; engine referees, Role 2)
 

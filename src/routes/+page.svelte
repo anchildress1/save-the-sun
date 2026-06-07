@@ -13,40 +13,57 @@
 	let askValue = $state('');
 	let pending = $state(false);
 
-	// The Oracle surface. Defaults read as ready, not blank (prd.md S3).
-	let interpretation = $state('—');
+	// The Oracle surface — one response at a time. Defaults read as ready, not blank (prd.md
+	// S3). Your Ask shows the answer, which restates the trait. The interpretation echo is
+	// reserved for the rival's Ask (you'd see his question, not his answer) — wired in S5/S6,
+	// so it is deliberately not rendered for your own Ask today.
 	let answer = $state('Twenty-four runes stand. None ruled out. Ask the Oracle.');
 
 	let selectedRune = $derived(
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
 	);
 
-	async function dispatch(action: GameAction): Promise<ActionResult> {
+	// Return type is derived from the action's `type`, so a caller can't request a
+	// mismatched result shape.
+	async function dispatch<T extends ActionResult['type']>(
+		action: Extract<GameAction, { type: T }>
+	): Promise<Extract<ActionResult, { type: T }>> {
 		const res = await fetch('/api/action', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(action)
 		});
 		if (!res.ok) throw new Error(`Action rejected (${res.status})`);
-		return res.json();
+		return res.json() as Promise<Extract<ActionResult, { type: T }>>;
 	}
 
 	async function submitAsk() {
 		const question = askValue.trim();
 		if (question === '') {
 			// Refusal does not consume a turn (game-spec). Client-side gate, no dispatch.
-			interpretation = '—';
 			answer = 'Speak your question, witch.';
 			return;
 		}
 		pending = true;
 		try {
-			const result = await dispatch({ type: 'Ask', player: 'Human', question });
-			interpretation = `You ask after “${question}.”`;
-			answer = result.message;
-			askValue = '';
-		} catch {
-			answer = 'The fire gutters. Ask again.';
+			const { oracle } = await dispatch({ type: 'Ask', player: 'Human', question });
+			if (oracle.ok) {
+				answer = oracle.answer;
+				askValue = '';
+			} else if (oracle.reason === 'refusal') {
+				answer = oracle.line;
+			} else {
+				// not-your-turn means the engine has handed the turn to Sköll.
+				answer =
+					oracle.engineReason === 'not-your-turn'
+						? 'The wolf is moving. Hold.'
+						: 'The Oracle falls silent. Draw breath and try again.';
+			}
+		} catch (err) {
+			// A real 500 here means something the server-side degradation did NOT catch — keep
+			// a trace so it's distinguishable from an expected in-world refusal.
+			console.error('[ui] Ask dispatch failed:', err);
+			answer = 'The Oracle falls silent. Draw breath and try again.';
 		} finally {
 			pending = false;
 		}
@@ -70,15 +87,20 @@
 		if (selectedRune === null) return;
 		pending = true;
 		try {
-			const result = await dispatch({
+			const { cast } = await dispatch({
 				type: 'Cast',
 				player: 'Human',
 				runeName: selectedRune.name
 			});
-			interpretation = `You name ${selectedRune.name}.`;
-			answer = result.message;
-		} catch {
-			answer = 'The fire gutters. The rune slips away.';
+			if (cast.ok) {
+				answer = cast.won ? 'The rune is true.' : 'The rune is not the one. The night holds.';
+			} else {
+				console.warn('[ui] Cast rejected by engine:', cast.reason);
+				answer = 'The rite falters. The rune slips away.';
+			}
+		} catch (err) {
+			console.error('[ui] Cast dispatch failed:', err);
+			answer = 'The rite falters. The rune slips away.';
 		} finally {
 			pending = false;
 			cancelCast();
@@ -138,12 +160,6 @@
 			<h2 class="oracle-title">The Oracle</h2>
 
 			<div class="oracle-frame">
-				<span class="frame-label">The Ask</span>
-				<p class="frame-text" data-testid="interpretation">{interpretation}</p>
-			</div>
-
-			<div class="oracle-frame">
-				<span class="frame-label">The Answer</span>
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
@@ -167,7 +183,7 @@
 					submitAsk();
 				}}
 			>
-				<label for="oracle-ask">Ask the Oracle — one sign at a time</label>
+				<label for="oracle-ask">Ask the Oracle — element, power, light, or hue</label>
 				<input
 					id="oracle-ask"
 					type="text"
@@ -337,15 +353,6 @@
 		border-radius: 6px;
 		padding: 0.55rem 0.7rem;
 		background: rgba(0, 0, 0, 0.25);
-	}
-
-	.frame-label {
-		display: block;
-		font-size: 0.6rem;
-		letter-spacing: 0.24em;
-		text-transform: uppercase;
-		color: var(--gold);
-		margin-bottom: 0.25rem;
 	}
 
 	.frame-text {

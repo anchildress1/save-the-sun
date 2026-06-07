@@ -6,11 +6,13 @@
 		rune,
 		crossed = false,
 		armed = false,
+		selected = false,
 		onAction
 	}: {
 		rune: Rune;
 		crossed?: boolean;
 		armed?: boolean;
+		selected?: boolean;
 		onAction: (id: number) => void;
 	} = $props();
 
@@ -23,7 +25,7 @@
 <button
 	class="rune-card"
 	class:crossed
-	class:armed
+	class:selected
 	data-rune-id={rune.id}
 	data-rune-name={rune.name}
 	onclick={() => onAction(rune.id)}
@@ -56,9 +58,9 @@
 
 	<footer class="traits">
 		<!-- Pips are aria-hidden, so they carry power for sighted players only: pip count =
-		     power, pip fill = light/dark (white = light, black = dark). The numeric value is
-		     never written; screen-reader players get it from the button's accessible name
-		     ("{n} {light|dark} power"). The label beside the pips names the trait. -->
+		     power, pip fill = light/dark (white fill = light, black fill = dark). The numeric
+		     value is never written; screen-reader players get it from the button's accessible
+		     name ("{n} {light|dark} power"). The label beside the pips names the trait. -->
 		<span class="trait power">
 			<span class="pips" aria-hidden="true">
 				{#each pips as i (i)}
@@ -70,10 +72,9 @@
 	</footer>
 
 	<!-- Chalk-style X: corner-to-corner diagonals inset so they reach toward the edges
-	     without touching them. Hidden while armed — a crossed rune is still legal to cast,
-	     so cast mode restores the card (see .armed.crossed) and the strike would contradict
-	     the "Select as cast target" affordance. -->
-	{#if crossed && !armed}
+	     without touching them. Stays visible in cast mode so the player keeps sight of every
+	     elimination while choosing what to cast — a crossed rune is still legal to cast. -->
+	{#if crossed}
 		<svg class="strikeout" viewBox="0 0 80 100" preserveAspectRatio="none" aria-hidden="true">
 			<line x1="5" y1="6" x2="75" y2="94" />
 			<line x1="75" y1="6" x2="5" y2="94" />
@@ -97,15 +98,17 @@
 		text-align: left;
 		cursor: pointer;
 		overflow: hidden;
-		border: 1px solid var(--gold-dim);
+		/* Gray stone tablet on the midnight board: a neutral ground so BOTH white (light) and
+		   black (dark) pips read, with the glyph/text carved dark instead of gilded. */
+		border: 1px solid var(--stone-edge);
 		border-radius: 7px;
-		color: var(--ink);
+		color: var(--stone-ink);
 		background:
-			radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.04) 0%, transparent 55%),
-			linear-gradient(180deg, var(--bg-card-top) 0%, var(--bg-card-bottom) 100%);
+			radial-gradient(circle at 50% 16%, rgba(255, 255, 255, 0.22) 0%, transparent 55%),
+			linear-gradient(180deg, var(--stone-top) 0%, var(--stone-bottom) 100%);
 		box-shadow:
 			0 6px 18px rgba(0, 0, 0, 0.45),
-			inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+			inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 		transition:
 			transform 0.25s cubic-bezier(0.2, 0, 0, 1),
 			border-color 0.25s ease,
@@ -130,12 +133,13 @@
 		inset: -30% -10% auto -10%;
 		height: 90%;
 		background: radial-gradient(circle at 50% 0%, var(--gem) 0%, transparent 62%);
-		opacity: 0.16;
-		mix-blend-mode: screen;
+		opacity: 0.18;
+		/* multiply, not screen: on the light stone a colour tint must darken, not wash out. */
+		mix-blend-mode: multiply;
 		pointer-events: none;
 	}
 	.rune-card:hover .ambient {
-		opacity: 0.28;
+		opacity: 0.3;
 	}
 
 	.card-top {
@@ -147,7 +151,7 @@
 		font-size: 0.62rem;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
-		color: var(--ink-muted);
+		color: var(--stone-ink-muted);
 		position: relative;
 		z-index: 2;
 	}
@@ -163,17 +167,19 @@
 		font-size: 0.62rem;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
-		color: var(--ink-muted);
+		color: var(--stone-ink-muted);
 		line-height: 1;
 	}
 
+	/* Dark rim so every hue's silhouette reads on the light stone, including the lighter
+	   gems that would otherwise blend into the gray. */
 	.gem {
 		width: 13px;
 		height: 13px;
 		border-radius: 50%;
-		background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.7), var(--gem) 60%);
+		background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.85), var(--gem) 65%);
 		box-shadow:
-			0 0 8px var(--gem),
+			0 0 0 1px rgba(0, 0, 0, 0.45),
 			inset 0 0 2px rgba(0, 0, 0, 0.4);
 	}
 
@@ -189,14 +195,16 @@
 		text-align: center;
 	}
 
+	/* Carved into the stone: dark glyph with a light-below / dark-above bevel for an engraved
+	   look, instead of the gilded glow that reads only on the navy board. */
 	.glyph {
 		font-family: var(--font-display);
 		font-size: clamp(2.4rem, 3.8vw, 3.6rem);
 		line-height: 1;
-		color: var(--gold-bright);
+		color: var(--stone-ink);
 		text-shadow:
-			0 0 10px rgba(217, 169, 74, 0.55),
-			0 0 26px rgba(217, 169, 74, 0.25);
+			0 1px 0 rgba(255, 255, 255, 0.3),
+			0 -1px 1px rgba(0, 0, 0, 0.28);
 	}
 
 	.name {
@@ -205,7 +213,7 @@
 		font-size: 0.9rem;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
-		color: var(--gold);
+		color: var(--stone-ink);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -216,7 +224,7 @@
 		max-width: 100%;
 		font-size: 0.62rem;
 		font-style: italic;
-		color: var(--ink-muted);
+		color: var(--stone-ink-muted);
 		line-height: 1.2;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -232,11 +240,11 @@
 		align-items: center;
 		gap: 0.3rem;
 		padding-top: 0.36rem;
-		border-top: 1px solid var(--gold-faint);
+		border-top: 1px solid rgba(0, 0, 0, 0.18);
 		font-size: 0.7rem;
 		letter-spacing: 0.03em;
 		text-transform: uppercase;
-		color: var(--ink-muted);
+		color: var(--stone-ink-muted);
 		overflow: hidden;
 	}
 
@@ -253,7 +261,7 @@
 	}
 
 	.ic {
-		color: var(--gold-bright);
+		color: var(--stone-ink-muted);
 		font-size: 0.82rem;
 	}
 
@@ -262,22 +270,24 @@
 		gap: 2px;
 	}
 
-	/* Pips show power count; fill encodes light/dark — white = light, black = dark.
-	   The dark pip gets a light ring so it doesn't vanish into the navy card. */
+	/* Pips show power count; fill encodes light/dark literally — white fill = light, black
+	   fill = dark — both legible directly on the gray stone card. The white pip keeps a thin
+	   dark rim so it reads against the stone. */
 	.pip {
 		width: 7px;
 		height: 7px;
 		border-radius: 50%;
-		background: rgba(255, 255, 255, 0.92);
+		background: var(--pip-light);
+		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
 	}
 	.pip.dark {
-		background: #0c0c12;
-		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+		background: var(--pip-dark);
+		box-shadow: none;
 	}
 
 	/* Crossed-off: dim the content, keep the strike vivid. */
 	.rune-card.crossed {
-		border-color: rgba(255, 255, 255, 0.06);
+		border-color: rgba(0, 0, 0, 0.18);
 	}
 	.rune-card.crossed .card-top,
 	.rune-card.crossed .middle,
@@ -297,28 +307,30 @@
 		z-index: 5;
 		pointer-events: none;
 	}
-	/* Round caps + soft white read as a chalk stroke; vector-effect keeps the line an
-	   even thickness despite the non-uniform viewBox scaling. */
+	/* Round caps read as a chalk stroke, dark so it reads on the light stone; vector-effect
+	   keeps the line an even thickness despite the non-uniform viewBox scaling. */
 	.strikeout line {
-		stroke: rgba(255, 255, 255, 0.9);
+		stroke: var(--stone-strike);
 		stroke-width: 2.5;
 		stroke-linecap: round;
 		vector-effect: non-scaling-stroke;
 	}
 
-	/* Armed for cast: gold halo, content restored even if crossed. */
-	.rune-card.armed {
+	/* The chosen cast target: gold halo on that one card only — the rest of the board is
+	   unchanged, crossings and all. Its content is restored to readable even if crossed
+	   (you can read what you're about to cast); the X stays so you still see it was ruled out. */
+	.rune-card.selected {
 		border-color: var(--gold-bright);
 		box-shadow:
 			0 0 0 1px var(--gold-bright),
 			0 0 22px rgba(217, 169, 74, 0.35);
 	}
-	.rune-card.armed .ambient {
+	.rune-card.selected .ambient {
 		opacity: 0.3;
 	}
-	.rune-card.armed.crossed .card-top,
-	.rune-card.armed.crossed .middle,
-	.rune-card.armed.crossed .traits {
+	.rune-card.selected.crossed .card-top,
+	.rune-card.selected.crossed .middle,
+	.rune-card.selected.crossed .traits {
 		opacity: 1;
 		filter: none;
 	}

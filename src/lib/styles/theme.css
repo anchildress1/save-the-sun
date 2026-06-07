@@ -20,6 +20,18 @@
 	--ink-muted: #a9a392;
 	--ink-faint: #6f6c62;
 
+	/* Stone (rune tablet surface, on the midnight board) */
+	--stone-top: #b2ada3;
+	--stone-bottom: #948f85;
+	--stone-edge: #6c675e;
+	--stone-ink: #2b2722; /* carved glyph + name */
+	--stone-ink-muted: #5c5749; /* meaning, trait labels, element/colour */
+	--stone-strike: rgba(30, 26, 20, 0.82);
+
+	/* Power pips — universal light/dark fill */
+	--pip-light: #ffffff;
+	--pip-dark: #111115;
+
 	/* Signals */
 	--strike: #c8473f;
 

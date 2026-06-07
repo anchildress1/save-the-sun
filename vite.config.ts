@@ -4,6 +4,11 @@ import { playwright } from '@vitest/browser-playwright';
 
 export default defineConfig({
 	plugins: [sveltekit()],
+	// Keep the dev server from reloading the live app when a test run or build rewrites
+	// generated artifacts — a coverage run was flooding `make dev` with page reloads.
+	server: {
+		watch: { ignored: ['**/coverage/**', '**/test-results/**', '**/build/**'] }
+	},
 	test: {
 		expect: { requireAssertions: true },
 		coverage: {
@@ -11,9 +16,14 @@ export default defineConfig({
 			reporter: ['text-summary', 'lcov'],
 			reportsDirectory: 'coverage',
 			include: ['src/**/*.{ts,svelte}'],
-			// +layout.svelte is framework boilerplate (favicon + theme import + <slot>) with
-			// no logic to test; index.ts is a re-export barrel.
-			exclude: ['src/**/*.d.ts', 'src/lib/index.ts', 'src/routes/+layout.svelte'],
+			// +layout.svelte is framework boilerplate; index.ts is a re-export barrel;
+			// gemini.ts is the untestable network seam (oracle.ts re-validates its output).
+			exclude: [
+				'src/**/*.d.ts',
+				'src/lib/index.ts',
+				'src/routes/+layout.svelte',
+				'src/lib/server/oracle/gemini.ts'
+			],
 			// CI coverage floors (test-plan.md §coverage). Globs gate per module — the engine
 			// is the referee and carries the strictest bar. Raise these as modules land;
 			// never lower them. Enforced by `make test` (CI) and the pre-push hook.
@@ -25,6 +35,7 @@ export default defineConfig({
 				'src/lib/server/engine/engine.ts': { lines: 100, branches: 95 },
 				'src/lib/server/engine/queries.ts': { lines: 100, branches: 95 },
 				'src/lib/server/engine/actions.ts': { lines: 90, branches: 85 },
+				'src/lib/server/oracle/oracle.ts': { lines: 90, branches: 85 },
 				'src/routes/api/action/+server.ts': { lines: 90, branches: 85 },
 				'src/lib/components/**': { lines: 80, branches: 70 },
 				'src/routes/+page.svelte': { lines: 80, branches: 70 }

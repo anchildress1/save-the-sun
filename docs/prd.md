@@ -69,7 +69,7 @@ Built as high-fidelity DOM components orchestrated by GSAP — not Canvas/WebGL.
 
 - **Header:** title "Save the Sun" + tagline "A rite for the longest day," the night-progress indicator, and a turn pill ("Your move." / "Sköll moves.").
 - **Rune grid (left / main):** 24 rune cards, 6×4. Each card shows the glyph, a color swatch, name + meaning, the **power** as a row of pips (the pip count is the power — no numeral on the card), the element symbol + name, and the color name. The rune id is not shown — it is an internal index, not player information. Cards cross off in place; a crossed card dims with a restore affordance. The color name and element name always accompany their icons — color is a game trait, so nothing is conveyed by color alone. Light/dark is encoded on the power pips — white pips for light, black (ringed so it reads on the navy card) for dark. The pip count and fill are spoken together in each card's accessible name as "{n} light/dark power"; neither the numeral nor the light/dark word appears **as visible text**. It still aligns with the element grouping (Sun/Fire/Air light, Spirit/Water/Earth dark) and stays a queryable Oracle axis.
-- **Right column:** the Rite transcript (You / Oracle / Sköll, with interpretation echoes) → the Reactions panel (Scry · Hex) → the "Ask the Oracle — one sign at a time" free-text input with suggestion chips → the "Cast the rune" button.
+- **Right column:** the Rite transcript (You / Oracle / Sköll, with interpretation echoes) → the Reactions panel (Scry · Hex) → the "Ask the Oracle — element, power, light, or hue" free-text input with suggestion chips → the "Cast the rune" button.
 - **Casting flow.** "Cast the rune" arms **Cast mode**. While armed, the grid stops crossing off and a card tap (or keyboard select) instead *chooses the target* — the chosen rune highlights and the chrome reads "Cast?". "Name it" commits the cast; "Not yet" cancels back to normal mode with no turn spent. Outside Cast mode, a card tap only crosses off. So a card carries two scoped behaviors — cross-off normally, select-target while armed — and they never collide. (Keyboard: arm cast → arrow to the rune → select → "Name it".)
 - **Persistent explainer:** "Ask. Cross off what it can't be. Cast when you're ready."
 
@@ -92,7 +92,7 @@ Built as high-fidelity DOM components orchestrated by GSAP — not Canvas/WebGL.
 - As a player, I want Ask and Cast disabled during Sköll's turn — so I can't act on the race out of order — while I keep full control of my rune crossings.
 - As a player, I want to arm a Cast and still back out ("Name it" / "Not yet") before it commits.
 - As a player, I want a wrong cast to cost only the turn and the round to continue.
-- As a player, I want a connection or engine error shown in-world ("The fire gutters…") without losing my crossings or turn state.
+- As a player, I want a connection or engine error shown in-world ("The Oracle falls silent…") without losing my crossings or turn state.
 - As a player, I want the Rite panel to show a starting state before any Ask ("Twenty-four runes stand. None ruled out. Ask the Oracle.") so it reads as ready, not as a blank, broken panel.
 
 ### The Accessibility-dependent player
@@ -170,7 +170,7 @@ Deterministic fallback (acceptance criteria — this is the floor that fires **o
 
 **R9. Accessibility basics (screen reader deferred to v1.5).** v1 must cover keyboard operability with visible focus, semantic labels for controls, no information by color alone (the color name accompanies every swatch and element carries text), WCAG 2.1 AA contrast including the dark palette, `prefers-reduced-motion` cutting motion to instant and keeping audio muted while responding to live changes, operability at 200% zoom, and a Lighthouse a11y pass in CI. Full screen-reader narration/navigation is v1.5.
 
-**R10. Best-on-desktop notice** on small screens — no responsive reflow.
+**R10. Best-on-desktop notice** below the 1280px minimum — no responsive reflow. (Small-desktop/1024px support is deferred to v2.)
 
 **R11. End screen** — win/lose lines and in-world replay.
 

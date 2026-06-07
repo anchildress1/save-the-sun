@@ -144,4 +144,18 @@ describe('parseQuery — validation (the referee leash)', () => {
 		expect(parseQuery({ axis: 'power', op: 'lt', value: 2.5 })).toBeNull();
 		expect(parseQuery({ axis: 'power', op: 'lt', value: 'three' })).toBeNull();
 	});
+
+	it('rejects an op key on a value axis (no operators there — negation is refused upstream)', () => {
+		expect(parseQuery({ axis: 'element', value: 'Fire', op: 'ne' })).toBeNull();
+		expect(parseQuery({ axis: 'fill', value: 'Light', op: 'eq' })).toBeNull();
+	});
+
+	it('accepts an out-of-range power value (resolves to a truthful No, never rejected)', () => {
+		expect(parseQuery({ axis: 'power', op: 'eq', value: 7 })).toEqual({
+			axis: 'power',
+			op: 'eq',
+			value: 7
+		});
+		expect(runes.some((r) => resolveQuery(r, { axis: 'power', op: 'eq', value: 7 }))).toBe(false);
+	});
 });

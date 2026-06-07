@@ -11,7 +11,7 @@ const uruz: Rune = {
 	element: 'Fire',
 	power: 4,
 	fill: 'Light',
-	color: 'Silver'
+	color: 'Purple'
 };
 
 // A Dark rune (power 1) to assert the dark-pip marker.
@@ -35,7 +35,7 @@ const othala: Rune = {
 	element: 'Earth',
 	power: 6,
 	fill: 'Dark',
-	color: 'Silver'
+	color: 'Purple'
 };
 
 describe('RuneCard', () => {
@@ -44,7 +44,7 @@ describe('RuneCard', () => {
 		await expect.element(screen.getByText('ᚢ')).toBeInTheDocument();
 		await expect.element(screen.getByText('Uruz')).toBeInTheDocument();
 		await expect.element(screen.getByText('Fire')).toBeInTheDocument();
-		await expect.element(screen.getByText('Silver')).toBeInTheDocument();
+		await expect.element(screen.getByText('Purple')).toBeInTheDocument();
 	});
 
 	it('displays the meaning under the name', async () => {
@@ -127,13 +127,29 @@ describe('RuneCard', () => {
 			.toBeInTheDocument();
 	});
 
-	it('armed + crossed: a crossed rune stays castable — no chalk X, cast-target label wins', async () => {
-		// A crossed rune is still legal to cast, so cast mode restores it: the strike must
-		// not contradict the "Select as cast target" affordance.
+	it('armed + crossed: the chalk X stays so eliminations remain visible while casting', async () => {
+		// A crossed rune is still legal to cast, but the player must keep sight of every
+		// elimination while choosing — the strike stays even as the cast-target label wins.
 		const screen = render(RuneCard, { rune: uruz, crossed: true, armed: true, onAction: vi.fn() });
 		await expect
 			.element(screen.getByRole('button', { name: /select uruz as cast target/i }))
 			.toBeInTheDocument();
-		expect(screen.container.querySelectorAll('.strikeout')).toHaveLength(0);
+		expect(screen.container.querySelectorAll('.strikeout line')).toHaveLength(2);
+	});
+
+	it('marks only the selected target with the gold halo class', async () => {
+		const selected = render(RuneCard, {
+			rune: uruz,
+			armed: true,
+			selected: true,
+			onAction: vi.fn()
+		});
+		expect(selected.container.querySelector('.rune-card')?.classList.contains('selected')).toBe(
+			true
+		);
+		const armedOnly = render(RuneCard, { rune: uruz, armed: true, onAction: vi.fn() });
+		expect(armedOnly.container.querySelector('.rune-card')?.classList.contains('selected')).toBe(
+			false
+		);
 	});
 });

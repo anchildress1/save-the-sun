@@ -6,6 +6,8 @@
 
 import { runes, type Rune } from '$lib/board';
 
+// Power comparisons only. There is no negation operator — the Oracle answers what
+// IS, so a negated Ask ("is it not fire?") is refused, never turned into a query.
 export type PowerOp = 'eq' | 'lt' | 'lte' | 'gt' | 'gte';
 
 export interface ElementQuery {
@@ -59,13 +61,13 @@ export function parseQuery(input: unknown): Query | null {
 }
 
 function parseValueQuery(axis: string, q: Record<string, unknown>): Query | null {
-	if (!onlyKeys(q, 'axis', 'value') || !VALUE_AXES[axis].has(q.value)) return null;
+	if (!shapeOk(q, 'axis', 'value') || !VALUE_AXES[axis].has(q.value)) return null;
 	return { axis, value: q.value } as Query;
 }
 
 function parsePowerQuery(q: Record<string, unknown>): Query | null {
 	if (
-		!onlyKeys(q, 'axis', 'op', 'value') ||
+		!shapeOk(q, 'axis', 'op', 'value') ||
 		typeof q.op !== 'string' ||
 		!POWER_OPS.has(q.op) ||
 		!Number.isInteger(q.value)
@@ -75,12 +77,9 @@ function parsePowerQuery(q: Record<string, unknown>): Query | null {
 	return { axis: 'power', op: q.op as PowerOp, value: q.value as number };
 }
 
-/**
- * Whether an object's keys are EXACTLY the allowed set — no missing, no extras. Rejects
- * mixed-type payloads like `{ axis: 'element', value: 'Fire', color: 'Red' }`: a query
- * carries one axis, so a stray trait key is a malformed (mixed) query, not a droppable extra.
- */
-function onlyKeys(q: Record<string, unknown>, ...allowed: string[]): boolean {
+// Keys must be exactly the allowed set — no missing, no extras. A stray trait key makes a
+// mixed query (e.g. `{axis:'element', value, color}`); reject it rather than half-resolve.
+function shapeOk(q: Record<string, unknown>, ...allowed: string[]): boolean {
 	const keys = Object.keys(q);
 	return keys.length === allowed.length && keys.every((k) => allowed.includes(k));
 }
@@ -92,25 +91,33 @@ function onlyKeys(q: Record<string, unknown>, ...allowed: string[]): boolean {
 export function resolveQuery(secret: Rune, query: Query): boolean {
 	switch (query.axis) {
 		case 'element':
-			return secret.element === query.value;
+			return matchValue(secret.element, query);
 		case 'fill':
-			return secret.fill === query.value;
+			return matchValue(secret.fill, query);
 		case 'color':
-			return secret.color === query.value;
+			return matchValue(secret.color, query);
 		case 'rune':
-			return secret.name === query.value;
+			return matchValue(secret.name, query);
 		case 'power':
-			switch (query.op) {
-				case 'eq':
-					return secret.power === query.value;
-				case 'lt':
-					return secret.power < query.value;
-				case 'lte':
-					return secret.power <= query.value;
-				case 'gt':
-					return secret.power > query.value;
-				case 'gte':
-					return secret.power >= query.value;
-			}
+			return matchPower(secret.power, query.op, query.value);
+	}
+}
+
+function matchValue(actual: string, query: { value: string }): boolean {
+	return actual === query.value;
+}
+
+function matchPower(power: number, op: PowerOp, value: number): boolean {
+	switch (op) {
+		case 'eq':
+			return power === value;
+		case 'lt':
+			return power < value;
+		case 'lte':
+			return power <= value;
+		case 'gt':
+			return power > value;
+		case 'gte':
+			return power >= value;
 	}
 }

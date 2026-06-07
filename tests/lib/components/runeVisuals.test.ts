@@ -19,7 +19,7 @@ describe('rune visual maps', () => {
 
 	it('covers all six colors and six elements with no extras', () => {
 		expect(Object.keys(GEM_COLOR).sort()).toEqual(
-			['Black', 'Blue', 'Gold', 'Green', 'Red', 'Silver'].sort()
+			['Black', 'Blue', 'Gold', 'Green', 'Purple', 'Red'].sort()
 		);
 		expect(Object.keys(ELEMENT_ICON).sort()).toEqual(
 			['Air', 'Earth', 'Fire', 'Spirit', 'Sun', 'Water'].sort()
