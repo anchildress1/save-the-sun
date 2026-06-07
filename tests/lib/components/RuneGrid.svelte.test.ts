@@ -44,12 +44,15 @@ describe('RuneGrid', () => {
 
 	it('lays the 24 cards out in a 6-column grid (6×4)', async () => {
 		const screen = render(RuneGrid, { boardSeed: 42, onSelectTarget: vi.fn() });
-		const grid = screen.container.querySelector<HTMLElement>('.rune-grid')!;
-		// Six explicit column tracks → 24 cards resolve to 6×4. Reads the resolved layout, not
-		// the source declaration, so a regression in the template/CSS surfaces here.
-		const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean);
-		expect(columns).toHaveLength(6);
-		expect(screen.container.querySelectorAll('.rune-card')).toHaveLength(24);
+		const cards = [...screen.container.querySelectorAll<HTMLElement>('.rune-card')];
+		expect(cards).toHaveLength(24);
+		// Count columns by geometry, not by parsing gridTemplateColumns: getComputedStyle can
+		// return the declared `minmax(0, 1fr)` (with internal spaces) when layout is unresolved,
+		// which makes string-splitting flaky. Cards sharing the first row's top give the column
+		// count — `repeat(6, …)` is always 6 tracks, so 24 cards resolve to 6×4.
+		const firstRowTop = cards[0].offsetTop;
+		const firstRow = cards.filter((card) => card.offsetTop === firstRowTop);
+		expect(firstRow).toHaveLength(6);
 	});
 
 	it('renders the crossed visual state in place — dimmed card keeps its chalk X', async () => {
