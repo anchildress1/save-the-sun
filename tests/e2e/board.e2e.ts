@@ -3,9 +3,7 @@ import { expect, test } from '@playwright/test';
 test('renders the rite header', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('h1', { hasText: 'Save the Sun' })).toBeVisible();
-	await expect(
-		page.getByText("Ask. Cross off what it can't be. Cast when you're ready.")
-	).toBeVisible();
+	await expect(page.locator('p.tagline', { hasText: 'A rite for the longest day.' })).toBeVisible();
 });
 
 test('renders all 24 rune cards with visible trait text', async ({ page }) => {

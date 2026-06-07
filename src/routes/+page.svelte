@@ -225,8 +225,6 @@
 		</div>
 	</header>
 
-	<p class="explainer">Ask. Cross off what it can't be. Cast when you're ready.</p>
-
 	<div class="game-layout">
 		<section class="board-section">
 			{#key boardSeed}
@@ -394,18 +392,6 @@
 		background: linear-gradient(180deg, var(--gold-bright), var(--gold));
 		border-color: var(--gold-bright);
 		box-shadow: 0 0 18px rgba(217, 169, 74, 0.4);
-	}
-
-	.explainer {
-		margin: 0;
-		text-align: center;
-		color: var(--ink-muted);
-		font-style: italic;
-		font-size: 0.85rem;
-		letter-spacing: 0.02em;
-		border-top: 1px solid var(--gold-faint);
-		border-bottom: 1px solid var(--gold-faint);
-		padding: 0.45rem 0;
 	}
 
 	.game-layout {

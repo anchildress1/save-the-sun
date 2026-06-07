@@ -115,7 +115,6 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Card dims in place when crossed; restore affordance present and works
 - [ ] Header: title "Save the Sun", tagline "A rite for the longest day," night-progress indicator, turn pill ("Your move." / "Sköll moves.")
 - [ ] Right column order: Rite transcript → Reactions panel (Scry · Hex) → Ask input with suggestion chips → "Cast the rune"
-- [ ] Persistent explainer "Ask. Cross off what it can't be. Cast when you're ready."
 - [ ] Native focusable DOM elements carry the controls so rendering never blocks keyboard play
 
 **Tests to land:** [V] grid renders, visual-regression snapshots for grid + crossed/armed states · [C] card content, cross-off affordance, header chrome · [A] no-color-alone assertion.
@@ -178,6 +177,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Title screen: title, tagline, primary CTA "Light the fire.", secondary "How the rite works"
 - [ ] First-run onboarding, one concept per step, dismissable, board visible behind (`ux-copy.md` §5 steps 1–4)
 - [ ] Skippable coach-mark tour over the live board; final button "Take up the runes."
+- [ ] How-to-play guidance ("Ask. Cross off what it can't be. Cast when you're ready.") lives here in the popovers — not as a persistent on-board explainer
 
 **Tests to land:** [C] title chrome, onboarding step copy, skip path.
 

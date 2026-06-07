@@ -195,8 +195,10 @@ Sól speaks only at victory — the goddess's rarity is the power.
 | Confirm a cast | **"Name it"** |
 | Back out of a cast | **"Not yet"** |
 
-### Deduction explainer (persistent, near the board)
+### Deduction explainer (first-run onboarding / coach-mark popovers, §5)
 > **"Ask. Cross off what it can't be. Cast when you're ready."**
+
+Delivered through the onboarding popovers (R7), not as persistent on-board text.
 
 ### Persistent chrome
 | Element | Copy |
