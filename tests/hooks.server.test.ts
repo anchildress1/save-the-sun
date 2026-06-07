@@ -1,4 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
+
+// Pin dev:false so the cookie is set with secure:true — the production posture we want to
+// assert (secure: !dev). Also keeps the dev-only "created" debug log out of the test output.
+vi.mock('$app/environment', () => ({ dev: false }));
+
 import { handle } from '../src/hooks.server';
 
 function fakeEvent(existing?: string) {
@@ -34,7 +39,8 @@ describe('session hook', () => {
 		expect(set).toHaveBeenCalledWith(
 			'sts_session',
 			locals.sessionId,
-			expect.objectContaining({ path: '/', httpOnly: true, sameSite: 'lax' })
+			// secure: true here because the test env is not dev (secure: !dev).
+			expect.objectContaining({ path: '/', httpOnly: true, sameSite: 'lax', secure: true })
 		);
 	});
 
