@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine, selectSecret } from '$lib/server/engine/engine';
-import { getEngine, resetEngine } from '$lib/server/engine/session';
+import { getEngine, resetEngine, sessionCount, MAX_SESSIONS } from '$lib/server/engine/session';
 
 const SEED = 1;
 const A = 'session-a';
@@ -44,5 +44,37 @@ describe('session engine registry', () => {
 		expect(after).not.toBe(before);
 		expect(after.status).toBe('active');
 		expect(after.activePlayer).toBe('Human');
+	});
+
+	it('never grows past the session cap', () => {
+		for (let i = 0; i <= MAX_SESSIONS + 10; i++) getEngine(`cap-${i}`);
+		expect(sessionCount()).toBe(MAX_SESSIONS);
+	});
+
+	it('evicts an idle session once the cap is exceeded', () => {
+		// Park a known terminal round, then never touch it again.
+		resetEngine('idle-victim', SEED);
+		getEngine('idle-victim').cast('Human', selectSecret(SEED).name);
+		expect(getEngine('idle-victim').status).toBe('won');
+
+		// Flood the cap with fresh sessions — the idle one is older than all of them.
+		for (let i = 0; i <= MAX_SESSIONS; i++) getEngine(`flood-${i}`);
+
+		// Evicted → the next access is a brand-new active round, not the won one.
+		expect(getEngine('idle-victim').status).toBe('active');
+	});
+
+	it('never evicts a session that is still being used', () => {
+		resetEngine('active-keep', SEED);
+		getEngine('active-keep').cast('Human', selectSecret(SEED).name); // terminal: won
+
+		// Overflow the cap, but touch the kept session every step so it stays most-recent.
+		for (let i = 0; i <= MAX_SESSIONS; i++) {
+			getEngine(`churn-${i}`);
+			getEngine('active-keep');
+		}
+
+		// Survived: still the same won round, never reset.
+		expect(getEngine('active-keep').status).toBe('won');
 	});
 });
