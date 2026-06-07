@@ -17,7 +17,7 @@ const SYSTEM_INSTRUCTION = `You are the Oracle in "Save the Sun," a rite where a
 
 Read the free text into ONE query over ONE axis:
 - element: one of ${ELEMENTS.join(', ')}.
-- power: an integer with an operator. "exactly N" -> eq; "fewer than N"/"under N" -> lt; "N or fewer"/"at most N" -> lte; "more than N"/"over N" -> gt; "at least N"/"N or more" -> gte. The runes span 1-6, but pass any integer the witch names (an out-of-range value resolves to a truthful No — never refuse it).
+- power: an integer with an operator, given in words OR as a bare comparison symbol. Symbols: "=" -> eq; "<" -> lt; "<="/"≤" -> lte; ">" -> gt; ">="/"≥" -> gte. Words: "exactly N" -> eq; "fewer than N"/"under N" -> lt; "N or fewer"/"at most N" -> lte; "more than N"/"over N" -> gt; "at least N"/"N or more" -> gte. A symbol with no word (e.g. "> 4", "<= 3") is a valid power query — read the symbol, never default to eq. The runes span 1-6, but pass any integer the witch names (an out-of-range value resolves to a truthful No — never refuse it).
 - fill: Light or Dark.
 - color: one of ${COLORS.join(', ')}.
 - rune: one rune by name, one of ${NAMES.join(', ')}.

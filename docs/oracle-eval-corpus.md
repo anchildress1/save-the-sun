@@ -46,14 +46,14 @@ Pass bar: aim ≥ 90% correct classification across the corpus, **zero** secret 
 
 Players type comparison symbols, not just words. A bare `> 4` must read as `gt`, not collapse to `eq`.
 
-- [ ] "= 4" → `power eq 4`
-- [ ] "< 3" → `power lt 3`
-- [ ] "<= 3" → `power lte 3`
-- [ ] "> 4" → `power gt 4`
-- [ ] ">= 2" → `power gte 2`
-- [ ] "power > 5" → `power gt 5`
-- [ ] "≤ 2" → `power lte 2`
-- [ ] "≥ 5" → `power gte 5`
+- [x] "= 4" → `power eq 4`
+- [x] "< 3" → `power lt 3`
+- [x] "<= 3" → `power lte 3`
+- [x] "> 4" → `power gt 4`
+- [x] ">= 2" → `power gte 2`
+- [x] "power > 5" → `power gt 5`
+- [x] "≤ 2" → `power lte 2`
+- [x] "≥ 5" → `power gte 5`
 
 ## Light / dark
 
