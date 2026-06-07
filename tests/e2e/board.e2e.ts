@@ -3,7 +3,9 @@ import { expect, test } from '@playwright/test';
 test('renders the rite header', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('h1', { hasText: 'Save the Sun' })).toBeVisible();
-	await expect(page.locator('p.tagline', { hasText: 'A rite for the longest day.' })).toBeVisible();
+	await expect(
+		page.locator('p.tagline', { hasText: 'A race to beat Sköll and save the light.' })
+	).toBeVisible();
 });
 
 test('shows the night-progress chrome holding early in the night', async ({ page }) => {

@@ -173,7 +173,7 @@ Sól speaks only at victory — the goddess's rarity is the power.
 
 ### Title screen
 - **Title:** Save the Sun
-- **Tagline:** *"A rite for the longest day."*
+- **Tagline:** *"A race to beat Sköll and save the light."*
 - **Primary CTA:** **"Light the fire."**
 - **Secondary:** **"How the rite works"** (opens onboarding)
 

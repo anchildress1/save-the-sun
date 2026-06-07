@@ -246,7 +246,7 @@
 			</svg>
 			<div>
 				<h1>Save the Sun</h1>
-				<p class="tagline">A rite for the longest day.</p>
+				<p class="tagline">A race to beat Sköll and save the light.</p>
 			</div>
 		</div>
 
@@ -341,7 +341,9 @@
 					submitAsk();
 				}}
 			>
-				<label for="oracle-ask">Ask the Oracle — element, power, light, or hue</label>
+				<!-- The howto (which axes to ask about) lives in the onboarding popovers, not on the
+				     board. Label kept for the field's accessible name only. -->
+				<label class="sr-only" for="oracle-ask">Ask the Oracle</label>
 				<input
 					id="oracle-ask"
 					type="text"
@@ -596,11 +598,16 @@
 		gap: 0.45rem;
 	}
 
-	.ask label {
-		font-size: 0.62rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--ink-muted);
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	.ask input {
