@@ -13,6 +13,9 @@ import type { Player } from './actions';
 
 export type InvalidReason = 'round-over' | 'not-your-turn' | 'malformed-query' | 'unknown-rune';
 
+/** One-use reactions (S5). Each player holds one of each per round; spending it is permanent. */
+export type Reaction = 'Scry' | 'Hex';
+
 export type AskResult =
 	| { ok: true; answer: boolean; turnConsumed: true }
 	| { ok: false; reason: InvalidReason; turnConsumed: false };
@@ -32,6 +35,14 @@ interface Round {
 	// courtesy passTurn does NOT, so this counts real plays, not alternation flips. Drives the
 	// cosmetic night-progress chrome and stays S6-stable (Sköll's plays bump it too).
 	turns: number;
+	// One Scry + one Hex per player, spent permanently within the round (S5).
+	reactions: Record<Player, Record<Reaction, boolean>>;
+	// The open reaction window: the asker whose *pending* Ask the rival may react to before it is
+	// answered, or null when none is open. It is opened around a pending Ask (openReactionWindow),
+	// NOT as a side effect of a resolved one — so a Hex lands before any answer is produced, never
+	// after. A resolved Cast closes it (casts are sacred, never interruptible); a reaction or a
+	// decline closes it — at most one reaction per window.
+	window: Player | null;
 }
 
 /** Pick the secret rune for a seed. Deterministic; the production round path. */
@@ -54,7 +65,12 @@ export class GameEngine {
 			status: 'active',
 			winner: null,
 			wrongCasts: { Human: 0, Sköll: 0 },
-			turns: 0
+			turns: 0,
+			reactions: {
+				Human: { Scry: true, Hex: true },
+				Sköll: { Scry: true, Hex: true }
+			},
+			window: null
 		};
 	}
 
@@ -128,6 +144,7 @@ export class GameEngine {
 		const rune = runes.find((r) => r.name === runeName);
 		if (rune === undefined) return { ok: false, reason: 'unknown-rune', turnConsumed: false };
 
+		this.#round.window = null; // a resolved Cast is sacred — it leaves no reaction window open
 		this.#round.turns += 1;
 
 		if (rune.name === this.#round.secret.name) {
@@ -139,5 +156,37 @@ export class GameEngine {
 		this.#round.wrongCasts[player] += 1;
 		this.#advance();
 		return { ok: true, won: false, turnConsumed: true };
+	}
+
+	/**
+	 * Open a reaction window around a *pending* Ask — the rival may Scry/Hex it before it is
+	 * answered. Opened by the orchestration when a player declares an Ask (the S6 seam where
+	 * Sköll Asks and the human reacts), not by `ask` itself, so a Hex resolves before any answer
+	 * is produced. On Hex the answer is never asked for; on Pass/Scry the orchestration resolves
+	 * the Ask after the window closes.
+	 */
+	openReactionWindow(asker: Player): void {
+		this.#round.window = asker;
+	}
+
+	/** Whether a player still holds a given reaction this round. */
+	reactionAvailable(player: Player, reaction: Reaction): boolean {
+		return this.#round.reactions[player][reaction];
+	}
+
+	/** The asker whose Ask is open to the rival's reaction, or null when no window is open. */
+	get reactionWindow(): Player | null {
+		return this.#round.window;
+	}
+
+	/** Spend a reaction and close the window — the one reaction this window allows. */
+	consumeReaction(player: Player, reaction: Reaction): void {
+		this.#round.reactions[player][reaction] = false;
+		this.#round.window = null;
+	}
+
+	/** Close the window without spending a reaction — the rival let the Ask pass. */
+	declineReaction(): void {
+		this.#round.window = null;
 	}
 }

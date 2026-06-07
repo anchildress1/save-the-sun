@@ -22,7 +22,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [U] Refused/invalid Ask does **not** consume the turn; resolved Ask does
 - [x] [Sec] No engine path returns the secret before a correct cast
 - [x] [U] Strict alternation, human-first; out-of-order Ask/Cast rejected
-- [ ] [U] Scry returns same answer to rival; Hex suppresses answer + spends turn; Cast never interruptible _(S5)_
+- [x] [U] Scry returns same answer to rival; Hex suppresses answer + spends turn; Cast never interruptible _(S5)_
 - [x] [U] Per-player wrong-cast counter increments from v1 (threshold unused until v2)
 
 ## 2. Oracle pipeline (Gemini, Role 1)
@@ -85,13 +85,13 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 5. Reactions — Scry & Hex
 
-- [ ] [I] Each reaction once per player per round; spent reaction unavailable after (no "spent" copy)
-- [ ] [I] Offered on an Ask's echo; **never** on a Cast
-- [ ] [I] At most one reaction per interrupt window; Hex leaves no answer for Scry
-- [ ] [I] Scry → rival also receives private answer
-- [ ] [I] Hex → question dies, no answer to anyone, active turn spent
-- [ ] [C] Human prompt "Sköll asks. Answer it?" → Scry / Hex / Let it pass per `ux-copy.md`
-- [ ] [I] Sköll's reaction is refereed Gemini response with deterministic-floor fallback
+- [x] [I] Each reaction once per player per round; spent reaction unavailable after (no "spent" copy)
+- [x] [I] Offered on an Ask's window; **never** on a Cast _(cast-sacredness structural — a Cast leaves no window; the rival's-Ask echo surface lights up in S6)_
+- [x] [I] At most one reaction per interrupt window; Hex leaves no answer for Scry
+- [x] [I] Scry → rival also receives private answer
+- [x] [I] Hex → question dies, no answer to anyone _(kill + no-answer tested in S5; the asker's turn-spend on a hexed Ask lands with S6's hexed-Ask orchestration — the window now precedes the answer, so the Ask is never resolved on a Hex)_
+- [x] [C] Human prompt "Sköll asks. Answer it?" → Scry / Hex / Let it pass per `ux-copy.md`
+- [ ] [I] Sköll's reaction is refereed Gemini response with deterministic-floor fallback _(S6 — Sköll's live Ask/reaction)_
 
 ## 6. UI / graphics presentation
 
@@ -127,7 +127,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C] Empty submit refused with "Speak your question, witch."
 - [x] [E] Below the 1280px minimum: best-on-desktop notice — no responsive reflow (1024px support is v2) _(e2e at 1024px asserts the notice shows and the rite is hidden; 1440px asserts the reverse)_
 - [x] [I] Invalid Ask costs only the rephrase, never a false answer
-- [ ] [S] Every seeded round winnable through legal Asks; Oracle never lies (fuzz across secrets/seeds)
+- [x] [S] Every seeded round winnable through legal Asks; Oracle never lies (fuzz across secrets/seeds)
 
 ## 10. Debug view
 
@@ -151,7 +151,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [ ] **Deterministic fallback policy** — line **95%** / branch **90%**
 - [x] **Action interface** — line **90%** / branch **85%**
 - [x] **Oracle pipeline** — line **90%** / branch **85%**
-- [ ] **Reactions** — line **95%** / branch **90%**
+- [x] **Reactions** — line **95%** / branch **90%**
 - [x] **UI / interaction** — line **80%** / branch **70%**
 - [ ] **Graphics render layer** — line **60%** _(→ v1.5: graphics is a separate layer; not a v1 gate. Functional render is covered under the components gate at 80/70)_
 - [x] **Project overall** — line **85%** / branch **80%**
@@ -168,7 +168,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [ ] Weighted-random vs argmax statistical test present and passing (§3)
 - [x] Turn-accounting-on-refusal covered for **every** refusal class (§2)
 - [x] Crossed-rune cast legality covered (§1)
-- [ ] Cast sacredness: reactions never offered on a Cast (§5)
+- [x] Cast sacredness: reactions never offered on a Cast (§5)
 - [ ] Degradation **fairness** (solvable), not just renders (§8)
 - [ ] Secret never present in Sköll's payload (§3)
 
@@ -177,7 +177,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] Engine suite lands with engine
 - [x] Oracle suite lands with Oracle
 - [x] Human-loop + win/cast suites land with that module
-- [ ] Reactions suite lands with reactions
+- [x] Reactions suite lands with reactions
 - [ ] Opponent (Gemini + floor) suite lands with opponent
 - [ ] Integration + E2E follow once action interface is stable
 - [ ] a11y + degradation E2E gate the v1 jam build (June 21)

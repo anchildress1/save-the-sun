@@ -304,6 +304,65 @@ describe('GameEngine.turns — consumed-turn count (drives night-progress chrome
 	});
 });
 
+describe('GameEngine — reaction charges & interrupt window (S5)', () => {
+	const LIGHT = { axis: 'fill', value: 'Light' } as const;
+
+	it('starts each round with both reactions held and no open window', () => {
+		const engine = new GameEngine(7);
+		for (const player of ['Human', 'Sköll'] as const) {
+			expect(engine.reactionAvailable(player, 'Scry')).toBe(true);
+			expect(engine.reactionAvailable(player, 'Hex')).toBe(true);
+		}
+		expect(engine.reactionWindow).toBeNull();
+	});
+
+	it('opens a window named for the asker of a pending Ask', () => {
+		const engine = new GameEngine(7);
+		engine.openReactionWindow('Human');
+		expect(engine.reactionWindow).toBe('Human');
+	});
+
+	it('does not open a window from `ask` itself — the window precedes the answer', () => {
+		const engine = new GameEngine(7);
+		engine.ask('Human', LIGHT); // resolving an Ask never opens a window on its own
+		expect(engine.reactionWindow).toBeNull();
+	});
+
+	it('leaves no window open after a resolved Cast — casts are sacred', () => {
+		const seed = 7;
+		const engine = new GameEngine(seed);
+		engine.openReactionWindow('Human'); // a pending Ask
+		engine.cast('Human', otherRune(selectSecret(seed)).name); // a resolved Cast closes any window
+		expect(engine.reactionWindow).toBeNull();
+	});
+
+	it('spends a reaction and closes the window when consumed', () => {
+		const engine = new GameEngine(7);
+		engine.openReactionWindow('Human');
+		engine.consumeReaction('Sköll', 'Scry');
+		expect(engine.reactionAvailable('Sköll', 'Scry')).toBe(false);
+		expect(engine.reactionAvailable('Sköll', 'Hex')).toBe(true);
+		expect(engine.reactionWindow).toBeNull();
+	});
+
+	it('closes the window without spending when declined', () => {
+		const engine = new GameEngine(7);
+		engine.openReactionWindow('Human');
+		engine.declineReaction();
+		expect(engine.reactionWindow).toBeNull();
+		expect(engine.reactionAvailable('Sköll', 'Scry')).toBe(true);
+	});
+
+	it('restores both reactions and clears the window on a new round', () => {
+		const engine = new GameEngine(7);
+		engine.openReactionWindow('Human');
+		engine.consumeReaction('Sköll', 'Hex');
+		engine.newRound(8);
+		expect(engine.reactionAvailable('Sköll', 'Hex')).toBe(true);
+		expect(engine.reactionWindow).toBeNull();
+	});
+});
+
 describe('GameEngine — round solvability (every secret winnable through legal Asks; Oracle never lies)', () => {
 	it('reaches every one of the 24 secrets by some seed', () => {
 		const seedFor = new Map<string, number>();
