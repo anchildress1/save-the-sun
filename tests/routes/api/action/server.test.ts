@@ -121,6 +121,15 @@ describe('POST /api/action', () => {
 		expect(data.skoll).toBeDefined(); // the wolf takes his turn after the miss
 	});
 
+	it('routes a bare React (no Sköll Ask pending) as a harmless no-window pass', async () => {
+		const data = await (await call({ type: 'React', player: 'Human', reaction: 'Pass' })).json();
+		expect(data).toEqual({
+			type: 'React',
+			outcome: { ok: true, choice: 'Pass' },
+			state: { ...HUMAN_TURN }
+		});
+	});
+
 	it('routes a CrossOff without a turn — Sköll does not move', async () => {
 		const data = await (
 			await call({ type: 'CrossOff', player: 'Human', runeId: 1, crossed: true })
