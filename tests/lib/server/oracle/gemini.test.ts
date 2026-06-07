@@ -52,7 +52,7 @@ describe('Gemini Oracle adapter', () => {
 		});
 		expect(sdk.generateContent).toHaveBeenCalledWith(
 			expect.objectContaining({
-				model: 'gemini-3.5-flash',
+				model: 'gemini-3-flash-preview',
 				contents: 'Is it a fire rune?',
 				config: expect.objectContaining({
 					responseMimeType: 'application/json',

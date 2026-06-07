@@ -1,5 +1,5 @@
 // Gemini adapter — the Oracle's LLM seam (S2). Excluded from coverage: oracle.ts
-// re-validates everything it returns. gemini-3.5-flash, MINIMAL thinking, JSON out.
+// re-validates everything it returns. gemini-3-flash-preview, MINIMAL thinking, JSON out.
 
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
@@ -7,7 +7,7 @@ import { runes } from '$lib/board';
 import type { PowerOp, Query } from '$lib/server/engine/queries';
 import type { Interpretation, Interpret, RefusalClass } from './types';
 
-const MODEL = 'gemini-3.5-flash';
+const MODEL = 'gemini-3-flash-preview';
 
 const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
 const COLORS: string[] = [...new Set(runes.map((r) => r.color))];
@@ -135,7 +135,7 @@ export const interpret: Interpret = async (question) => {
 		// Only transport/parse failures degrade to an in-world engine-error so a live round
 		// never hard-fails; the turn is preserved. normalize() is pure and stays OUTSIDE the
 		// catch, so a mapping bug surfaces loudly instead of masquerading as a network outage.
-		console.error(`[oracle] Gemini interpret failed (model=${MODEL}):`, err);
+		console.error('[oracle] Gemini interpret failed:', { model: MODEL, error: err });
 		return { kind: 'refusal', refusal: 'engine-error' };
 	}
 	return normalize(raw);
