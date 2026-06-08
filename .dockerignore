@@ -1,7 +1,47 @@
+# ─── Secrets (never bake into an image) ──────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Version control / CI / editor ───────────────────────────────────────────
+.git
+.github
+.vscode
+.DS_Store
+
+# ─── Build + dependency artifacts (rebuilt inside Docker) ────────────────────
 node_modules
 build
 .svelte-kit
-.env
-.DS_Store
-docs
+.vitest-attachments
+coverage
+test-results
+.playwright-mcp
+.tmp
+
+# ─── Tests + dev-only source ─────────────────────────────────────────────────
+tests
 poc
+playwright.config.ts
+vitest-setup-client.ts
+
+# ─── Docs + meta (not needed at build/runtime) ───────────────────────────────
+docs
+*.md
+LICENSE
+commit.tmp
+
+# ─── Tooling configs the build doesn't read ──────────────────────────────────
+Makefile
+deploy.sh
+cleanup-policy.json
+lefthook.yml
+commitlint.config.js
+eslint.config.js
+.prettierrc
+.prettierignore
+.secretlintrc.json
+sonar-project.properties
+.dockerignore
+.gcloudignore
+.gitignore

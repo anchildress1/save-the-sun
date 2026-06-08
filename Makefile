@@ -1,4 +1,4 @@
-.PHONY: install dev format format-check lint typecheck test build e2e perf secret-scan clean ai-checks
+.PHONY: install dev format format-check lint typecheck test build e2e perf secret-scan deploy clean ai-checks
 
 install:
 	pnpm install
@@ -33,6 +33,9 @@ perf:
 
 secret-scan:
 	npx secretlint
+
+deploy:
+	./deploy.sh
 
 clean:
 	rm -rf build node_modules .svelte-kit

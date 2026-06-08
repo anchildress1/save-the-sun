@@ -1,10 +1,31 @@
-.gcloudignore
+# Pulls node_modules, build, .svelte-kit, .env*, coverage, test-results, etc.
+#!include:.gitignore
+
+# Version control / CI / editor
 .git
-.gitignore
-node_modules
-build
-.svelte-kit
-.env
-.DS_Store
-docs
+.github
+.vscode
+
+# Tests + dev-only source (image is built from src/, static/, configs)
+tests
 poc
+playwright.config.ts
+vitest-setup-client.ts
+
+# Docs + meta
+docs
+*.md
+LICENSE
+commit.tmp
+
+# Tooling configs Cloud Build doesn't need
+Makefile
+deploy.sh
+cleanup-policy.json
+lefthook.yml
+commitlint.config.js
+.secretlintrc.json
+sonar-project.properties
+.gcloudignore
+.playwright-mcp
+.tmp
