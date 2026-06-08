@@ -549,7 +549,6 @@
 			</form>
 
 			<div class="cast" data-coach="cast">
-				<span class="cast-label">Cast a Rune</span>
 				{#if castMode}
 					<p class="cast-hint" data-testid="cast-hint">
 						{selectedRune ? RITE.castPrompt(selectedRune.name) : RITE.chooseTarget}
@@ -872,13 +871,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.45rem;
-	}
-
-	.cast-label {
-		font-size: 0.62rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--ink-muted);
 	}
 
 	.cast-hint {
