@@ -312,10 +312,15 @@ describe('resolveSkollAsk — closing his Ask after the human reacts', () => {
 		expect(state.facts).toHaveLength(1); // the question was answered, not killed
 	});
 
-	it('throws if called with no parked Ask', () => {
+	it('throws if called with no parked Ask — without mutating state', () => {
 		const engine = skollsTurn();
 		const reaction = resolveReaction(engine, 'Human', 'Pass');
-		expect(() => resolveSkollAsk(engine, freshSkollState(SEED), reaction)).toThrow();
+		// An inconsistent state (no pending Ask, but a decision lingering): the guard must throw
+		// BEFORE clearing, so the decision survives for debugging rather than vanishing as a side effect.
+		const state = freshSkollState(SEED);
+		state.pendingDecision = { source: 'gemini', reasoning: 'x' };
+		expect(() => resolveSkollAsk(engine, state, reaction)).toThrow('no pending Ask');
+		expect(state.pendingDecision).toEqual({ source: 'gemini', reasoning: 'x' }); // untouched
 	});
 });
 
