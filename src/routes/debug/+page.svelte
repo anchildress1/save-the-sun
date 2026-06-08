@@ -85,27 +85,32 @@
 </main>
 
 <style>
+	/* Fluid throughout — no fixed widths or breakpoints. border-box so padding never widens a box
+	   past its track, scoped to this view so it can't leak into the game. */
+	main,
+	main * {
+		box-sizing: border-box;
+	}
 	main {
-		max-width: 64rem;
-		margin: 0 auto;
-		padding: 2rem 1.5rem;
-		font-family: system-ui, sans-serif;
+		inline-size: 100%;
+		padding: clamp(1rem, 0.5rem + 2vw, 2.5rem) clamp(0.75rem, 0.5rem + 1.5vw, 2rem);
+		min-block-size: 100dvh;
 		color: #e8e8ea;
 		background: #16161a;
-		min-height: 100vh;
+		font-family: var(--font-body);
 	}
 	h1 {
 		margin: 0 0 0.25rem;
 	}
 	header p {
-		margin: 0 0 1.5rem;
+		margin: 0 0 clamp(1rem, 0.5rem + 1.5vw, 1.75rem);
 		color: #b8b8c0;
 		line-height: 1.5;
 	}
 	code {
 		background: #2c2c34;
-		padding: 0.05rem 0.35rem;
-		border-radius: 0.25rem;
+		padding: 0.05em 0.35em;
+		border-radius: 0.25em;
 		font-size: 0.85em;
 	}
 	.empty {
@@ -117,36 +122,36 @@
 		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 0.6rem;
+		gap: clamp(0.4rem, 0.3rem + 0.4vw, 0.75rem);
 	}
 	li {
-		min-width: 0; /* let a wide child (the raw I/O <pre>) shrink instead of stretching the card */
+		min-inline-size: 0; /* let a wide child (the raw I/O <pre>) shrink, not stretch the card */
 		border: 1px solid #2c2c34;
-		border-left-width: 3px;
+		border-inline-start-width: 3px;
 		border-radius: 0.4rem;
 		padding: 0.6rem 0.9rem;
 		background: #1d1d22;
 	}
 	li.turn {
-		border-left-color: #3a6ea5;
+		border-inline-start-color: #3a6ea5;
 	}
 	li.skoll {
-		border-left-color: #8a6d3b;
+		border-inline-start-color: #8a6d3b;
 	}
 	li.oracle {
-		border-left-color: #4a7a4a;
+		border-inline-start-color: #4a7a4a;
 	}
 	li.gemini {
-		border-left-color: #7a4a8a;
+		border-inline-start-color: #7a4a8a;
 	}
 	li.session {
-		border-left-color: #7a7a85;
+		border-inline-start-color: #7a7a85;
 	}
 	li.warn {
-		border-left-color: #b9892b;
+		border-inline-start-color: #b9892b;
 	}
 	li.error {
-		border-left-color: #b03a3a;
+		border-inline-start-color: #b03a3a;
 	}
 	.head {
 		display: flex;
@@ -155,7 +160,7 @@
 		gap: 0.35rem 0.5rem;
 		font-size: 0.8rem;
 		color: #b8b8c0;
-		margin-bottom: 0.35rem;
+		margin-block-end: 0.35rem;
 	}
 	.seq {
 		color: #7a7a85;
@@ -171,7 +176,7 @@
 		font-weight: 600;
 	}
 	.badge {
-		margin-left: auto;
+		margin-inline-start: auto;
 		padding: 0.05rem 0.45rem;
 		border-radius: 1rem;
 		background: #2c2c34;
@@ -180,12 +185,12 @@
 	.badge.warn {
 		background: #5a4300;
 		color: #ffd98a;
-		margin-left: 0.25rem;
+		margin-inline-start: 0.25rem;
 	}
 	.badge.error {
 		background: #5a1f1f;
 		color: #ff9d9d;
-		margin-left: 0.25rem;
+		margin-inline-start: 0.25rem;
 	}
 	.sensitive .badge:first-of-type {
 		background: #4a1f4a;
@@ -209,8 +214,10 @@
 	}
 	.cols {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); /* columns shrink, never overflow */
-		gap: 1rem;
+		/* Two columns when there's room, one when there isn't — the reflow threshold is a relative
+		   measure, not a pixel breakpoint. min(100%, …) keeps the floor from ever exceeding the track. */
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+		gap: clamp(0.6rem, 0.4rem + 1vw, 1.25rem);
 	}
 	.tag {
 		display: block;
@@ -218,18 +225,18 @@
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		color: #7a7a85;
-		margin-bottom: 0.2rem;
+		margin-block-end: 0.2rem;
 	}
 	.cols p {
 		margin: 0;
 		overflow-wrap: anywhere;
 	}
 	.truth {
-		border-left: 2px solid #3a6ea5;
-		padding-left: 0.75rem;
+		border-inline-start: 2px solid #3a6ea5;
+		padding-inline-start: 0.75rem;
 	}
 	.inference {
-		border-left: 2px solid #8a6d3b;
-		padding-left: 0.75rem;
+		border-inline-start: 2px solid #8a6d3b;
+		padding-inline-start: 0.75rem;
 	}
 </style>
