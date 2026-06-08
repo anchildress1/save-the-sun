@@ -1,12 +1,21 @@
 // Pure trait -> visual mappings for the rune cards. Kept framework-free so the
 // completeness of every axis is unit-testable outside the Svelte component.
 import stoneCardBackground from '$lib/assets/card/stone.png';
+import chalkCrossAsset from '$lib/assets/marks/chalk-cross.png';
 import blackColorIcon from '$lib/assets/colors/black.png';
 import blueColorIcon from '$lib/assets/colors/blue.png';
 import goldColorIcon from '$lib/assets/colors/gold.png';
 import greenColorIcon from '$lib/assets/colors/green.png';
 import purpleColorIcon from '$lib/assets/colors/purple.png';
 import redColorIcon from '$lib/assets/colors/red.png';
+import airElementIcon from '$lib/assets/elements/air.png';
+import earthElementIcon from '$lib/assets/elements/earth.png';
+import fireElementIcon from '$lib/assets/elements/fire.png';
+import spiritElementIcon from '$lib/assets/elements/spirit.png';
+import sunElementIcon from '$lib/assets/elements/sun.png';
+import waterElementIcon from '$lib/assets/elements/water.png';
+import darkFillIcon from '$lib/assets/fills/dark.png';
+import lightFillIcon from '$lib/assets/fills/light.png';
 import algizSymbol from '$lib/assets/runes/algiz.png';
 import ansuzSymbol from '$lib/assets/runes/ansuz.png';
 import berkanaSymbol from '$lib/assets/runes/berkana.png';
@@ -34,6 +43,7 @@ import wunjoSymbol from '$lib/assets/runes/wunjo.png';
 
 export type RuneColor = 'Blue' | 'Red' | 'Green' | 'Purple' | 'Gold' | 'Black';
 export type RuneElement = 'Sun' | 'Fire' | 'Air' | 'Water' | 'Earth' | 'Spirit';
+export type RuneFill = 'Light' | 'Dark';
 export type RuneName =
 	| 'Algiz'
 	| 'Ansuz'
@@ -116,7 +126,22 @@ export const COLOR_ICON_ASSET: Record<RuneColor, string> = {
 	Red: redColorIcon
 };
 
+export const ELEMENT_ICON_ASSET: Record<RuneElement, string> = {
+	Air: airElementIcon,
+	Earth: earthElementIcon,
+	Fire: fireElementIcon,
+	Spirit: spiritElementIcon,
+	Sun: sunElementIcon,
+	Water: waterElementIcon
+};
+
+export const FILL_ICON_ASSET: Record<RuneFill, string> = {
+	Dark: darkFillIcon,
+	Light: lightFillIcon
+};
+
 export const CARD_BACKGROUND_ASSET = stoneCardBackground;
+export const CHALK_CROSS_ASSET = chalkCrossAsset;
 
 /** Gem color for a rune color. Throws on an unmapped value rather than silently defaulting. */
 export function gemColor(color: string): string {
@@ -143,5 +168,19 @@ export function runeSymbolAsset(name: string): string {
 export function colorIconAsset(color: string): string {
 	const icon = COLOR_ICON_ASSET[color as RuneColor];
 	if (!icon) throw new Error(`Unmapped color icon: ${color}`);
+	return icon;
+}
+
+/** Element icon asset URL for a rune element. Throws on an unmapped value rather than silently defaulting. */
+export function elementIconAsset(element: string): string {
+	const icon = ELEMENT_ICON_ASSET[element as RuneElement];
+	if (!icon) throw new Error(`Unmapped element icon: ${element}`);
+	return icon;
+}
+
+/** Fill icon asset URL for a rune fill. Throws on an unmapped value rather than silently defaulting. */
+export function fillIconAsset(fill: string): string {
+	const icon = FILL_ICON_ASSET[fill as RuneFill];
+	if (!icon) throw new Error(`Unmapped fill icon: ${fill}`);
 	return icon;
 }

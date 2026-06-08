@@ -60,7 +60,9 @@ describe('RuneGrid', () => {
 		const card = screen.container.querySelector('.rune-card[data-rune-id="1"]')!;
 		await screen.getByRole('button', { name: /cross off sowilo/i }).click();
 		expect(card.classList.contains('crossed')).toBe(true);
-		expect(card.querySelectorAll('.strikeout line')).toHaveLength(2);
+		const strikeout = card.querySelector('.strikeout');
+		expect(strikeout).toBeInstanceOf(HTMLImageElement);
+		expect((strikeout as HTMLImageElement).src).toMatch(/chalk-cross\.png/);
 	});
 
 	it('renders the armed visual state — only the chosen target wears the halo', async () => {

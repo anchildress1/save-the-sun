@@ -5,11 +5,16 @@ import {
 	elementIcon,
 	runeSymbolAsset,
 	colorIconAsset,
+	elementIconAsset,
+	fillIconAsset,
 	GEM_COLOR,
 	ELEMENT_ICON,
 	RUNE_SYMBOL_ASSET,
 	COLOR_ICON_ASSET,
-	CARD_BACKGROUND_ASSET
+	ELEMENT_ICON_ASSET,
+	FILL_ICON_ASSET,
+	CARD_BACKGROUND_ASSET,
+	CHALK_CROSS_ASSET
 } from '$lib/components/runeVisuals';
 
 describe('rune visual maps', () => {
@@ -41,8 +46,26 @@ describe('rune visual maps', () => {
 		}
 	});
 
+	it('maps every rune element to a bundled icon asset', () => {
+		for (const rune of runes) {
+			expect(() => elementIconAsset(rune.element)).not.toThrow();
+			expect(elementIconAsset(rune.element)).toMatch(/\.png$/);
+		}
+	});
+
+	it('maps every rune fill to a bundled icon asset', () => {
+		for (const rune of runes) {
+			expect(() => fillIconAsset(rune.fill)).not.toThrow();
+			expect(fillIconAsset(rune.fill)).toMatch(/\.png$/);
+		}
+	});
+
 	it('exposes a bundled stone card background asset', () => {
 		expect(CARD_BACKGROUND_ASSET).toMatch(/\.png$/);
+	});
+
+	it('exposes a bundled chalk cross asset', () => {
+		expect(CHALK_CROSS_ASSET).toMatch(/\.png$/);
 	});
 
 	it('covers all six colors and six elements with no extras', () => {
@@ -55,6 +78,10 @@ describe('rune visual maps', () => {
 		expect(Object.keys(ELEMENT_ICON).sort()).toEqual(
 			['Air', 'Earth', 'Fire', 'Spirit', 'Sun', 'Water'].sort()
 		);
+		expect(Object.keys(ELEMENT_ICON_ASSET).sort()).toEqual(
+			['Air', 'Earth', 'Fire', 'Spirit', 'Sun', 'Water'].sort()
+		);
+		expect(Object.keys(FILL_ICON_ASSET).sort()).toEqual(['Dark', 'Light']);
 		expect(Object.keys(RUNE_SYMBOL_ASSET).sort()).toEqual(runes.map((rune) => rune.name).sort());
 	});
 
@@ -63,5 +90,7 @@ describe('rune visual maps', () => {
 		expect(() => elementIcon('Aether')).toThrow(/Unmapped rune element/);
 		expect(() => runeSymbolAsset('Glorp')).toThrow(/Unmapped rune symbol/);
 		expect(() => colorIconAsset('Chartreuse')).toThrow(/Unmapped color icon/);
+		expect(() => elementIconAsset('Aether')).toThrow(/Unmapped element icon/);
+		expect(() => fillIconAsset('Shadow')).toThrow(/Unmapped fill icon/);
 	});
 });
