@@ -180,10 +180,12 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *Needs a live board to coach-mark over. Depends on: S4.*
 
-- [ ] Title screen: title, tagline, primary CTA "Light the fire.", secondary "How the rite works"
-- [ ] First-run onboarding, one concept per step, dismissable, board visible behind (`ux-copy.md` §5 steps 1–4)
-- [ ] Skippable coach-mark tour over the live board; final button "Take up the runes."
-- [ ] How-to-play guidance ("Ask. Cross off what it can't be. Cast when you're ready.") lives here in the popovers — not as a persistent on-board explainer
+- [x] Title screen: title, tagline, primary CTA "Light the fire.", secondary "How the rite works"
+- [x] First-run onboarding, one concept per step, dismissable, board visible behind (`ux-copy.md` §5 steps 1–4)
+- [x] Skippable coach-mark tour over the live board; final button "Take up the runes."
+- [x] How-to-play guidance ("Ask. Cross off what it can't be. Cast when you're ready.") lives here in the popovers — not as a persistent on-board explainer
+
+**Implementation (S7):** `Onboarding.svelte` overlays the live board (`+page.svelte`). The **title** phase is a centered card (title, tagline, "Light the fire." → straight to play, "How the rite works" → tour). The **tour** is a real coach-mark walk of the four §5 concepts: each step spotlights the board region it describes (the runes, the Ask, the Cast) by anchoring to a `data-coach` hook on the page — a gold ring whose oversized box-shadow dims everything else — with the popover positioned beside the lit region (a transparent catcher keeps the board inert mid-tour). A missing anchor falls back to a centered popover. Each step has a Skip; the last reads "Take up the runes." A persistent "How the rite works" button in the Oracle panel reopens the tour directly (the page passes `start='tour'`). First-run is gated on a `localStorage` flag (`save-the-sun:onboarded`) set on any exit — a refresh resumes the same round (S2.5), so the title must not nag the returning player; storage failures (private mode) degrade to showing it, never to breaking play.
 
 **Tests to land:** [C] title chrome, onboarding step copy, skip path.
 
