@@ -111,6 +111,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C][E] Skip path exits cleanly mid-tour; the final step "Take up the runes." dismisses
 - [x] [C][E] First-run gate: shown once, dismissal remembered (localStorage), not re-shown for a returning player — survives a real reload
 - [x] [C][E] Persistent "How the rite works" (header) reopens the tour directly, skipping the title
+- [x] [C][A] Modal focus management: focus moves into the dialog on open, Tab is trapped (wraps both ends), Escape exits — the board/header behind stays untabbable while open
 - [x] [E] Board e2e seeds the onboarded flag so the first-run overlay never blocks board interaction
 
 ## 7. Accessibility (v1; screen reader = v1.5)
