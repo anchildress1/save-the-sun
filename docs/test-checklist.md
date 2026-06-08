@@ -107,7 +107,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 - [x] [C] Title screen: title, tagline, primary "Light the fire.", secondary "How the rite works"
 - [x] [C][E] First-run onboarding steps 1–4 copy, one concept per step, board visible behind each coach-mark
-- [x] [C][E] Coach-mark tour spotlights the region each step describes (the runes, the Ask, the Cast); a missing anchor falls back to a centered popover
+- [x] [C][E] Step 1 ("the stakes") is a centered intro — no board highlight; steps 2–4 spotlight the Ask, then the board ("read & cross"), then the Cast; an anchorless step falls back to a centered popover
 - [x] [C][E] Skip path exits cleanly mid-tour; the final step "Take up the runes." dismisses
 - [x] [C][E] First-run gate: shown once, dismissal remembered (localStorage), not re-shown for a returning player — survives a real reload
 - [x] [C][E] Persistent "How the rite works" (header) reopens the tour directly, skipping the title

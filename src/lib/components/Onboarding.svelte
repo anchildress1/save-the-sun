@@ -12,8 +12,10 @@
 	// spotlight anchors to; a missing target falls back to a centered popover (still readable).
 	const STEPS = [
 		{
+			// Scene-setting, not a pointer — no anchor, so it opens as a centered intro and the board
+			// stays unhighlighted until "Read & cross."
 			label: 'The stakes',
-			target: '[data-coach="board"]',
+			target: null,
 			body: 'Tonight the coven makes one offering to Sól. Name her true rune before Sköll does, and the longest day breaks. Fail, and the wolf swallows the dawn.'
 		},
 		{
@@ -44,11 +46,12 @@
 	let isLast = $derived(step === STEPS.length - 1);
 
 	function measure() {
-		if (phase !== 'tour') {
-			rect = null;
+		const target = phase === 'tour' ? STEPS[step].target : null;
+		if (!target) {
+			rect = null; // no anchor → centered popover over the dimmed page (the intro step)
 			return;
 		}
-		const el = document.querySelector(STEPS[step].target);
+		const el = document.querySelector(target);
 		rect = el ? el.getBoundingClientRect() : null;
 	}
 
