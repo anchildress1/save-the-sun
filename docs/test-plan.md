@@ -139,9 +139,26 @@ Covers R3, R4, and the casting flow. One shared action interface serves both the
 | Card content | Component | Each card shows glyph, color swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name. Rune id not shown. Light/dark encoded by pip color (white light / black dark); pip count + fill spoken together in the accessible name as "{n} light/dark power", never as visible text; light/dark still a queryable Oracle axis. |
 | No color alone | a11y assertion | Color name and element name always accompany their icons — nothing conveyed by color alone. |
 | Cross-off affordance | Component | Card dims in place when crossed; restore affordance present and works. |
-| Header chrome | Component | Title, tagline ("A race to beat Sköll and save the light."), night-progress indicator, turn pill ("Your move." / "Sköll moves."). |
+| Header chrome | Component | Title, tagline ("A race to beat Sköll and save the light."), night-progress indicator; the turn pill ("Your move." / "Sköll moves.") sits at the top of the Oracle panel beside the controls it gates (moved off the header in S7). |
 | Round resolved | Component | Header swaps the moon → risen sun on a human win, holds the moon on a Sköll win, with the short resolution tag; the outcome pill flips and the Oracle panel carries the full resolution line. |
 | High-fidelity art + visual regression (v1.5) | Smoke / visual | The image/art presentation and its visual-regression baselines are split to v1.5 — out of v1 scope (no image assets yet). |
+
+---
+
+## 6.5 Title screen & first-run onboarding (R7)
+
+Covers R7. A first-run title overlay and an anchored coach-mark tour over the live board; the how-to lives in the steps, never as persistent on-board text.
+
+| Area | Test type | What to test |
+|---|---|---|
+| Title screen | Component | Title, tagline, primary "Light the fire." (→ play), secondary "How the rite works" (→ tour). |
+| Onboarding steps | Component + E2E | Steps 1–4 copy, one concept per step; the board stays visible behind each coach-mark. |
+| Anchored coach-marks | Component + E2E | Step 1 ("the stakes") is a centered intro with no board highlight; steps 2–4 spotlight the Ask, then the board ("read & cross"), then the Cast; an anchorless step falls back to a centered popover, and an anchored step re-measures on the next frame so the opening one never sticks on a stale (pre-layout) rect. |
+| Skip / finish | Component + E2E | Skip exits cleanly mid-tour; the final step "Take up the runes." dismisses. |
+| First-run gate | Component + E2E | Shown once; dismissal remembered (`localStorage`), not re-shown for a returning player — survives a real reload (a refresh resumes the same round). |
+| Header re-entry | Component + E2E | The persistent "How the rite works" header button reopens the tour directly, skipping the title. |
+| Modal focus management | Component + a11y | `aria-modal` dialogs: focus moves in on open, Tab is trapped (wraps both ends), Escape exits; the board/header behind stay untabbable while open. |
+| Board e2e isolation | E2E | Board-driving e2e seeds the onboarded flag so the first-run overlay never blocks board interaction. |
 
 ---
 
