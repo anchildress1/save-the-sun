@@ -203,12 +203,14 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *The on-stage proof that the engine owns truth. Depends on: S1, S2, S6.*
 
-- [ ] Every result logged tagged **deterministic-engine** vs **LLM-inference**
-- [ ] Any turn the deterministic floor fired is flagged
-- [ ] Engine truth shown beside Gemini's reasoning — the demo contrast holds
-- [ ] Surface Gemini's **reasoning output for Sköll's move** when available — the chain of deduction that led to his Ask/Cast — so the debug view shows *how* he reached the guess, not just the chosen tool call. (Needs the move seam to capture the model's reasoning/thinking trace; if the API returns none, show the earned-only payload it reasoned from as the fallback.)
+- [x] Every result logged tagged **deterministic-engine** vs **LLM-inference**
+- [x] Any turn the deterministic floor fired is flagged
+- [x] Engine truth shown beside Gemini's reasoning — the demo contrast holds
+- [x] Surface Gemini's **reasoning output for Sköll's move** when available — the chain of deduction that led to his Ask/Cast — so the debug view shows *how* he reached the guess, not just the chosen tool call. (Needs the move seam to capture the model's reasoning/thinking trace; if the API returns none, show the earned-only payload it reasoned from as the fallback.)
 
-**Tests to land:** [I] result tagging, fallback flag, truth-vs-reasoning.
+**Implementation (S8):** a per-session **debug log** (`src/lib/server/debug/log.ts`) records one `DebugEntry` per resolved result — the engine's deterministic `truth` beside the `inference` that reached it, with a `source` (`gemini`/`floor`) on Sköll's moves. It is lifecycle-linked to the round through `session.ts` (reset on a new round, evicted with the session), holds no secret (only already-resolved answers + cast verdicts), and is written from the one place every move resolves — the `api/action` route. A human Ask logs the Oracle's reading beside the engine's answer; a human Cast logs the verdict with no inference; a Sköll **Cast** logs immediately; a Sköll **Ask** is parked (its decision held on `SkollState.pendingDecision`) and logged once the human's reaction reveals the answer — so reasoning and engine truth land on the same row. The **reasoning trace** comes from the move seam: `decideSkollMove` now requests `includeThoughts` and extracts the thought parts; on MINIMAL thinking the model usually returns none, so `skoll.ts` falls back to `summarizePayload` — the earned-only state he reasoned from (his facts + sheet, or the opening hunch). The floor never reasons, so it shows the same payload digest, flagged `floor`. The view is a standalone route, **`/debug`** (`GET /api/debug` + a polling `+page.svelte`), screen-shared on a second tab during the demo — newest move on top, two tagged columns, a floor badge. It is intentionally ungated (the demo needs it in the deployed build) and not linked from the game, so a normal player never lands on it.
+
+**Tests landed:** [I] result tagging (human Ask, Sköll Cast), fallback flag (floor fired), truth-vs-reasoning (Sköll Ask reasoning beside the engine answer) (`action/server.test`) · [U] log store seq/trim/isolation/reset, reasoning threading + `pendingDecision` + `summarizePayload` (`debug/log.test`, `skoll.test`) · [C] view renders both tagged columns, floor badge, newest-first, empty state (`debug/page.svelte.test`) · the Gemini seam's thought extraction (`skoll/gemini.test`). _(Whether a live MINIMAL-thinking model returns any trace at all stays the deferred persona eval — the fallback is the safe default.)_
 
 **Done when:** the debug view can be screen-shared during the demo and visibly separates fact from inference for every turn.
 
