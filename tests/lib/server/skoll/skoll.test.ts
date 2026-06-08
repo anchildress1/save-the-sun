@@ -210,7 +210,7 @@ describe('takeSkollTurn — Gemini plays, engine referees', () => {
 describe('reasoning capture for the debug view (S8)', () => {
 	const LIGHT = { axis: 'fill', value: 'Light' } as const;
 
-	it('carries Gemini’s thinking trace onto the outcome and parks it with his Ask', async () => {
+	it('carries Gemini’s thinking trace onto the outcome', async () => {
 		const engine = skollsTurn();
 		const state = freshSkollState(SEED);
 		const decide: SkollDecide = vi.fn(async () => ({
@@ -220,7 +220,6 @@ describe('reasoning capture for the debug view (S8)', () => {
 		}));
 		const out = await takeSkollTurn(engine, state, decide, mulberry32(1));
 		expect(out).toMatchObject({ kind: 'ask', source: 'gemini', reasoning: 'Light feels right.' });
-		expect(state.pendingDecision).toEqual({ source: 'gemini', reasoning: 'Light feels right.' });
 	});
 
 	it('falls back to the earned-only payload when Gemini returns no trace', async () => {
@@ -239,15 +238,6 @@ describe('reasoning capture for the debug view (S8)', () => {
 		const out = await takeSkollTurn(engine, state, decide, mulberry32(1));
 		expect(out.source).toBe('floor');
 		expect(out.reasoning).toBe(summarizePayload(buildPayload(state)));
-	});
-
-	it('resolveSkollAsk clears the parked decision with the Ask', () => {
-		const engine = skollsTurn();
-		const state = freshSkollState(SEED);
-		state.pendingAsk = LIGHT;
-		state.pendingDecision = { source: 'gemini', reasoning: 'x' };
-		resolveSkollAsk(engine, state, resolveReaction(engine, 'Human', 'Pass'));
-		expect(state.pendingDecision).toBeNull();
 	});
 });
 
@@ -312,15 +302,15 @@ describe('resolveSkollAsk — closing his Ask after the human reacts', () => {
 		expect(state.facts).toHaveLength(1); // the question was answered, not killed
 	});
 
-	it('throws if called with no parked Ask — without mutating state', () => {
+	it('throws if called with no parked Ask — and spends no turn', () => {
 		const engine = skollsTurn();
 		const reaction = resolveReaction(engine, 'Human', 'Pass');
-		// An inconsistent state (no pending Ask, but a decision lingering): the guard must throw
-		// BEFORE clearing, so the decision survives for debugging rather than vanishing as a side effect.
+		// The guard validates a pending Ask exists before touching the engine — an unexpected call
+		// fails loud without advancing the turn or recording a fact.
 		const state = freshSkollState(SEED);
-		state.pendingDecision = { source: 'gemini', reasoning: 'x' };
 		expect(() => resolveSkollAsk(engine, state, reaction)).toThrow('no pending Ask');
-		expect(state.pendingDecision).toEqual({ source: 'gemini', reasoning: 'x' }); // untouched
+		expect(state.facts).toEqual([]);
+		expect(engine.activePlayer).toBe('Sköll'); // turn untouched
 	});
 });
 

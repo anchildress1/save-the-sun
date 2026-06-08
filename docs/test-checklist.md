@@ -149,13 +149,13 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 10. Debug view (S8)
 
-- [x] [I] Each result tagged deterministic-engine vs LLM-inference; the human question, Sköll's move + source, and his reaction recorded per turn
+- [x] [I] Engine fact vs LLM inference cleanly separated: the engine's verdict is the ONLY thing on a `turn` event; the inference (Oracle reading, Sköll reasoning + source) lives on its own `oracle`/`skoll` channel
 - [x] [I] Any turn the deterministic floor fired is flagged (warn on the `skoll` channel)
-- [x] [I] Engine truth shown beside Gemini's reasoning — reasoning + answer pair on the parked-Ask row once it resolves
 - [x] [U] Per-session event stream: seq, bounded trim, session isolation; lifecycle-linked — reset on a new round (reseeded with the new secret) **and** evicted with the session
 - [x] [U][I] `DEBUG_LOG` verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev / off in prod; filtered server-side (`/api/debug` + page load)
-- [x] [I][U] Raw Gemini I/O captured (verbose) as a sensitive event, snapshotted to a serializable POJO so the page load never 500s
+- [x] [I][U] Raw Gemini I/O captured (verbose) as a sensitive event, **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe snapshot so neither the API nor the load 500s
 - [x] [I] Sköll's move event shows the cross-offs made **this** turn (the delta), consistent with the pre-move reasoning
+- [x] [C] Turn renders as a single engine-fact card; border + chip mark engine fact (turn/session) vs LLM inference (oracle/skoll/gemini)
 
 ## 11. Voice / copy conformance (lint + eval, not coverage-gated)
 

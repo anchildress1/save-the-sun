@@ -11,6 +11,7 @@
 // Recorded server-side regardless of level (bounded, no client exposure); the level only decides
 // what the /debug API hands back. Lifecycle-linked to the round through session.ts.
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import type { Player } from '$lib/server/engine/actions';
@@ -50,9 +51,10 @@ export function getEvents(sessionId: string): DebugEvent[] {
 	return logs.get(sessionId) ?? [];
 }
 
-/** Drop a session's log — a new round starts the demo fresh; eviction reclaims the memory. */
+/** Drop a session's log (and any pending raw I/O) — a new round starts fresh; eviction reclaims it. */
 export function resetLog(sessionId: string): void {
 	logs.delete(sessionId);
+	geminiSinks.delete(sessionId);
 }
 
 /** The exposure level from DEBUG_LOG, validated; default verbose in dev, off in prod. */
@@ -70,11 +72,10 @@ export function filterForLevel(events: DebugEvent[], level: DebugLevel): DebugEv
 }
 
 // --- Raw Gemini I/O sink (verbose only) -------------------------------------------------------
-// gemini.ts has no sessionId, so it tees its raw request/response here and the action route (which
-// does) drains it onto the session's log right after the call. Best-effort: the route drains inside
-// the per-session lock immediately after the one decide() call, so in normal single-flight play the
-// drained calls belong to that turn. Under concurrent multi-session VERBOSE debugging two turns could
-// interleave their I/O — acceptable for a dev-only diagnostic, never enabled in a real deployment.
+// gemini.ts has no sessionId, so it tees its raw request/response here and the action route drains
+// it onto the session's log right after the call. The sink is keyed PER SESSION via an
+// AsyncLocalStorage the route opens around the action — so two players running verbose turns
+// concurrently never drain each other's I/O (a process-global sink would).
 export interface GeminiCall {
 	label: 'move' | 'reaction';
 	request: unknown;
@@ -82,35 +83,64 @@ export interface GeminiCall {
 	error?: string;
 }
 
-let geminiSink: GeminiCall[] = [];
+const sessionStore = new AsyncLocalStorage<string>();
+const geminiSinks = new Map<string, GeminiCall[]>();
 
-// The SDK response is a class instance (getters, non-POJO). `json()` tolerates it, but SvelteKit's
-// load serializer (devalue) rejects non-POJOs — so snapshot to a plain object here, at ingestion, and
-// both the /api/debug response and the /debug page load stay serializable. structuredClone drops the
-// prototype (its methods/getters) and keeps the data (candidates, usage, headers); a non-cloneable
-// value (a function/stream own-prop, a cycle) degrades to a marker rather than crashing the view.
+/** Open the session context so a Gemini call teed inside `fn` is attributed to this session. */
+export function runWithSession<T>(sessionId: string, fn: () => T): T {
+	return sessionStore.run(sessionId, fn);
+}
+
+/**
+ * A JSON-safe snapshot of a value. The SDK response is a class instance (getters, non-POJO) that
+ * SvelteKit's load serializer (devalue) rejects — and may carry cycles that crash `json()` too. So
+ * walk it into a plain object: own enumerable data only (prototype methods/getters dropped, like
+ * JSON), functions/symbols dropped, cycles broken to '[Circular]', Dates to ISO. A throwing getter
+ * (or anything else) degrades the whole value to a marker rather than crashing the view.
+ */
 function toSerializable(value: unknown): unknown {
 	if (value === undefined) return undefined;
 	try {
-		return structuredClone(value);
+		return sanitize(value, new WeakSet());
 	} catch {
 		return { note: 'value omitted — not serializable' };
 	}
 }
 
+function sanitize(value: unknown, seen: WeakSet<object>): unknown {
+	if (value === null) return null;
+	const type = typeof value;
+	if (type === 'bigint') return (value as bigint).toString();
+	if (type !== 'object') return type === 'function' || type === 'symbol' ? undefined : value;
+	if (value instanceof Date) return value.toISOString();
+	if (seen.has(value as object)) return '[Circular]';
+	seen.add(value as object);
+	if (Array.isArray(value)) return value.map((v) => sanitize(v, seen));
+	const out: Record<string, unknown> = {};
+	for (const [key, v] of Object.entries(value as object)) {
+		const s = sanitize(v, seen);
+		if (s !== undefined) out[key] = s;
+	}
+	return out;
+}
+
 /** gemini.ts tees one raw call here (verbose only); the route drains it onto the session log. */
 export function captureGemini(call: GeminiCall): void {
-	geminiSink.push({
+	const sessionId = sessionStore.getStore();
+	if (sessionId === undefined) return; // no session context → nothing to attribute it to
+	const sink = geminiSinks.get(sessionId) ?? [];
+	sink.push({
 		...call,
 		request: toSerializable(call.request),
 		response: toSerializable(call.response)
 	});
-	if (geminiSink.length > 20) geminiSink.shift(); // never drained (off): stay bounded
+	if (sink.length > 20) sink.shift(); // bounded if a session is never drained
+	geminiSinks.set(sessionId, sink);
 }
 
-/** Pull and clear the pending raw Gemini calls. */
-export function drainGemini(): GeminiCall[] {
-	const out = geminiSink;
-	geminiSink = [];
+/** Pull and clear this session's pending raw Gemini calls. */
+export function drainGemini(sessionId: string): GeminiCall[] {
+	const out = geminiSinks.get(sessionId) ?? [];
+	geminiSinks.delete(sessionId);
 	return out;
 }

@@ -29,6 +29,12 @@
 	});
 
 	const pretty = (d: unknown) => JSON.stringify(d, null, 2);
+
+	// The view's whole axis: the rules engine produces FACTS (turn verdicts, the secret); the LLM
+	// actors produce INFERENCE (the Oracle reading the human, Sköll deciding, raw model I/O). The
+	// border + chip encode that, so the engine is never shown with inference bolted on.
+	const ENGINE_CHANNELS = new Set<DebugEvent['channel']>(['turn', 'session']);
+	const isEngine = (e: DebugEvent) => ENGINE_CHANNELS.has(e.channel);
 </script>
 
 <svelte:head><title>Save the Sun — debug</title></svelte:head>
@@ -41,6 +47,10 @@
 			verdicts, and (verbose) the secret + raw Gemini I/O. Level: <code>{level}</code> (set
 			<code>DEBUG_LOG</code> to <code>verbose</code> / <code>demo</code> / <code>off</code>).
 		</p>
+		<p class="legend">
+			Each card is an <span class="kind engine">engine fact</span> (the deterministic referee) or an
+			<span class="kind inference">LLM inference</span> (the Oracle reading you, or Sköll deciding).
+		</p>
 	</header>
 
 	{#if level === 'off'}
@@ -52,32 +62,25 @@
 	{:else}
 		<ol reversed>
 			{#each ordered as event (event.seq)}
-				<li class="ev {event.channel} {event.level}" class:sensitive={event.sensitive}>
+				<li
+					class="ev {event.channel} {event.level}"
+					class:engine={isEngine(event)}
+					class:inference={!isEngine(event)}
+					class:sensitive={event.sensitive}
+				>
 					<div class="head">
 						<span class="seq">#{event.seq}</span>
 						<span class="channel">{event.channel}</span>
+						<span class="kind" class:engine={isEngine(event)} class:inference={!isEngine(event)}>
+							{isEngine(event) ? 'engine fact' : 'LLM inference'}
+						</span>
 						{#if event.actor}<span class="actor">{event.actor}</span>{/if}
 						{#if event.sensitive}<span class="badge">sensitive</span>{/if}
 						{#if event.level !== 'info'}<span class="badge {event.level}">{event.level}</span>{/if}
 					</div>
 
-					{#if event.channel === 'turn'}
-						<div class="cols">
-							<div class="truth">
-								<span class="tag">deterministic-engine</span>
-								<p>{event.data?.truth ?? event.message}</p>
-							</div>
-							<div class="inference">
-								<span class="tag"
-									>LLM-inference{event.data?.source ? ` · ${event.data.source}` : ''}</span
-								>
-								<p>{event.data?.inference || '—'}</p>
-							</div>
-						</div>
-					{:else}
-						<p class="msg">{event.message}</p>
-						{#if event.data}<pre>{pretty(event.data)}</pre>{/if}
-					{/if}
+					<p class="msg">{event.message}</p>
+					{#if event.data}<pre>{pretty(event.data)}</pre>{/if}
 				</li>
 			{/each}
 		</ol>
@@ -92,6 +95,9 @@
 		box-sizing: border-box;
 	}
 	main {
+		/* The two meanings the view turns on, defined once: engine fact vs LLM inference. */
+		--engine: #4a82c2;
+		--inference: #c79a4a;
 		inline-size: 100%;
 		padding: clamp(1rem, 0.5rem + 2vw, 2.5rem) clamp(0.75rem, 0.5rem + 1.5vw, 2rem);
 		min-block-size: 100dvh;
@@ -103,9 +109,13 @@
 		margin: 0 0 0.25rem;
 	}
 	header p {
-		margin: 0 0 clamp(1rem, 0.5rem + 1.5vw, 1.75rem);
+		margin: 0 0 0.6rem;
 		color: #b8b8c0;
 		line-height: 1.5;
+	}
+	header p.legend {
+		margin-block-end: clamp(1rem, 0.5rem + 1.5vw, 1.75rem);
+		font-size: 0.9rem;
 	}
 	code {
 		background: #2c2c34;
@@ -132,26 +142,12 @@
 		padding: 0.6rem 0.9rem;
 		background: #1d1d22;
 	}
-	li.turn {
-		border-inline-start-color: #3a6ea5;
+	/* Border carries ONE meaning — engine fact vs LLM inference. Severity (warn/error) is the badge. */
+	li.engine {
+		border-inline-start-color: var(--engine);
 	}
-	li.skoll {
-		border-inline-start-color: #8a6d3b;
-	}
-	li.oracle {
-		border-inline-start-color: #4a7a4a;
-	}
-	li.gemini {
-		border-inline-start-color: #7a4a8a;
-	}
-	li.session {
-		border-inline-start-color: #7a7a85;
-	}
-	li.warn {
-		border-inline-start-color: #b9892b;
-	}
-	li.error {
-		border-inline-start-color: #b03a3a;
+	li.inference {
+		border-inline-start-color: var(--inference);
 	}
 	.head {
 		display: flex;
@@ -170,6 +166,22 @@
 		letter-spacing: 0.04em;
 		font-size: 0.7rem;
 		font-weight: 600;
+	}
+	.kind {
+		padding: 0.05rem 0.4rem;
+		border-radius: 1rem;
+		font-size: 0.68rem;
+		font-weight: 600;
+		border: 1px solid currentcolor;
+	}
+	.kind.engine {
+		color: var(--engine);
+	}
+	.kind.inference {
+		color: var(--inference);
+	}
+	.legend .kind {
+		font-size: 0.8em;
 	}
 	.actor {
 		color: #e8e8ea;
@@ -211,32 +223,5 @@
 		overflow-wrap: anywhere;
 		font-size: 0.8rem;
 		color: #c8c8d0;
-	}
-	.cols {
-		display: grid;
-		/* Two columns when there's room, one when there isn't — the reflow threshold is a relative
-		   measure, not a pixel breakpoint. min(100%, …) keeps the floor from ever exceeding the track. */
-		grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-		gap: clamp(0.6rem, 0.4rem + 1vw, 1.25rem);
-	}
-	.tag {
-		display: block;
-		font-size: 0.7rem;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: #7a7a85;
-		margin-block-end: 0.2rem;
-	}
-	.cols p {
-		margin: 0;
-		overflow-wrap: anywhere;
-	}
-	.truth {
-		border-inline-start: 2px solid #3a6ea5;
-		padding-inline-start: 0.75rem;
-	}
-	.inference {
-		border-inline-start: 2px solid #8a6d3b;
-		padding-inline-start: 0.75rem;
 	}
 </style>

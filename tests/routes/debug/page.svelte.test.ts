@@ -3,28 +3,28 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Page from '$routes/debug/+page.svelte';
 import type { DebugEvent, DebugLevel } from '$lib/server/debug/log';
 
-// The page polls /api/debug on mount; stub fetch to reject so the SSR-given data stands and the
-// poll is a harmless no-op for these render assertions. Restore it after each so the stub never
-// leaks into other test files.
+// The page polls /api/debug on a setInterval. Fake timers keep that interval from ever firing, so
+// no request escapes to the (hook-less) test dev server — a late real tick was the source of the
+// `wrapDynamicImport` TypeError in coverage. The fetch stub is belt-and-suspenders; both are torn
+// down after each test so nothing leaks into other files.
 beforeEach(() => {
+	vi.useFakeTimers();
 	vi.stubGlobal(
 		'fetch',
 		vi.fn(() => Promise.reject(new Error('no server in test')))
 	);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.useRealTimers();
+	vi.unstubAllGlobals();
+});
 
 const turn: DebugEvent = {
 	seq: 1,
 	channel: 'turn',
 	level: 'info',
 	actor: 'Human',
-	message: 'Yes. Sól is reaching for a light rune.',
-	data: {
-		action: 'Ask',
-		truth: 'Yes. Sól is reaching for a light rune.',
-		inference: 'read as "is it light"'
-	}
+	message: 'Yes. Sól is reaching for a light rune.'
 };
 const floor: DebugEvent = {
 	seq: 2,
@@ -46,13 +46,24 @@ const renderWith = (events: DebugEvent[], level: DebugLevel = 'verbose') =>
 	render(Page, { data: { events, level }, params: {}, form: null });
 
 describe('/debug view', () => {
-	it('renders a turn event as two tagged columns', async () => {
+	it('renders a turn as a single engine-fact card (no inference column)', () => {
 		const { container } = renderWith([turn]);
-		const tags = [...container.querySelectorAll('.cols .tag')].map((n) => n.textContent?.trim());
-		expect(tags[0]).toBe('deterministic-engine');
-		expect(tags[1]).toContain('LLM-inference');
-		expect(container.querySelector('.truth p')?.textContent).toContain('Sól is reaching');
-		expect(container.querySelector('.inference p')?.textContent).toContain('read as');
+		const li = container.querySelector('li')!;
+		expect(li.classList.contains('engine')).toBe(true);
+		expect(li.querySelector('.kind')?.textContent?.trim()).toBe('engine fact');
+		expect(li.querySelector('.msg')?.textContent).toContain('Sól is reaching');
+		expect(container.querySelector('.cols')).toBeNull(); // the two-column layout is gone
+	});
+
+	it('marks engine channels vs LLM-inference channels by class + chip', () => {
+		const oracle: DebugEvent = { seq: 4, channel: 'oracle', level: 'info', message: 'Human asks' };
+		const { container } = renderWith([turn, secret, floor, oracle]);
+		const li = (c: string) => container.querySelector<HTMLElement>(`li.${c}`)!;
+		expect(li('turn').classList.contains('engine')).toBe(true); // verdicts
+		expect(li('session').classList.contains('engine')).toBe(true); // the secret
+		expect(li('skoll').classList.contains('inference')).toBe(true); // his move
+		expect(li('oracle').classList.contains('inference')).toBe(true); // the reading
+		expect(li('oracle').querySelector('.kind')?.textContent?.trim()).toBe('LLM inference');
 	});
 
 	it('renders a non-turn event as a message + JSON detail, flagging warn', async () => {

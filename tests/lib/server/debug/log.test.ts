@@ -13,6 +13,7 @@ import {
 	filterForLevel,
 	captureGemini,
 	drainGemini,
+	runWithSession,
 	type DebugEvent
 } from '$lib/server/debug/log';
 
@@ -27,7 +28,7 @@ const ev = (over: Partial<DebugEvent> = {}): Omit<DebugEvent, 'seq'> => ({
 beforeEach(() => {
 	resetLog(SID);
 	mock.env.DEBUG_LOG = undefined;
-	drainGemini();
+	drainGemini(SID);
 });
 
 describe('debug event log', () => {
@@ -96,14 +97,32 @@ describe('filterForLevel', () => {
 	});
 });
 
-describe('raw Gemini sink', () => {
-	it('captures calls and drains them once, clearing each time', () => {
-		captureGemini({ label: 'move', request: { a: 1 }, response: { b: 2 } });
-		captureGemini({ label: 'reaction', request: {}, error: 'boom' });
-		const drained = drainGemini();
+describe('raw Gemini sink (per session)', () => {
+	it('captures and drains per session, clearing each time', () => {
+		runWithSession(SID, () => {
+			captureGemini({ label: 'move', request: { a: 1 }, response: { b: 2 } });
+			captureGemini({ label: 'reaction', request: {}, error: 'boom' });
+		});
+		const drained = drainGemini(SID);
 		expect(drained).toHaveLength(2);
 		expect(drained[1]).toMatchObject({ label: 'reaction', error: 'boom' });
-		expect(drainGemini()).toEqual([]); // drained = cleared
+		expect(drainGemini(SID)).toEqual([]); // drained = cleared
+	});
+
+	it('isolates one session’s captures from another’s', () => {
+		runWithSession('sink-a', () =>
+			captureGemini({ label: 'move', request: {}, response: { a: 1 } })
+		);
+		runWithSession('sink-b', () =>
+			captureGemini({ label: 'move', request: {}, response: { b: 2 } })
+		);
+		expect(drainGemini('sink-a')).toHaveLength(1);
+		expect(drainGemini('sink-b')).toHaveLength(1);
+	});
+
+	it('ignores a capture outside any session context', () => {
+		captureGemini({ label: 'move', request: {}, response: { x: 1 } }); // no runWithSession
+		expect(drainGemini('no-context')).toEqual([]);
 	});
 
 	it('snapshots a non-POJO response so the /debug load can serialize it', () => {
@@ -114,17 +133,32 @@ describe('raw Gemini sink', () => {
 				return '{}';
 			}
 		}
-		captureGemini({ label: 'move', request: {}, response: new FakeResponse() });
-		const [call] = drainGemini();
+		runWithSession(SID, () =>
+			captureGemini({ label: 'move', request: {}, response: new FakeResponse() })
+		);
+		const [call] = drainGemini(SID);
 		// Plain object: the getter is dropped, the data kept — and it round-trips without throwing.
 		expect(call.response).toEqual({ candidates: [{ content: { parts: [{ text: '{}' }] } }] });
 		expect(() => JSON.stringify(call)).not.toThrow();
 	});
 
-	it('degrades a non-serializable value to a marker instead of throwing', () => {
-		// A function own-prop is not structured-cloneable — the snapshot must not crash the view.
-		captureGemini({ label: 'move', request: {}, response: { stream: () => 'x' } });
-		expect(drainGemini()[0].response).toEqual({ note: 'value omitted — not serializable' });
+	it('strips functions and breaks cycles so json()/devalue never crash', () => {
+		const cyclic: Record<string, unknown> = { a: 1, fn: () => 'x' };
+		cyclic.self = cyclic;
+		runWithSession(SID, () => captureGemini({ label: 'move', request: {}, response: cyclic }));
+		const [call] = drainGemini(SID);
+		expect(call.response).toEqual({ a: 1, self: '[Circular]' }); // fn dropped, cycle broken
+		expect(() => JSON.stringify(call)).not.toThrow();
+	});
+
+	it('degrades to a marker when sanitizing throws (a throwing getter)', () => {
+		const bad = {
+			get boom() {
+				throw new Error('nope');
+			}
+		};
+		runWithSession(SID, () => captureGemini({ label: 'move', request: {}, response: bad }));
+		expect(drainGemini(SID)[0].response).toEqual({ note: 'value omitted — not serializable' });
 	});
 });
 

@@ -36,9 +36,6 @@ export interface SkollState {
 	// capable model copies whatever opener its prompt last demonstrated (the "always gold" tell);
 	// a seeded, trait-level lean makes the first Ask vary per round while staying reproducible.
 	hunch: string;
-	// The decision behind {@link pendingAsk}, parked alongside it so the debug log (S8) can pair
-	// Gemini's reasoning with the engine's answer once the human's reaction closes the window.
-	pendingDecision: SkollDecision | null;
 	// One persistent PRNG for the round — floor and reaction gate both draw from it, so variety comes
 	// from the advancing stream, not from re-seeding off a state counter each call.
 	rng: () => number;
@@ -73,7 +70,6 @@ export function freshSkollState(seed: number): SkollState {
 		facts: [],
 		crossed: new Set(),
 		pendingAsk: null,
-		pendingDecision: null,
 		tauntIndex: 0,
 		hunch: pickHunch(rng),
 		rng
@@ -215,7 +211,6 @@ export async function takeSkollTurn(
 
 	engine.openReactionWindow('Sköll');
 	state.pendingAsk = move.query;
-	state.pendingDecision = { source, reasoning }; // paired with the answer once the window closes (S8)
 	if (dev) console.debug(`[skoll] asks ${JSON.stringify(move.query)} via ${source}`);
 	return { kind: 'ask', source, reasoning, query: move.query, echo: skollAskEcho(move.query) };
 }
@@ -268,7 +263,6 @@ export function resolveSkollAsk(
 	if (query === null) throw new Error('resolveSkollAsk called with no pending Ask');
 	// Clear only once we know there was an Ask — an unexpected call throws without mutating state.
 	state.pendingAsk = null;
-	state.pendingDecision = null; // the debug log reads it before this resolves; clear it with the Ask
 
 	if (reaction.ok && reaction.choice === 'Hex') {
 		engine.passTurn(); // his turn is spent unanswered; the question dies before any answer
