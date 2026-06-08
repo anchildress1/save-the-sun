@@ -3,7 +3,7 @@
 import { dev } from '$app/environment';
 import { GameEngine, selectSecret } from './engine';
 import { freshSkollState, type SkollState } from '$lib/server/skoll/skoll';
-import { resetLog } from '$lib/server/debug/log';
+import { resetLog, logEvent } from '$lib/server/debug/log';
 
 // LRU-capped so abandoned rounds can't grow memory without bound. Map keeps insertion
 // order, so the first key is the least-recently-used; every access re-inserts to the end.
@@ -20,12 +20,18 @@ function randomSeed(): number {
 	return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
-// Dev-only: log the secret so a new round is visible in the server log.
+// Open the round's debug log with the secret (a `sensitive` event — verbose only). Mirrored to the
+// dev server console for parity.
 function create(sessionId: string, seed: number): GameEngine {
-	if (dev)
-		console.debug(
-			`[session ${sessionId}] new round — secret: ${selectSecret(seed).name} (seed ${seed})`
-		);
+	const secret = selectSecret(seed).name;
+	if (dev) console.debug(`[session ${sessionId}] new round — secret: ${secret} (seed ${seed})`);
+	logEvent(sessionId, {
+		channel: 'session',
+		level: 'info',
+		sensitive: true,
+		message: `New round — secret is ${secret}`,
+		data: { secret, seed }
+	});
 	return new GameEngine(seed);
 }
 

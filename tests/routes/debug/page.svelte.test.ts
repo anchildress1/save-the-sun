@@ -1,9 +1,9 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Page from '$routes/debug/+page.svelte';
-import type { DebugEntry } from '$lib/server/debug/log';
+import type { DebugEvent, DebugLevel } from '$lib/server/debug/log';
 
-// The page polls /api/debug on mount; stub fetch to reject so the SSR-given entries stand and the
+// The page polls /api/debug on mount; stub fetch to reject so the SSR-given data stands and the
 // poll is a harmless no-op for these render assertions.
 beforeEach(() => {
 	vi.stubGlobal(
@@ -12,53 +12,72 @@ beforeEach(() => {
 	);
 });
 
-const human: DebugEntry = {
+const turn: DebugEvent = {
 	seq: 1,
+	channel: 'turn',
+	level: 'info',
 	actor: 'Human',
-	action: 'Ask',
-	truth: 'Yes. Sól is reaching for a light rune.',
-	inference: 'read as "whether it is light"'
+	message: 'Yes. Sól is reaching for a light rune.',
+	data: {
+		action: 'Ask',
+		truth: 'Yes. Sól is reaching for a light rune.',
+		inference: 'read as "is it light"'
+	}
 };
-const skollFloor: DebugEntry = {
+const floor: DebugEvent = {
 	seq: 2,
+	channel: 'skoll',
+	level: 'warn',
 	actor: 'Sköll',
-	action: 'Cast',
-	truth: 'Cast Fehu — wrong, the round continues',
-	inference: '',
-	source: 'floor'
+	message: 'Floor fired — Sköll asks after a gold rune.',
+	data: { source: 'floor', reasoning: 'No facts yet; opening hunch: a gold rune.' }
+};
+const secret: DebugEvent = {
+	seq: 3,
+	channel: 'session',
+	level: 'info',
+	sensitive: true,
+	message: 'New round — secret is Sowilo'
 };
 
-const renderWith = (entries: DebugEntry[]) =>
-	render(Page, { data: { entries }, params: {}, form: null });
+const renderWith = (events: DebugEvent[], level: DebugLevel = 'verbose') =>
+	render(Page, { data: { events, level }, params: {}, form: null });
 
 describe('/debug view', () => {
-	it('shows both tagged columns for a result', async () => {
-		const screen = renderWith([human]);
-		const { container } = screen;
-		// The column tags (the header reuses the words, so scope to the entry's .tag spans).
-		const tags = [...container.querySelectorAll('.cols .tag')].map((n) => n.textContent);
-		expect(tags).toEqual(['deterministic-engine', 'LLM-inference']);
-		await expect.element(screen.getByText(human.truth)).toBeInTheDocument();
-		await expect.element(screen.getByText(human.inference)).toBeInTheDocument();
+	it('renders a turn event as two tagged columns', async () => {
+		const { container } = renderWith([turn]);
+		const tags = [...container.querySelectorAll('.cols .tag')].map((n) => n.textContent?.trim());
+		expect(tags[0]).toBe('deterministic-engine');
+		expect(tags[1]).toContain('LLM-inference');
+		expect(container.querySelector('.truth p')?.textContent).toContain('Sól is reaching');
+		expect(container.querySelector('.inference p')?.textContent).toContain('read as');
 	});
 
-	it('flags a floor-fired turn and renders newest first', async () => {
-		const { container } = renderWith([human, skollFloor]);
+	it('renders a non-turn event as a message + JSON detail, flagging warn', async () => {
+		const { container } = renderWith([floor]);
 		await expect
-			.element(container.querySelector<HTMLElement>('.source.floor')!)
+			.element(container.querySelector<HTMLElement>('li.skoll.warn')!)
 			.toBeInTheDocument();
-		// Newest (#2) renders above oldest (#1).
+		expect(container.querySelector('.msg')?.textContent).toContain('Floor fired');
+		expect(container.querySelector('pre')?.textContent).toContain('floor'); // the data block
+	});
+
+	it('badges a sensitive event and renders newest first', async () => {
+		const { container } = renderWith([turn, floor, secret]);
+		await expect
+			.element(container.querySelector<HTMLElement>('li.session .badge')!)
+			.toBeInTheDocument();
 		const seqs = [...container.querySelectorAll('.seq')].map((n) => n.textContent);
-		expect(seqs).toEqual(['#2', '#1']);
+		expect(seqs).toEqual(['#3', '#2', '#1']);
 	});
 
-	it('renders an em dash when there is no inference (a human Cast)', () => {
-		const { container } = renderWith([skollFloor]);
-		expect(container.querySelector('.inference p')?.textContent).toBe('—');
-	});
-
-	it('shows the empty state before any move', async () => {
+	it('shows the empty state when there are no events', async () => {
 		const screen = renderWith([]);
-		await expect.element(screen.getByText(/No moves yet/)).toBeInTheDocument();
+		await expect.element(screen.getByText(/No events yet/)).toBeInTheDocument();
+	});
+
+	it('shows the disabled hint when the level is off', async () => {
+		const screen = renderWith([], 'off');
+		await expect.element(screen.getByText(/debug log is off/)).toBeInTheDocument();
 	});
 });

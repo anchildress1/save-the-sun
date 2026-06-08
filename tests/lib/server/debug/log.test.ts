@@ -1,52 +1,118 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { record, getLog, resetLog, floorFired, type DebugEntry } from '$lib/server/debug/log';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// debugLevel reads $env/dynamic/private + $app/environment; mock both to control the level.
+const mock = vi.hoisted(() => ({ env: {} as Record<string, string | undefined> }));
+vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
+vi.mock('$app/environment', () => ({ dev: true }));
+
+import {
+	logEvent,
+	getEvents,
+	resetLog,
+	debugLevel,
+	filterForLevel,
+	captureGemini,
+	drainGemini,
+	type DebugEvent
+} from '$lib/server/debug/log';
 
 const SID = 'log-session';
-const base = { actor: 'Human', action: 'Ask', truth: 't', inference: 'i' } as const;
+const ev = (over: Partial<DebugEvent> = {}): Omit<DebugEvent, 'seq'> => ({
+	channel: 'turn',
+	level: 'info',
+	message: 'm',
+	...over
+});
 
-describe('debug log store', () => {
-	beforeEach(() => resetLog(SID));
+beforeEach(() => {
+	resetLog(SID);
+	mock.env.DEBUG_LOG = undefined;
+	drainGemini();
+});
 
-	it('is empty before any result', () => {
-		expect(getLog(SID)).toEqual([]);
+describe('debug event log', () => {
+	it('is empty before any event', () => {
+		expect(getEvents(SID)).toEqual([]);
 	});
 
-	it('appends results in order, assigning a monotonic seq', () => {
-		record(SID, base);
-		record(SID, { ...base, actor: 'Sköll', action: 'Cast' });
-		expect(getLog(SID).map((e) => e.seq)).toEqual([1, 2]);
-		expect(getLog(SID)[1]).toMatchObject({ actor: 'Sköll', action: 'Cast' });
+	it('appends with a monotonic seq', () => {
+		logEvent(SID, ev());
+		logEvent(SID, ev({ channel: 'skoll' }));
+		expect(getEvents(SID).map((e) => e.seq)).toEqual([1, 2]);
 	});
 
-	it('trims the oldest past the cap while keeping seq climbing', () => {
-		for (let i = 0; i < 65; i++) record(SID, { ...base, truth: `t${i}` });
-		const log = getLog(SID);
-		expect(log).toHaveLength(60); // MAX_ENTRIES
-		expect(log[0].truth).toBe('t5'); // first five trimmed
-		expect(log.at(-1)?.seq).toBe(65); // seq survives trimming, never resets
+	it('trims the oldest past the cap while seq keeps climbing', () => {
+		for (let i = 0; i < 205; i++) logEvent(SID, ev({ message: `m${i}` }));
+		const log = getEvents(SID);
+		expect(log).toHaveLength(200); // MAX_EVENTS
+		expect(log[0].message).toBe('m5'); // first five trimmed
+		expect(log.at(-1)?.seq).toBe(205); // seq survives trimming
 	});
 
 	it('isolates sessions', () => {
-		record(SID, base);
-		record('other', base);
-		record('other', base);
-		expect(getLog(SID)).toHaveLength(1);
-		expect(getLog('other')).toHaveLength(2);
+		logEvent(SID, ev());
+		logEvent('other', ev());
+		expect(getEvents(SID)).toHaveLength(1);
 		resetLog('other');
 	});
 
 	it('resetLog drops the round’s record', () => {
-		record(SID, base);
+		logEvent(SID, ev());
 		resetLog(SID);
-		expect(getLog(SID)).toEqual([]);
+		expect(getEvents(SID)).toEqual([]);
+	});
+});
+
+describe('debugLevel', () => {
+	it.each(['verbose', 'demo', 'off'] as const)('reads %s from DEBUG_LOG', (v) => {
+		mock.env.DEBUG_LOG = v;
+		expect(debugLevel()).toBe(v);
 	});
 
-	it('floorFired flags only floor-sourced entries', () => {
-		const floor: DebugEntry = { seq: 1, ...base, actor: 'Sköll', source: 'floor' };
-		const gemini: DebugEntry = { seq: 2, ...base, actor: 'Sköll', source: 'gemini' };
-		const human: DebugEntry = { seq: 3, ...base };
-		expect(floorFired(floor)).toBe(true);
-		expect(floorFired(gemini)).toBe(false);
-		expect(floorFired(human)).toBe(false);
+	it('defaults to verbose in dev when unset or invalid', () => {
+		mock.env.DEBUG_LOG = undefined;
+		expect(debugLevel()).toBe('verbose');
+		mock.env.DEBUG_LOG = 'loud';
+		expect(debugLevel()).toBe('verbose');
+	});
+});
+
+describe('filterForLevel', () => {
+	const events: DebugEvent[] = [
+		{ seq: 1, channel: 'turn', level: 'info', message: 'safe' },
+		{ seq: 2, channel: 'session', level: 'info', sensitive: true, message: 'the secret' }
+	];
+
+	it('off hides everything', () => {
+		expect(filterForLevel(events, 'off')).toEqual([]);
+	});
+
+	it('demo strips sensitive events', () => {
+		expect(filterForLevel(events, 'demo')).toEqual([events[0]]);
+	});
+
+	it('verbose keeps everything', () => {
+		expect(filterForLevel(events, 'verbose')).toEqual(events);
+	});
+});
+
+describe('raw Gemini sink', () => {
+	it('captures calls and drains them once, clearing each time', () => {
+		captureGemini({ label: 'move', request: { a: 1 }, response: { b: 2 } });
+		captureGemini({ label: 'reaction', request: {}, error: 'boom' });
+		const drained = drainGemini();
+		expect(drained).toHaveLength(2);
+		expect(drained[1]).toMatchObject({ label: 'reaction', error: 'boom' });
+		expect(drainGemini()).toEqual([]); // drained = cleared
+	});
+});
+
+describe('debugLevel in prod', () => {
+	it('defaults to off when DEBUG_LOG is unset', async () => {
+		vi.resetModules();
+		vi.doMock('$app/environment', () => ({ dev: false }));
+		vi.doMock('$env/dynamic/private', () => ({ env: {} }));
+		const mod = await import('$lib/server/debug/log');
+		expect(mod.debugLevel()).toBe('off');
 	});
 });

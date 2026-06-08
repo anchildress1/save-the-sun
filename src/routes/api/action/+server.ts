@@ -20,10 +20,9 @@ import {
 } from '$lib/server/skoll/skoll';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
 import { castLine, tauntAt } from '$lib/server/skoll/taunts';
-import { record } from '$lib/server/debug/log';
+import { logEvent, drainGemini } from '$lib/server/debug/log';
 import type { CastResult, GameEngine } from '$lib/server/engine/engine';
 import type { Player } from '$lib/server/engine/actions';
-import type { Query } from '$lib/server/engine/queries';
 import type { RequestHandler } from './$types';
 
 // 'Advance' is not a player action — it's the client asking the engine to run Sköll's pending turn
@@ -64,6 +63,42 @@ function castTruth(player: Player, runeName: string, won: boolean): string {
 	return won
 		? `Cast ${runeName} — the rune is true (${player} wins)`
 		: `Cast ${runeName} — wrong, the round continues`;
+}
+
+const castWon = (result: CastResult): boolean => result.ok && result.won;
+
+// A resolved result: the engine's deterministic `truth` beside the `inference` that reached it (the
+// two tagged columns of the S8 demo). `source` marks Sköll's moves gemini/floor; absent for the human.
+function turnEvent(
+	sessionId: string,
+	actor: Player,
+	action: 'Ask' | 'Cast',
+	truth: string,
+	inference: string,
+	source?: 'gemini' | 'floor'
+): void {
+	logEvent(sessionId, {
+		channel: 'turn',
+		level: 'info',
+		actor,
+		message: truth,
+		data: { action, truth, inference, ...(source && { source }) }
+	});
+}
+
+// Drain the raw Gemini I/O the seam teed during this turn onto the session log (sensitive: verbose
+// only). Empty unless DEBUG_LOG=verbose, so this is a no-op in demo/off.
+function geminiEvents(sessionId: string): void {
+	for (const call of drainGemini())
+		logEvent(sessionId, {
+			channel: 'gemini',
+			level: call.error ? 'error' : 'info',
+			sensitive: true,
+			message: `Gemini ${call.label} call${call.error ? ' failed' : ''}`,
+			data: call.error
+				? { request: call.request, error: call.error }
+				: { request: call.request, response: call.response }
+		});
 }
 
 // Map his resolved turn into the wire DTO the client voices and reacts to.
@@ -131,7 +166,17 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 		const decision = skoll.pendingDecision;
 		const reaction = resolveReaction(engine, 'Human', action.reaction);
 		const answer = resolveSkollAsk(engine, skoll, reaction);
-		recordSkollAsk(sessionId, askedQuery, answer, decision);
+		// His Ask now has an answer — log the turn row pairing his reasoning with the engine's verdict.
+		turnEvent(
+			sessionId,
+			'Sköll',
+			'Ask',
+			answer.hexed
+				? 'Hexed by the witch — the question dies, his turn spent'
+				: voiceAnswer(askedQuery, answer.affirmative),
+			decision?.reasoning ?? '',
+			decision?.source
+		);
 		const skollReaction: SkollReaction = answer.hexed
 			? { hexed: true }
 			: {
@@ -158,31 +203,14 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 	// A human Cast is pure player choice resolved by the engine — log the deterministic verdict with
 	// no inference column. (His Cast is logged from his own turn; her Ask is logged in askWith….)
 	if (result.type === 'Cast' && result.cast.ok)
-		record(sessionId, {
-			actor: action.player,
-			action: 'Cast',
-			truth: castTruth(action.player, (action as { runeName: string }).runeName, result.cast.won),
-			inference: ''
-		});
+		turnEvent(
+			sessionId,
+			action.player,
+			'Cast',
+			castTruth(action.player, (action as { runeName: string }).runeName, result.cast.won),
+			''
+		);
 	return json({ ...result, state: gameState(engine) });
-}
-
-/** Pair Sköll's parked-Ask reasoning with the engine's now-known answer for the debug log (S8). */
-function recordSkollAsk(
-	sessionId: string,
-	query: Query,
-	answer: { hexed: boolean; affirmative?: boolean },
-	decision: { source: 'gemini' | 'floor'; reasoning: string } | null
-): void {
-	record(sessionId, {
-		actor: 'Sköll',
-		action: 'Ask',
-		truth: answer.hexed
-			? 'Hexed by the witch — the question dies, his turn spent'
-			: voiceAnswer(query, answer.affirmative ?? false),
-		inference: decision?.reasoning ?? '',
-		...(decision && { source: decision.source })
-	});
 }
 
 async function askWithSkollReaction(
@@ -192,10 +220,35 @@ async function askWithSkollReaction(
 	question: string
 ) {
 	const prepared = await prepareAsk(question, interpret);
-	// A refusal never opens a window, spends a turn, or rouses Sköll — it just bounces back.
-	if (!prepared.ok) return json({ type: 'Ask', oracle: prepared.result, state: gameState(engine) });
+	// A refusal never opens a window, spends a turn, or rouses Sköll — it just bounces back. Log it.
+	if (!prepared.ok) {
+		logEvent(sessionId, {
+			channel: 'oracle',
+			level: 'warn',
+			actor: 'Human',
+			message: `Oracle refused: "${question}"`,
+			data: { question, result: prepared.result }
+		});
+		return json({ type: 'Ask', oracle: prepared.result, state: gameState(engine) });
+	}
+	logEvent(sessionId, {
+		channel: 'oracle',
+		level: 'info',
+		actor: 'Human',
+		message: `Human asks: "${question}"`,
+		data: { question, readAs: prepared.paraphrase, query: prepared.query }
+	});
 
 	const vs = await reactToHumanAsk(engine, skoll, prepared.query, decideSkollReaction, skoll.rng);
+	geminiEvents(sessionId); // raw reaction-seam I/O (verbose only)
+	logEvent(sessionId, {
+		channel: 'skoll',
+		level: 'info',
+		actor: 'Sköll',
+		message: `Sköll reacts to your Ask: ${vs.choice}`,
+		data: { choice: vs.choice }
+	});
+
 	let oracle;
 	if (vs.killed) {
 		engine.passTurn(); // her question dies; her turn is spent with no answer
@@ -206,17 +259,18 @@ async function askWithSkollReaction(
 			skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
 	}
 
-	// Log the result: the Oracle's reading (LLM-inference) beside the engine's answer (deterministic).
-	record(sessionId, {
-		actor: 'Human',
-		action: 'Ask',
-		truth: vs.killed
+	// The result row: the Oracle's reading (LLM-inference) beside the engine's answer (deterministic).
+	turnEvent(
+		sessionId,
+		'Human',
+		'Ask',
+		vs.killed
 			? 'Hexed by Sköll — the Oracle is silent, her turn spent'
 			: oracle?.ok
 				? oracle.answer
 				: 'engine declined the Ask',
-		inference: `read as "${prepared.paraphrase}"`
-	});
+		`read as "${prepared.paraphrase}"`
+	);
 
 	// The turn now sits with Sköll; the client advances him in a follow-up request.
 	return json({
@@ -236,18 +290,31 @@ async function playSkollIfActive(
 	// He already has an Ask parked, waiting on the human's reaction — never start a second turn.
 	if (skoll.pendingAsk !== null) return undefined;
 	const out = await takeSkollTurn(engine, skoll, decideSkollMove, skoll.rng);
-	// His Cast resolves now (log it); his Ask is logged later, once the human's reaction reveals the answer.
+	geminiEvents(sessionId); // raw move-seam I/O (verbose only)
+
+	// His action this turn — flagged warn when the deterministic floor stood in for Gemini.
+	const floored = out.source === 'floor';
+	logEvent(sessionId, {
+		channel: 'skoll',
+		level: floored ? 'warn' : 'info',
+		actor: 'Sköll',
+		message:
+			(floored ? 'Floor fired — ' : '') +
+			(out.kind === 'cast' ? `Sköll casts ${out.runeName}` : out.echo),
+		data: { source: out.source, reasoning: out.reasoning, crossed: [...skoll.crossed] }
+	});
+
+	// His Cast resolves now (log the turn row); his Ask's row waits for the human's reaction.
 	if (out.kind === 'cast')
-		record(sessionId, {
-			actor: 'Sköll',
-			action: 'Cast',
-			truth: castTruth('Sköll', out.runeName, castWon(out.result)),
-			inference: out.reasoning,
-			source: out.source
-		});
+		turnEvent(
+			sessionId,
+			'Sköll',
+			'Cast',
+			castTruth('Sköll', out.runeName, castWon(out.result)),
+			out.reasoning,
+			out.source
+		);
 	const turn = describeTurn(out, tauntAt(skoll.tauntIndex));
 	skoll.tauntIndex += 1;
 	return turn;
 }
-
-const castWon = (result: CastResult): boolean => result.ok && result.won;

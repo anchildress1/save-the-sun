@@ -18,7 +18,7 @@ vi.mock('$lib/server/skoll/gemini', () => ({
 import { POST } from '$routes/api/action/+server';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
 import { resetEngine, getEngine, getSkoll } from '$lib/server/engine/session';
-import { getLog } from '$lib/server/debug/log';
+import { getEvents, captureGemini } from '$lib/server/debug/log';
 import { selectSecret } from '$lib/server/engine/engine';
 import { runes } from '$lib/board';
 
@@ -285,54 +285,73 @@ describe('POST /api/action', () => {
 		});
 	});
 
-	// S8 / R8 debug view — every result tagged deterministic-engine vs LLM-inference, the floor
-	// flagged, engine truth recorded beside Gemini's reasoning. Asserted on the log the view reads.
+	// S8 / R8 debug log — the chronological stream the /debug view reads. Turn rows tag the engine's
+	// deterministic truth beside the LLM-inference; channel events carry the questions, his moves, the
+	// floor flag, his reactions. (Gemini I/O events need the real seam, which is mocked here.)
+	const turns = () => getEvents(SID).filter((e) => e.channel === 'turn');
+	const lastTurn = () => turns().at(-1)!;
+	const byChannel = (c: string) => getEvents(SID).filter((e) => e.channel === c);
+
 	describe('debug log (S8)', () => {
-		it('tags a human Ask: the engine answer beside the Oracle’s reading', async () => {
+		it('opens the round with the secret as a sensitive session event', () => {
+			const secretEv = byChannel('session').at(-1)!;
+			expect(secretEv).toMatchObject({ sensitive: true });
+			expect(secretEv.data).toMatchObject({ secret: SECRET });
+		});
+
+		it('logs the raw human question and tags the turn row', async () => {
 			await ask();
-			const entry = getLog(SID).at(-1)!;
-			expect(entry).toMatchObject({ actor: 'Human', action: 'Ask' });
-			expect(entry.truth).toMatch(/^(Yes|No)\. Sól is/); // deterministic-engine verdict
-			expect(entry.inference).toBe('read as "whether it is light"'); // LLM-inference
-			expect(entry.source).toBeUndefined(); // the Oracle has no floor
+			const q = byChannel('oracle').at(-1)!;
+			expect(q.message).toContain('is it light?'); // the raw free-text
+			expect(q.data).toMatchObject({ question: 'is it light?', readAs: 'whether it is light' });
+
+			const turn = lastTurn();
+			expect(turn).toMatchObject({ actor: 'Human' });
+			expect(turn.data).toMatchObject({
+				action: 'Ask',
+				inference: 'read as "whether it is light"'
+			});
+			expect(String(turn.data?.truth)).toMatch(/^(Yes|No)\. Sól is/); // deterministic-engine verdict
+			expect(turn.data?.source).toBeUndefined(); // the Oracle has no floor
 		});
 
-		it('logs a human Cast with no inference column', async () => {
+		it('logs a human Cast turn row with no inference', async () => {
 			await call({ type: 'Cast', player: 'Human', runeName: WRONG });
-			const entry = getLog(SID).at(-1)!;
-			expect(entry).toMatchObject({ actor: 'Human', action: 'Cast', inference: '' });
-			expect(entry.truth).toContain('wrong');
+			expect(lastTurn().data).toMatchObject({ action: 'Cast', inference: '' });
+			expect(String(lastTurn().data?.truth)).toContain('wrong');
 		});
 
-		it('tags a Sköll Cast as Gemini-sourced with his reasoning', async () => {
+		it('tags a Sköll Cast turn as Gemini-sourced with his reasoning', async () => {
 			await ask(); // hand him the turn
-			await advance(); // he casts (default mock: wrong, no trace → payload fallback)
-			const entry = getLog(SID).at(-1)!;
-			expect(entry).toMatchObject({ actor: 'Sköll', action: 'Cast', source: 'gemini' });
-			expect(entry.inference).toContain('hunch'); // the earned-only fallback
+			await advance(); // he casts (default mock: wrong, payload fallback for reasoning)
+			expect(lastTurn().data).toMatchObject({ action: 'Cast', source: 'gemini' });
+			expect(String(lastTurn().data?.inference)).toContain('hunch'); // the earned-only fallback
+			// And his action is on the skoll channel.
+			expect(byChannel('skoll').some((e) => e.message.includes('Sköll casts'))).toBe(true);
 		});
 
-		it('flags the turn the deterministic floor fired', async () => {
+		it('flags the turn the deterministic floor fired (warn on the skoll channel)', async () => {
 			skollDecides(async () => {
 				throw new Error('timeout');
 			});
 			await ask();
-			await advance(); // Gemini throws → floor plays (an Ask on the fresh board, parked)
-			await call({ type: 'React', player: 'Human', reaction: 'Pass' }); // resolve → logged
-			const entry = getLog(SID).at(-1)!;
-			expect(entry).toMatchObject({ actor: 'Sköll', source: 'floor' });
+			await advance(); // Gemini throws → floor plays
+			const move = byChannel('skoll').at(-1)!;
+			expect(move).toMatchObject({ level: 'warn' });
+			expect(move.message).toContain('Floor fired');
 		});
 
 		it('pairs Sköll’s Ask reasoning with the engine’s answer once the human reacts', async () => {
 			skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
 			await ask();
-			await advance(); // his Ask is parked — not yet logged (truth unknown)
-			expect(getLog(SID).some((e) => e.actor === 'Sköll' && e.action === 'Ask')).toBe(false);
+			await advance(); // his Ask is parked — no turn row yet (truth unknown)
+			expect(turns().some((e) => e.actor === 'Sköll')).toBe(false);
 			await call({ type: 'React', player: 'Human', reaction: 'Pass' });
-			const entry = getLog(SID).at(-1)!;
-			expect(entry).toMatchObject({ actor: 'Sköll', action: 'Ask', source: 'gemini' });
-			expect(entry.truth).toMatch(/Sól is (not )?reaching for a gold rune\./); // deterministic-engine
-			expect(entry.inference).toContain('hunch'); // LLM-inference, shown beside the truth
+			const turn = lastTurn();
+			expect(turn).toMatchObject({ actor: 'Sköll' });
+			expect(turn.data).toMatchObject({ action: 'Ask', source: 'gemini' });
+			expect(String(turn.data?.truth)).toMatch(/Sól is (not )?reaching for a gold rune\./);
+			expect(String(turn.data?.inference)).toContain('hunch');
 		});
 
 		it('records the engine’s verdict, not a Hex, on a hexed Sköll Ask', async () => {
@@ -340,9 +359,28 @@ describe('POST /api/action', () => {
 			await ask();
 			await advance();
 			await call({ type: 'React', player: 'Human', reaction: 'Hex' });
-			const entry = getLog(SID).at(-1)!;
-			expect(entry).toMatchObject({ actor: 'Sköll', action: 'Ask' });
-			expect(entry.truth).toContain('Hexed'); // his question died — no answer produced
+			expect(String(lastTurn().data?.truth)).toContain('Hexed');
+		});
+
+		it('logs Sköll reacting to the human’s Ask', async () => {
+			skollReacts(async () => ({ reaction: 'Pass' }));
+			openGate();
+			await ask();
+			expect(byChannel('skoll').some((e) => e.message.includes('reacts to your Ask: Pass'))).toBe(
+				true
+			);
+		});
+
+		it('drains raw Gemini I/O onto the log as a sensitive event (verbose)', async () => {
+			// The real seam is mocked here, so seed the sink the way gemini.ts would, then advance —
+			// the route drains it onto the session log as a sensitive `gemini` event.
+			await ask(); // hand the wolf his turn
+			captureGemini({ label: 'move', request: { contents: 'board…' }, response: { text: '{}' } });
+			await advance();
+			const io = byChannel('gemini').at(-1)!;
+			expect(io).toMatchObject({ sensitive: true });
+			expect(io.message).toContain('move');
+			expect(io.data).toMatchObject({ response: { text: '{}' } });
 		});
 	});
 

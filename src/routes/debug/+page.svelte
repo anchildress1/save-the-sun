@@ -1,19 +1,23 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import type { DebugEntry } from '$lib/server/debug/log';
+	import type { DebugEvent, DebugLevel } from '$lib/server/debug/log';
 	import type { PageProps } from './$types';
 
 	// SSR gives the first paint; the page then polls so the log stays live while screen-shared.
 	let { data }: PageProps = $props();
-	let entries = $state<DebugEntry[]>(untrack(() => data.entries));
+	let events = $state<DebugEvent[]>(untrack(() => data.events));
+	let level = $state<DebugLevel>(untrack(() => data.level));
 
 	// Newest first so the latest move is on top during the demo (no scrolling to follow along).
-	const ordered = $derived([...entries].reverse());
+	const ordered = $derived([...events].reverse());
 
 	async function refresh() {
 		try {
 			const res = await fetch('/api/debug');
-			if (res.ok) entries = ((await res.json()) as { entries: DebugEntry[] }).entries;
+			if (!res.ok) return;
+			const next = (await res.json()) as { level: DebugLevel; events: DebugEvent[] };
+			events = next.events;
+			level = next.level;
 		} catch {
 			// A dropped poll is harmless — the next tick retries; never break the view over it.
 		}
@@ -23,45 +27,57 @@
 		const id = setInterval(refresh, 1500);
 		return () => clearInterval(id);
 	});
+
+	const pretty = (d: unknown) => JSON.stringify(d, null, 2);
 </script>
 
 <svelte:head><title>Save the Sun — debug</title></svelte:head>
 
 <main>
 	<header>
-		<h1>Debug view 🔧</h1>
+		<h1>Debug log 🔧</h1>
 		<p>
-			Every result: the <strong>deterministic-engine</strong> truth beside the
-			<strong>LLM-inference</strong> that reached it. A turn the deterministic floor fired is flagged.
+			Chronological stream — human questions, Sköll's move + reasoning each turn, the engine's
+			verdicts, and (verbose) the secret + raw Gemini I/O. Level: <code>{level}</code> (set
+			<code>DEBUG_LOG</code> to <code>verbose</code> / <code>demo</code> / <code>off</code>).
 		</p>
 	</header>
 
-	{#if ordered.length === 0}
-		<p class="empty">No moves yet. Play a turn and they appear here.</p>
+	{#if level === 'off'}
+		<p class="empty">
+			The debug log is off. Set <code>DEBUG_LOG=verbose</code> (or <code>demo</code>) to see it.
+		</p>
+	{:else if ordered.length === 0}
+		<p class="empty">No events yet. Play a turn and they appear here.</p>
 	{:else}
 		<ol reversed>
-			{#each ordered as entry (entry.seq)}
-				<li>
+			{#each ordered as event (event.seq)}
+				<li class="ev {event.channel} {event.level}" class:sensitive={event.sensitive}>
 					<div class="head">
-						<span class="seq">#{entry.seq}</span>
-						<span class="actor">{entry.actor}</span>
-						<span class="action">{entry.action}</span>
-						{#if entry.source}
-							<span class="source" class:floor={entry.source === 'floor'}>
-								{entry.source === 'floor' ? 'deterministic floor' : 'Gemini'}
-							</span>
-						{/if}
+						<span class="seq">#{event.seq}</span>
+						<span class="channel">{event.channel}</span>
+						{#if event.actor}<span class="actor">{event.actor}</span>{/if}
+						{#if event.sensitive}<span class="badge">sensitive</span>{/if}
+						{#if event.level !== 'info'}<span class="badge {event.level}">{event.level}</span>{/if}
 					</div>
-					<div class="cols">
-						<div class="truth">
-							<span class="tag">deterministic-engine</span>
-							<p>{entry.truth}</p>
+
+					{#if event.channel === 'turn'}
+						<div class="cols">
+							<div class="truth">
+								<span class="tag">deterministic-engine</span>
+								<p>{event.data?.truth ?? event.message}</p>
+							</div>
+							<div class="inference">
+								<span class="tag"
+									>LLM-inference{event.data?.source ? ` · ${event.data.source}` : ''}</span
+								>
+								<p>{event.data?.inference || '—'}</p>
+							</div>
 						</div>
-						<div class="inference">
-							<span class="tag">LLM-inference</span>
-							<p>{entry.inference || '—'}</p>
-						</div>
-					</div>
+					{:else}
+						<p class="msg">{event.message}</p>
+						{#if event.data}<pre>{pretty(event.data)}</pre>{/if}
+					{/if}
 				</li>
 			{/each}
 		</ol>
@@ -70,7 +86,7 @@
 
 <style>
 	main {
-		max-width: 60rem;
+		max-width: 64rem;
 		margin: 0 auto;
 		padding: 2rem 1.5rem;
 		font-family: system-ui, sans-serif;
@@ -84,6 +100,13 @@
 	header p {
 		margin: 0 0 1.5rem;
 		color: #b8b8c0;
+		line-height: 1.5;
+	}
+	code {
+		background: #2c2c34;
+		padding: 0.05rem 0.35rem;
+		border-radius: 0.25rem;
+		font-size: 0.85em;
 	}
 	.empty {
 		color: #b8b8c0;
@@ -93,40 +116,89 @@
 		margin: 0;
 		padding: 0;
 		display: grid;
-		gap: 0.75rem;
+		gap: 0.6rem;
 	}
 	li {
 		border: 1px solid #2c2c34;
-		border-radius: 0.5rem;
-		padding: 0.75rem 1rem;
+		border-left-width: 3px;
+		border-radius: 0.4rem;
+		padding: 0.6rem 0.9rem;
 		background: #1d1d22;
+	}
+	li.turn {
+		border-left-color: #3a6ea5;
+	}
+	li.skoll {
+		border-left-color: #8a6d3b;
+	}
+	li.oracle {
+		border-left-color: #4a7a4a;
+	}
+	li.gemini {
+		border-left-color: #7a4a8a;
+	}
+	li.session {
+		border-left-color: #7a7a85;
+	}
+	li.warn {
+		border-left-color: #b9892b;
+	}
+	li.error {
+		border-left-color: #b03a3a;
 	}
 	.head {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		margin-bottom: 0.5rem;
-		font-size: 0.85rem;
+		font-size: 0.8rem;
+		color: #b8b8c0;
+		margin-bottom: 0.35rem;
 	}
 	.seq {
 		color: #7a7a85;
 	}
-	.actor {
+	.channel {
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		font-size: 0.7rem;
 		font-weight: 600;
 	}
-	.action {
-		color: #b8b8c0;
+	.actor {
+		color: #e8e8ea;
+		font-weight: 600;
 	}
-	.source {
+	.badge {
 		margin-left: auto;
-		padding: 0.1rem 0.5rem;
+		padding: 0.05rem 0.45rem;
 		border-radius: 1rem;
 		background: #2c2c34;
-		color: #b8b8c0;
+		font-size: 0.7rem;
 	}
-	.source.floor {
-		background: #5a2d00;
-		color: #ffcf99;
+	.badge.warn {
+		background: #5a4300;
+		color: #ffd98a;
+		margin-left: 0.25rem;
+	}
+	.badge.error {
+		background: #5a1f1f;
+		color: #ff9d9d;
+		margin-left: 0.25rem;
+	}
+	.sensitive .badge:first-of-type {
+		background: #4a1f4a;
+		color: #f0b3f0;
+	}
+	.msg {
+		margin: 0;
+	}
+	pre {
+		margin: 0.4rem 0 0;
+		padding: 0.5rem 0.7rem;
+		background: #121215;
+		border-radius: 0.3rem;
+		overflow-x: auto;
+		font-size: 0.8rem;
+		color: #c8c8d0;
 	}
 	.cols {
 		display: grid;
