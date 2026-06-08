@@ -115,10 +115,12 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		display: grid;
+		display: flex;
+		flex-direction: column;
 		gap: 0.6rem;
 	}
 	li {
+		min-width: 0; /* let a wide child (the raw I/O <pre>) shrink instead of stretching the card */
 		border: 1px solid #2c2c34;
 		border-left-width: 3px;
 		border-radius: 0.4rem;
@@ -148,8 +150,9 @@
 	}
 	.head {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.35rem 0.5rem;
 		font-size: 0.8rem;
 		color: #b8b8c0;
 		margin-bottom: 0.35rem;
@@ -190,19 +193,23 @@
 	}
 	.msg {
 		margin: 0;
+		overflow-wrap: anywhere; /* break long unbroken tokens (echoes, names) rather than overflow */
 	}
 	pre {
 		margin: 0.4rem 0 0;
 		padding: 0.5rem 0.7rem;
 		background: #121215;
 		border-radius: 0.3rem;
-		overflow-x: auto;
+		/* Wrap the raw JSON (long system-instruction / base64 strings) instead of scrolling — keeps
+		   indentation, never pushes the page wide. */
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
 		font-size: 0.8rem;
 		color: #c8c8d0;
 	}
 	.cols {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); /* columns shrink, never overflow */
 		gap: 1rem;
 	}
 	.tag {
@@ -215,6 +222,7 @@
 	}
 	.cols p {
 		margin: 0;
+		overflow-wrap: anywhere;
 	}
 	.truth {
 		border-left: 2px solid #3a6ea5;

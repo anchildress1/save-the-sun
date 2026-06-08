@@ -82,4 +82,26 @@ describe('/debug view', () => {
 		const screen = renderWith([], 'off');
 		await expect.element(screen.getByText(/debug log is off/)).toBeInTheDocument();
 	});
+
+	it('wraps long raw I/O instead of overflowing the page horizontally', async () => {
+		// A realistic verbose gemini event: a long unbroken token (base64-like) + a long prose string.
+		const heavy: DebugEvent = {
+			seq: 9,
+			channel: 'gemini',
+			level: 'info',
+			sensitive: true,
+			message: 'Gemini move call',
+			data: {
+				request: { systemInstruction: 'word '.repeat(900), contents: '{}' },
+				response: { thoughtSignature: 'A'.repeat(2000) }
+			}
+		};
+		const { container } = renderWith([heavy]);
+		const pre = container.querySelector<HTMLElement>('pre')!;
+		await expect.element(pre).toBeInTheDocument();
+		// The long pre must not be wider than its card, and the page must not scroll sideways.
+		expect(pre.scrollWidth).toBeLessThanOrEqual(pre.clientWidth + 1);
+		const root = document.documentElement;
+		expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+	});
 });
