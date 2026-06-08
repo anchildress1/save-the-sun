@@ -86,15 +86,15 @@ let geminiSink: GeminiCall[] = [];
 
 // The SDK response is a class instance (getters, non-POJO). `json()` tolerates it, but SvelteKit's
 // load serializer (devalue) rejects non-POJOs — so snapshot to a plain object here, at ingestion, and
-// both the /api/debug response and the /debug page load stay serializable. The JSON round-trip drops
-// methods/getters and keeps the data (candidates, usage, headers); a non-serializable value (circular,
-// etc.) degrades to its string form rather than crashing the view.
+// both the /api/debug response and the /debug page load stay serializable. structuredClone drops the
+// prototype (its methods/getters) and keeps the data (candidates, usage, headers); a non-cloneable
+// value (a function/stream own-prop, a cycle) degrades to a marker rather than crashing the view.
 function toSerializable(value: unknown): unknown {
 	if (value === undefined) return undefined;
 	try {
-		return JSON.parse(JSON.stringify(value));
+		return structuredClone(value);
 	} catch {
-		return String(value);
+		return { note: 'value omitted — not serializable' };
 	}
 }
 

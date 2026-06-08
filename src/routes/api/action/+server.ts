@@ -5,7 +5,8 @@ import {
 	type GameAction,
 	type SkollTurn,
 	type SkollReaction,
-	type AdvanceResponse
+	type AdvanceResponse,
+	type Player
 } from '$lib/server/engine/actions';
 import { getEngine, getSkoll, withSessionLock } from '$lib/server/engine/session';
 import { interpret } from '$lib/server/oracle/gemini';
@@ -22,7 +23,6 @@ import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
 import { castLine, tauntAt } from '$lib/server/skoll/taunts';
 import { logEvent, drainGemini } from '$lib/server/debug/log';
 import type { CastResult, GameEngine } from '$lib/server/engine/engine';
-import type { Player } from '$lib/server/engine/actions';
 import type { RequestHandler } from './$types';
 
 // 'Advance' is not a player action — it's the client asking the engine to run Sköll's pending turn
@@ -260,17 +260,11 @@ async function askWithSkollReaction(
 	}
 
 	// The result row: the Oracle's reading (LLM-inference) beside the engine's answer (deterministic).
-	turnEvent(
-		sessionId,
-		'Human',
-		'Ask',
-		vs.killed
-			? 'Hexed by Sköll — the Oracle is silent, her turn spent'
-			: oracle?.ok
-				? oracle.answer
-				: 'engine declined the Ask',
-		`read as "${prepared.paraphrase}"`
-	);
+	let truth: string;
+	if (vs.killed) truth = 'Hexed by Sköll — the Oracle is silent, her turn spent';
+	else if (oracle?.ok) truth = oracle.answer;
+	else truth = 'engine declined the Ask';
+	turnEvent(sessionId, 'Human', 'Ask', truth, `read as "${prepared.paraphrase}"`);
 
 	// The turn now sits with Sköll; the client advances him in a follow-up request.
 	return json({

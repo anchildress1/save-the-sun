@@ -120,6 +120,12 @@ describe('raw Gemini sink', () => {
 		expect(call.response).toEqual({ candidates: [{ content: { parts: [{ text: '{}' }] } }] });
 		expect(() => JSON.stringify(call)).not.toThrow();
 	});
+
+	it('degrades a non-serializable value to a marker instead of throwing', () => {
+		// A function own-prop is not structured-cloneable — the snapshot must not crash the view.
+		captureGemini({ label: 'move', request: {}, response: { stream: () => 'x' } });
+		expect(drainGemini()[0].response).toEqual({ note: 'value omitted — not serializable' });
+	});
 });
 
 describe('debugLevel in prod', () => {
