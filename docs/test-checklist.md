@@ -38,6 +38,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C] Empty submit refused with "Speak your question, witch." (nothing sent)
 - [x] [I] Resolved Ask consumes turn; every refusal class does not
 - [x] [Eval] ~40-phrasing corpus scored for correct query-type / refusal-class _(live Gemini — manual/offline, intentionally out of deterministic CI; phrases in `oracle-eval-corpus.md`)_
+- [x] [Eval] "Is the power white/black?" reads as the **fill** axis (white→Light, black→Dark via the power pips); a bare "is it black?" stays the Black hue _(verified live against gemini-3.5-flash; in `oracle-eval-corpus.md`)_
 
 ## 3. Sköll — opponent + deterministic floor
 
@@ -146,11 +147,15 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [I] Invalid Ask costs only the rephrase, never a false answer
 - [x] [S] Every seeded round winnable through legal Asks; Oracle never lies (fuzz across secrets/seeds)
 
-## 10. Debug view
+## 10. Debug view (S8)
 
-- [ ] [I] Every result tagged deterministic-engine vs LLM-inference
-- [ ] [I] Any turn the fallback fired is flagged
-- [ ] [I] Engine truth shown beside Gemini's reasoning
+- [x] [I] Each result tagged deterministic-engine vs LLM-inference; the human question, Sköll's move + source, and his reaction recorded per turn
+- [x] [I] Any turn the deterministic floor fired is flagged (warn on the `skoll` channel)
+- [x] [I] Engine truth shown beside Gemini's reasoning — reasoning + answer pair on the parked-Ask row once it resolves
+- [x] [U] Per-session event stream: seq, bounded trim, session isolation; lifecycle-linked — reset on a new round (reseeded with the new secret) **and** evicted with the session
+- [x] [U][I] `DEBUG_LOG` verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev / off in prod; filtered server-side (`/api/debug` + page load)
+- [x] [I][U] Raw Gemini I/O captured (verbose) as a sensitive event, snapshotted to a serializable POJO so the page load never 500s
+- [x] [I] Sköll's move event shows the cross-offs made **this** turn (the delta), consistent with the pre-move reasoning
 
 ## 11. Voice / copy conformance (lint + eval, not coverage-gated)
 

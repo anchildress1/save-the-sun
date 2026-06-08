@@ -218,9 +218,13 @@ A mood feature that can't degrade to the tier below doesn't ship — so each tie
 
 | Area | Test type | What to test |
 |---|---|---|
-| Result tagging | Integration | Every result logged as **deterministic-engine** or **LLM-inference**. |
+| Result tagging | Integration | Each result logged as **deterministic-engine** vs **LLM-inference**; the human question, Sköll's move + source, and his reaction are recorded per turn. |
 | Fallback flag | Integration | Any turn the deterministic floor fired is flagged. |
-| Truth-vs-reasoning | Integration | Engine truth is shown beside Gemini's reasoning — the demo contrast holds. |
+| Truth-vs-reasoning | Integration | Engine truth is shown beside Gemini's reasoning — reasoning and answer pair on one row once a parked Ask resolves. |
+| Event-log lifecycle | Unit | Per-session event stream: seq, bounded trim, session isolation; lifecycle-linked to the round — reset on a new round (reseeded with the new secret) and evicted with the session. |
+| Exposure level (`DEBUG_LOG`) | Unit + Integration | verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev, off in prod; filtered server-side (`/api/debug` + page load). |
+| Raw model I/O | Integration + Unit | The Gemini request+response captured (verbose) as a sensitive event, snapshotted to a serializable POJO so the page load never 500s. |
+| Cross-offs this move | Integration | Sköll's move event shows the cross-offs he made **this** turn (the delta), consistent with the pre-move reasoning. |
 
 ---
 
