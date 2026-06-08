@@ -218,6 +218,28 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 ---
 
+## S8.5 — Resume the view on reload (view ↔ round ↔ log consistency)
+
+*Closes the gap S8 surfaced. Depends on: S2.5 (session resume), S3 (crossings + transcript), S8 (the debug log the view should match).*
+
+**The mismatch:** a refresh resumes the round server-side (same secret, same turn — S2.5) and the debug log keeps the full history (S8), but the **client** play state is not persisted, so the visible game resets to its opening — crossings gone, the Rite transcript back to "Twenty-four runes stand…" — while the turn pill / night-progress (hydrated from the engine) still read mid-round. The view *looks* reset though nothing reset; the debug stream and the board now disagree, with no event explaining why. This story makes the view resume so all three agree.
+
+- [ ] Persist the human's **crossings** (rune **ids**, not positions) for the round; restore them on load so the board shows the same marks after a reload
+- [ ] Persist the **Rite transcript** (the Ask/answer/reaction history shown in the panel); restore it on load instead of resetting to the opening line
+- [ ] Restore layered **on top of** the server-hydrated engine state (turn pill, round status, night-progress, pending reaction) — the engine stays the source of truth; the view history is presentation only
+- [ ] **Scope to the current round/session:** a new round (new secret via `/api/new-game` or a new session) clears the persisted view state — never restore stale crossings/transcript onto a fresh secret
+- [ ] **Board reshuffle stays** (`boardSeed` is display-only and still reseeds on refresh — see `boardseed-display-only-dont-persist`); because crossings are keyed by rune **id**, they survive the reshuffle and land on the right runes in the new order
+- [ ] Storage via `localStorage` keyed by session/round; storage failure (private mode) degrades to the current reset-on-reload behavior, never to broken play
+- [ ] Consistency check: after a mid-round reload the board marks + transcript match what the **debug log** shows for the same round — no silent divergence
+
+**Implementation (planned, not built):** the client owns this — `+page.svelte` reads/writes a per-round `localStorage` record (crossings set + transcript entries) keyed by a round id, and rehydrates it on mount after the server `data` (engine state) is applied. A round id distinct from `boardSeed` (which reshuffles) ties the persisted view to the secret's lifetime; `/api/new-game` and a fresh session clear it. No server or engine change — the engine already resumes; this only restores the *presentation* the client currently throws away. (If a server round id isn't already exposed, surface a stable per-round token from the load — not the secret — for the storage key.)
+
+**Tests to land:** [C] crossings restore on reload, transcript restore, new-round clears persisted state, storage-failure degradation · [E] reload mid-round restores the board marks + transcript over the resumed round.
+
+**Done when:** a mid-round reload restores the visible crossings + transcript to match the resumed round and the debug log — the view, the round, and the log all agree, with no silent reset.
+
+---
+
 ## S9 — R11 End screen + in-world replay
 
 *Closes the loop. Depends on: S3 (win/cast), S6 (loss path).*
