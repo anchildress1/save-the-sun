@@ -3,7 +3,6 @@
 // (deferred) — these are the v1 idle/turn taunts only.
 
 const TAUNTS = [
-	'I have chased the sun across every sky there is. It tires. I do not.',
 	'The sun already knows my teeth. You are only late to the news.',
 	'Spend the night talking. I will spend it swallowing the dawn.',
 	'Cross them off, one by one. I will cross off the morning in a single bite.',

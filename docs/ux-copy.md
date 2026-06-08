@@ -113,7 +113,6 @@ Templated. **Both verdicts restate the trait** — `Yes. Sól is reaching for {v
 ## 2. Sköll
 
 ### Idle / turn taunts (rotate, no repeat within a game)
-- "I have chased the sun across every sky there is. It tires. I do not."
 - "The sun already knows my teeth. You are only late to the news."
 - "Spend the night talking. I will spend it swallowing the dawn."
 - "Cross them off, one by one. I will cross off the morning in a single bite."

@@ -3,14 +3,14 @@ import { castLine, tauntAt } from '$lib/server/skoll/taunts';
 
 describe('tauntAt', () => {
 	it('returns a line and wraps around the pool', () => {
-		expect(tauntAt(0)).toBe('I have chased the sun across every sky there is. It tires. I do not.');
-		// Wrap: index 8 lands back on the first of the 8-line pool.
-		expect(tauntAt(8)).toBe(tauntAt(0));
+		expect(tauntAt(0)).toBe('The sun already knows my teeth. You are only late to the news.');
+		// Wrap: index 7 lands back on the first of the 7-line pool.
+		expect(tauntAt(7)).toBe(tauntAt(0));
 	});
 
 	it('rotates without repeating across one pass of the pool', () => {
-		const seen = new Set(Array.from({ length: 8 }, (_, i) => tauntAt(i)));
-		expect(seen.size).toBe(8);
+		const seen = new Set(Array.from({ length: 7 }, (_, i) => tauntAt(i)));
+		expect(seen.size).toBe(7);
 	});
 });
 
