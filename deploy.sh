@@ -23,6 +23,10 @@ PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null)}"
   exit 1
 }
 
+# Pin every gcloud call in this run to PROJECT_ID without mutating the user's
+# persistent config — covers commands that don't take an explicit --project.
+export CLOUDSDK_CORE_PROJECT="${PROJECT_ID}"
+
 # GEMINI_API_KEY from env, else from .env — needed to seed Secret Manager.
 if [[ -z "${GEMINI_API_KEY:-}" ]] && [[ -f .env ]]; then
   GEMINI_API_KEY=$(grep '^GEMINI_API_KEY=' .env | cut -d= -f2- || true)
@@ -117,7 +121,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --min-instances 0 \
   --max-instances 2 \
   --concurrency 80 \
-  --timeout 60 \
+  --timeout 60s \
   --cpu-boost \
   --set-secrets="GEMINI_API_KEY=${SECRET_GEMINI}:latest" \
   --quiet
@@ -125,20 +129,24 @@ gcloud run deploy "${SERVICE_NAME}" \
 # ─── Smoke test ──────────────────────────────────────────────────────────────────
 SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" --region="${REGION}" --format="value(status.url)")
 echo "» Smoke test: ${SERVICE_URL}/"
+SMOKE_OK=false
 RETRIES=4
 for i in $(seq 1 $RETRIES); do
   if curl -sf --max-time 10 "${SERVICE_URL}/" >/dev/null 2>&1; then
     echo "  PASS — service is healthy"
+    SMOKE_OK=true
     break
   fi
-  if [[ "$i" -eq "$RETRIES" ]]; then
-    echo "  WARN — no healthy response after ${RETRIES} attempts. Check logs:"
-    echo "    gcloud run services logs read ${SERVICE_NAME} --region=${REGION} --limit=20"
-  else
-    echo "  Attempt ${i}/${RETRIES} failed, retrying in 5s..."
-    sleep 5
-  fi
+  echo "  Attempt ${i}/${RETRIES} failed$([[ "$i" -lt "$RETRIES" ]] && echo ', retrying in 5s...')"
+  [[ "$i" -lt "$RETRIES" ]] && sleep 5
 done
+
+# Fail loudly: a deploy that never served traffic is not a success.
+if [[ "${SMOKE_OK}" != true ]]; then
+  echo "  FAIL — service did not respond after ${RETRIES} attempts. Check logs:" >&2
+  echo "    gcloud run services logs read ${SERVICE_NAME} --region=${REGION} --limit=20" >&2
+  exit 1
+fi
 
 echo ""
 echo "${RULE}"
