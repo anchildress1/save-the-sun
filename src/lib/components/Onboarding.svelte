@@ -152,8 +152,16 @@
 			<h1 id="onboarding-heading">Save the Sun</h1>
 			<p class="tagline">A race to beat Sköll and save the light.</p>
 			<div class="actions">
-				<button class="primary" type="button" onclick={() => onDone()}>Light the fire.</button>
-				<button class="ghost" type="button" onclick={beginTour}>How the rite works</button>
+				<button
+					class="primary ritual-button ritual-button--primary"
+					type="button"
+					onclick={() => onDone()}
+				>
+					Light the fire.
+				</button>
+				<button class="ghost ritual-button ritual-button--ghost" type="button" onclick={beginTour}>
+					How the rite works
+				</button>
 			</div>
 		</div>
 	</div>
@@ -177,8 +185,14 @@
 		<h2 id="onboarding-heading">{STEPS[step].label}</h2>
 		<p class="step-body" data-testid="step-body">{STEPS[step].body}</p>
 		<div class="actions">
-			<button class="ghost" type="button" onclick={() => onDone()}>Skip</button>
-			<button class="primary" type="button" onclick={next}>
+			<button
+				class="ghost ritual-button ritual-button--ghost"
+				type="button"
+				onclick={() => onDone()}
+			>
+				Skip
+			</button>
+			<button class="primary ritual-button ritual-button--primary" type="button" onclick={next}>
 				{isLast ? 'Take up the runes.' : 'Next'}
 			</button>
 		</div>
@@ -308,30 +322,9 @@
 
 	button.primary,
 	button.ghost {
-		padding: 0.6rem 1rem;
-		font-family: var(--font-display);
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
+		min-height: 3rem;
+		padding: 0.72rem 1.05rem;
 		font-size: 0.8rem;
-		border-radius: 5px;
-		cursor: pointer;
-	}
-
-	button.primary {
-		color: var(--bg-deep);
-		background: linear-gradient(180deg, var(--gold-bright), var(--gold));
-		border: 1px solid var(--gold-bright);
-		transition: filter 0.2s ease;
-	}
-
-	button.primary:hover {
-		filter: brightness(1.08);
-	}
-
-	button.ghost {
-		color: var(--ink-muted);
-		background: transparent;
-		border: 1px solid var(--gold-dim);
 	}
 
 	button:focus-visible {

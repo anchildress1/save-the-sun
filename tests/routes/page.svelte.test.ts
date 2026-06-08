@@ -321,19 +321,18 @@ describe('Save the Sun page', () => {
 
 	it('raises the sun and voices the victory line in the header on a human win', async () => {
 		const screen = render(Page, propsWith(HUMAN_WON));
-		// Moon gives way to the risen sun; the resolution line replaces the night-progress phase.
+		expect(screen.container.querySelector('.page-background-image')).not.toBeNull();
 		expect(screen.container.querySelector('.sun-risen')).not.toBeNull();
-		expect(screen.container.querySelector('.moon')).toBeNull();
 		await expect
 			.element(screen.getByTestId('outcome-line'))
 			.toHaveTextContent('Sól crests the rim of the world.');
 	});
 
-	it('keeps the moon on a Sköll win — short tag in the header, full line in the Oracle panel', async () => {
+	it('keeps the moon banner on a Sköll win — short tag in the header, full line in the Oracle panel', async () => {
 		const screen = render(Page, propsWith(SKOLL_WON));
-		// No sunrise for a loss — the moon holds. The header carries only the short tag; the full
+		// No sunrise for a loss — the moonlit background holds. The header carries only the short tag; the full
 		// resolution sentence lives in the Oracle panel, which wraps responsively on its own.
-		expect(screen.container.querySelector('.moon')).not.toBeNull();
+		expect(screen.container.querySelector('.page-background-image')).not.toBeNull();
 		expect(screen.container.querySelector('.sun-risen')).toBeNull();
 		await expect
 			.element(screen.getByTestId('outcome-line'))
@@ -414,6 +413,7 @@ describe('Save the Sun page', () => {
 		// His box persists (title) but carries no question and no taunt/cast text.
 		await expect.element(screen.getByTestId('skoll-frame')).toHaveTextContent('Sköll');
 		expect(screen.container.querySelector('[data-testid="skoll-echo"]')).toBeNull();
+		expect(screen.container.querySelector('.skoll-banner')).not.toBeNull();
 		expect(screen.container.querySelector('[data-testid="skoll-voice"]')).toBeNull();
 	});
 

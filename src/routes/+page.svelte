@@ -4,6 +4,8 @@
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 	import Onboarding from '$lib/components/Onboarding.svelte';
 	import { runes } from '$lib/board';
+	import moonSplash from '$lib/assets/banners/moon-splash.jpg';
+	import skollBanner from '$lib/assets/banners/skoll-banner.jpg';
 	import type {
 		GameAction,
 		ActionResponse,
@@ -76,6 +78,7 @@
 	let turns = $state<number>(untrack(() => data.state.turns));
 	let winner = $state<Player | null>(untrack(() => data.state.winner));
 	let roundOver = $derived(roundStatus === 'won');
+	// A human win adds a risen sun marker; a Sköll win leaves only the moonlit night and defeat line.
 	let humanWon = $derived(roundOver && winner === 'Human');
 	let skollWon = $derived(roundOver && winner === 'Sköll');
 	let outcomeLine = $derived(humanWon ? RITE.sunCrests : RITE.skollTakes);
@@ -361,22 +364,15 @@
 
 <main>
 	<header class="rite-header">
+		<img
+			class="header-background-image"
+			src={moonSplash}
+			alt=""
+			aria-hidden="true"
+			decoding="async"
+		/>
 		<div class="title-block">
-			<svg class="sun-sigil" viewBox="0 0 48 48" aria-hidden="true">
-				<g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
-					<circle cx="24" cy="24" r="8" />
-					{#each Array.from({ length: 12 }, (_, i) => i) as i (i)}
-						<line
-							x1="24"
-							y1="24"
-							x2={24 + 20 * Math.cos((i * Math.PI) / 6)}
-							y2={24 + 20 * Math.sin((i * Math.PI) / 6)}
-							transform-origin="24 24"
-							opacity="0.85"
-						/>
-					{/each}
-				</g>
-			</svg>
+			<img class="app-sigil" src="/icon-192.png" alt="" aria-hidden="true" decoding="async" />
 			<div>
 				<h1>Save the Sun</h1>
 				<p class="tagline">A race to beat Sköll and save the light.</p>
@@ -405,20 +401,6 @@
 					</g>
 					<circle cx="32" cy="32" r="14" fill="url(#sunFace)" />
 				</svg>
-			{:else}
-				<svg class="moon" viewBox="0 0 64 64" aria-hidden="true">
-					<defs>
-						<radialGradient id="moonFace" cx="40%" cy="35%" r="75%">
-							<stop offset="0%" stop-color="#f4eede" />
-							<stop offset="70%" stop-color="#cdd2dd" />
-							<stop offset="100%" stop-color="#8b93a6" />
-						</radialGradient>
-					</defs>
-					<circle cx="32" cy="32" r="22" fill="url(#moonFace)" />
-					<circle cx="26" cy="24" r="3.4" fill="#b9bdc8" opacity="0.6" />
-					<circle cx="40" cy="34" r="2.4" fill="#b9bdc8" opacity="0.5" />
-					<circle cx="30" cy="40" r="1.8" fill="#b9bdc8" opacity="0.5" />
-				</svg>
 			{/if}
 			<p
 				class="night-progress"
@@ -432,14 +414,19 @@
 
 		<div class="header-controls">
 			<button
-				class="ghost"
+				class="ghost ritual-button ritual-button--ghost"
 				type="button"
 				data-testid="show-instructions"
 				onclick={showInstructions}
 			>
 				How the rite works
 			</button>
-			<button class="ghost new-game" type="button" onclick={newGame} disabled={pending}>
+			<button
+				class="ghost new-game ritual-button ritual-button--ghost"
+				type="button"
+				onclick={newGame}
+				disabled={pending}
+			>
 				Begin another night
 			</button>
 		</div>
@@ -453,6 +440,8 @@
 		</section>
 
 		<aside class="oracle-panel">
+			<img class="skoll-banner" src={skollBanner} alt="" aria-hidden="true" decoding="async" />
+
 			<div class="turn-pill-row">
 				<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
 					{turnPill}
@@ -474,6 +463,7 @@
 			</div>
 
 			<h2 class="oracle-title">The Oracle</h2>
+			<hr class="ornate-divider oracle-divider" aria-hidden="true" />
 
 			<div class="oracle-frame">
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
@@ -491,10 +481,16 @@
 				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
 			{:else}
 				<div class="reactions" data-coach="reactions">
-					<button type="button" disabled title="When your rival asks, hear the answer too.">
+					<button
+						class="ritual-button ritual-button--ghost"
+						type="button"
+						disabled
+						title="When your rival asks, hear the answer too."
+					>
 						Scry
 					</button>
 					<button
+						class="ritual-button ritual-button--ghost"
 						type="button"
 						disabled
 						title="When your rival asks, silence the Oracle — their question dies."
@@ -506,7 +502,7 @@
 
 			{#if skollStalled}
 				<button
-					class="ghost rouse-wolf"
+					class="ghost rouse-wolf ritual-button ritual-button--ghost"
 					type="button"
 					data-testid="rouse-wolf"
 					onclick={advanceSkoll}
@@ -534,7 +530,11 @@
 					bind:value={askValue}
 					disabled={castMode || pending || !canAct}
 				/>
-				<button class="primary" type="submit" disabled={castMode || pending || !canAct}>
+				<button
+					class="primary ritual-button ritual-button--primary"
+					type="submit"
+					disabled={castMode || pending || !canAct}
+				>
 					Ask the Oracle
 				</button>
 			</form>
@@ -546,18 +546,24 @@
 					</p>
 					<div class="cast-actions">
 						<button
-							class="primary"
+							class="primary ritual-button ritual-button--primary"
 							type="button"
 							onclick={commitCast}
 							disabled={!selectedRune || pending}
 						>
 							Name it
 						</button>
-						<button class="ghost" type="button" onclick={cancelCast}>Not yet</button>
+						<button
+							class="ghost ritual-button ritual-button--ghost"
+							type="button"
+							onclick={cancelCast}
+						>
+							Not yet
+						</button>
 					</div>
 				{:else}
 					<button
-						class="primary cast-arm"
+						class="primary cast-arm ritual-button ritual-button--primary"
 						type="button"
 						onclick={armCast}
 						disabled={pending || !canAct}
@@ -566,15 +572,6 @@
 					</button>
 				{/if}
 			</div>
-
-			<svg class="wolf" viewBox="0 0 200 110" aria-hidden="true">
-				<circle cx="150" cy="30" r="20" fill="#2a3247" opacity="0.7" />
-				<!-- howling wolf on a ridge -->
-				<path
-					d="M8 108 L60 108 C66 96 70 92 76 90 C78 78 82 70 88 64 C86 58 88 50 94 44 C92 40 92 34 96 30 C98 36 100 40 104 42 C108 50 110 58 110 66 C116 72 120 82 121 92 C126 96 130 102 134 108 L196 108 L196 110 L8 110 Z"
-					fill="#0a0e1c"
-				/>
-			</svg>
 		</aside>
 	</div>
 </main>
@@ -585,6 +582,7 @@
 
 <style>
 	main {
+		position: relative;
 		max-width: 1600px;
 		margin: 0 auto;
 		min-height: 100vh;
@@ -592,13 +590,75 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.6rem;
+		isolation: isolate;
+		--skoll-saturation: 1.04;
+		--skoll-brightness: 1.06;
+		--skoll-contrast: 1.04;
 	}
 
 	.rite-header {
+		position: relative;
 		display: grid;
 		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
-		padding-bottom: 0.4rem;
+		min-height: 7rem;
+		padding: 0.8rem 1rem;
+		overflow: hidden;
+		border: 1px solid rgba(217, 169, 74, 0.18);
+		border-radius: 10px;
+		background: var(--bg-deep);
+		isolation: isolate;
+	}
+
+	.rite-header::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		background:
+			linear-gradient(
+				90deg,
+				rgba(6, 9, 18, 0.82) 0%,
+				rgba(6, 9, 18, 0.26) 42%,
+				rgba(6, 9, 18, 0.78) 100%
+			),
+			linear-gradient(180deg, rgba(6, 9, 18, 0.16) 0%, rgba(6, 9, 18, 0.52) 100%);
+		pointer-events: none;
+	}
+
+	.ornate-divider {
+		position: relative;
+		z-index: 2;
+		width: 100%;
+		height: 2.3rem;
+		margin: -0.25rem 0 -0.35rem;
+		border: 0;
+		background: var(--ui-divider) center / 100% 100% no-repeat;
+		pointer-events: none;
+	}
+
+	.oracle-divider {
+		align-self: stretch;
+		height: 1.25rem;
+		margin: -0.4rem 0 -0.1rem;
+		opacity: 0.92;
+	}
+
+	.rite-header > :not(.header-background-image) {
+		position: relative;
+		z-index: 2;
+	}
+
+	.header-background-image {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		object-position: 50% 42%;
+		filter: saturate(1.04) brightness(0.92) contrast(1.02);
+		pointer-events: none;
 	}
 
 	.title-block {
@@ -607,11 +667,11 @@
 		gap: 0.8rem;
 	}
 
-	.sun-sigil {
-		width: 46px;
-		height: 46px;
-		color: var(--gold);
-		filter: drop-shadow(0 0 8px rgba(217, 169, 74, 0.5));
+	.app-sigil {
+		width: 54px;
+		height: 54px;
+		object-fit: contain;
+		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 10px rgba(217, 169, 74, 0.28));
 	}
 
 	h1 {
@@ -639,12 +699,7 @@
 		gap: 0.3rem;
 	}
 
-	.moon {
-		width: 58px;
-		height: 58px;
-		filter: drop-shadow(0 0 16px rgba(220, 226, 240, 0.4));
-	}
-
+	/* The risen sun replaces the moon on a human win — the saved sun, warm and radiant. */
 	.sun-risen {
 		width: 58px;
 		height: 58px;
@@ -728,11 +783,39 @@
 		gap: 0.85rem;
 		padding: 1.1rem 1.1rem 0;
 		background:
-			radial-gradient(circle at 50% 0%, rgba(217, 169, 74, 0.06) 0%, transparent 40%),
-			linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-deep) 100%);
+			linear-gradient(
+				180deg,
+				rgba(6, 9, 18, 0.9) 0%,
+				rgba(6, 9, 18, 0.64) 48%,
+				rgba(6, 9, 18, 0.16) 100%
+			),
+			var(--bg-deep);
 		border: 1px solid var(--gold-dim);
 		border-radius: 10px;
 		overflow: hidden;
+		isolation: isolate;
+	}
+
+	.oracle-panel::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		background:
+			linear-gradient(
+				180deg,
+				rgba(6, 9, 18, 0.78) 0%,
+				rgba(6, 9, 18, 0.5) 44%,
+				rgba(6, 9, 18, 0.08) 76%,
+				transparent 100%
+			),
+			radial-gradient(circle at 50% 0%, rgba(217, 169, 74, 0.1) 0%, transparent 36%);
+		pointer-events: none;
+	}
+
+	.oracle-panel > :not(.skoll-banner) {
+		position: relative;
+		z-index: 2;
 	}
 
 	.oracle-title {
@@ -801,15 +884,10 @@
 
 	.reactions button {
 		flex: 1;
-		padding: 0.4rem;
+		min-height: 2.35rem;
+		padding: 0.45rem 0.65rem;
 		font-size: 0.72rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--ink-faint);
-		background: rgba(255, 255, 255, 0.02);
-		border: 1px solid var(--gold-faint);
-		border-radius: 5px;
-		cursor: not-allowed;
+		letter-spacing: 0.13em;
 	}
 
 	.ask {
@@ -870,41 +948,11 @@
 	}
 
 	button.primary {
-		padding: 0.65rem 0.9rem;
-		font-family: var(--font-display);
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		font-size: 0.82rem;
-		color: var(--bg-deep);
-		background: linear-gradient(180deg, var(--gold-bright), var(--gold));
-		border: 1px solid var(--gold-bright);
-		border-radius: 5px;
-		cursor: pointer;
-		transition:
-			filter 0.2s ease,
-			transform 0.1s ease;
-	}
-
-	button.primary:hover:not(:disabled) {
-		filter: brightness(1.08);
-	}
-
-	button.primary:disabled {
-		opacity: 0.45;
-		cursor: not-allowed;
+		min-height: 3rem;
 	}
 
 	button.ghost {
-		padding: 0.65rem 0.9rem;
-		font-family: var(--font-display);
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		font-size: 0.82rem;
-		color: var(--ink-muted);
-		background: transparent;
-		border: 1px solid var(--gold-dim);
-		border-radius: 5px;
-		cursor: pointer;
+		min-height: 3rem;
 	}
 
 	button:focus-visible {
@@ -957,11 +1005,20 @@
 		visibility: visible;
 	}
 
-	.wolf {
-		width: 100%;
-		height: auto;
-		margin-top: auto;
+	.skoll-banner {
+		position: absolute;
+		inset: auto 0 0;
+		z-index: 0;
 		display: block;
+		width: 100%;
+		height: min(68%, 42rem);
+		object-fit: cover;
+		object-position: 50% 16%;
+		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
+			contrast(var(--skoll-contrast));
+		mask-image: linear-gradient(180deg, transparent 0%, black 12%, black 100%);
+		-webkit-mask-image: linear-gradient(180deg, transparent 0%, black 12%, black 100%);
+		pointer-events: none;
 	}
 
 	/* The one deliberate width breakpoint: below the 1280px minimum the rite steps aside for this
