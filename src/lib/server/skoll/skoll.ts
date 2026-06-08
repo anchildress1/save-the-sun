@@ -279,9 +279,10 @@ function validateReaction(raw: unknown, canScry: boolean, canHex: boolean): Reac
 }
 
 // How often Sköll even *considers* reacting to an Ask. Without this gate Gemini interrupts every
-// single Ask, far too cannily for a twelve-year-old; at 0.5 he only thinks to react half the time
-// (and may still Pass when he does), roughly halving his attempts. Tune up for a craftier wolf.
-const REACTION_CHANCE = 0.5;
+// single Ask, far too cannily for a twelve-year-old; at 0.65 he thinks to react about two-thirds of
+// the time (and may still Pass when he does), so he shows up in the rite often without policing
+// every question. Higher = a more present wolf; lower = a sleepier one.
+const REACTION_CHANCE = 0.65;
 
 async function planReaction(
 	engine: GameEngine,
