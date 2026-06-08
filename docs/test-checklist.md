@@ -121,6 +121,13 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C][A] Modal focus management: focus moves into the dialog on open, Tab is trapped (wraps both ends), Escape exits — the board/header behind stays untabbable while open
 - [x] [E] Board e2e seeds the onboarded flag so the first-run overlay never blocks board interaction
 
+## 6.7 Asset delivery pipeline (v2 future work)
+
+- [ ] [V][manual] Cleanup: all generated image assets align to one stable stylized art direction before new format variants ship
+- [ ] [C][E] AVIF/WebP fallbacks load for large stone, banner, chalk, rune, element, color, and fill assets; PNG/JPEG fallback remains available
+- [ ] [E] Responsive image variants are requested when the same art renders at materially different sizes
+- [ ] [CI] Bundle-size budget fails when first-load image weight or total client assets exceed the v2 budget
+
 ## 7. Accessibility (v1; screen reader = v1.5)
 
 - [ ] [E][manual] Whole round operable by keyboard with visible focus indicator

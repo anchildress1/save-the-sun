@@ -326,6 +326,11 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 4. Voice interaction with Gemini — speak the Ask, hear the Oracle/Sköll (TTS)
 5. Wrong-cast penalty — cap ≈2 wrong casts per player (threshold on the v1 counter; alternation unaffected)
 6. Small-desktop support down to 1024px — a responsive board below the v1 1280px floor (v1 just shows the best-on-desktop notice there)
+7. Asset delivery pipeline — generate AVIF/WebP fallbacks for large stone, banner, chalk, and rune assets; ship responsive variants where the UI has multiple display sizes; keep a checked bundle-size budget so deploy cost and first-load weight do not creep back up
+   - [ ] Cleanup: align all generated image assets to one stable stylized art direction before adding more format variants
+   - [ ] Generate AVIF/WebP fallbacks for large stone, banner, chalk, rune, element, color, and fill assets
+   - [ ] Ship responsive image variants anywhere the same art renders at materially different sizes
+   - [ ] Add an enforced bundle-size budget for first-load image weight and total client assets
 
 ---
 
