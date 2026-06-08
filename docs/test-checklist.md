@@ -59,6 +59,12 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [U] Casts when one candidate remains; else casts best remaining when no splitter exists
 - [x] [U] Same seed + state → same sampled move (reproducible)
 
+**Opening hunch (seeded — varies the otherwise-constant first move)**
+
+- [x] [U] Per-round hunch is deterministic per seed and varies across seeds — the opener is not pinned to one trait
+- [x] [U] Hunch is trait-level (colour/element) — never a rune by name (can't echo the secret), never light/dark (the prompt forbids that clean-split opener)
+- [x] [I] Hunch is surfaced to Gemini **only** on the opening move (no facts yet); once a fact exists the hunch value is absent from the prompt entirely (not just the sentence)
+
 **Persona (eval, low gate)**
 
 - [ ] [Eval] ~12-year-old behavior: one clue at a time, works from board + own cross-offs, may overlook a legal elimination, casts on "sure enough"; computation tells flagged as failures _(live-LLM eval, not a CI gate — deferred with the Oracle's eval harness)_
