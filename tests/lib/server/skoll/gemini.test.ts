@@ -129,14 +129,17 @@ describe('Gemini Sköll adapter', () => {
 		expect(sent).toContain('a fire rune');
 	});
 
-	it('drops the hunch nudge once he has learned something', async () => {
+	it('drops the hunch entirely once he has learned something — value gone, not just the sentence', async () => {
 		geminiJson({ kind: 'ask', axis: 'color', colorValue: 'Gold' });
 		await decideSkollMove({
 			...emptyMove,
 			answers: [{ trait: 'a fire rune', holds: false }],
-			hunch: 'a gold rune'
+			// A distinctive phrase that appears nowhere else in the payload, so finding it means the
+			// hunch leaked into the prompt.
+			hunch: 'a teal rune'
 		});
 		const sent = sdk.generateContent.mock.calls[0][0].contents as string;
-		expect(sent).not.toContain('hunch you woke with');
+		expect(sent).not.toContain('hunch you woke with'); // opener sentence gone
+		expect(sent).not.toContain('a teal rune'); // and the value itself is gone, not stringified in
 	});
 });
