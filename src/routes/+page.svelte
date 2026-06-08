@@ -459,6 +459,14 @@
 		</div>
 
 		<div class="header-controls">
+			<button
+				class="ghost"
+				type="button"
+				data-testid="show-instructions"
+				onclick={showInstructions}
+			>
+				How the rite works
+			</button>
 			<button class="ghost new-game" type="button" onclick={newGame} disabled={pending}>
 				Begin another night
 			</button>
@@ -575,10 +583,6 @@
 					</button>
 				{/if}
 			</div>
-
-			<button class="help" type="button" data-testid="show-instructions" onclick={showInstructions}>
-				How the rite works
-			</button>
 
 			<svg class="wolf" viewBox="0 0 200 110" aria-hidden="true">
 				<circle cx="150" cy="30" r="20" fill="#2a3247" opacity="0.7" />
@@ -934,29 +938,10 @@
 		outline-offset: 2px;
 	}
 
-	/* Subtle persistent re-entry to the tour — quiet so it never competes with the live controls. */
-	.help {
-		align-self: center;
-		margin-top: auto;
-		padding: 0.3rem 0.2rem;
-		font-family: var(--font-display);
-		font-size: 0.72rem;
-		letter-spacing: 0.1em;
-		color: var(--ink-faint);
-		background: none;
-		border: none;
-		text-decoration: underline;
-		text-underline-offset: 3px;
-		cursor: pointer;
-	}
-
-	.help:hover {
-		color: var(--ink-muted);
-	}
-
 	.wolf {
 		width: 100%;
 		height: auto;
+		margin-top: auto;
 		display: block;
 	}
 
