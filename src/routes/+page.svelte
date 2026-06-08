@@ -23,7 +23,6 @@
 	// (title, button labels) stays inline in the template; these are the lines the Oracle panel,
 	// the turn pill, and the cast prompt show as play resolves.
 	const RITE = {
-		ready: 'Twenty-four runes stand. None ruled out. Ask the Oracle.',
 		emptyAsk: 'Speak your question, witch.',
 		wolfMoving: 'The wolf is moving. Hold.',
 		oracleSilent: 'The Oracle falls silent. Draw breath and try again.',
@@ -73,7 +72,6 @@
 	// the human to react to. A round can resume on his parked Ask, so the prompt + the human's still-
 	// held charges hydrate from the load (the reaction window lives server-side); otherwise they
 	// start fresh. The engine stays authoritative on charges, so the hydrated values can't over-grant.
-	let skollVoice = $state('');
 	let skollEcho = $state(untrack(() => data.pendingReaction?.echo ?? ''));
 	let skollAsking = $state(untrack(() => data.pendingReaction != null));
 	let heldScry = $state(untrack(() => data.pendingReaction?.held.Scry ?? true));
@@ -120,19 +118,17 @@
 		winner = state.winner;
 	}
 
-	// Surface the wolf's turn: a cast voices his line, an Ask voices his taunt and opens the interrupt
-	// prompt with his echo. The defeat *line* is NOT set here — it derives from engine truth (winner)
-	// in advanceSkoll, so there's one source of "Sköll won," not two that can drift.
+	// His box shows ONLY his templated question (the inference) when he Asks, and is blank otherwise —
+	// no taunt, no cast line. The cast outcome derives from engine truth (winner) in advanceSkoll, so
+	// there's one source of "Sköll won," not two that can drift.
 	function applySkoll(skoll: SkollTurn | undefined) {
 		if (skoll === undefined) return;
-		if (skoll.cast) {
-			skollVoice = skoll.cast.line;
-			skollEcho = '';
-			skollAsking = false;
-		} else if (skoll.asks) {
-			skollVoice = skoll.taunt;
+		if (skoll.asks) {
 			skollEcho = skoll.asks.echo;
 			skollAsking = true;
+		} else {
+			skollEcho = '';
+			skollAsking = false;
 		}
 	}
 
@@ -150,7 +146,7 @@
 	let answer = $state(
 		untrack(() =>
 			data.state.status !== 'won'
-				? RITE.ready
+				? '' // blank until the Oracle has a response to voice
 				: data.state.winner === 'Sköll'
 					? RITE.skollTakesSun
 					: RITE.runeTrue
@@ -288,7 +284,6 @@
 			applyState(state);
 			skollAsking = false;
 			skollEcho = '';
-			skollVoice = '';
 			// Key on what the engine actually DID (skollReaction), not what was requested — a Scry/Hex
 			// can fail (e.g. no charge after a desync), which the server resolves as a Pass. Spend the
 			// charge only when the reaction truly landed, so the UI never diverges from engine truth.
@@ -337,10 +332,9 @@
 			// reset — treat it as a hard failure, not a silent no-op.
 			if (!Number.isFinite(seed)) throw new Error('New game response missing boardSeed');
 			seedOverride = seed; // remounts RuneGrid → crossings + highlight clear
-			answer = RITE.ready;
+			answer = ''; // a fresh round opens blank — the Oracle speaks only when it has a response
 			askValue = '';
 			// The wolf's surfaced turn + the human's reactions reset with the round.
-			skollVoice = '';
 			skollEcho = '';
 			skollAsking = false;
 			heldScry = true;
@@ -493,19 +487,14 @@
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
-			{#if skollVoice || skollAsking}
-				<div class="skoll-frame" data-testid="skoll-frame">
-					<h2 class="skoll-title">Sköll</h2>
-					<!-- His question is the actionable line (you Scry/Hex/Pass it), so it leads; the taunt
-					     is flavor and sits beneath, set off by a blank line. -->
-					{#if skollEcho}
-						<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
-					{/if}
-					{#if skollVoice}
-						<p class="frame-text skoll-voice" data-testid="skoll-voice">{skollVoice}</p>
-					{/if}
-				</div>
-			{/if}
+			<!-- Always present, like the Oracle frame; carries ONLY his templated question (the
+			     inference) when he Asks, and is blank otherwise — no taunt, no cast line. -->
+			<div class="skoll-frame" data-testid="skoll-frame">
+				<h2 class="skoll-title">Sköll</h2>
+				{#if skollEcho}
+					<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
+				{/if}
+			</div>
 
 			{#if skollAsking}
 				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
@@ -807,17 +796,6 @@
 	}
 
 	/* His voice — colder than the Oracle's gold; his presence on the panel. */
-	.skoll-voice {
-		margin: 0;
-		font-style: italic;
-		color: #cdd2dd;
-	}
-
-	/* Blank line between his question (lead) and the taunt beneath it — only when both are present. */
-	.skoll-echo + .skoll-voice {
-		margin-top: 0.6rem;
-	}
-
 	/* His Ask, echoed so the human knows what they're choosing to Scry, Hex, or let pass. */
 	.skoll-echo {
 		margin: 0;

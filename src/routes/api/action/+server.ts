@@ -20,7 +20,6 @@ import {
 	type SkollState
 } from '$lib/server/skoll/skoll';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
-import { castLine, tauntAt } from '$lib/server/skoll/taunts';
 import { logEvent, drainGemini, runWithSession } from '$lib/server/debug/log';
 import type { CastResult, GameEngine } from '$lib/server/engine/engine';
 import type { RequestHandler } from './$types';
@@ -89,17 +88,10 @@ function geminiEvents(sessionId: string): void {
 		});
 }
 
-// Map his resolved turn into the wire DTO the client voices and reacts to.
-function describeTurn(out: SkollOutcome, taunt: string): SkollTurn {
-	return out.kind === 'cast'
-		? {
-				taunt,
-				cast: {
-					line: castLine(out.runeName, out.result.ok && out.result.won),
-					won: out.result.ok && out.result.won
-				}
-			}
-		: { taunt, asks: { echo: out.echo } };
+// What the client surfaces of his turn: his templated question when he Asks (the human Scry/Hex/Pass
+// it), nothing when he Casts — the cast outcome rides the turn state, not a flavor line.
+function describeTurn(out: SkollOutcome): SkollTurn {
+	return out.kind === 'ask' ? { asks: { echo: out.echo } } : {};
 }
 
 // Single server entry point for game actions. Both the human UI and the Gemini-driven Sköll route
@@ -295,7 +287,5 @@ async function playSkollIfActive(
 	// His Cast resolves now (log the engine verdict); his Ask's row waits for the human's reaction.
 	if (out.kind === 'cast')
 		turnEvent(sessionId, 'Sköll', castTruth('Sköll', out.runeName, castWon(out.result)));
-	const turn = describeTurn(out, tauntAt(skoll.tauntIndex));
-	skoll.tauntIndex += 1;
-	return turn;
+	return describeTurn(out);
 }

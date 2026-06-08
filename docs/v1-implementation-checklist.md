@@ -96,7 +96,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [x] Cast arming flow: "Cast the rune" arms Cast mode; while armed a card select **chooses target** (no cross-off), chrome reads "Cast?"; "Name it" commits; "Not yet" cancels with **no turn spent**
 - [x] Two scoped card behaviors (cross-off normally, select-target while armed) never collide
 - [x] Wrong cast costs the turn only; crossings + round state preserved
-- [x] Pre-Ask panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle." (not blank)
+- [x] Oracle panel opens **blank** — it voices a response only (an answer, refusal, or resolution), never idle filler _(revised: the original "Twenty-four runes stand…" pre-Ask line was cut — the box is blank until the Oracle has something to say)_
 - [x] Win on correct cast resolves the round
 
 **Implementation (S3):** every `api/action` response carries a `state` snapshot (`activePlayer`, `status`, `winner`) read from the engine **after** the route's pre-Sköll shim (`actions.ts` → `gameState`). The page drives the turn pill, the Ask/Cast disabling, and the round-over lock from it; cross-off lives in `RuneGrid` and is never turn-gated. In v1 the shim hands play back to the human every turn, so `activePlayer` reads `Human` in real play — the `Sköll` branch (pill flip, Ask/Cast disabled, "The wolf is moving. Hold.") is the same machinery S6 lights up when the shim is removed, exercised today via mocked responses. A resolved round flips the turn pill to the victory line ("The rune is true.") and locks Ask/Cast, leaving "Begin another night" as the next step — the full S9 victory sequence (Sól's line, defeat, choreography) builds on this minimal win state. Initial turn/round state is **hydrated from the page load** (`+page.server.ts` returns `gameState`), not guessed, so a resumed round — including one already won (S2.5 resume) — renders true on refresh instead of flipping on the first action.
@@ -284,7 +284,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] No emoji in diegetic copy; no exclamation in Oracle/Sól lines (Sköll's single winning-cast exclamation allowlisted)
 - [ ] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
 - [ ] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
-- [ ] Sköll vs Oracle lines attributable to the correct speaker; Sköll taunt pool does not repeat within a game
+- [ ] Sköll vs Oracle lines attributable to the correct speaker _(Sköll's taunts were cut from the UI — his only on-board line is his templated Ask; no taunt pool to de-dup)_
 - [ ] Connection/engine error shown in-world ("The Oracle falls silent…") **without** losing crossings or turn state
 
 **Tests to land:** [A] string + terminology lint · [Eval] speaker-distinctness · [I] no-repeat taunts, error-state preserves crossings/turn.

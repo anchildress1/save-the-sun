@@ -123,7 +123,7 @@ Covers R3, R4, and the casting flow. One shared action interface serves both the
 | Two scoped card behaviors | Component | Outside armed mode a tap crosses off; inside armed mode a tap selects target — the two never collide. |
 | Wrong cast continues | E2E | Wrong cast costs the turn only; crossings and round state preserved. |
 | Keyboard cast path | E2E + a11y | arm cast → arrow to rune → select → "Name it" works entirely by keyboard. |
-| Starting Rite state | Component | Before any Ask the panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle." (not blank). |
+| Starting Rite state | Component | The Oracle panel opens **blank** and voices a response only (answer / refusal / resolution) — no idle filler. |
 
 ---
 
@@ -234,7 +234,7 @@ Not a coverage-gated suite, but an automated lint + eval pass over player-facing
 - **String lint (automated):** no emoji in diegetic copy; no exclamation in Oracle/Sól lines (Sköll's single winning-cast exclamation is the one allowlist); banned modern idiom and arcade phrases ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs) absent.
 - **Terminology lint:** world-nouns enforced (rune not "answer", Ask/Cast not "guess/submit", power not "pips", light/dark not "filled", hue not "color" in player copy, Scry/Hex never "card").
 - **Speaker-distinctness eval:** sampled Oracle vs Sköll lines are attributable to the correct speaker (the "rewrite until unmistakable" rule).
-- **No-repeat taunts:** Sköll taunt pool does not repeat within a single game.
+- **Sköll surface:** his box shows only his templated Ask — taunts and cast lines are cut from the v1 UI.
 
 ---
 

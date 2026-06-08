@@ -67,9 +67,7 @@ export interface GameState {
  * must show the interrupt prompt; his answer is produced only once the human reacts.
  */
 export interface SkollTurn {
-	taunt: string;
 	asks?: { echo: string };
-	cast?: { line: string; won: boolean };
 }
 
 /** How Sköll's parked Ask resolved after the human reacted (S6). A Hex kills it; a Scry shares it. */

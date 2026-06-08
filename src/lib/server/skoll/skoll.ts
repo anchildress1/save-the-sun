@@ -30,8 +30,6 @@ export interface SkollState {
 	// His declared-but-unanswered Ask, awaiting the human's reaction (the interrupt window). The
 	// window opens before the answer, so a Hex kills the question before any answer is produced.
 	pendingAsk: Query | null;
-	// Rotates the taunt pool; no repeat within a round.
-	tauntIndex: number;
 	// A plain-hunch opener for the round, surfaced to Gemini on his first move only. Without it a
 	// capable model copies whatever opener its prompt last demonstrated (the "always gold" tell);
 	// a seeded, trait-level lean makes the first Ask vary per round while staying reproducible.
@@ -70,7 +68,6 @@ export function freshSkollState(seed: number): SkollState {
 		facts: [],
 		crossed: new Set(),
 		pendingAsk: null,
-		tauntIndex: 0,
 		hunch: pickHunch(rng),
 		rng
 	};

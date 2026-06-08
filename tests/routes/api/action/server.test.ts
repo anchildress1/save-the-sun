@@ -73,10 +73,9 @@ describe('POST /api/action', () => {
 	it('runs Sköll’s turn only on Advance, handing play back after a wrong cast', async () => {
 		await ask(); // turn now sits with Sköll
 		const data = await json(await advance());
-		expect(data).toMatchObject({
-			type: 'Advance',
-			skoll: { cast: { line: `I name it. ${WRONG}.`, won: false } }
-		});
+		expect(data.type).toBe('Advance');
+		// A Cast carries no flavor line — the outcome is in the turn state (play handed back, round on).
+		expect(data.skoll).toEqual({});
 		expect(data.state).toMatchObject({ activePlayer: 'Human', status: 'active' });
 	});
 
@@ -169,7 +168,8 @@ describe('POST /api/action', () => {
 		skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
 		await ask();
 		const data = await json(await advance());
-		expect(data.skoll.cast).toEqual({ line: `The hunt ends. ${SECRET}.`, won: true });
+		// The defeat is engine truth in the turn state, not a Sköll flavor line.
+		expect(data.skoll).toEqual({});
 		expect(data.state).toMatchObject({ status: 'won', winner: 'Sköll' });
 	});
 
@@ -179,7 +179,8 @@ describe('POST /api/action', () => {
 		});
 		await ask();
 		const data = await json(await advance());
-		expect(data.skoll.asks ?? data.skoll.cast).toBeDefined();
+		// Floor either casts ({}), or asks ({ asks }) — both are valid "he still moved".
+		expect(data.skoll.asks !== undefined || Object.keys(data.skoll).length === 0).toBe(true);
 	});
 
 	it('lets Sköll Hex the human Ask — no answer comes back, her turn is spent', async () => {

@@ -112,26 +112,12 @@ Templated. **Both verdicts restate the trait** — `Yes. Sól is reaching for {v
 
 ## 2. Sköll
 
-### Idle / turn taunts (rotate, no repeat within a game)
-- "The sun already knows my teeth. You are only late to the news."
-- "Spend the night talking. I will spend it swallowing the dawn."
-- "Cross them off, one by one. I will cross off the morning in a single bite."
-- "You count runes, witch. I count the breaths left in the night."
-- "Every sign you read, I have already devoured its shadow."
-- "Two of us hunt one rune. Only one of us has tasted a star."
-- "Run for the dawn. I am the night that runs faster."
+Sköll's on-board surface carries **only his templated question** — the inference the human Scries, Hexes, or lets pass. No taunts, no cast lines: his box shows his Ask when he Asks and is blank otherwise. His casts read from the engine (the turn pill flips, the Oracle panel voices the resolution); the wolf's pressure is felt in how he plays, not in chatter.
 
-### Escalation tier (P2 — copy ready; Medium Sköll already tracks candidates, so the narrowing signal exists. P2 by priority, not capability — wire to candidate-count when time allows.)
-- "I can almost taste the dawn I mean to swallow."
-- "One sign left to me. Perhaps two for you. Perhaps too many."
-- "Closer. You feel it too — that's the cold."
+### His Ask (the only Sköll line shown)
+- "Sköll asks after {value-phrase}." — the `{value-phrase}` grammar of §1, so the human knows what they're choosing to Scry, Hex, or let pass.
 
-### His casts (public)
-| Situation | Line |
-|---|---|
-| Sköll casts (any) | "I name it. {Rune}." |
-| Sköll casts to win | "The hunt ends. {Rune}." *(his one permitted exclamation may land here)* |
-| Sköll casts wrong (P2 early-cast) | "{Rune}. …No. The scent was false." |
+_Cut from the v1 UI (flavor, not inference): the idle/turn taunts, the escalation tier (was P2), and the public cast lines ("I name it. {Rune}." / "The hunt ends. {Rune}.")._
 
 ## 3. Reactions — Scry & Hex
 

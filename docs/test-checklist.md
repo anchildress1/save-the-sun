@@ -80,7 +80,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C] Two scoped card behaviors (cross-off vs select-target) never collide
 - [x] [E] Wrong cast costs turn only; crossings + round state preserved
 - [ ] [E][A] Full keyboard cast path: arm → arrow → select → "Name it" _(S10 a11y)_
-- [x] [C] Pre-Ask panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle."
+- [x] [C] Oracle panel opens **blank** — voices a response only (answer/refusal/resolution), no idle filler
 
 ## 4.5 Round lifecycle & session isolation (S2.5)
 
@@ -163,7 +163,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [ ] [A] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
 - [ ] [A] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
 - [ ] [Eval] Sampled Oracle vs Sköll lines attributable to correct speaker
-- [x] [I] Sköll taunt pool does not repeat within a game _(rotation by per-round index; one pass of the pool is distinct)_
+- [x] [C] Sköll's box shows only his templated Ask (no taunts, no cast lines); blank when he isn't asking
 
 ---
 
