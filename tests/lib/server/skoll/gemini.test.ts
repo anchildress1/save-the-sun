@@ -47,14 +47,15 @@ describe('Gemini Sköll adapter', () => {
 		expect(result).toEqual({
 			kind: 'ask',
 			query: { axis: 'fill', value: 'Light' },
-			crossOff: [1]
+			crossOff: [1],
+			reasoning: ''
 		});
 		expect(sdk.generateContent).toHaveBeenCalledWith(
 			expect.objectContaining({
 				model: 'gemini-3.5-flash',
 				config: expect.objectContaining({
 					responseMimeType: 'application/json',
-					thinkingConfig: { thinkingLevel: 'MINIMAL' },
+					thinkingConfig: { thinkingLevel: 'MINIMAL', includeThoughts: true },
 					temperature: 1
 				})
 			})
@@ -113,13 +114,32 @@ describe('Gemini Sköll adapter', () => {
 	it('maps a cast response, carrying its cross-offs', async () => {
 		geminiJson({ kind: 'cast', runeName: 'Tiwaz', crossOff: [3, 7] });
 		const result = await decideSkollMove(emptyMove);
-		expect(result).toEqual({ kind: 'cast', runeName: 'Tiwaz', crossOff: [3, 7] });
+		expect(result).toEqual({ kind: 'cast', runeName: 'Tiwaz', crossOff: [3, 7], reasoning: '' });
 	});
 
 	it('returns an unreadable ask on an empty response (skoll.ts then floors it)', async () => {
 		sdk.generateContent.mockResolvedValueOnce({ text: undefined });
 		const result = await decideSkollMove(emptyMove);
-		expect(result).toEqual({ kind: 'ask', query: undefined, crossOff: undefined });
+		expect(result).toEqual({ kind: 'ask', query: undefined, crossOff: undefined, reasoning: '' });
+	});
+
+	it('surfaces his thinking trace for the debug view (S8) when the model returns one', async () => {
+		sdk.generateContent.mockResolvedValueOnce({
+			text: JSON.stringify({ kind: 'ask', axis: 'color', colorValue: 'Gold' }),
+			candidates: [
+				{
+					content: {
+						parts: [
+							{ thought: true, text: 'Gold feels lucky. ' },
+							{ thought: true, text: 'I will ask that.' },
+							{ text: '{"kind":"ask"}' } // the answer part — not a thought, excluded
+						]
+					}
+				}
+			]
+		});
+		const result = await decideSkollMove(emptyMove);
+		expect(result.reasoning).toBe('Gold feels lucky. I will ask that.');
 	});
 
 	it('surfaces the seeded hunch in the opening prompt when nothing is known', async () => {

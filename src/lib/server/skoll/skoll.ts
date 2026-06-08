@@ -36,9 +36,18 @@ export interface SkollState {
 	// capable model copies whatever opener its prompt last demonstrated (the "always gold" tell);
 	// a seeded, trait-level lean makes the first Ask vary per round while staying reproducible.
 	hunch: string;
+	// The decision behind {@link pendingAsk}, parked alongside it so the debug log (S8) can pair
+	// Gemini's reasoning with the engine's answer once the human's reaction closes the window.
+	pendingDecision: SkollDecision | null;
 	// One persistent PRNG for the round — floor and reaction gate both draw from it, so variety comes
 	// from the advancing stream, not from re-seeding off a state counter each call.
 	rng: () => number;
+}
+
+/** How a move was reached: which seam decided it, and the reasoning to show on stage (S8). */
+export interface SkollDecision {
+	source: SkollSource;
+	reasoning: string;
 }
 
 /**
@@ -64,6 +73,7 @@ export function freshSkollState(seed: number): SkollState {
 		facts: [],
 		crossed: new Set(),
 		pendingAsk: null,
+		pendingDecision: null,
 		tauntIndex: 0,
 		hunch: pickHunch(rng),
 		rng
@@ -99,6 +109,9 @@ export interface RawSkollDecision {
 	query?: unknown;
 	runeName?: string;
 	crossOff?: unknown;
+	// His thinking trace, when the model returns one (S8). Untrusted display text only — never
+	// validated into a move; absent on MINIMAL thinking, in which case the floor's payload stands in.
+	reasoning?: string;
 }
 
 /** The Gemini seam: earned-only payload in, one (untrusted) tool call out. */
@@ -108,8 +121,8 @@ export type SkollMove = { kind: 'ask'; query: Query } | { kind: 'cast'; runeName
 export type SkollSource = 'gemini' | 'floor';
 
 export type SkollOutcome =
-	| { kind: 'cast'; source: SkollSource; runeName: string; result: CastResult }
-	| { kind: 'ask'; source: SkollSource; query: Query; echo: string };
+	| { kind: 'cast'; source: SkollSource; reasoning: string; runeName: string; result: CastResult }
+	| { kind: 'ask'; source: SkollSource; reasoning: string; query: Query; echo: string };
 
 /** The answer half of Sköll's Ask, produced after the human's reaction closes the window. */
 export type SkollAnswer = { hexed: true } | { hexed: false; affirmative: boolean; shared: boolean };
@@ -129,6 +142,18 @@ export function buildPayload(state: SkollState): SkollPayload {
 		crossedOff: [...state.crossed],
 		hunch: state.hunch
 	};
+}
+
+/**
+ * A readable one-line digest of the state Sköll reasoned from — the S8 fallback shown when the
+ * model returns no thinking trace (and the only "reasoning" available when the floor played, since
+ * the floor doesn't reason). Earned facts and his sheet, never the secret.
+ */
+export function summarizePayload(payload: SkollPayload): string {
+	if (payload.answers.length === 0) return `No facts yet; opening hunch: ${payload.hunch}.`;
+	const facts = payload.answers.map((a) => `${a.trait} → ${a.holds ? 'yes' : 'no'}`).join('; ');
+	const crossed = payload.crossedOff.length ? `; crossed ${payload.crossedOff.length}` : '';
+	return `Earned: ${facts}${crossed}.`;
 }
 
 const RUNE_IDS = new Set(runes.map((r) => r.id));
@@ -179,41 +204,49 @@ export async function takeSkollTurn(
 	decide: SkollDecide,
 	rng: () => number
 ): Promise<SkollOutcome> {
-	const { move, source } = await planMove(state, decide, rng);
+	const { move, source, reasoning } = await planMove(state, decide, rng);
 
 	if (move.kind === 'cast') {
 		const result = engine.cast('Sköll', move.runeName);
 		if (dev)
 			console.debug(`[skoll] cast ${move.runeName} via ${source} → won=${result.ok && result.won}`);
-		return { kind: 'cast', source, runeName: move.runeName, result };
+		return { kind: 'cast', source, reasoning, runeName: move.runeName, result };
 	}
 
 	engine.openReactionWindow('Sköll');
 	state.pendingAsk = move.query;
+	state.pendingDecision = { source, reasoning }; // paired with the answer once the window closes (S8)
 	if (dev) console.debug(`[skoll] asks ${JSON.stringify(move.query)} via ${source}`);
-	return { kind: 'ask', source, query: move.query, echo: skollAskEcho(move.query) };
+	return { kind: 'ask', source, reasoning, query: move.query, echo: skollAskEcho(move.query) };
 }
 
 async function planMove(
 	state: SkollState,
 	decide: SkollDecide,
 	rng: () => number
-): Promise<{ move: SkollMove; source: SkollSource }> {
+): Promise<{ move: SkollMove } & SkollDecision> {
+	const payload = buildPayload(state);
 	try {
-		const raw = await decide(buildPayload(state));
+		const raw = await decide(payload);
 		const move = validateMove(raw);
 		if (move) {
 			for (const id of legalCrossOffs(raw.crossOff)) state.crossed.add(id);
 			if (dev && state.crossed.size)
 				console.debug(`[skoll] sheet: ${[...state.crossed].join(',')}`);
-			return { move, source: 'gemini' };
+			// His thinking trace when the model returns one; otherwise the facts he reasoned from.
+			return {
+				move,
+				source: 'gemini',
+				reasoning: raw.reasoning?.trim() || summarizePayload(payload)
+			};
 		}
 		console.warn(`[skoll] illegal/malformed decision, floor fires: ${JSON.stringify(raw)}`);
 	} catch (err) {
 		console.error('[skoll] Gemini decision failed, floor fires:', err);
 	}
+	// The floor doesn't reason — the demo shows the earned-only state it played from instead.
 	const floor = chooseFloorMove(state.facts, asked(state), rng);
-	return { move: floor, source: 'floor' };
+	return { move: floor, source: 'floor', reasoning: summarizePayload(payload) };
 }
 
 /** Already-asked queries — the answers he holds; the floor excludes them as redundant. */
@@ -233,6 +266,7 @@ export function resolveSkollAsk(
 ): SkollAnswer {
 	const query = state.pendingAsk;
 	state.pendingAsk = null;
+	state.pendingDecision = null; // the debug log reads it before this resolves; clear it with the Ask
 	if (query === null) throw new Error('resolveSkollAsk called with no pending Ask');
 
 	if (reaction.ok && reaction.choice === 'Hex') {

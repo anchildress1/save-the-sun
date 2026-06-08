@@ -4,6 +4,7 @@ import {
 	freshSkollState,
 	reactToHumanAsk,
 	resolveSkollAsk,
+	summarizePayload,
 	takeSkollTurn,
 	type RawSkollDecision,
 	type SkollDecide,
@@ -203,6 +204,64 @@ describe('takeSkollTurn — Gemini plays, engine referees', () => {
 			mulberry32(1)
 		);
 		expect(out.source).toBe('floor');
+	});
+});
+
+describe('reasoning capture for the debug view (S8)', () => {
+	const LIGHT = { axis: 'fill', value: 'Light' } as const;
+
+	it('carries Gemini’s thinking trace onto the outcome and parks it with his Ask', async () => {
+		const engine = skollsTurn();
+		const state = freshSkollState(SEED);
+		const decide: SkollDecide = vi.fn(async () => ({
+			kind: 'ask',
+			query: LIGHT,
+			reasoning: 'Light feels right.'
+		}));
+		const out = await takeSkollTurn(engine, state, decide, mulberry32(1));
+		expect(out).toMatchObject({ kind: 'ask', source: 'gemini', reasoning: 'Light feels right.' });
+		expect(state.pendingDecision).toEqual({ source: 'gemini', reasoning: 'Light feels right.' });
+	});
+
+	it('falls back to the earned-only payload when Gemini returns no trace', async () => {
+		const engine = skollsTurn();
+		const state = freshSkollState(SEED);
+		const out = await takeSkollTurn(engine, state, decideAsk(LIGHT), mulberry32(1));
+		// No trace → the reasoning is the state he played from (his opening hunch this round).
+		expect(out.reasoning).toBe(summarizePayload(buildPayload(state)));
+		expect(out.reasoning).toContain('hunch');
+	});
+
+	it('shows the earned-only payload as the floor’s reasoning (the floor doesn’t reason)', async () => {
+		const engine = skollsTurn();
+		const state = freshSkollState(SEED);
+		const decide: SkollDecide = vi.fn(async () => ({ kind: 'ask', query: { axis: 'nonsense' } }));
+		const out = await takeSkollTurn(engine, state, decide, mulberry32(1));
+		expect(out.source).toBe('floor');
+		expect(out.reasoning).toBe(summarizePayload(buildPayload(state)));
+	});
+
+	it('resolveSkollAsk clears the parked decision with the Ask', () => {
+		const engine = skollsTurn();
+		const state = freshSkollState(SEED);
+		state.pendingAsk = LIGHT;
+		state.pendingDecision = { source: 'gemini', reasoning: 'x' };
+		resolveSkollAsk(engine, state, resolveReaction(engine, 'Human', 'Pass'));
+		expect(state.pendingDecision).toBeNull();
+	});
+});
+
+describe('summarizePayload — the demo reasoning fallback', () => {
+	it('reads the opening hunch before any fact is earned', () => {
+		const payload = buildPayload(freshSkollState(SEED));
+		expect(summarizePayload(payload)).toMatch(/No facts yet; opening hunch: .+\./);
+	});
+
+	it('lists earned facts and a crossed count once he has learned something', () => {
+		const state = freshSkollState(SEED);
+		state.facts = [{ query: { axis: 'element', value: 'Fire' }, answer: true }];
+		state.crossed = new Set([3, 7]);
+		expect(summarizePayload(buildPayload(state))).toBe('Earned: a fire rune → yes; crossed 2.');
 	});
 });
 

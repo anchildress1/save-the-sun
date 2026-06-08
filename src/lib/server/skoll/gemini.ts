@@ -125,9 +125,23 @@ function toQuery(raw: RawResponse): Query | undefined {
 }
 
 // Map the flat schema response into a (still untrusted) decision. skoll.ts validates the rest.
-function normalize(raw: RawResponse): RawSkollDecision {
-	if (raw.kind === 'cast') return { kind: 'cast', runeName: raw.runeName, crossOff: raw.crossOff };
-	return { kind: 'ask', query: toQuery(raw), crossOff: raw.crossOff };
+function normalize(raw: RawResponse, reasoning: string): RawSkollDecision {
+	if (raw.kind === 'cast')
+		return { kind: 'cast', runeName: raw.runeName, crossOff: raw.crossOff, reasoning };
+	return { kind: 'ask', query: toQuery(raw), crossOff: raw.crossOff, reasoning };
+}
+
+// His thinking trace, for the debug view (S8). On MINIMAL thinking the model usually returns none —
+// then this is empty and skoll.ts falls back to the earned-only payload he reasoned from.
+function thoughts(response: {
+	candidates?: { content?: { parts?: { thought?: boolean; text?: string }[] } }[];
+}): string {
+	const parts = response.candidates?.[0]?.content?.parts ?? [];
+	return parts
+		.filter((p) => p.thought && typeof p.text === 'string')
+		.map((p) => p.text)
+		.join('')
+		.trim();
 }
 
 let client: GoogleGenAI | null = null;
@@ -155,11 +169,13 @@ export const decideSkollMove: SkollDecide = async (payload: SkollPayload) => {
 			responseMimeType: 'application/json',
 			responseSchema: RESPONSE_SCHEMA,
 			// MINIMAL keeps him from reasoning his way to the optimal play — he reacts, he doesn't solve.
-			thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+			// includeThoughts surfaces whatever trace he does produce for the demo view (S8); the text
+			// getter excludes thought parts, so the JSON parse below is unaffected.
+			thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL, includeThoughts: true },
 			temperature: 1
 		}
 	});
-	return normalize(JSON.parse(response.text ?? '{}') as RawResponse);
+	return normalize(JSON.parse(response.text ?? '{}') as RawResponse, thoughts(response));
 };
 
 const REACTION_INSTRUCTION = `<role>
