@@ -102,11 +102,50 @@
 		if (isLast) onDone();
 		else step += 1;
 	}
+
+	// Focus trap for the aria-modal dialogs: move focus in on open and keep Tab cycling inside, so the
+	// tour can't tab out to the board or the header "How the rite works" button while it's meant to be
+	// inert. Escape exits via onDone. Re-runs per dialog — title → tour swaps the node, so focus
+	// re-enters the new one.
+	function trapFocus(node: HTMLElement) {
+		const focusable = () =>
+			Array.from(node.querySelectorAll<HTMLElement>('button:not([disabled])'));
+		focusable()[0]?.focus();
+
+		function onKeydown(e: KeyboardEvent) {
+			if (e.key === 'Escape') {
+				e.preventDefault();
+				onDone();
+				return;
+			}
+			if (e.key !== 'Tab') return;
+			const els = focusable();
+			if (els.length === 0) return;
+			const first = els[0];
+			const last = els[els.length - 1];
+			if (e.shiftKey && document.activeElement === first) {
+				e.preventDefault();
+				last.focus();
+			} else if (!e.shiftKey && document.activeElement === last) {
+				e.preventDefault();
+				first.focus();
+			}
+		}
+
+		node.addEventListener('keydown', onKeydown);
+		return { destroy: () => node.removeEventListener('keydown', onKeydown) };
+	}
 </script>
 
 {#if phase === 'title'}
 	<div class="backdrop" data-testid="onboarding">
-		<div class="panel" role="dialog" aria-modal="true" aria-labelledby="onboarding-heading">
+		<div
+			class="panel"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="onboarding-heading"
+			use:trapFocus
+		>
 			<h1 id="onboarding-heading">Save the Sun</h1>
 			<p class="tagline">A race to beat Sköll and save the light.</p>
 			<div class="actions">
@@ -129,6 +168,7 @@
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby="onboarding-heading"
+		use:trapFocus
 	>
 		<p class="step-count" data-testid="step-count">{step + 1} / {STEPS.length}</p>
 		<h2 id="onboarding-heading">{STEPS[step].label}</h2>

@@ -65,4 +65,36 @@ describe('Onboarding — title screen + first-run tour (S7)', () => {
 		await screen.getByRole('button', { name: 'Skip' }).click();
 		expect(onDone).toHaveBeenCalledOnce();
 	});
+
+	// aria-modal focus management (PR #12 review): the dialog must own keyboard focus so Tab can't
+	// reach the board or the header behind it.
+	it('moves focus into the dialog on open', async () => {
+		render(Onboarding, { onDone: vi.fn() });
+		await expect.poll(() => document.activeElement?.textContent?.trim()).toBe('Light the fire.');
+	});
+
+	it('traps Tab inside the dialog — wraps at both ends', async () => {
+		render(Onboarding, { onDone: vi.fn() });
+		await expect.poll(() => document.activeElement?.textContent?.trim()).toBe('Light the fire.');
+		// Shift+Tab off the first focusable wraps to the last.
+		document.activeElement?.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true })
+		);
+		await expect.poll(() => document.activeElement?.textContent?.trim()).toBe('How the rite works');
+		// Tab off the last wraps back to the first.
+		document.activeElement?.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })
+		);
+		await expect.poll(() => document.activeElement?.textContent?.trim()).toBe('Light the fire.');
+	});
+
+	it('exits on Escape', async () => {
+		const onDone = vi.fn();
+		render(Onboarding, { onDone });
+		await expect.poll(() => document.activeElement?.textContent?.trim()).toBe('Light the fire.');
+		document.activeElement?.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+		);
+		expect(onDone).toHaveBeenCalledOnce();
+	});
 });
