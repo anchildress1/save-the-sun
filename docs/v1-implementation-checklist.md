@@ -281,13 +281,13 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *Cross-cutting lint, runs once the strings exist. Depends on: S2–S9.*
 
-- [ ] No emoji in diegetic copy; no exclamation in Oracle/Sól lines (Sköll's single winning-cast exclamation allowlisted)
+- [ ] No emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line — the old winning-cast exclamation allowlist — was cut)
 - [ ] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
 - [ ] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
 - [ ] Sköll vs Oracle lines attributable to the correct speaker _(Sköll's taunts were cut from the UI — his only on-board line is his templated Ask; no taunt pool to de-dup)_
 - [ ] Connection/engine error shown in-world ("The Oracle falls silent…") **without** losing crossings or turn state
 
-**Tests to land:** [A] string + terminology lint · [Eval] speaker-distinctness · [I] no-repeat taunts, error-state preserves crossings/turn.
+**Tests to land:** [A] string + terminology lint · [Eval] speaker-distinctness · [I] error-state preserves crossings/turn.
 
 **Done when:** the voice/terminology lint reports zero diegetic violations in CI.
 

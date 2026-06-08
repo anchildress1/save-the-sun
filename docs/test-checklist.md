@@ -159,7 +159,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 11. Voice / copy conformance (lint + eval, not coverage-gated)
 
-- [ ] [A] No emoji in diegetic copy; no exclamation in Oracle/Sól lines (Sköll's winning-cast exclamation allowlisted)
+- [ ] [A] No emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line — the old winning-cast exclamation allowlist — was cut)
 - [ ] [A] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
 - [ ] [A] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
 - [ ] [Eval] Sampled Oracle vs Sköll lines attributable to correct speaker

@@ -2,7 +2,7 @@
 
 Every player-facing string, plus the voice rules that govern them. Diegetic (in-world) voice only — the dev.to submission post is a separate, judge-facing register and is out of scope here. Mechanics in `game-spec.md`, rune data in `rune-board.md`.
 
-Production notes: the Oracle's answers may be templated (engine fills `{trait}`/`{value}`). Sköll's taunts rotate from a pool, no repeat within a game. No emoji anywhere; no exclamation in Oracle/Sól lines (Sköll earns at most one, only on his winning cast).
+Production notes: the Oracle's answers may be templated (engine fills `{trait}`/`{value}`). Sköll's only player-facing line is his templated Ask — taunts and cast lines were cut from v1 (see §2). No emoji anywhere; no exclamation in any diegetic line.
 
 ---
 
@@ -148,9 +148,8 @@ One-use reactions, **not cards** — no deck, no hand. Both trigger on an **Ask*
 4. CTA: primary **"Begin another night"** · secondary **"Leave the fire."**
 
 ### Defeat — Sköll casts first
-1. On Sköll's correct cast: **"The hunt ends. {Rune}."**
-2. The loss resolves: **"Sköll takes the sun. The longest day never breaks. The year falls to dark."**
-3. CTA: primary **"Stand against him again"** · secondary **"Leave the fire."**
+1. The loss resolves: **"Sköll takes the sun. The longest day never breaks. The year falls to dark."** _(Sköll's cast carries no line of its own — the resolution is the Oracle panel's; see §2.)_
+2. CTA: primary **"Stand against him again"** · secondary **"Leave the fire."**
 
 Sól speaks only at victory — the goddess's rarity is the power.
 

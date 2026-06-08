@@ -232,7 +232,7 @@ A mood feature that can't degrade to the tier below doesn't ship — so each tie
 
 Not a coverage-gated suite, but an automated lint + eval pass over player-facing strings.
 
-- **String lint (automated):** no emoji in diegetic copy; no exclamation in Oracle/Sól lines (Sköll's single winning-cast exclamation is the one allowlist); banned modern idiom and arcade phrases ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs) absent.
+- **String lint (automated):** no emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line, the old winning-cast exclamation allowlist, was cut); banned modern idiom and arcade phrases ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs) absent.
 - **Terminology lint:** world-nouns enforced (rune not "answer", Ask/Cast not "guess/submit", power not "pips", light/dark not "filled", hue not "color" in player copy, Scry/Hex never "card").
 - **Speaker-distinctness eval:** sampled Oracle vs Sköll lines are attributable to the correct speaker (the "rewrite until unmistakable" rule).
 - **Sköll surface:** his box shows only his templated Ask — taunts and cast lines are cut from the v1 UI.
