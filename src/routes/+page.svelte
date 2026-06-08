@@ -470,9 +470,6 @@
 			<button class="ghost new-game" type="button" onclick={newGame} disabled={pending}>
 				Begin another night
 			</button>
-			<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
-				{turnPill}
-			</div>
 		</div>
 	</header>
 
@@ -484,6 +481,12 @@
 		</section>
 
 		<aside class="oracle-panel">
+			<!-- Turn state sits with the controls it gates: whose move it is is the reason Ask/Cast are
+			     live or dead. Doubles as the resolution indicator, beside the full line in the frame. -->
+			<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
+				{turnPill}
+			</div>
+
 			<h2 class="oracle-title">The Oracle</h2>
 
 			<div class="oracle-frame">
@@ -692,9 +695,12 @@
 		gap: 0.8rem;
 	}
 
+	/* At the top of the Oracle panel, centered above the controls it gates. */
 	.turn-pill {
+		align-self: center;
 		font-family: var(--font-display);
 		letter-spacing: 0.08em;
+		text-align: center;
 		color: var(--gold-bright);
 		background: rgba(217, 169, 74, 0.08);
 		border: 1px solid var(--gold-dim);
