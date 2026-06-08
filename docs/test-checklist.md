@@ -99,9 +99,19 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C] Each card shows glyph, swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken in the accessible name as "{n} light/dark power", never as visible text)
 - [x] [A] Color name + element name accompany icons — nothing by color alone
 - [x] [C] Card dims in place when crossed; restore affordance works
-- [x] [C] Header: title, tagline, night-progress, turn pill ("Your move." / "Sköll moves.")
+- [x] [C] Header: title, tagline, night-progress; turn pill ("Your move." / "Sköll moves.") sits at the top of the Oracle panel, beside the controls it gates _(moved off the header in S7)_
 - [x] [C] Round resolved: header swaps the moon → risen sun on a human win, holds the moon on a Sköll win, with the short resolution tag; the outcome pill flips and the Oracle panel carries the full resolution line
 - [ ] [V] Visual regression snapshots for grid + crossed/armed states _(→ v1.5 with the separate graphics layer; v1 captures state screenshots as e2e artifacts only — no pixel-diff baselines)_
+
+## 6.5 Title screen & first-run onboarding (R7 / S7)
+
+- [x] [C] Title screen: title, tagline, primary "Light the fire.", secondary "How the rite works"
+- [x] [C][E] First-run onboarding steps 1–4 copy, one concept per step, board visible behind each coach-mark
+- [x] [C][E] Coach-mark tour spotlights the region each step describes (the runes, the Ask, the Cast); a missing anchor falls back to a centered popover
+- [x] [C][E] Skip path exits cleanly mid-tour; the final step "Take up the runes." dismisses
+- [x] [C][E] First-run gate: shown once, dismissal remembered (localStorage), not re-shown for a returning player — survives a real reload
+- [x] [C][E] Persistent "How the rite works" (header) reopens the tour directly, skipping the title
+- [x] [E] Board e2e seeds the onboarded flag so the first-run overlay never blocks board interaction
 
 ## 7. Accessibility (v1; screen reader = v1.5)
 
@@ -178,6 +188,6 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] Oracle suite lands with Oracle
 - [x] Human-loop + win/cast suites land with that module
 - [x] Reactions suite lands with reactions
-- [ ] Opponent (Gemini + floor) suite lands with opponent
-- [ ] Integration + E2E follow once action interface is stable
+- [x] Opponent (Gemini + floor) suite lands with opponent
+- [x] Integration + E2E follow once action interface is stable
 - [ ] a11y + degradation E2E gate the v1 jam build (June 21)
