@@ -42,18 +42,17 @@ export interface SkollState {
 }
 
 /**
- * A trait-level opening hunch — a colour, element, or light/dark the wolf "feels" this round.
- * Drawn from the seed so it varies per round and stays reproducible; trait-level (never a rune by
- * name) so it can never echo the secret rune.
+ * A trait-level opening hunch — a colour or element the wolf "feels" this round. Drawn from the
+ * seed so it varies per round and stays reproducible; a rune by name is excluded so it can never
+ * echo the secret, and light/dark is excluded because the prompt forbids a light/dark opener (it is
+ * the clean 50/50 split — exactly the optimal play this nudge exists to steer him away from).
  */
 function pickHunch(rng: () => number): string {
 	const elements = [...new Set(runes.map((r) => r.element))];
 	const colors = [...new Set(runes.map((r) => r.color))];
 	const candidates: Query[] = [
 		...elements.map((value): Query => ({ axis: 'element', value })),
-		...colors.map((value): Query => ({ axis: 'color', value })),
-		{ axis: 'fill', value: 'Light' },
-		{ axis: 'fill', value: 'Dark' }
+		...colors.map((value): Query => ({ axis: 'color', value }))
 	];
 	return valuePhrase(candidates[Math.floor(rng() * candidates.length)]);
 }
@@ -71,7 +70,11 @@ export function freshSkollState(seed: number): SkollState {
 	};
 }
 
-/** The earned-only view handed to Gemini. Built from state alone — never the secret. */
+/**
+ * The view handed to Gemini: his earned state (public board + his answers + his sheet) plus one
+ * seeded opening `hunch`. The hunch is a coaching nudge, NOT earned state — it doesn't vary with
+ * play and is surfaced only on the opening move. Built from state alone — never the secret.
+ */
 export interface SkollPayload {
 	// The board in fixed order — public traits only. Told not to reorder it (reason, don't compute).
 	board: {

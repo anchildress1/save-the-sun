@@ -33,8 +33,8 @@ const decideAsk = (query: unknown, crossOff?: number[]): SkollDecide =>
 const decideCast = (runeName: string): SkollDecide =>
 	vi.fn(async () => ({ kind: 'cast', runeName }) as RawSkollDecision);
 
-describe('buildPayload — earned-only, no secret', () => {
-	it('exposes only the public board, his answers, and his sheet', () => {
+describe('buildPayload — board + facts + sheet + seeded hunch, no secret', () => {
+	it('exposes the public board, his answers, his sheet, and the seeded hunch', () => {
 		const state: SkollState = {
 			...freshSkollState(SEED),
 			facts: [{ query: { axis: 'element', value: 'Fire' }, answer: true }],
@@ -78,10 +78,16 @@ describe('freshSkollState — seeded opening hunch', () => {
 			expect(runeNames.has(freshSkollState(seed).hunch)).toBe(false);
 		}
 	});
+
+	it('never opens on light/dark — the clean 50/50 split the prompt forbids as too optimal', () => {
+		for (let seed = 1; seed <= 30; seed++) {
+			expect(['a light rune', 'a dark rune']).not.toContain(freshSkollState(seed).hunch);
+		}
+	});
 });
 
 describe('takeSkollTurn — Gemini plays, engine referees', () => {
-	it('[Sec] hands Gemini an earned-only payload, never the secret', async () => {
+	it('[Sec] hands Gemini his earned state + seeded hunch, never the secret', async () => {
 		const engine = skollsTurn();
 		const state = freshSkollState(SEED);
 		const decide = decideCast(wrongName());
