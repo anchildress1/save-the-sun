@@ -371,6 +371,22 @@ describe('POST /api/action', () => {
 			);
 		});
 
+		it('shows only what Sköll crossed off THIS move, matching the pre-move reasoning', async () => {
+			// His move bundles an Ask + cross-offs. The event must show the delta he crossed this turn,
+			// not the post-move cumulative sheet (which read one move ahead of the reasoning beside it).
+			skollDecides(async () => ({
+				kind: 'ask',
+				query: { axis: 'color', value: 'Gold' },
+				crossOff: [4, 8]
+			}));
+			await ask(); // hand him the turn (Pass gate closed → he learns nothing first)
+			await advance();
+			const move = byChannel('skoll').at(-1)!;
+			expect(move.data?.crossedThisMove).toEqual([4, 8]);
+			// Reasoning is the state he reasoned FROM — no facts yet → the opening-hunch line, 0 crossed.
+			expect(String(move.data?.reasoning)).toContain('hunch');
+		});
+
 		it('drains raw Gemini I/O onto the log as a sensitive event (verbose)', async () => {
 			// The real seam is mocked here, so seed the sink the way gemini.ts would, then advance —
 			// the route drains it onto the session log as a sensitive `gemini` event.

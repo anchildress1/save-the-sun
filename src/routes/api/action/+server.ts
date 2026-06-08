@@ -289,8 +289,13 @@ async function playSkollIfActive(
 	if (engine.status !== 'active' || engine.activePlayer !== 'Sköll') return undefined;
 	// He already has an Ask parked, waiting on the human's reaction — never start a second turn.
 	if (skoll.pendingAsk !== null) return undefined;
+	// Snapshot his sheet BEFORE the move so the event shows what he crossed off THIS turn (the delta),
+	// consistent with `reasoning` (the pre-move state he reasoned from) — not the post-move cumulative
+	// sheet, which read one move ahead of the reasoning beside it.
+	const before = new Set(skoll.crossed);
 	const out = await takeSkollTurn(engine, skoll, decideSkollMove, skoll.rng);
 	geminiEvents(sessionId); // raw move-seam I/O (verbose only)
+	const crossedThisMove = [...skoll.crossed].filter((id) => !before.has(id));
 
 	// His action this turn — flagged warn when the deterministic floor stood in for Gemini.
 	const floored = out.source === 'floor';
@@ -301,7 +306,11 @@ async function playSkollIfActive(
 		message:
 			(floored ? 'Floor fired — ' : '') +
 			(out.kind === 'cast' ? `Sköll casts ${out.runeName}` : out.echo),
-		data: { source: out.source, reasoning: out.reasoning, crossed: [...skoll.crossed] }
+		data: {
+			source: out.source,
+			reasoning: out.reasoning,
+			...(crossedThisMove.length > 0 && { crossedThisMove })
+		}
 	});
 
 	// His Cast resolves now (log the turn row); his Ask's row waits for the human's reaction.
