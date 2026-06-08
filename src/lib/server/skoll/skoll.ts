@@ -265,9 +265,10 @@ export function resolveSkollAsk(
 	reaction: ReactionOutcome
 ): SkollAnswer {
 	const query = state.pendingAsk;
+	if (query === null) throw new Error('resolveSkollAsk called with no pending Ask');
+	// Clear only once we know there was an Ask — an unexpected call throws without mutating state.
 	state.pendingAsk = null;
 	state.pendingDecision = null; // the debug log reads it before this resolves; clear it with the Ask
-	if (query === null) throw new Error('resolveSkollAsk called with no pending Ask');
 
 	if (reaction.ok && reaction.choice === 'Hex') {
 		engine.passTurn(); // his turn is spent unanswered; the question dies before any answer

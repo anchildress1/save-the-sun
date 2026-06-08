@@ -1,16 +1,18 @@
 import { render } from 'vitest-browser-svelte';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Page from '$routes/debug/+page.svelte';
 import type { DebugEvent, DebugLevel } from '$lib/server/debug/log';
 
 // The page polls /api/debug on mount; stub fetch to reject so the SSR-given data stands and the
-// poll is a harmless no-op for these render assertions.
+// poll is a harmless no-op for these render assertions. Restore it after each so the stub never
+// leaks into other test files.
 beforeEach(() => {
 	vi.stubGlobal(
 		'fetch',
 		vi.fn(() => Promise.reject(new Error('no server in test')))
 	);
 });
+afterEach(() => vi.unstubAllGlobals());
 
 const turn: DebugEvent = {
 	seq: 1,
