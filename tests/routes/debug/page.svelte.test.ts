@@ -68,14 +68,6 @@ describe('/debug view', () => {
 			part: 'Ask',
 			message: 'Human asks'
 		};
-		const gemini: DebugEvent = {
-			seq: 5,
-			channel: 'gemini',
-			level: 'info',
-			sensitive: true,
-			part: 'Ask',
-			message: 'Gemini move call'
-		};
 		const skollLlm: DebugEvent = {
 			seq: 6,
 			channel: 'skoll',
@@ -85,22 +77,38 @@ describe('/debug view', () => {
 			message: 'Sköll asks…',
 			data: { source: 'gemini' }
 		};
-		const { container } = renderWith([turn, secret, floor, oracle, gemini, skollLlm]);
+		const { container } = renderWith([turn, secret, floor, oracle, skollLlm]);
 		const li = (c: string) => container.querySelector<HTMLElement>(`li.${c}`)!;
 		// Colour = source (turn coloured by its actor).
 		expect(li('human')).toBeTruthy();
 		expect(li('oracle')).toBeTruthy();
-		expect(li('gemini')).toBeTruthy();
 		expect(li('session')).toBeTruthy();
 		// LLM vs deterministic badge.
 		const isDet = (el: HTMLElement) => el.querySelector('.badge.llm')!.classList.contains('det');
 		expect(isDet(li('oracle'))).toBe(false); // Oracle reads via Gemini → LLM
-		expect(isDet(li('gemini'))).toBe(false); // raw model I/O → LLM
 		expect(isDet(li('human'))).toBe(true); // engine verdict → deterministic
 		expect(isDet(li('session'))).toBe(true); // the secret → deterministic
 		// Sköll: gemini-sourced → LLM; floor-sourced → deterministic.
 		expect(isDet(container.querySelector<HTMLElement>('li.skoll')!)).toBe(false); // skollLlm renders first among skoll
 		expect(isDet(container.querySelectorAll<HTMLElement>('li.skoll')[1])).toBe(true); // floor
+	});
+
+	it('shows a raw Gemini call as a Sköll card (his move), LLM-badged', () => {
+		const gemini: DebugEvent = {
+			seq: 5,
+			channel: 'gemini',
+			level: 'info',
+			sensitive: true,
+			part: 'Cast',
+			message: 'Gemini move call',
+			data: { response: {} }
+		};
+		const { container } = renderWith([gemini]);
+		const card = container.querySelector('li')!;
+		expect(card.classList.contains('skoll')).toBe(true); // his move call → Sköll colour
+		expect(card.querySelector('.who')?.textContent?.trim()).toBe('Sköll');
+		expect(card.querySelector('.badge.llm')?.classList.contains('det')).toBe(false); // LLM
+		expect(card.querySelector('.msg')?.textContent).toContain('Gemini move call');
 	});
 
 	it('renders a non-turn event as a message + JSON detail, flagging warn', async () => {

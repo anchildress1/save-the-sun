@@ -30,23 +30,24 @@
 
 	const pretty = (d: unknown) => JSON.stringify(d, null, 2);
 
-	type Source = 'human' | 'oracle' | 'skoll' | 'gemini' | 'session';
+	type Source = 'human' | 'oracle' | 'skoll' | 'session';
 	const LABEL: Record<Source, string> = {
 		human: 'Human',
 		oracle: 'Oracle',
 		skoll: 'Sköll',
-		gemini: 'Gemini',
 		session: 'Engine'
 	};
 
-	// Card colour = WHO the event belongs to. A turn verdict is its actor's; every other channel names
-	// its own source. The raw Gemini I/O is its own colour, kept apart from Sköll.
+	// Card colour = WHO the event belongs to. A turn verdict is its actor's; the raw Gemini call IS
+	// Sköll's move/reaction (the model computing his move), so it's his too — kept distinct as a raw-I/O
+	// card, not a separate actor. The Oracle and the secret name themselves.
 	function source(e: DebugEvent): Source {
 		if (e.channel === 'turn') return e.actor === 'Sköll' ? 'skoll' : 'human';
-		return e.channel;
+		if (e.channel === 'gemini') return 'skoll';
+		return e.channel as Source; // 'oracle' | 'skoll' | 'session'
 	}
 
-	// Orthogonal to colour: was this reached by a model call? The Oracle's read and raw Gemini I/O
+	// Orthogonal to colour: was this reached by a model call? The Oracle's read and the raw Gemini I/O
 	// always are; a Sköll move/reaction is LLM only when Gemini decided it (the floor is deterministic).
 	function isLlm(e: DebugEvent): boolean {
 		if (e.channel === 'oracle' || e.channel === 'gemini') return true;
@@ -69,8 +70,7 @@
 			Colour = source:
 			<span class="tag human">Human</span>
 			<span class="tag oracle">Oracle</span>
-			<span class="tag skoll">Sköll</span>
-			<span class="tag gemini">Gemini</span>
+			<span class="tag skoll">Sköll</span> (incl. his raw Gemini move/reaction calls)
 			<span class="tag session">Engine</span>. The <span class="badge llm">LLM</span> badge marks a
 			model-derived event vs <span class="badge llm det">deterministic</span>; the part chip shows
 			the turn phase.
@@ -118,7 +118,6 @@
 		--human: #d069a8;
 		--oracle: #d9a94a;
 		--skoll: #4a82c2;
-		--gemini: #3fae8f;
 		--session: #8a8a95;
 		inline-size: 100%;
 		padding: clamp(1rem, 0.5rem + 2vw, 2.5rem) clamp(0.75rem, 0.5rem + 1.5vw, 2rem);
@@ -174,9 +173,6 @@
 	li.skoll {
 		border-inline-start-color: var(--skoll);
 	}
-	li.gemini {
-		border-inline-start-color: var(--gemini);
-	}
 	li.session {
 		border-inline-start-color: var(--session);
 	}
@@ -215,9 +211,6 @@
 	}
 	li.skoll .who {
 		color: var(--skoll);
-	}
-	li.gemini .who {
-		color: var(--gemini);
 	}
 	li.session .who {
 		color: var(--session);
@@ -269,9 +262,6 @@
 	}
 	.legend .tag.skoll {
 		background: var(--skoll);
-	}
-	.legend .tag.gemini {
-		background: var(--gemini);
 	}
 	.legend .tag.session {
 		background: var(--session);

@@ -219,7 +219,7 @@ A mood feature that can't degrade to the tier below doesn't ship — so each tie
 | Area | Test type | What to test |
 |---|---|---|
 | Engine fact vs LLM inference | Integration | The engine's deterministic verdict is the ONLY thing on a `turn` event; the inference that reached the move — the Oracle's reading, Sköll's reasoning + source — lives on its own channel (`oracle`/`skoll`), never bolted onto the engine. |
-| View encoding | Component | Each card is coloured by source (Human / Oracle / Sköll / Gemini / Engine); an LLM-vs-deterministic badge keys off the channel + Sköll's source (gemini = LLM, floor = deterministic); a turn-part chip (Ask / Cast / React / Round) names the phase. |
+| View encoding | Component | Each card is coloured by source (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine); an LLM-vs-deterministic badge keys off the channel + Sköll's source (gemini = LLM, floor = deterministic); a turn-part chip (Ask / Cast / React / Round) names the phase. |
 | Fallback flag | Integration | Any turn the deterministic floor fired is flagged (`warn` on the `skoll` channel). |
 | Event-log lifecycle | Unit | Per-session event stream: seq, bounded trim, session isolation; lifecycle-linked to the round — reset on a new round (reseeded with the new secret) and evicted with the session. |
 | Exposure level (`DEBUG_LOG`) | Unit + Integration | verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev, off in prod; filtered server-side (`/api/debug` + page load). |
