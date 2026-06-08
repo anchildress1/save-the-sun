@@ -41,7 +41,7 @@ describe('buildPayload — earned-only, no secret', () => {
 			crossed: new Set([3, 7])
 		};
 		const payload = buildPayload(state);
-		expect(Object.keys(payload).sort()).toEqual(['answers', 'board', 'crossedOff']);
+		expect(Object.keys(payload).sort()).toEqual(['answers', 'board', 'crossedOff', 'hunch']);
 		expect(payload.answers).toEqual([{ trait: 'a fire rune', holds: true }]);
 		expect(payload.crossedOff).toEqual([3, 7]);
 		// Board carries public traits only — no `fill`-of-secret marker, no human crossings.
@@ -62,6 +62,24 @@ describe('buildPayload — earned-only, no secret', () => {
 	});
 });
 
+describe('freshSkollState — seeded opening hunch', () => {
+	it('is deterministic per seed (reproducible for the demo)', () => {
+		expect(freshSkollState(SEED).hunch).toBe(freshSkollState(SEED).hunch);
+	});
+
+	it('varies across seeds — the opener is not pinned to one trait', () => {
+		const hunches = new Set(Array.from({ length: 24 }, (_, i) => freshSkollState(i + 1).hunch));
+		expect(hunches.size).toBeGreaterThan(1);
+	});
+
+	it('is a trait-level phrase, never a rune by name — it can never echo the secret', () => {
+		const runeNames = new Set(runes.map((r) => r.name));
+		for (let seed = 1; seed <= 30; seed++) {
+			expect(runeNames.has(freshSkollState(seed).hunch)).toBe(false);
+		}
+	});
+});
+
 describe('takeSkollTurn — Gemini plays, engine referees', () => {
 	it('[Sec] hands Gemini an earned-only payload, never the secret', async () => {
 		const engine = skollsTurn();
@@ -71,7 +89,7 @@ describe('takeSkollTurn — Gemini plays, engine referees', () => {
 		const payload = (decide as ReturnType<typeof vi.fn>).mock.calls[0][0] as SkollPayload;
 		const seen = JSON.stringify(payload);
 		// The payload reveals no which-rune-is-secret signal: it is pure public board + his facts.
-		expect(Object.keys(payload).sort()).toEqual(['answers', 'board', 'crossedOff']);
+		expect(Object.keys(payload).sort()).toEqual(['answers', 'board', 'crossedOff', 'hunch']);
 		expect(seen).not.toContain('secret');
 	});
 

@@ -32,14 +32,43 @@ export interface SkollState {
 	pendingAsk: Query | null;
 	// Rotates the taunt pool; no repeat within a round.
 	tauntIndex: number;
+	// A plain-hunch opener for the round, surfaced to Gemini on his first move only. Without it a
+	// capable model copies whatever opener its prompt last demonstrated (the "always gold" tell);
+	// a seeded, trait-level lean makes the first Ask vary per round while staying reproducible.
+	hunch: string;
 	// One persistent PRNG for the round — floor and reaction gate both draw from it, so variety comes
 	// from the advancing stream, not from re-seeding off a state counter each call.
 	rng: () => number;
 }
 
+/**
+ * A trait-level opening hunch — a colour, element, or light/dark the wolf "feels" this round.
+ * Drawn from the seed so it varies per round and stays reproducible; trait-level (never a rune by
+ * name) so it can never echo the secret rune.
+ */
+function pickHunch(rng: () => number): string {
+	const elements = [...new Set(runes.map((r) => r.element))];
+	const colors = [...new Set(runes.map((r) => r.color))];
+	const candidates: Query[] = [
+		...elements.map((value): Query => ({ axis: 'element', value })),
+		...colors.map((value): Query => ({ axis: 'color', value })),
+		{ axis: 'fill', value: 'Light' },
+		{ axis: 'fill', value: 'Dark' }
+	];
+	return valuePhrase(candidates[Math.floor(rng() * candidates.length)]);
+}
+
 /** A fresh Sköll memory for a new round. The seed is crypto-sourced upstream (session.ts). */
 export function freshSkollState(seed: number): SkollState {
-	return { facts: [], crossed: new Set(), pendingAsk: null, tauntIndex: 0, rng: mulberry32(seed) };
+	const rng = mulberry32(seed);
+	return {
+		facts: [],
+		crossed: new Set(),
+		pendingAsk: null,
+		tauntIndex: 0,
+		hunch: pickHunch(rng),
+		rng
+	};
 }
 
 /** The earned-only view handed to Gemini. Built from state alone — never the secret. */
@@ -57,6 +86,8 @@ export interface SkollPayload {
 	answers: { trait: string; holds: boolean }[];
 	// Rune ids he has crossed off his own sheet.
 	crossedOff: number[];
+	// His seeded opening hunch (a trait phrase) — used only when he has learned nothing yet.
+	hunch: string;
 }
 
 /** Loosely-typed decision from Gemini — validated here before the engine ever sees it. */
@@ -92,7 +123,8 @@ export function buildPayload(state: SkollState): SkollPayload {
 			color: r.color
 		})),
 		answers: state.facts.map((f) => ({ trait: valuePhrase(f.query), holds: f.answer })),
-		crossedOff: [...state.crossed]
+		crossedOff: [...state.crossed],
+		hunch: state.hunch
 	};
 }
 
