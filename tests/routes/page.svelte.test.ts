@@ -321,7 +321,7 @@ describe('Save the Sun page', () => {
 
 	it('raises the sun and voices the victory line in the header on a human win', async () => {
 		const screen = render(Page, propsWith(HUMAN_WON));
-		expect(screen.container.querySelector('.page-background-image')).not.toBeNull();
+		expect(screen.container.querySelector('.header-background-image')).not.toBeNull();
 		expect(screen.container.querySelector('.sun-risen')).not.toBeNull();
 		await expect
 			.element(screen.getByTestId('outcome-line'))
@@ -332,7 +332,7 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, propsWith(SKOLL_WON));
 		// No sunrise for a loss — the moonlit background holds. The header carries only the short tag; the full
 		// resolution sentence lives in the Oracle panel, which wraps responsively on its own.
-		expect(screen.container.querySelector('.page-background-image')).not.toBeNull();
+		expect(screen.container.querySelector('.header-background-image')).not.toBeNull();
 		expect(screen.container.querySelector('.sun-risen')).toBeNull();
 		await expect
 			.element(screen.getByTestId('outcome-line'))
