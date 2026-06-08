@@ -94,6 +94,22 @@ describe('/debug view', () => {
 		await expect.element(screen.getByText(/debug log is off/)).toBeInTheDocument();
 	});
 
+	it('polls /api/debug and replaces the stream on each tick', async () => {
+		// Real timers for this one so the onMount interval actually fires; a resolving fetch feeds it.
+		vi.useRealTimers();
+		const next = {
+			level: 'verbose' as DebugLevel,
+			events: [
+				{ seq: 9, channel: 'oracle', level: 'info', message: 'Human asks: "fresh"' } as DebugEvent
+			]
+		};
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(next))));
+		const { container } = renderWith([turn]); // first paint: seq 1
+		await expect
+			.poll(() => container.querySelector('.msg')?.textContent, { timeout: 3000 })
+			.toContain('Human asks: "fresh"');
+	});
+
 	it('wraps long raw I/O instead of overflowing the page horizontally', async () => {
 		// A realistic verbose gemini event: a long unbroken token (base64-like) + a long prose string.
 		const heavy: DebugEvent = {

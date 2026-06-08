@@ -151,6 +151,28 @@ describe('raw Gemini sink (per session)', () => {
 		expect(() => JSON.stringify(call)).not.toThrow();
 	});
 
+	it('coerces every JSON-hostile shape: bigint→string, Date→ISO, null kept, fn/symbol dropped', () => {
+		const response = {
+			big: 10n,
+			when: new Date('2020-01-01T00:00:00.000Z'),
+			nada: null,
+			n: 5,
+			s: 'ok',
+			sym: Symbol('x'),
+			fn: () => 'y',
+			nested: [1n, null]
+		};
+		runWithSession(SID, () => captureGemini({ label: 'move', request: {}, response }));
+		expect(drainGemini(SID)[0].response).toEqual({
+			big: '10',
+			when: '2020-01-01T00:00:00.000Z',
+			nada: null,
+			n: 5,
+			s: 'ok',
+			nested: ['1', null] // sym + fn dropped
+		});
+	});
+
 	it('degrades to a marker when sanitizing throws (a throwing getter)', () => {
 		const bad = {
 			get boom() {
