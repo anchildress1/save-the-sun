@@ -155,7 +155,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [U][I] `DEBUG_LOG` verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev / off in prod; filtered server-side (`/api/debug` + page load)
 - [x] [I][U] Raw Gemini I/O captured (verbose) as a sensitive event, **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe snapshot so neither the API nor the load 500s
 - [x] [I] Sköll's move event shows the cross-offs made **this** turn (the delta), consistent with the pre-move reasoning
-- [x] [C] Turn renders as a single engine-fact card; border + chip mark engine fact (turn/session) vs LLM inference (oracle/skoll/gemini)
+- [x] [C] Cards coloured by source (Human / Oracle / Sköll / Gemini / Engine); an LLM-vs-deterministic badge (Sköll's gemini move = LLM, floor = deterministic); a turn-part chip (Ask / Cast / React / Round)
 
 ## 11. Voice / copy conformance (lint + eval, not coverage-gated)
 

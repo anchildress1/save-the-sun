@@ -24,6 +24,7 @@ const turn: DebugEvent = {
 	channel: 'turn',
 	level: 'info',
 	actor: 'Human',
+	part: 'Ask',
 	message: 'Yes. Sól is reaching for a light rune.'
 };
 const floor: DebugEvent = {
@@ -31,6 +32,7 @@ const floor: DebugEvent = {
 	channel: 'skoll',
 	level: 'warn',
 	actor: 'Sköll',
+	part: 'Ask',
 	message: 'Floor fired — Sköll asks after a gold rune.',
 	data: { source: 'floor', reasoning: 'No facts yet; opening hunch: a gold rune.' }
 };
@@ -39,6 +41,7 @@ const secret: DebugEvent = {
 	channel: 'session',
 	level: 'info',
 	sensitive: true,
+	part: 'Round',
 	message: 'New round — secret is Sowilo'
 };
 
@@ -46,24 +49,58 @@ const renderWith = (events: DebugEvent[], level: DebugLevel = 'verbose') =>
 	render(Page, { data: { events, level }, params: {}, form: null });
 
 describe('/debug view', () => {
-	it('renders a turn as a single engine-fact card (no inference column)', () => {
+	it('renders a turn verdict as a deterministic card coloured by its actor, with its part', () => {
 		const { container } = renderWith([turn]);
 		const li = container.querySelector('li')!;
-		expect(li.classList.contains('engine')).toBe(true);
-		expect(li.querySelector('.kind')?.textContent?.trim()).toBe('engine fact');
+		expect(li.classList.contains('human')).toBe(true); // actor Human → Human colour
+		expect(li.querySelector('.who')?.textContent?.trim()).toBe('Human');
+		expect(li.querySelector('.badge.llm')?.classList.contains('det')).toBe(true); // deterministic
+		expect(li.querySelector('.part')?.textContent?.trim()).toBe('Ask');
 		expect(li.querySelector('.msg')?.textContent).toContain('Sól is reaching');
-		expect(container.querySelector('.cols')).toBeNull(); // the two-column layout is gone
+		expect(container.querySelector('.cols')).toBeNull(); // the old two-column layout is gone
 	});
 
-	it('marks engine channels vs LLM-inference channels by class + chip', () => {
-		const oracle: DebugEvent = { seq: 4, channel: 'oracle', level: 'info', message: 'Human asks' };
-		const { container } = renderWith([turn, secret, floor, oracle]);
+	it('colours each card by source and badges LLM vs deterministic', () => {
+		const oracle: DebugEvent = {
+			seq: 4,
+			channel: 'oracle',
+			level: 'info',
+			part: 'Ask',
+			message: 'Human asks'
+		};
+		const gemini: DebugEvent = {
+			seq: 5,
+			channel: 'gemini',
+			level: 'info',
+			sensitive: true,
+			part: 'Ask',
+			message: 'Gemini move call'
+		};
+		const skollLlm: DebugEvent = {
+			seq: 6,
+			channel: 'skoll',
+			level: 'info',
+			actor: 'Sköll',
+			part: 'Ask',
+			message: 'Sköll asks…',
+			data: { source: 'gemini' }
+		};
+		const { container } = renderWith([turn, secret, floor, oracle, gemini, skollLlm]);
 		const li = (c: string) => container.querySelector<HTMLElement>(`li.${c}`)!;
-		expect(li('turn').classList.contains('engine')).toBe(true); // verdicts
-		expect(li('session').classList.contains('engine')).toBe(true); // the secret
-		expect(li('skoll').classList.contains('inference')).toBe(true); // his move
-		expect(li('oracle').classList.contains('inference')).toBe(true); // the reading
-		expect(li('oracle').querySelector('.kind')?.textContent?.trim()).toBe('LLM inference');
+		// Colour = source (turn coloured by its actor).
+		expect(li('human')).toBeTruthy();
+		expect(li('oracle')).toBeTruthy();
+		expect(li('gemini')).toBeTruthy();
+		expect(li('session')).toBeTruthy();
+		// LLM vs deterministic badge.
+		const isDet = (el: HTMLElement) => el.querySelector('.badge.llm')!.classList.contains('det');
+		expect(isDet(li('oracle'))).toBe(false); // Oracle reads via Gemini → LLM
+		expect(isDet(li('gemini'))).toBe(false); // raw model I/O → LLM
+		expect(isDet(li('human'))).toBe(true); // engine verdict → deterministic
+		expect(isDet(li('session'))).toBe(true); // the secret → deterministic
+		// Sköll: gemini-sourced → LLM; floor-sourced → deterministic.
+		expect(isDet(container.querySelector<HTMLElement>('li.skoll')!)).toBe(false); // skollLlm renders first among skoll
+		expect(isDet(container.querySelectorAll<HTMLElement>('li.skoll')[1])).toBe(true); // floor
 	});
 
 	it('renders a non-turn event as a message + JSON detail, flagging warn', async () => {
@@ -103,7 +140,10 @@ describe('/debug view', () => {
 				{ seq: 9, channel: 'oracle', level: 'info', message: 'Human asks: "fresh"' } as DebugEvent
 			]
 		};
-		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(next))));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response(JSON.stringify(next)))
+		);
 		const { container } = renderWith([turn]); // first paint: seq 1
 		await expect
 			.poll(() => container.querySelector('.msg')?.textContent, { timeout: 3000 })

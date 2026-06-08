@@ -329,7 +329,8 @@ describe('reactToHumanAsk — Sköll reacting to the human (R12 reverse)', () =>
 			reacts('Pass'),
 			consider
 		);
-		expect(vs).toEqual({ choice: 'Pass', killed: false, scried: false });
+		// The gate is open (consider) and Gemini answered Pass — so the source is gemini, not the floor.
+		expect(vs).toEqual({ choice: 'Pass', killed: false, scried: false, source: 'gemini' });
 		expect(engine.reactionAvailable('Sköll', 'Scry')).toBe(true);
 		expect(engine.reactionWindow).toBeNull();
 	});

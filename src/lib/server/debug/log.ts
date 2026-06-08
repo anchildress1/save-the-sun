@@ -18,6 +18,8 @@ import type { Player } from '$lib/server/engine/actions';
 
 export type DebugLevel = 'verbose' | 'demo' | 'off';
 export type DebugChannel = 'turn' | 'oracle' | 'skoll' | 'gemini' | 'session';
+// Which phase of the turn cycle an event belongs to (shown per card).
+export type TurnPart = 'Ask' | 'Cast' | 'React' | 'Round';
 
 export interface DebugEvent {
 	// Monotonic within a round, so the view renders in order even after the buffer trims.
@@ -26,10 +28,15 @@ export interface DebugEvent {
 	level: 'info' | 'warn' | 'error';
 	// Held back unless DEBUG_LOG=verbose: the secret and raw Gemini request/response.
 	sensitive?: boolean;
+	// Whose colour the card carries — the human, or Sköll (the channel names the Oracle/Gemini/round).
 	actor?: Player;
+	// The turn phase this belongs to. The view derives LLM-vs-deterministic from the channel + source
+	// (an LLM badge on the Oracle's read, Sköll's gemini moves, and raw Gemini I/O; deterministic
+	// otherwise) — that judgement is presentation, not stored here.
+	part?: TurnPart;
 	message: string;
 	// Structured detail rendered beneath the line — the interpreted query, the chosen move + source,
-	// the raw model I/O, etc. `turn` events carry { truth, inference, source } for the two tagged columns.
+	// the raw model I/O. `skoll` events carry `source` ('gemini'/'floor'), which drives the LLM badge.
 	data?: Record<string, unknown>;
 }
 

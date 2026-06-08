@@ -293,11 +293,13 @@ export interface SkollReactionView {
 /** The Gemini reaction seam: a reaction view in, an (untrusted) choice out. */
 export type SkollReactionDecide = (view: SkollReactionView) => Promise<{ reaction?: string }>;
 
-/** What Sköll did to the human's Ask — `killed` means his Hex landed; `scried` means he overheard. */
+/** What Sköll did to the human's Ask — `killed` means his Hex landed; `scried` means he overheard.
+ *  `source` marks whether Gemini decided the reaction or the floor passed (drives the debug LLM badge). */
 export interface SkollVsHuman {
 	choice: ReactionChoice;
 	killed: boolean;
 	scried: boolean;
+	source: SkollSource;
 }
 
 function validateReaction(raw: unknown, canScry: boolean, canHex: boolean): ReactionChoice | null {
@@ -319,13 +321,14 @@ async function planReaction(
 	query: Query,
 	decide: SkollReactionDecide,
 	rng: () => number
-): Promise<ReactionChoice> {
+): Promise<{ choice: ReactionChoice; source: SkollSource }> {
+	const floorPass = { choice: 'Pass' as ReactionChoice, source: 'floor' as SkollSource };
 	const canScry = engine.reactionAvailable('Sköll', 'Scry');
 	const canHex = engine.reactionAvailable('Sköll', 'Hex');
-	if (!canScry && !canHex) return 'Pass'; // nothing left to spend — never bluff a reaction
+	if (!canScry && !canHex) return floorPass; // nothing left to spend — never bluff a reaction
 	// Dumb him down: most of the time he doesn't even think to react. Only on the occasional
 	// impulse does he consult his judgement (Gemini) at all.
-	if (rng() > REACTION_CHANCE) return 'Pass';
+	if (rng() > REACTION_CHANCE) return floorPass;
 	try {
 		const raw = await decide({
 			askedTrait: valuePhrase(query),
@@ -335,12 +338,12 @@ async function planReaction(
 			canHex
 		});
 		const choice = validateReaction(raw.reaction, canScry, canHex);
-		if (choice) return choice;
+		if (choice) return { choice, source: 'gemini' };
 		console.warn(`[skoll] illegal/unavailable reaction, passing: ${JSON.stringify(raw)}`);
 	} catch (err) {
 		console.error('[skoll] reaction decision failed, passing:', err);
 	}
-	return 'Pass'; // the safe floor — never spends a charge, never kills
+	return floorPass; // the safe floor — never spends a charge, never kills
 }
 
 /**
@@ -357,12 +360,13 @@ export async function reactToHumanAsk(
 	rng: () => number
 ): Promise<SkollVsHuman> {
 	engine.openReactionWindow('Human');
-	const choice = await planReaction(engine, state, query, decide, rng);
+	const { choice, source } = await planReaction(engine, state, query, decide, rng);
 	const outcome = resolveReaction(engine, 'Sköll', choice);
 	if (dev) console.debug(`[skoll] reacts to the human's Ask: ${choice} (landed=${outcome.ok})`);
 	return {
 		choice,
 		killed: outcome.ok && outcome.choice === 'Hex',
-		scried: outcome.ok && outcome.choice === 'Scry'
+		scried: outcome.ok && outcome.choice === 'Scry',
+		source
 	};
 }

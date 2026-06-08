@@ -294,21 +294,22 @@ describe('POST /api/action', () => {
 	const byChannel = (c: string) => getEvents(SID).filter((e) => e.channel === c);
 
 	describe('debug log (S8)', () => {
-		it('opens the round with the secret as a sensitive session event', () => {
+		it('opens the round with the secret as a sensitive session event tagged Round', () => {
 			const secretEv = byChannel('session').at(-1)!;
-			expect(secretEv).toMatchObject({ sensitive: true });
+			expect(secretEv).toMatchObject({ sensitive: true, part: 'Round' });
 			expect(secretEv.data).toMatchObject({ secret: SECRET });
 		});
 
-		it('logs the human question on the oracle channel and the verdict on the turn', async () => {
+		it('logs the human question on the oracle channel and the verdict on the turn (both Ask)', async () => {
 			await ask();
 			// The Oracle's reading (LLM-inference) is its own event — not bolted onto the engine's turn.
 			const q = byChannel('oracle').at(-1)!;
+			expect(q).toMatchObject({ actor: 'Human', part: 'Ask' });
 			expect(q.message).toContain('is it light?'); // the raw free-text
 			expect(q.data).toMatchObject({ question: 'is it light?', readAs: 'whether it is light' });
 
 			const turn = lastTurn();
-			expect(turn).toMatchObject({ actor: 'Human' });
+			expect(turn).toMatchObject({ actor: 'Human', part: 'Ask' });
 			expect(turn.data).toBeUndefined(); // the turn is the engine fact, no inference attached
 			expect(turn.message).toMatch(/^(Yes|No)\. Sól is/); // deterministic-engine verdict
 		});
@@ -322,9 +323,10 @@ describe('POST /api/action', () => {
 		it('puts a Sköll Cast verdict on the turn, his reasoning + source on the skoll event', async () => {
 			await ask(); // hand him the turn
 			await advance(); // he casts (default mock: wrong, payload fallback for reasoning)
-			expect(lastTurn()).toMatchObject({ actor: 'Sköll' });
+			expect(lastTurn()).toMatchObject({ actor: 'Sköll', part: 'Cast' });
 			expect(lastTurn().message).toContain('wrong'); // engine fact only
 			const move = byChannel('skoll').at(-1)!;
+			expect(move).toMatchObject({ part: 'Cast' });
 			expect(move.message).toContain('Sköll casts');
 			expect(move.data).toMatchObject({ source: 'gemini' });
 			expect(String(move.data?.reasoning)).toContain('hunch'); // the earned-only fallback
@@ -365,13 +367,13 @@ describe('POST /api/action', () => {
 			expect(lastTurn().message).toContain('Hexed');
 		});
 
-		it('logs Sköll reacting to the human’s Ask', async () => {
+		it('logs Sköll reacting to the human’s Ask (React part, gemini source)', async () => {
 			skollReacts(async () => ({ reaction: 'Pass' }));
-			openGate();
+			openGate(); // gate open → Gemini decided → source gemini (drives the LLM badge)
 			await ask();
-			expect(byChannel('skoll').some((e) => e.message.includes('reacts to your Ask: Pass'))).toBe(
-				true
-			);
+			const react = byChannel('skoll').find((e) => e.message.includes('reacts to your Ask: Pass'))!;
+			expect(react).toMatchObject({ part: 'React' });
+			expect(react.data).toMatchObject({ choice: 'Pass', source: 'gemini' });
 		});
 
 		it('shows only what Sköll crossed off THIS move, matching the pre-move reasoning', async () => {

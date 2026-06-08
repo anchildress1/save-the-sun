@@ -29,6 +29,7 @@ function create(sessionId: string, seed: number): GameEngine {
 		channel: 'session',
 		level: 'info',
 		sensitive: true,
+		part: 'Round',
 		message: `New round — secret is ${secret}`,
 		data: { secret, seed }
 	});

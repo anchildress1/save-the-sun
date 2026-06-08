@@ -30,11 +30,29 @@
 
 	const pretty = (d: unknown) => JSON.stringify(d, null, 2);
 
-	// The view's whole axis: the rules engine produces FACTS (turn verdicts, the secret); the LLM
-	// actors produce INFERENCE (the Oracle reading the human, Sköll deciding, raw model I/O). The
-	// border + chip encode that, so the engine is never shown with inference bolted on.
-	const ENGINE_CHANNELS = new Set<DebugEvent['channel']>(['turn', 'session']);
-	const isEngine = (e: DebugEvent) => ENGINE_CHANNELS.has(e.channel);
+	type Source = 'human' | 'oracle' | 'skoll' | 'gemini' | 'session';
+	const LABEL: Record<Source, string> = {
+		human: 'Human',
+		oracle: 'Oracle',
+		skoll: 'Sköll',
+		gemini: 'Gemini',
+		session: 'Engine'
+	};
+
+	// Card colour = WHO the event belongs to. A turn verdict is its actor's; every other channel names
+	// its own source. The raw Gemini I/O is its own colour, kept apart from Sköll.
+	function source(e: DebugEvent): Source {
+		if (e.channel === 'turn') return e.actor === 'Sköll' ? 'skoll' : 'human';
+		return e.channel;
+	}
+
+	// Orthogonal to colour: was this reached by a model call? The Oracle's read and raw Gemini I/O
+	// always are; a Sköll move/reaction is LLM only when Gemini decided it (the floor is deterministic).
+	function isLlm(e: DebugEvent): boolean {
+		if (e.channel === 'oracle' || e.channel === 'gemini') return true;
+		if (e.channel === 'skoll') return e.data?.source === 'gemini';
+		return false; // turn verdicts + the round's secret are the deterministic engine
+	}
 </script>
 
 <svelte:head><title>Save the Sun — debug</title></svelte:head>
@@ -48,8 +66,14 @@
 			<code>DEBUG_LOG</code> to <code>verbose</code> / <code>demo</code> / <code>off</code>).
 		</p>
 		<p class="legend">
-			Each card is an <span class="kind engine">engine fact</span> (the deterministic referee) or an
-			<span class="kind inference">LLM inference</span> (the Oracle reading you, or Sköll deciding).
+			Colour = source:
+			<span class="tag human">Human</span>
+			<span class="tag oracle">Oracle</span>
+			<span class="tag skoll">Sköll</span>
+			<span class="tag gemini">Gemini</span>
+			<span class="tag session">Engine</span>. The <span class="badge llm">LLM</span> badge marks a
+			model-derived event vs <span class="badge llm det">deterministic</span>; the part chip shows
+			the turn phase.
 		</p>
 	</header>
 
@@ -62,20 +86,15 @@
 	{:else}
 		<ol reversed>
 			{#each ordered as event (event.seq)}
-				<li
-					class="ev {event.channel} {event.level}"
-					class:engine={isEngine(event)}
-					class:inference={!isEngine(event)}
-					class:sensitive={event.sensitive}
-				>
+				<li class="ev {source(event)} {event.level}" class:sensitive={event.sensitive}>
 					<div class="head">
 						<span class="seq">#{event.seq}</span>
-						<span class="channel">{event.channel}</span>
-						<span class="kind" class:engine={isEngine(event)} class:inference={!isEngine(event)}>
-							{isEngine(event) ? 'engine fact' : 'LLM inference'}
+						{#if event.part}<span class="part">{event.part}</span>{/if}
+						<span class="who">{LABEL[source(event)]}</span>
+						<span class="badge llm" class:det={!isLlm(event)}>
+							{isLlm(event) ? 'LLM' : 'deterministic'}
 						</span>
-						{#if event.actor}<span class="actor">{event.actor}</span>{/if}
-						{#if event.sensitive}<span class="badge">sensitive</span>{/if}
+						{#if event.sensitive}<span class="badge sensitive-flag">sensitive</span>{/if}
 						{#if event.level !== 'info'}<span class="badge {event.level}">{event.level}</span>{/if}
 					</div>
 
@@ -95,9 +114,12 @@
 		box-sizing: border-box;
 	}
 	main {
-		/* The two meanings the view turns on, defined once: engine fact vs LLM inference. */
-		--engine: #4a82c2;
-		--inference: #c79a4a;
+		/* Source colours — one per actor, defined once. Gemini (raw I/O) is its own, apart from Sköll. */
+		--human: #d069a8;
+		--oracle: #d9a94a;
+		--skoll: #4a82c2;
+		--gemini: #3fae8f;
+		--session: #8a8a95;
 		inline-size: 100%;
 		padding: clamp(1rem, 0.5rem + 2vw, 2.5rem) clamp(0.75rem, 0.5rem + 1.5vw, 2rem);
 		min-block-size: 100dvh;
@@ -142,12 +164,21 @@
 		padding: 0.6rem 0.9rem;
 		background: #1d1d22;
 	}
-	/* Border carries ONE meaning — engine fact vs LLM inference. Severity (warn/error) is the badge. */
-	li.engine {
-		border-inline-start-color: var(--engine);
+	/* Border = source. Severity (warn/error) and LLM-vs-deterministic are badges, not the colour. */
+	li.human {
+		border-inline-start-color: var(--human);
 	}
-	li.inference {
-		border-inline-start-color: var(--inference);
+	li.oracle {
+		border-inline-start-color: var(--oracle);
+	}
+	li.skoll {
+		border-inline-start-color: var(--skoll);
+	}
+	li.gemini {
+		border-inline-start-color: var(--gemini);
+	}
+	li.session {
+		border-inline-start-color: var(--session);
 	}
 	.head {
 		display: flex;
@@ -161,52 +192,92 @@
 	.seq {
 		color: #7a7a85;
 	}
-	.channel {
+	/* Turn phase (Ask / Cast / React / Round). */
+	.part {
+		padding: 0.05rem 0.4rem;
+		border-radius: 0.25rem;
+		background: #2c2c34;
+		color: #c8c8d0;
+		font-size: 0.68rem;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
-		font-size: 0.7rem;
 		font-weight: 600;
 	}
-	.kind {
-		padding: 0.05rem 0.4rem;
-		border-radius: 1rem;
-		font-size: 0.68rem;
-		font-weight: 600;
-		border: 1px solid currentcolor;
+	/* The source label, coloured to match its border. */
+	.who {
+		font-weight: 700;
 	}
-	.kind.engine {
-		color: var(--engine);
+	li.human .who {
+		color: var(--human);
 	}
-	.kind.inference {
-		color: var(--inference);
+	li.oracle .who {
+		color: var(--oracle);
 	}
-	.legend .kind {
-		font-size: 0.8em;
+	li.skoll .who {
+		color: var(--skoll);
 	}
-	.actor {
-		color: #e8e8ea;
-		font-weight: 600;
+	li.gemini .who {
+		color: var(--gemini);
+	}
+	li.session .who {
+		color: var(--session);
 	}
 	.badge {
-		margin-inline-start: auto;
 		padding: 0.05rem 0.45rem;
 		border-radius: 1rem;
 		background: #2c2c34;
+		color: #b8b8c0;
 		font-size: 0.7rem;
+	}
+	/* LLM badge — highlighted; deterministic — muted. */
+	.badge.llm {
+		margin-inline-start: auto;
+		background: #5a4a00;
+		color: #ffe08a;
+		font-weight: 600;
+	}
+	.badge.llm.det {
+		background: #2c2c34;
+		color: #8a8a95;
+		font-weight: 400;
+	}
+	.badge.sensitive-flag {
+		background: #4a1f4a;
+		color: #f0b3f0;
 	}
 	.badge.warn {
 		background: #5a4300;
 		color: #ffd98a;
-		margin-inline-start: 0.25rem;
 	}
 	.badge.error {
 		background: #5a1f1f;
 		color: #ff9d9d;
-		margin-inline-start: 0.25rem;
 	}
-	.sensitive .badge:first-of-type {
-		background: #4a1f4a;
-		color: #f0b3f0;
+	/* Legend swatches. */
+	.legend .tag {
+		padding: 0.05rem 0.4rem;
+		border-radius: 0.25rem;
+		font-weight: 600;
+		font-size: 0.85em;
+		color: #16161a;
+	}
+	.legend .tag.human {
+		background: var(--human);
+	}
+	.legend .tag.oracle {
+		background: var(--oracle);
+	}
+	.legend .tag.skoll {
+		background: var(--skoll);
+	}
+	.legend .tag.gemini {
+		background: var(--gemini);
+	}
+	.legend .tag.session {
+		background: var(--session);
+	}
+	.legend .badge {
+		font-size: 0.85em;
 	}
 	.msg {
 		margin: 0;
