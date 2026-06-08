@@ -2,6 +2,7 @@
 	import { untrack, tick, onMount } from 'svelte';
 	import RuneGrid from '$lib/components/RuneGrid.svelte';
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
+	import Onboarding from '$lib/components/Onboarding.svelte';
 	import { runes } from '$lib/board';
 	import type {
 		GameAction,
@@ -60,6 +61,13 @@
 	let selectedTargetId: number | null = $state(null);
 	let askValue = $state('');
 	let pending = $state(false);
+
+	// First-run title screen + onboarding (S7). Shown once over the live board, then remembered —
+	// a refresh resumes the same round (S2.5), so the title must not nag the returning player.
+	const ONBOARDED_KEY = 'save-the-sun:onboarded';
+	let showOnboarding = $state(false);
+	// First run opens on the title; the persistent "How the rite works" button reopens the tour itself.
+	let onboardingStart = $state<'title' | 'tour'>('title');
 
 	// Sköll's surfaced turn (S6): his voice this turn, his Ask echo, and whether his Ask is open for
 	// the human to react to. A round can resume on his parked Ask, so the prompt + the human's still-
@@ -204,7 +212,28 @@
 	// Wrapped so the async return is never mistaken for an onMount cleanup.
 	onMount(() => {
 		advanceSkoll();
+		// Storage can throw (private mode) — first-run is the safe default, so show it then.
+		try {
+			showOnboarding = localStorage.getItem(ONBOARDED_KEY) === null;
+		} catch {
+			showOnboarding = true;
+		}
 	});
+
+	function finishOnboarding() {
+		showOnboarding = false;
+		// A failed write just means the title shows again next load — degrade, don't break play.
+		try {
+			localStorage.setItem(ONBOARDED_KEY, '1');
+		} catch {
+			/* storage unavailable — non-fatal */
+		}
+	}
+
+	function showInstructions() {
+		onboardingStart = 'tour';
+		showOnboarding = true;
+	}
 
 	async function submitAsk() {
 		const question = askValue.trim();
@@ -440,7 +469,7 @@
 	</header>
 
 	<div class="game-layout">
-		<section class="board-section">
+		<section class="board-section" data-coach="board">
 			{#key boardSeed}
 				<RuneGrid {castMode} {boardSeed} onSelectTarget={handleTargetSelect} />
 			{/key}
@@ -498,6 +527,7 @@
 
 			<form
 				class="ask"
+				data-coach="ask"
 				onsubmit={(e) => {
 					e.preventDefault();
 					submitAsk();
@@ -518,7 +548,7 @@
 				</button>
 			</form>
 
-			<div class="cast">
+			<div class="cast" data-coach="cast">
 				<span class="cast-label">Cast a Rune</span>
 				{#if castMode}
 					<p class="cast-hint" data-testid="cast-hint">
@@ -547,6 +577,10 @@
 				{/if}
 			</div>
 
+			<button class="help" type="button" data-testid="show-instructions" onclick={showInstructions}>
+				How the rite works
+			</button>
+
 			<svg class="wolf" viewBox="0 0 200 110" aria-hidden="true">
 				<circle cx="150" cy="30" r="20" fill="#2a3247" opacity="0.7" />
 				<!-- howling wolf on a ridge -->
@@ -558,6 +592,10 @@
 		</aside>
 	</div>
 </main>
+
+{#if showOnboarding}
+	<Onboarding onDone={finishOnboarding} start={onboardingStart} />
+{/if}
 
 <style>
 	main {
@@ -904,10 +942,29 @@
 		outline-offset: 2px;
 	}
 
+	/* Subtle persistent re-entry to the tour — quiet so it never competes with the live controls. */
+	.help {
+		align-self: center;
+		margin-top: auto;
+		padding: 0.3rem 0.2rem;
+		font-family: var(--font-display);
+		font-size: 0.72rem;
+		letter-spacing: 0.1em;
+		color: var(--ink-faint);
+		background: none;
+		border: none;
+		text-decoration: underline;
+		text-underline-offset: 3px;
+		cursor: pointer;
+	}
+
+	.help:hover {
+		color: var(--ink-muted);
+	}
+
 	.wolf {
 		width: 100%;
 		height: auto;
-		margin-top: auto;
 		display: block;
 	}
 

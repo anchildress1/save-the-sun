@@ -1,7 +1,9 @@
 import { render } from 'vitest-browser-svelte';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Page from '$routes/+page.svelte';
 import type { GameState } from '$lib/server/engine/actions';
+
+const ONBOARDED_KEY = 'save-the-sun:onboarded';
 
 // Full page props (data normally comes from +page.server.ts). A fixed seed keeps the
 // board order deterministic across these behavioural tests; the hydrated state opens the
@@ -20,8 +22,15 @@ const props = (state: GameState, pendingReaction: PendingReaction = null) => ({
 const pageProps = props(HUMAN_TURN);
 const propsWith = (state: GameState) => props(state);
 
+// These tests drive the in-game board, so the first-run title screen (S7) must be out of the way —
+// mark the player onboarded before each render. The onboarding flow itself is covered below.
+beforeEach(() => {
+	localStorage.setItem(ONBOARDED_KEY, '1');
+});
+
 afterEach(() => {
 	vi.unstubAllGlobals();
+	localStorage.clear();
 });
 
 function stubFetch(impl: (input: string) => Promise<Response>) {
@@ -527,5 +536,50 @@ describe('Save the Sun page', () => {
 		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
 		// Replay stays the live next step.
 		await expect.element(screen.getByRole('button', { name: 'Begin another night' })).toBeEnabled();
+	});
+});
+
+describe('Save the Sun page — first-run onboarding (S7)', () => {
+	beforeEach(() => {
+		localStorage.clear();
+		respond({}); // onMount fires advanceSkoll; keep it a harmless no-op
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		localStorage.clear();
+	});
+
+	it('shows the title screen on a first run, over the live board behind it', async () => {
+		const screen = render(Page, pageProps);
+		await expect.element(screen.getByTestId('onboarding')).toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: 'Light the fire.' }))
+			.toBeInTheDocument();
+		// The board is rendered behind the dimmed overlay, not replaced by it.
+		expect(screen.container.querySelector('main')).not.toBeNull();
+	});
+
+	it('dismisses on "Light the fire." and remembers it for the next load', async () => {
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Light the fire.' }).click();
+		expect(screen.container.querySelector('[data-testid="onboarding"]')).toBeNull();
+		expect(localStorage.getItem(ONBOARDED_KEY)).toBe('1');
+	});
+
+	it('does not show the title screen for a returning player', async () => {
+		localStorage.setItem(ONBOARDED_KEY, '1');
+		const screen = render(Page, pageProps);
+		await expect.element(screen.getByTestId('turn-pill')).toBeInTheDocument();
+		expect(screen.container.querySelector('[data-testid="onboarding"]')).toBeNull();
+	});
+
+	it('reopens the tour from the persistent "How the rite works" button — skipping the title', async () => {
+		localStorage.setItem(ONBOARDED_KEY, '1');
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('show-instructions').click();
+		// Straight into the tour (no title screen) on the first concept.
+		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 4');
+		expect(screen.container.querySelector('[data-testid="onboarding"]')).not.toBeNull();
 	});
 });
