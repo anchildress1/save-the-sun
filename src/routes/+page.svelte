@@ -510,7 +510,7 @@
 			{#if skollAsking}
 				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
 			{:else}
-				<div class="reactions">
+				<div class="reactions" data-coach="reactions">
 					<button type="button" disabled title="When your rival asks, hear the answer too.">
 						Scry
 					</button>

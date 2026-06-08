@@ -113,7 +113,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## 6.5 Title screen & first-run onboarding (R7 / S7)
 
 - [x] [C] Title screen: title, tagline, primary "Light the fire.", secondary "How the rite works"
-- [x] [C][E] First-run onboarding steps 1–4 copy, one concept per step, board visible behind each coach-mark
+- [x] [C][E] First-run onboarding steps 1–5 copy (stakes · Ask · read & cross · Cast · Scry & Hex), one concept per step, board visible behind each coach-mark
 - [x] [C][E] Step 1 ("the stakes") is a centered intro — no board highlight; steps 2–4 spotlight the Ask, then the board ("read & cross"), then the Cast; an anchorless step falls back to a centered popover
 - [x] [C][E] Skip path exits cleanly mid-tour; the final step "Take up the runes." dismisses
 - [x] [C][E] First-run gate: shown once, dismissal remembered (localStorage), not re-shown for a returning player — survives a real reload

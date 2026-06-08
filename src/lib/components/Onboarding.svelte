@@ -8,7 +8,7 @@
 	// page reopen straight into the tour from a persistent "How the rite works" button.
 	let { onDone, start = 'title' }: { onDone: () => void; start?: 'title' | 'tour' } = $props();
 
-	// One concept per step (ux-copy.md §5 steps 1–4). `target` is the page's data-coach hook the
+	// One concept per step (ux-copy.md §5 steps 1–5). `target` is the page's data-coach hook the
 	// spotlight anchors to; a missing target falls back to a centered popover (still readable).
 	const STEPS = [
 		{
@@ -32,6 +32,11 @@
 			label: 'Cast',
 			target: '[data-coach="cast"]',
 			body: "When you're sure, cast a rune. Cast true and dawn is yours. Cast wrong and the turn is gone. Sköll is racing you for the same rune."
+		},
+		{
+			label: 'Scry & Hex',
+			target: '[data-coach="reactions"]',
+			body: 'Sköll asks the Oracle too. When he does, you may answer back once — Scry to overhear her reply, or Hex to silence her and kill his question. One Scry and one Hex a night; a Cast is sacred, never interrupted.'
 		}
 	];
 

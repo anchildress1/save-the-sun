@@ -181,6 +181,7 @@ Sól speaks only at victory — the goddess's rarity is the power.
 - **Step 2 — Ask:** "Ask the Oracle yes/no questions about the runes — their element, power, light, hue, or one rune by name. She answers the sign she reads. One question a turn."
 - **Step 3 — read & cross:** "Twenty-four runes stand in the open. Cross off what each answer rules out. The crossing is yours — the board never does it for you. That reading is the whole game."
 - **Step 4 — Cast:** "When you're sure, cast a rune. Cast true and dawn is yours. Cast wrong and the turn is gone. Sköll is racing you for the same rune."
+- **Step 5 — Scry & Hex:** "Sköll asks the Oracle too. When he does, you may answer back once — Scry to overhear her reply, or Hex to silence her and kill his question. One Scry and one Hex a night; a Cast is sacred, never interrupted."
 - **Final button:** **"Take up the runes."**
 
 ## 6. Chrome & States

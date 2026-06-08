@@ -213,12 +213,12 @@ test.describe('first-run onboarding (S7)', () => {
 			.getByTestId('onboarding')
 			.getByRole('button', { name: 'How the rite works' })
 			.click();
-		await expect(page.getByTestId('step-count')).toHaveText('1 / 4');
+		await expect(page.getByTestId('step-count')).toHaveText('1 / 5');
 		// The board stays visible behind each coach-mark.
 		await expect(page.locator('.rune-card')).toHaveCount(24);
 
-		for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Next' }).click();
-		await expect(page.getByTestId('step-count')).toHaveText('4 / 4');
+		for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Next' }).click();
+		await expect(page.getByTestId('step-count')).toHaveText('5 / 5');
 		await page.getByRole('button', { name: 'Take up the runes.' }).click();
 		await expect(page.getByTestId('onboarding')).toHaveCount(0);
 	});
@@ -235,7 +235,7 @@ test.describe('first-run onboarding (S7)', () => {
 		await expect(page.getByTestId('onboarding')).toHaveCount(0);
 		await page.getByTestId('show-instructions').click();
 		// Straight into the tour (no title), spotlighting the live board.
-		await expect(page.getByTestId('step-count')).toHaveText('1 / 4');
+		await expect(page.getByTestId('step-count')).toHaveText('1 / 5');
 		await expect(page.locator('.rune-card')).toHaveCount(24);
 	});
 });
