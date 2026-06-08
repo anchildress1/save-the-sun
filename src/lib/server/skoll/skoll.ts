@@ -32,17 +32,49 @@ export interface SkollState {
 	pendingAsk: Query | null;
 	// Rotates the taunt pool; no repeat within a round.
 	tauntIndex: number;
+	// A plain-hunch opener for the round, surfaced to Gemini on his first move only. Without it a
+	// capable model copies whatever opener its prompt last demonstrated (the "always gold" tell);
+	// a seeded, trait-level lean makes the first Ask vary per round while staying reproducible.
+	hunch: string;
 	// One persistent PRNG for the round — floor and reaction gate both draw from it, so variety comes
 	// from the advancing stream, not from re-seeding off a state counter each call.
 	rng: () => number;
 }
 
-/** A fresh Sköll memory for a new round. The seed is crypto-sourced upstream (session.ts). */
-export function freshSkollState(seed: number): SkollState {
-	return { facts: [], crossed: new Set(), pendingAsk: null, tauntIndex: 0, rng: mulberry32(seed) };
+/**
+ * A trait-level opening hunch — a colour or element the wolf "feels" this round. Drawn from the
+ * seed so it varies per round and stays reproducible; a rune by name is excluded so it can never
+ * echo the secret, and light/dark is excluded because the prompt forbids a light/dark opener (it is
+ * the clean 50/50 split — exactly the optimal play this nudge exists to steer him away from).
+ */
+function pickHunch(rng: () => number): string {
+	const elements = [...new Set(runes.map((r) => r.element))];
+	const colors = [...new Set(runes.map((r) => r.color))];
+	const candidates: Query[] = [
+		...elements.map((value): Query => ({ axis: 'element', value })),
+		...colors.map((value): Query => ({ axis: 'color', value }))
+	];
+	return valuePhrase(candidates[Math.floor(rng() * candidates.length)]);
 }
 
-/** The earned-only view handed to Gemini. Built from state alone — never the secret. */
+/** A fresh Sköll memory for a new round. The seed is crypto-sourced upstream (session.ts). */
+export function freshSkollState(seed: number): SkollState {
+	const rng = mulberry32(seed);
+	return {
+		facts: [],
+		crossed: new Set(),
+		pendingAsk: null,
+		tauntIndex: 0,
+		hunch: pickHunch(rng),
+		rng
+	};
+}
+
+/**
+ * The view handed to Gemini: his earned state (public board + his answers + his sheet) plus one
+ * seeded opening `hunch`. The hunch is a coaching nudge, NOT earned state — it doesn't vary with
+ * play and is surfaced only on the opening move. Built from state alone — never the secret.
+ */
 export interface SkollPayload {
 	// The board in fixed order — public traits only. Told not to reorder it (reason, don't compute).
 	board: {
@@ -57,6 +89,8 @@ export interface SkollPayload {
 	answers: { trait: string; holds: boolean }[];
 	// Rune ids he has crossed off his own sheet.
 	crossedOff: number[];
+	// His seeded opening hunch (a trait phrase) — used only when he has learned nothing yet.
+	hunch: string;
 }
 
 /** Loosely-typed decision from Gemini — validated here before the engine ever sees it. */
@@ -92,7 +126,8 @@ export function buildPayload(state: SkollState): SkollPayload {
 			color: r.color
 		})),
 		answers: state.facts.map((f) => ({ trait: valuePhrase(f.query), holds: f.answer })),
-		crossedOff: [...state.crossed]
+		crossedOff: [...state.crossed],
+		hunch: state.hunch
 	};
 }
 
@@ -247,9 +282,10 @@ function validateReaction(raw: unknown, canScry: boolean, canHex: boolean): Reac
 }
 
 // How often Sköll even *considers* reacting to an Ask. Without this gate Gemini interrupts every
-// single Ask, far too cannily for a twelve-year-old; at 0.5 he only thinks to react half the time
-// (and may still Pass when he does), roughly halving his attempts. Tune up for a craftier wolf.
-const REACTION_CHANCE = 0.5;
+// single Ask, far too cannily for a twelve-year-old; at 0.65 he thinks to react about two-thirds of
+// the time (and may still Pass when he does), so he shows up in the rite often without policing
+// every question. Higher = a more present wolf; lower = a sleepier one.
+const REACTION_CHANCE = 0.65;
 
 async function planReaction(
 	engine: GameEngine,

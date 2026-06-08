@@ -94,6 +94,16 @@ Covers R5 and the Architecture contract. **We never assert a specific Gemini mov
 | Cast condition | Unit | Casts when exactly one candidate remains; if no splitting question exists earlier, casts the best remaining candidate. |
 | Determinism under seed | Unit | Same seed + same state → same sampled move (reproducible for the demo). |
 
+### Opening hunch (seeded — breaks the constant-first-move opener)
+
+On move 1 his payload is byte-identical every round (no facts, fixed board), so a low-thinking model lands on the same opener every time. A seeded per-round hunch injects the one varying token to break that, without seeding later moves (those already vary on their earned facts).
+
+| Area | Test type | What to test |
+|---|---|---|
+| Hunch determinism + variety | Unit | The per-round hunch is deterministic per seed and varies across seeds — the opener is not pinned to one trait. |
+| Hunch is safe + sub-optimal | Unit | Trait-level (colour/element) only — never a rune by name (cannot echo the secret), never light/dark (the prompt forbids that clean-split opener). |
+| Opening-move only | Integration | The hunch is surfaced in the prompt only when no facts are known; once a fact exists the hunch value is absent from the prompt entirely (not just the opener sentence). |
+
 ### Persona (acceptance, eval-style — low gate, manual-assisted)
 
 Encoded "~12-year-old" behavior from R5 is checked by an eval harness, not unit asserted: reasons one clue at a time, works from visible board + own cross-offs, can overlook a legal elimination, casts on "sure enough." Flag obvious tells of computation (full cross-product elimination, probability math, perfect play) as failures.

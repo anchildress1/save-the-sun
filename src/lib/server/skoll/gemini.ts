@@ -138,10 +138,18 @@ function ai(): GoogleGenAI {
 
 // Throws on transport/parse failure — skoll.ts catches it and plays the deterministic floor.
 export const decideSkollMove: SkollDecide = async (payload: SkollPayload) => {
+	// The hunch is a coaching nudge, never board data — keep it OUT of the stringified payload so it
+	// can't bias him later, and surface it ONLY on the opening move (no answers yet). Once he has
+	// learned something he reasons from those facts and the hunch is gone from the prompt entirely.
+	const { hunch, ...data } = payload;
+	const opener =
+		data.answers.length === 0
+			? `\n\nYou have learned nothing yet. The hunch you woke with this round: ${hunch}. Open on that — or another plain hunch — never the cleanest split.`
+			: '';
 	const response = await ai().models.generateContent({
 		model: MODEL,
 		// Data first, task last — the ordering Flash anchors best on.
-		contents: `Your board and what you have learned so far:\n${JSON.stringify(payload)}\n\nIt is your move.`,
+		contents: `Your board and what you have learned so far:\n${JSON.stringify(data)}${opener}\n\nIt is your move.`,
 		config: {
 			systemInstruction: SYSTEM_INSTRUCTION,
 			responseMimeType: 'application/json',
