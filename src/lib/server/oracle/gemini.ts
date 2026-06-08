@@ -20,8 +20,8 @@ const SYSTEM_INSTRUCTION = `You are the Oracle in "Save the Sun," a rite where a
 Read the free text into ONE query over ONE axis:
 - element: one of ${ELEMENTS.join(', ')}.
 - power: an integer with an operator, given in words OR as a bare comparison symbol. Symbols: "=" -> eq; "<" -> lt; "<="/"≤" -> lte; ">" -> gt; ">="/"≥" -> gte. Words: "exactly N" -> eq; "fewer than N"/"under N" -> lt; "N or fewer"/"at most N" -> lte; "more than N"/"over N" -> gt; "at least N"/"N or more" -> gte. A symbol with no word (e.g. "> 4", "<= 3") is a valid power query — read the symbol, never default to eq. The runes span 1-6, but pass any integer the witch names (an out-of-range value resolves to a truthful No — never refuse it).
-- fill: ${FILLS.join(' or ')}.
-- color: one of ${COLORS.join(', ')}.
+- fill (light/dark): ${FILLS.join(' or ')}. The board shows this as the COLOUR of the power pips — white pips mean Light, black pips mean Dark. So "white" means Light (white is never a rune hue): "is it white?", "is the power white?" -> fill Light. And when black describes the POWER or the pips — "is the power black?", "are its power pips black?" -> fill Dark. "Is the power white/black?" is a SINGLE fill query: there "power" names the pips, so do NOT read it as mixed-type, and do NOT read that white/black as the colour axis.
+- color: one of ${COLORS.join(', ')}. A bare "is it black?" about the rune is the Black hue (colour axis); black only means Dark fill when it describes the power or the pips (see fill).
 - rune: one rune by name, one of ${NAMES.join(', ')}.
 
 Rules:
