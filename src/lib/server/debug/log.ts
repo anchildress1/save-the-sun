@@ -84,9 +84,27 @@ export interface GeminiCall {
 
 let geminiSink: GeminiCall[] = [];
 
+// The SDK response is a class instance (getters, non-POJO). `json()` tolerates it, but SvelteKit's
+// load serializer (devalue) rejects non-POJOs — so snapshot to a plain object here, at ingestion, and
+// both the /api/debug response and the /debug page load stay serializable. The JSON round-trip drops
+// methods/getters and keeps the data (candidates, usage, headers); a non-serializable value (circular,
+// etc.) degrades to its string form rather than crashing the view.
+function toSerializable(value: unknown): unknown {
+	if (value === undefined) return undefined;
+	try {
+		return JSON.parse(JSON.stringify(value));
+	} catch {
+		return String(value);
+	}
+}
+
 /** gemini.ts tees one raw call here (verbose only); the route drains it onto the session log. */
 export function captureGemini(call: GeminiCall): void {
-	geminiSink.push(call);
+	geminiSink.push({
+		...call,
+		request: toSerializable(call.request),
+		response: toSerializable(call.response)
+	});
 	if (geminiSink.length > 20) geminiSink.shift(); // never drained (off): stay bounded
 }
 

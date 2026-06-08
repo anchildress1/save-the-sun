@@ -105,6 +105,21 @@ describe('raw Gemini sink', () => {
 		expect(drained[1]).toMatchObject({ label: 'reaction', error: 'boom' });
 		expect(drainGemini()).toEqual([]); // drained = cleared
 	});
+
+	it('snapshots a non-POJO response so the /debug load can serialize it', () => {
+		// Mirror the SDK's class instance: data on own fields, conveniences on getters.
+		class FakeResponse {
+			candidates = [{ content: { parts: [{ text: '{}' }] } }];
+			get text() {
+				return '{}';
+			}
+		}
+		captureGemini({ label: 'move', request: {}, response: new FakeResponse() });
+		const [call] = drainGemini();
+		// Plain object: the getter is dropped, the data kept — and it round-trips without throwing.
+		expect(call.response).toEqual({ candidates: [{ content: { parts: [{ text: '{}' }] } }] });
+		expect(() => JSON.stringify(call)).not.toThrow();
+	});
 });
 
 describe('debugLevel in prod', () => {
