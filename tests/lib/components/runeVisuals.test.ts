@@ -42,7 +42,7 @@ describe('rune visual maps', () => {
 	});
 
 	it('exposes a bundled stone card background asset', () => {
-		expect(CARD_BACKGROUND_ASSET).toMatch(/\.webp$/);
+		expect(CARD_BACKGROUND_ASSET).toMatch(/\.png$/);
 	});
 
 	it('covers all six colors and six elements with no extras', () => {

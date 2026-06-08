@@ -1,6 +1,6 @@
 // Pure trait -> visual mappings for the rune cards. Kept framework-free so the
 // completeness of every axis is unit-testable outside the Svelte component.
-import stoneCardBackground from '$lib/assets/card/stone.webp';
+import stoneCardBackground from '$lib/assets/card/stone.png';
 import blackColorIcon from '$lib/assets/colors/black.png';
 import blueColorIcon from '$lib/assets/colors/blue.png';
 import goldColorIcon from '$lib/assets/colors/gold.png';
