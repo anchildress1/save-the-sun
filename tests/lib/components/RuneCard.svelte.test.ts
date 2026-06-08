@@ -39,11 +39,40 @@ const othala: Rune = {
 };
 
 describe('RuneCard', () => {
-	it('renders glyph, name, element, and color as visible text', async () => {
+	it('renders the symbol image, name, element, and color', async () => {
 		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
-		await expect.element(screen.getByText('ᚢ')).toBeInTheDocument();
+		const image = screen.container.querySelector('.rune-symbol-image');
+		expect(image).toBeInstanceOf(HTMLImageElement);
+		expect((image as HTMLImageElement).src).toMatch(/uruz\.png/);
+		const colorIcon = screen.container.querySelector('.color-icon-image');
+		expect(colorIcon).toBeInstanceOf(HTMLImageElement);
+		expect((colorIcon as HTMLImageElement).src).toMatch(/purple\.png/);
+		expect(screen.container.querySelector('.rune-card')?.getAttribute('style')).toContain('stone');
 		await expect.element(screen.getByText('Uruz')).toBeInTheDocument();
 		await expect.element(screen.getByText('Fire')).toBeInTheDocument();
+		await expect.element(screen.getByText('Purple')).toBeInTheDocument();
+	});
+
+	it('falls back to visible text glyph when the symbol image fails to load', async () => {
+		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		const image = screen.container.querySelector('.rune-symbol-image');
+		expect(image).toBeInstanceOf(HTMLImageElement);
+
+		image?.dispatchEvent(new Event('error'));
+		await expect.element(screen.getByText('ᚢ')).toBeInTheDocument();
+		expect(screen.container.querySelector('.rune-symbol-image')).toBeNull();
+	});
+
+	it('falls back to the CSS gem when the color icon fails to load', async () => {
+		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		const image = screen.container.querySelector('.color-icon-image');
+		expect(image).toBeInstanceOf(HTMLImageElement);
+
+		image?.dispatchEvent(new Event('error'));
+		await vi.waitFor(() => {
+			expect(screen.container.querySelector('.color-icon-image')).toBeNull();
+			expect(screen.container.querySelector('.gem[aria-hidden="true"]')).not.toBeNull();
+		});
 		await expect.element(screen.getByText('Purple')).toBeInTheDocument();
 	});
 
@@ -54,7 +83,7 @@ describe('RuneCard', () => {
 		for (const rune of [uruz, perthro, othala]) {
 			const { container } = render(RuneCard, { rune, onAction: vi.fn() });
 			// Decorative marks present...
-			expect(container.querySelector('.gem[aria-hidden="true"]')).not.toBeNull();
+			expect(container.querySelector('.color-icon-image[aria-hidden="true"]')).not.toBeNull();
 			expect(container.querySelector('.element .ic[aria-hidden="true"]')).not.toBeNull();
 			// ...and each is named in visible text on the card.
 			expect(container.textContent).toContain(rune.color);

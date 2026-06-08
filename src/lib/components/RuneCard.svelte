@@ -1,6 +1,12 @@
 <script lang="ts">
 	import type { Rune } from '$lib/board';
-	import { gemColor, elementIcon } from './runeVisuals';
+	import {
+		gemColor,
+		elementIcon,
+		runeSymbolAsset,
+		colorIconAsset,
+		CARD_BACKGROUND_ASSET
+	} from './runeVisuals';
 
 	let {
 		rune,
@@ -18,8 +24,13 @@
 
 	let gem = $derived(gemColor(rune.color));
 	let icon = $derived(elementIcon(rune.element));
+	let symbol = $derived(runeSymbolAsset(rune.name));
+	let colorIcon = $derived(colorIconAsset(rune.color));
+	let cardStyle = $derived(`--gem: ${gem}; --card-background: url("${CARD_BACKGROUND_ASSET}");`);
 	let pips = $derived(Array.from({ length: rune.power }, (_, i) => i));
 	let fillWord = $derived(rune.fill.toLowerCase());
+	let symbolFailed = $state(false);
+	let colorIconFailed = $state(false);
 </script>
 
 <button
@@ -29,7 +40,7 @@
 	data-rune-id={rune.id}
 	data-rune-name={rune.name}
 	onclick={() => onAction(rune.id)}
-	style="--gem: {gem};"
+	style={cardStyle}
 	aria-label={armed
 		? `Select ${rune.name} as cast target, ${rune.power} ${fillWord} power`
 		: crossed
@@ -45,13 +56,37 @@
 		<!-- Colour shown once: a gem dot beside its name (no-colour-alone), top-right. The
 		     rune id is not shown — it is an internal index, not player information. -->
 		<span class="color-mark">
-			<span class="gem" aria-hidden="true"></span>
+			{#if !colorIconFailed}
+				<img
+					class="color-icon-image"
+					src={colorIcon}
+					alt=""
+					aria-hidden="true"
+					decoding="async"
+					onerror={() => (colorIconFailed = true)}
+				/>
+			{:else}
+				<span class="gem" aria-hidden="true"></span>
+			{/if}
 			<span class="color-name">{rune.color}</span>
 		</span>
 	</header>
 
 	<div class="middle">
-		<span class="glyph">{rune.glyph}</span>
+		<span class="symbol">
+			{#if !symbolFailed}
+				<img
+					class="rune-symbol-image"
+					src={symbol}
+					alt=""
+					aria-hidden="true"
+					decoding="async"
+					onerror={() => (symbolFailed = true)}
+				/>
+			{:else}
+				<span class="glyph" aria-hidden="true">{rune.glyph}</span>
+			{/if}
+		</span>
 		<span class="name">{rune.name}</span>
 		<span class="meaning">{rune.meaning}</span>
 	</div>
@@ -98,13 +133,13 @@
 		text-align: left;
 		cursor: pointer;
 		overflow: hidden;
-		/* Gray stone tablet on the midnight board: a neutral ground so BOTH white (light) and
-		   black (dark) pips read, with the glyph/text carved dark instead of gilded. */
 		border: 1px solid var(--stone-edge);
 		border-radius: 7px;
 		color: var(--stone-ink);
 		background:
 			radial-gradient(circle at 50% 16%, rgba(255, 255, 255, 0.22) 0%, transparent 55%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.18) 100%),
+			var(--card-background) center / 100% 100% no-repeat,
 			linear-gradient(180deg, var(--stone-top) 0%, var(--stone-bottom) 100%);
 		box-shadow:
 			0 6px 18px rgba(0, 0, 0, 0.45),
@@ -171,8 +206,15 @@
 		line-height: 1;
 	}
 
-	/* Dark rim so every hue's silhouette reads on the light stone, including the lighter
-	   gems that would otherwise blend into the gray. */
+	.color-icon-image {
+		display: block;
+		width: 22px;
+		height: 22px;
+		object-fit: contain;
+		filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
+	}
+
+	/* Fallback when an icon image cannot load; the visible colour name still carries the trait. */
 	.gem {
 		width: 13px;
 		height: 13px;
@@ -195,8 +237,23 @@
 		text-align: center;
 	}
 
-	/* Carved into the stone: dark glyph with a light-below / dark-above bevel for an engraved
-	   look, instead of the gilded glow that reads only on the navy board. */
+	.symbol {
+		display: grid;
+		place-items: center;
+		width: 100%;
+		height: clamp(3.2rem, 5.7vw, 4.9rem);
+	}
+
+	.rune-symbol-image {
+		display: block;
+		width: min(74%, 4.75rem);
+		height: 100%;
+		object-fit: contain;
+		filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+	}
+
+	/* Backup text when an image cannot load: same old carved glyph, only now it is Plan B
+	   instead of the headline act. */
 	.glyph {
 		font-family: var(--font-display);
 		font-size: clamp(2.4rem, 3.8vw, 3.6rem);
