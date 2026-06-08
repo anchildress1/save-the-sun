@@ -3,6 +3,7 @@
 import { dev } from '$app/environment';
 import { GameEngine, selectSecret } from './engine';
 import { freshSkollState, type SkollState } from '$lib/server/skoll/skoll';
+import { resetLog } from '$lib/server/debug/log';
 
 // LRU-capped so abandoned rounds can't grow memory without bound. Map keeps insertion
 // order, so the first key is the least-recently-used; every access re-inserts to the end.
@@ -43,6 +44,7 @@ function remember(sessionId: string, engine: GameEngine): GameEngine {
 		const [lru] = engines.keys();
 		engines.delete(lru);
 		skolls.delete(lru); // his memory dies with the round it belonged to
+		resetLog(lru); // and the demo log, lifecycle-linked to the same round
 		// Rare, but the resulting fresh-secret-on-next-access desync is otherwise invisible.
 		console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
 	}
@@ -60,6 +62,7 @@ export function getEngine(sessionId: string): GameEngine {
 export function resetEngine(sessionId: string, seed?: number): GameEngine {
 	requireId(sessionId);
 	skolls.delete(sessionId); // a new round wipes the wolf's memory; recreated lazily on his turn
+	resetLog(sessionId); // and the demo log — a fresh round starts the on-stage record over
 	return remember(sessionId, create(sessionId, seed ?? randomSeed()));
 }
 
