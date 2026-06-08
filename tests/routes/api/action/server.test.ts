@@ -18,6 +18,7 @@ vi.mock('$lib/server/skoll/gemini', () => ({
 import { POST } from '$routes/api/action/+server';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
 import { resetEngine, getEngine, getSkoll } from '$lib/server/engine/session';
+import { getLog } from '$lib/server/debug/log';
 import { selectSecret } from '$lib/server/engine/engine';
 import { runes } from '$lib/board';
 
@@ -281,6 +282,67 @@ describe('POST /api/action', () => {
 		await expect(call(body)).rejects.toMatchObject({
 			status: 400,
 			body: expect.objectContaining({ message: 'Malformed action payload.' })
+		});
+	});
+
+	// S8 / R8 debug view — every result tagged deterministic-engine vs LLM-inference, the floor
+	// flagged, engine truth recorded beside Gemini's reasoning. Asserted on the log the view reads.
+	describe('debug log (S8)', () => {
+		it('tags a human Ask: the engine answer beside the Oracle’s reading', async () => {
+			await ask();
+			const entry = getLog(SID).at(-1)!;
+			expect(entry).toMatchObject({ actor: 'Human', action: 'Ask' });
+			expect(entry.truth).toMatch(/^(Yes|No)\. Sól is/); // deterministic-engine verdict
+			expect(entry.inference).toBe('read as "whether it is light"'); // LLM-inference
+			expect(entry.source).toBeUndefined(); // the Oracle has no floor
+		});
+
+		it('logs a human Cast with no inference column', async () => {
+			await call({ type: 'Cast', player: 'Human', runeName: WRONG });
+			const entry = getLog(SID).at(-1)!;
+			expect(entry).toMatchObject({ actor: 'Human', action: 'Cast', inference: '' });
+			expect(entry.truth).toContain('wrong');
+		});
+
+		it('tags a Sköll Cast as Gemini-sourced with his reasoning', async () => {
+			await ask(); // hand him the turn
+			await advance(); // he casts (default mock: wrong, no trace → payload fallback)
+			const entry = getLog(SID).at(-1)!;
+			expect(entry).toMatchObject({ actor: 'Sköll', action: 'Cast', source: 'gemini' });
+			expect(entry.inference).toContain('hunch'); // the earned-only fallback
+		});
+
+		it('flags the turn the deterministic floor fired', async () => {
+			skollDecides(async () => {
+				throw new Error('timeout');
+			});
+			await ask();
+			await advance(); // Gemini throws → floor plays (an Ask on the fresh board, parked)
+			await call({ type: 'React', player: 'Human', reaction: 'Pass' }); // resolve → logged
+			const entry = getLog(SID).at(-1)!;
+			expect(entry).toMatchObject({ actor: 'Sköll', source: 'floor' });
+		});
+
+		it('pairs Sköll’s Ask reasoning with the engine’s answer once the human reacts', async () => {
+			skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+			await ask();
+			await advance(); // his Ask is parked — not yet logged (truth unknown)
+			expect(getLog(SID).some((e) => e.actor === 'Sköll' && e.action === 'Ask')).toBe(false);
+			await call({ type: 'React', player: 'Human', reaction: 'Pass' });
+			const entry = getLog(SID).at(-1)!;
+			expect(entry).toMatchObject({ actor: 'Sköll', action: 'Ask', source: 'gemini' });
+			expect(entry.truth).toMatch(/Sól is (not )?reaching for a gold rune\./); // deterministic-engine
+			expect(entry.inference).toContain('hunch'); // LLM-inference, shown beside the truth
+		});
+
+		it('records the engine’s verdict, not a Hex, on a hexed Sköll Ask', async () => {
+			skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+			await ask();
+			await advance();
+			await call({ type: 'React', player: 'Human', reaction: 'Hex' });
+			const entry = getLog(SID).at(-1)!;
+			expect(entry).toMatchObject({ actor: 'Sköll', action: 'Ask' });
+			expect(entry.truth).toContain('Hexed'); // his question died — no answer produced
 		});
 	});
 

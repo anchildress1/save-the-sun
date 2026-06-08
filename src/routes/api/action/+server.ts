@@ -20,7 +20,10 @@ import {
 } from '$lib/server/skoll/skoll';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
 import { castLine, tauntAt } from '$lib/server/skoll/taunts';
-import type { GameEngine } from '$lib/server/engine/engine';
+import { record } from '$lib/server/debug/log';
+import type { CastResult, GameEngine } from '$lib/server/engine/engine';
+import type { Player } from '$lib/server/engine/actions';
+import type { Query } from '$lib/server/engine/queries';
 import type { RequestHandler } from './$types';
 
 // 'Advance' is not a player action — it's the client asking the engine to run Sköll's pending turn
@@ -54,6 +57,13 @@ function isAction(body: Partial<GameAction>): body is GameAction {
 		default:
 			return false;
 	}
+}
+
+// The engine's deterministic verdict on a cast, in the debug log's terse voice (S8).
+function castTruth(player: Player, runeName: string, won: boolean): string {
+	return won
+		? `Cast ${runeName} — the rune is true (${player} wins)`
+		: `Cast ${runeName} — wrong, the round continues`;
 }
 
 // Map his resolved turn into the wire DTO the client voices and reacts to.
@@ -101,7 +111,7 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 	// turn, so the human's answer lands first and his move shows under a live "Sköll moves." pill.
 	// A no-op if it isn't his turn (or his Ask is already parked), so a stray Advance is harmless.
 	if ((body.type as string) === 'Advance') {
-		const skollTurn = await playSkollIfActive(engine, skoll);
+		const skollTurn = await playSkollIfActive(sessionId, engine, skoll);
 		const response: AdvanceResponse = {
 			type: 'Advance',
 			...(skollTurn && { skoll: skollTurn }),
@@ -118,8 +128,10 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 	// completes a turn Sköll already opened, rather than starting a fresh action.
 	if (action.type === 'React' && skoll.pendingAsk !== null && engine.reactionWindow === 'Sköll') {
 		const askedQuery = skoll.pendingAsk;
+		const decision = skoll.pendingDecision;
 		const reaction = resolveReaction(engine, 'Human', action.reaction);
 		const answer = resolveSkollAsk(engine, skoll, reaction);
+		recordSkollAsk(sessionId, askedQuery, answer, decision);
 		const skollReaction: SkollReaction = answer.hexed
 			? { hexed: true }
 			: {
@@ -139,14 +151,46 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 		engine.status === 'active' &&
 		engine.activePlayer === 'Human'
 	) {
-		return askWithSkollReaction(engine, skoll, action.question);
+		return askWithSkollReaction(sessionId, engine, skoll, action.question);
 	}
 
 	const result = await handleAction(action, { engine, interpret });
+	// A human Cast is pure player choice resolved by the engine — log the deterministic verdict with
+	// no inference column. (His Cast is logged from his own turn; her Ask is logged in askWith….)
+	if (result.type === 'Cast' && result.cast.ok)
+		record(sessionId, {
+			actor: action.player,
+			action: 'Cast',
+			truth: castTruth(action.player, (action as { runeName: string }).runeName, result.cast.won),
+			inference: ''
+		});
 	return json({ ...result, state: gameState(engine) });
 }
 
-async function askWithSkollReaction(engine: GameEngine, skoll: SkollState, question: string) {
+/** Pair Sköll's parked-Ask reasoning with the engine's now-known answer for the debug log (S8). */
+function recordSkollAsk(
+	sessionId: string,
+	query: Query,
+	answer: { hexed: boolean; affirmative?: boolean },
+	decision: { source: 'gemini' | 'floor'; reasoning: string } | null
+): void {
+	record(sessionId, {
+		actor: 'Sköll',
+		action: 'Ask',
+		truth: answer.hexed
+			? 'Hexed by the witch — the question dies, his turn spent'
+			: voiceAnswer(query, answer.affirmative ?? false),
+		inference: decision?.reasoning ?? '',
+		...(decision && { source: decision.source })
+	});
+}
+
+async function askWithSkollReaction(
+	sessionId: string,
+	engine: GameEngine,
+	skoll: SkollState,
+	question: string
+) {
 	const prepared = await prepareAsk(question, interpret);
 	// A refusal never opens a window, spends a turn, or rouses Sköll — it just bounces back.
 	if (!prepared.ok) return json({ type: 'Ask', oracle: prepared.result, state: gameState(engine) });
@@ -162,6 +206,18 @@ async function askWithSkollReaction(engine: GameEngine, skoll: SkollState, quest
 			skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
 	}
 
+	// Log the result: the Oracle's reading (LLM-inference) beside the engine's answer (deterministic).
+	record(sessionId, {
+		actor: 'Human',
+		action: 'Ask',
+		truth: vs.killed
+			? 'Hexed by Sköll — the Oracle is silent, her turn spent'
+			: oracle?.ok
+				? oracle.answer
+				: 'engine declined the Ask',
+		inference: `read as "${prepared.paraphrase}"`
+	});
+
 	// The turn now sits with Sköll; the client advances him in a follow-up request.
 	return json({
 		type: 'Ask',
@@ -172,6 +228,7 @@ async function askWithSkollReaction(engine: GameEngine, skoll: SkollState, quest
 }
 
 async function playSkollIfActive(
+	sessionId: string,
 	engine: GameEngine,
 	skoll: SkollState
 ): Promise<SkollTurn | undefined> {
@@ -179,7 +236,18 @@ async function playSkollIfActive(
 	// He already has an Ask parked, waiting on the human's reaction — never start a second turn.
 	if (skoll.pendingAsk !== null) return undefined;
 	const out = await takeSkollTurn(engine, skoll, decideSkollMove, skoll.rng);
+	// His Cast resolves now (log it); his Ask is logged later, once the human's reaction reveals the answer.
+	if (out.kind === 'cast')
+		record(sessionId, {
+			actor: 'Sköll',
+			action: 'Cast',
+			truth: castTruth('Sköll', out.runeName, castWon(out.result)),
+			inference: out.reasoning,
+			source: out.source
+		});
 	const turn = describeTurn(out, tauntAt(skoll.tauntIndex));
 	skoll.tauntIndex += 1;
 	return turn;
 }
+
+const castWon = (result: CastResult): boolean => result.ok && result.won;
