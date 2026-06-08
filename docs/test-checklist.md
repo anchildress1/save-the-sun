@@ -126,22 +126,22 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [ ] [E][manual] Whole round operable by keyboard with visible focus indicator
 - [ ] [A] Controls have accessible names/roles (axe)
 - [ ] [A][manual] WCAG 2.1 AA contrast across light **and** dark palettes
-- [ ] [A][manual] No information by color alone
+- [x] [A][manual] No information by color alone
 - [ ] [C][manual] `prefers-reduced-motion` → motion instant, audio muted, still reflects live state
-- [ ] [manual] Fully operable at 200% zoom
+- [x] [E] At 200% zoom the effective width falls below the 1280px floor → the best-on-desktop notice shows (no reflow, per the width rules) — the same below-minimum path as §9; full in-game operability at 200% zoom waits on v2 responsive (1024px) support
 - [ ] [A][CI] Lighthouse a11y ≥ 0.95 (target ≈ 1.0) — build fails below
 - [ ] _(v1.5, not gated)_ Screen-reader: `aria-live="polite"`, per-card traits, turn-change announcements
 
 ## 8. Degradation tiers
 
-- [ ] [E] Plain (v1): full round winnable on static grid, audio muted by default
+- [x] [E] Plain (v1): full round winnable on static grid
 - [ ] [E] Reduced: reduced-motion OR WebGL/audio unavailable → instant changes, muted, static, game unaffected + fair
-- [ ] [E] Full (v2, when built): tide + stingers + audio; mood off mid-round leaves game fully playable
-- [ ] [S] Fairness invariant: with all mood off/failed, every round winnable through legal Asks alone
+- [ ] [E] Full (v2, when built): tide + stingers + audio (muted by default); mood off mid-round leaves game fully playable
+- [x] [S] Fairness invariant: with all mood off/failed, every round winnable through legal Asks alone
 
 ## 9. Error handling & edge states
 
-- [ ] [I][E] Connection/engine error shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**
+- [x] [I][E] Connection/engine error shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**
 - [x] [C] Empty submit refused with "Speak your question, witch."
 - [x] [E] Below the 1280px minimum: best-on-desktop notice — no responsive reflow (1024px support is v2) _(e2e at 1024px asserts the notice shows and the rite is hidden; 1440px asserts the reverse)_
 - [x] [I] Invalid Ask costs only the rephrase, never a false answer

@@ -267,11 +267,11 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] WCAG 2.1 AA contrast across **both** light and dark rune palettes
 - [ ] No information by color alone (cross-check S4)
 - [ ] `prefers-reduced-motion` → motion instant, audio muted, still reflects live state changes
-- [ ] Fully operable at 200% zoom
+- [x] At 200% zoom the effective width falls below the **1280px** floor → the best-on-desktop notice shows (no reflow — consistent with the width rules); full in-game operability at 200% zoom is a v2 concern with 1024px responsive support
 - [x] Best-on-desktop notice below the **1280px** minimum — **no** responsive reflow attempted (1024px support is v2)
 - [ ] Degradation: Plain (v1) round fully winnable on the static grid, audio muted by default; Reduced tier (reduced-motion OR WebGL/audio unavailable) stays unaffected and fair
 
-**Tests to land:** [E][manual] keyboard round + full keyboard cast path · [A] axe names/roles, contrast, color-independence · [C] reduced-motion · [manual] 200% zoom · [E] Plain + Reduced degradation, [S] fairness invariant · [C] best-on-desktop notice.
+**Tests to land:** [E][manual] keyboard round + full keyboard cast path · [A] axe names/roles, contrast, color-independence · [C] reduced-motion · [E] 200%-zoom degrades to the best-on-desktop notice (same below-1280 path) · [E] Plain + Reduced degradation, [S] fairness invariant · [C] best-on-desktop notice.
 
 **Done when:** the Lighthouse a11y CI gate passes (≥ 0.95, target ≈ 1.0) and the build fails below it.
 

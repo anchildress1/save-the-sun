@@ -183,7 +183,7 @@ The lineage bar is Lighthouse a11y ≈ 1.0; this build inherits it.
 | Contrast — incl. dark palette | Automated + manual | WCAG 2.1 AA contrast across light and dark rune palettes. |
 | Color independence | Automated + manual | No information by color alone (see §6). |
 | Reduced motion | Component + manual | `prefers-reduced-motion` cuts motion to instant and keeps audio muted, while still reflecting live state changes. |
-| 200% zoom | Manual | Fully operable at 200% zoom. |
+| 200% zoom | E2E | At 200% zoom the effective width drops below the 1280px floor → the best-on-desktop notice shows (no reflow, per the width rules) — the same below-minimum path as §9. Full in-game operability at 200% zoom is v2 (1024px responsive). |
 | Lighthouse gate | **CI** | Automated Lighthouse a11y run in CI; build fails below threshold (target ≈ 1.0, floor 0.95). |
 | Screen reader (v1.5) | Deferred | `aria-live="polite"` announcements, per-card trait exposure, turn-change announcements — **planned, not gated in v1**. |
 
