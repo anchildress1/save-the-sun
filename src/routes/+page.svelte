@@ -2,6 +2,7 @@
 	import { untrack, tick, onMount } from 'svelte';
 	import RuneGrid from '$lib/components/RuneGrid.svelte';
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
+	import Onboarding from '$lib/components/Onboarding.svelte';
 	import { runes } from '$lib/board';
 	import type {
 		GameAction,
@@ -60,6 +61,13 @@
 	let selectedTargetId: number | null = $state(null);
 	let askValue = $state('');
 	let pending = $state(false);
+
+	// First-run title screen + onboarding (S7). Shown once over the live board, then remembered —
+	// a refresh resumes the same round (S2.5), so the title must not nag the returning player.
+	const ONBOARDED_KEY = 'save-the-sun:onboarded';
+	let showOnboarding = $state(false);
+	// First run opens on the title; the persistent "How the rite works" button reopens the tour itself.
+	let onboardingStart = $state<'title' | 'tour'>('title');
 
 	// Sköll's surfaced turn (S6): his voice this turn, his Ask echo, and whether his Ask is open for
 	// the human to react to. A round can resume on his parked Ask, so the prompt + the human's still-
@@ -204,7 +212,28 @@
 	// Wrapped so the async return is never mistaken for an onMount cleanup.
 	onMount(() => {
 		advanceSkoll();
+		// Storage can throw (private mode) — first-run is the safe default, so show it then.
+		try {
+			showOnboarding = localStorage.getItem(ONBOARDED_KEY) === null;
+		} catch {
+			showOnboarding = true;
+		}
 	});
+
+	function finishOnboarding() {
+		showOnboarding = false;
+		// A failed write just means the title shows again next load — degrade, don't break play.
+		try {
+			localStorage.setItem(ONBOARDED_KEY, '1');
+		} catch {
+			/* storage unavailable — non-fatal */
+		}
+	}
+
+	function showInstructions() {
+		onboardingStart = 'tour';
+		showOnboarding = true;
+	}
 
 	async function submitAsk() {
 		const question = askValue.trim();
@@ -430,23 +459,34 @@
 		</div>
 
 		<div class="header-controls">
+			<button
+				class="ghost"
+				type="button"
+				data-testid="show-instructions"
+				onclick={showInstructions}
+			>
+				How the rite works
+			</button>
 			<button class="ghost new-game" type="button" onclick={newGame} disabled={pending}>
 				Begin another night
 			</button>
-			<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
-				{turnPill}
-			</div>
 		</div>
 	</header>
 
 	<div class="game-layout">
-		<section class="board-section">
+		<section class="board-section" data-coach="board">
 			{#key boardSeed}
 				<RuneGrid {castMode} {boardSeed} onSelectTarget={handleTargetSelect} />
 			{/key}
 		</section>
 
 		<aside class="oracle-panel">
+			<!-- Turn state sits with the controls it gates: whose move it is is the reason Ask/Cast are
+			     live or dead. Doubles as the resolution indicator, beside the full line in the frame. -->
+			<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
+				{turnPill}
+			</div>
+
 			<h2 class="oracle-title">The Oracle</h2>
 
 			<div class="oracle-frame">
@@ -498,6 +538,7 @@
 
 			<form
 				class="ask"
+				data-coach="ask"
 				onsubmit={(e) => {
 					e.preventDefault();
 					submitAsk();
@@ -518,8 +559,7 @@
 				</button>
 			</form>
 
-			<div class="cast">
-				<span class="cast-label">Cast a Rune</span>
+			<div class="cast" data-coach="cast">
 				{#if castMode}
 					<p class="cast-hint" data-testid="cast-hint">
 						{selectedRune ? RITE.castPrompt(selectedRune.name) : RITE.chooseTarget}
@@ -558,6 +598,10 @@
 		</aside>
 	</div>
 </main>
+
+{#if showOnboarding}
+	<Onboarding onDone={finishOnboarding} start={onboardingStart} />
+{/if}
 
 <style>
 	main {
@@ -651,9 +695,12 @@
 		gap: 0.8rem;
 	}
 
+	/* At the top of the Oracle panel, centered above the controls it gates. */
 	.turn-pill {
+		align-self: center;
 		font-family: var(--font-display);
 		letter-spacing: 0.08em;
+		text-align: center;
 		color: var(--gold-bright);
 		background: rgba(217, 169, 74, 0.08);
 		border: 1px solid var(--gold-dim);
@@ -834,13 +881,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.45rem;
-	}
-
-	.cast-label {
-		font-size: 0.62rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--ink-muted);
 	}
 
 	.cast-hint {

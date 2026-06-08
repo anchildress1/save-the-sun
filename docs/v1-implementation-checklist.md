@@ -180,12 +180,16 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *Needs a live board to coach-mark over. Depends on: S4.*
 
-- [ ] Title screen: title, tagline, primary CTA "Light the fire.", secondary "How the rite works"
-- [ ] First-run onboarding, one concept per step, dismissable, board visible behind (`ux-copy.md` §5 steps 1–4)
-- [ ] Skippable coach-mark tour over the live board; final button "Take up the runes."
-- [ ] How-to-play guidance ("Ask. Cross off what it can't be. Cast when you're ready.") lives here in the popovers — not as a persistent on-board explainer
+- [x] Title screen: title, tagline, primary CTA "Light the fire.", secondary "How the rite works"
+- [x] First-run onboarding, one concept per step, dismissable, board visible behind (`ux-copy.md` §5 steps 1–4)
+- [x] Skippable coach-mark tour over the live board; final button "Take up the runes."
+- [x] How-to-play guidance ("Ask. Cross off what it can't be. Cast when you're ready.") lives here in the popovers — not as a persistent on-board explainer
 
-**Tests to land:** [C] title chrome, onboarding step copy, skip path.
+**Implementation (S7):** `Onboarding.svelte` overlays the live board (`+page.svelte`). The **title** phase is a centered card (title, tagline, "Light the fire." → straight to play, "How the rite works" → tour). The **tour** is a real coach-mark walk of the four §5 concepts. Step 1 ("the stakes") is a scene-setting centered intro over the dimmed page — no anchor, so the board stays unhighlighted. Steps 2–4 spotlight the region each describes (the Ask, then the board at "read & cross," then the Cast) by anchoring to a `data-coach` hook on the page — a gold ring whose oversized box-shadow dims everything else — with the popover positioned beside the lit region (a transparent catcher keeps the board inert mid-tour). A step with no anchor falls back to a centered popover; each anchored step re-measures on the next frame so the opening anchored step never sticks on a stale (pre-layout) rect. Each step has a Skip; the last reads "Take up the runes." A persistent "How the rite works" button in the header reopens the tour directly (the page passes `start='tour'`). First-run is gated on a `localStorage` flag (`save-the-sun:onboarded`) set on any exit — a refresh resumes the same round (S2.5), so the title must not nag the returning player; storage failures (private mode) degrade to showing it, never to breaking play. Both dialogs are `aria-modal` with a focus trap — focus enters on open, Tab cycles inside (wrapping both ends), Escape exits — so the board and header behind them stay untabbable while the overlay is up.
+
+**Chrome cleanup landed alongside S7:** the turn pill moved off the header to the top of the Oracle panel (beside the Ask/Cast controls it gates), "How the rite works" became a header button next to "Begin another night," and the redundant "Cast a Rune" label above the Cast button was dropped.
+
+**Tests landed:** [C] title chrome, step copy, skip path, first-run gate + returning-player skip, header re-entry, modal focus trap (focus-in, Tab wrap, Escape) (`Onboarding.svelte.test`, `page.svelte.test`). [E] first-run over the live board, dismissal persisting across a real reload, full tour, and header re-entry (`board.e2e`); the board e2e seeds the onboarded flag so the overlay never blocks board interaction.
 
 **Done when:** a first-time player can read the stakes, Ask, cross, and Cast concepts before the board, and skip cleanly.
 
