@@ -53,8 +53,14 @@
 	}
 
 	// Re-measure on every step/phase change — measure() reads both, so the effect tracks them.
+	// Measure twice: now, and again after the next frame. The title→tour swap can run this effect a
+	// tick before the board has settled its layout, leaving the FIRST step's spotlight on an empty
+	// rect (the whole screen dims) with nothing to correct it until the next step. The rAF pass
+	// self-corrects that opening step.
 	$effect(() => {
 		measure();
+		const raf = requestAnimationFrame(measure);
+		return () => cancelAnimationFrame(raf);
 	});
 
 	onMount(() => {
