@@ -903,4 +903,17 @@ describe('Save the Sun page — end screen + replay (S9)', () => {
 		// The flag is cleared so a reload opens the title too, not a mid-round resume.
 		expect(localStorage.getItem(ONBOARDED_KEY)).toBeNull();
 	});
+
+	it('keeps the end screen up when leaving fails — never strands the player on the title', async () => {
+		const error = expectConsole('error');
+		// new-game fails: the round never resets, so leaveFire must not advance to the title.
+		stubFetch(async () => new Response('nope', { status: 500 }));
+		const screen = render(Page, propsWith(HUMAN_WON));
+		await screen.getByTestId('end-leave').click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+		// The end screen stays mounted (round still resolved); no title overlay over a stale round.
+		await expect.element(screen.getByTestId('end-screen')).toBeInTheDocument();
+		expect(screen.container.querySelector('[data-testid="onboarding"]')).toBeNull();
+		expect(error).toHaveBeenCalled();
+	});
 });

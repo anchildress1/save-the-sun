@@ -402,7 +402,8 @@
 		crossings = ids;
 	}
 
-	async function newGame() {
+	// Returns whether the reset landed, so callers (leaveFire) don't advance the view on a failed reset.
+	async function newGame(): Promise<boolean> {
 		pending = true;
 		let res: Response | undefined;
 		try {
@@ -437,9 +438,11 @@
 			heldHex = true;
 			applyState(state);
 			cancelCast();
+			return true;
 		} catch (err) {
 			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
 			answer = RITE.oracleSilent;
+			return false;
 		} finally {
 			pending = false;
 		}
@@ -448,8 +451,10 @@
 	// "Leave the fire." — step back from the closing rite to the threshold. A fresh round is prepared
 	// behind the title (so the resolved one is discarded, not re-entered), then the title screen returns;
 	// the onboarded flag is cleared so the rite opens as a fresh arrival, not a mid-round resume.
+	// Guarded on the reset: a failed newGame() leaves the end screen up with its in-world error line,
+	// rather than stranding the player on the title over a round the server never reset.
 	async function leaveFire() {
-		await newGame();
+		if (!(await newGame())) return;
 		onboardingStart = 'title';
 		showOnboarding = true;
 		try {
