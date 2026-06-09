@@ -67,16 +67,16 @@ describe('EndScreen — defeat sequence', () => {
 	const renderLose = (over: { onReplay?: () => void; onLeave?: () => void } = {}) =>
 		render(EndScreen, { outcome: 'lose', onReplay: vi.fn(), onLeave: vi.fn(), ...over });
 
-	it('tolls the single defeat line', async () => {
+	it('tolls the defeat in a lead line and its quieter consequence — no victory verse', async () => {
 		const screen = renderLose();
-		await expect
-			.element(
-				screen.getByText(
-					'Sköll takes the sun. The longest day never breaks. The year falls to dark.'
-				)
-			)
-			.toBeInTheDocument();
-		expect(screen.container.querySelectorAll('.line')).toHaveLength(1);
+		const root = screen.getByTestId('end-screen').element();
+		expect(root.querySelector('.lead')?.textContent?.trim()).toBe('Sköll takes the sun.');
+		expect(root.querySelector('.coda')?.textContent?.trim()).toBe(
+			'The longest day never breaks. The year falls to dark.'
+		);
+		// The full canonical sentence is preserved across the two lines, in order.
+		expect(root.querySelector('.verse')).toBeNull();
+		expect(screen.container.querySelectorAll('.line')).toHaveLength(2);
 	});
 
 	it('offers the defeat CTAs — "Stand against him again" replaces the victory replay', async () => {
@@ -104,15 +104,13 @@ describe('EndScreen — defeat sequence', () => {
 });
 
 describe('EndScreen — accessibility & voice', () => {
-	it('is an aria-modal dialog named by its final, heaviest line', async () => {
+	it('is an aria-modal dialog named by its lead line — the heaviest beat', async () => {
 		const screen = render(EndScreen, { outcome: 'win', onReplay: vi.fn(), onLeave: vi.fn() });
 		const dialog = screen.getByRole('dialog').element();
 		expect(dialog.getAttribute('aria-modal')).toBe('true');
 		const labelledby = dialog.getAttribute('aria-labelledby');
 		const labelEl = dialog.querySelector(`#${labelledby}`);
-		expect(labelEl?.textContent?.trim()).toBe(
-			'The offering is made. The longest day breaks — and the light is yours to keep.'
-		);
+		expect(labelEl?.textContent?.trim()).toBe('The rune is true.');
 	});
 
 	it('moves focus onto the primary CTA on open', async () => {

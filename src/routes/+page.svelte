@@ -811,10 +811,10 @@
 
 	h1 {
 		margin: 0;
-		font-family: var(--font-display);
-		font-size: 1.8rem;
-		font-weight: 600;
-		letter-spacing: 0.06em;
+		font-family: var(--font-story-title);
+		font-size: 2rem;
+		font-weight: 400;
+		letter-spacing: 0.04em;
 		color: var(--gold-bright);
 		text-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
 	}
@@ -1223,9 +1223,9 @@
 
 		.notice-title {
 			margin: 0;
-			font-family: var(--font-display);
-			font-size: 2rem;
-			letter-spacing: 0.06em;
+			font-family: var(--font-story-title);
+			font-size: 2.4rem;
+			letter-spacing: 0.04em;
 			color: var(--gold-bright);
 			text-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
 		}

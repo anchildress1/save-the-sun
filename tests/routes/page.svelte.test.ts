@@ -830,9 +830,10 @@ describe('Save the Sun page — end screen + replay (S9)', () => {
 		const screen = render(Page, propsWith(SKOLL_WON));
 		const end = screen.getByTestId('end-screen').element();
 		expect(end.getAttribute('data-outcome')).toBe('lose');
-		// The full defeat toll also sits in the answer panel behind — scope to the end screen's own line.
-		expect(end.querySelector('.line.final')?.textContent?.trim()).toBe(
-			'Sköll takes the sun. The longest day never breaks. The year falls to dark.'
+		// The toll also sits in the answer panel behind — scope to the end screen's own lead + coda.
+		expect(end.querySelector('.lead')?.textContent?.trim()).toBe('Sköll takes the sun.');
+		expect(end.querySelector('.coda')?.textContent?.trim()).toBe(
+			'The longest day never breaks. The year falls to dark.'
 		);
 		expect(screen.getByTestId('end-replay').element().textContent?.trim()).toBe(
 			'Stand against him again'

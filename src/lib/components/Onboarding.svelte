@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
+	import introSplash from '$lib/assets/banners/intro-splash.jpg';
 
 	// Title screen + first-run coach-mark tour: the tour spotlights the live board region each step
 	// describes, so the how-to lives in the steps rather than as persistent on-board text. `onDone`
@@ -174,25 +175,24 @@
 </script>
 
 {#if phase === 'title'}
-	<div class="backdrop" data-testid="onboarding">
+	<div class="backdrop title-backdrop" data-testid="onboarding">
+		<img class="title-splash" src={introSplash} alt="" aria-hidden="true" decoding="async" />
+		<div class="title-scrim" aria-hidden="true"></div>
 		<div
-			class="panel"
+			class="title-card"
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="onboarding-heading"
 			use:trapFocus
 		>
 			<h1 id="onboarding-heading">Save the Sun</h1>
+			<hr class="title-divider" aria-hidden="true" />
 			<p class="tagline">A race to beat Sköll and save the light.</p>
-			<div class="actions">
-				<button
-					class="primary ritual-button ritual-button--primary"
-					type="button"
-					onclick={() => onDone()}
-				>
+			<div class="title-actions">
+				<button class="rite-cta rite-cta--primary" type="button" onclick={() => onDone()}>
 					Light the fire.
 				</button>
-				<button class="ghost ritual-button ritual-button--ghost" type="button" onclick={beginTour}>
+				<button class="rite-cta rite-cta--ghost" type="button" onclick={beginTour}>
 					How the rite works
 				</button>
 			</div>
@@ -247,6 +247,75 @@
 		backdrop-filter: blur(2px);
 	}
 
+	/* The first-run title is its own cinematic splash — the intro art fills the screen behind a
+	   centered scrim so the wordmark + CTAs always read over the busy scene. */
+	.title-backdrop {
+		padding: 0;
+		background: var(--bg-deep);
+		backdrop-filter: none;
+		overflow: hidden;
+	}
+
+	.title-splash {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		object-position: 50% 40%;
+	}
+
+	.title-scrim {
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		pointer-events: none;
+		background:
+			radial-gradient(
+				ellipse 58% 44% at 50% 52%,
+				rgba(6, 9, 18, 0.74) 0%,
+				rgba(6, 9, 18, 0.34) 56%,
+				transparent 100%
+			),
+			linear-gradient(
+				180deg,
+				rgba(6, 9, 18, 0.5) 0%,
+				transparent 26%,
+				transparent 60%,
+				rgba(6, 9, 18, 0.82) 100%
+			);
+	}
+
+	.title-card {
+		position: relative;
+		z-index: 2;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1rem;
+		max-width: 44rem;
+		padding: 2rem;
+		text-align: center;
+	}
+
+	.title-divider {
+		width: min(22rem, 70%);
+		height: 1.6rem;
+		margin: 0.1rem 0;
+		border: 0;
+		background: var(--ui-divider) center / 100% 100% no-repeat;
+		opacity: 0.9;
+	}
+
+	.title-actions {
+		display: flex;
+		gap: 0.9rem;
+		flex-wrap: wrap;
+		justify-content: center;
+		margin-top: 0.8rem;
+	}
+
 	.catcher {
 		position: fixed;
 		inset: 0;
@@ -273,7 +342,6 @@
 			height 0.25s ease;
 	}
 
-	.panel,
 	.popover {
 		display: flex;
 		flex-direction: column;
@@ -286,11 +354,6 @@
 		border: 1px solid var(--gold-dim);
 		border-radius: 12px;
 		box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
-	}
-
-	.panel {
-		max-width: 32rem;
-		padding: 2rem 2.2rem;
 	}
 
 	.popover {
@@ -309,12 +372,15 @@
 
 	h1 {
 		margin: 0;
-		font-family: var(--font-display);
-		font-size: 2.2rem;
-		font-weight: 600;
-		letter-spacing: 0.06em;
+		font-family: var(--font-story-title);
+		font-size: clamp(2.8rem, 7vw, 4.6rem);
+		font-weight: 400;
+		letter-spacing: 0.03em;
+		line-height: 1.05;
 		color: var(--gold-bright);
-		text-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
+		text-shadow:
+			0 2px 6px rgba(0, 0, 0, 0.7),
+			0 0 34px rgba(217, 169, 74, 0.5);
 	}
 
 	h2 {
@@ -329,8 +395,9 @@
 		margin: 0;
 		font-family: var(--font-story-body);
 		font-style: italic;
-		font-size: 1.05rem;
-		color: var(--ink-muted);
+		font-size: clamp(1.05rem, 2.2vw, 1.3rem);
+		color: var(--ink);
+		text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
 	}
 
 	.step-count {
