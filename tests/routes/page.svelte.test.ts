@@ -97,6 +97,16 @@ describe('Save the Sun page', () => {
 		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
 	});
 
+	it('carries a meta AI-fallibility note, keyboard-reachable and naming both AI actors', async () => {
+		const { container } = render(Page, pageProps);
+		const btn = container.querySelector('button.ai-note-btn')!;
+		expect(btn.getAttribute('aria-describedby')).toBe('ai-note');
+		const note = container.querySelector('#ai-note')!;
+		expect(note.getAttribute('role')).toBe('tooltip');
+		expect(note.textContent).toMatch(/Oracle and Sköll/);
+		expect(note.textContent).toMatch(/AI/);
+	});
+
 	it('refuses an empty Ask without dispatching', async () => {
 		const spy = stubFetch(async () => new Response('{}'));
 		const screen = render(Page, pageProps);

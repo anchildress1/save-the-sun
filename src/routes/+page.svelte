@@ -446,8 +446,24 @@
 		</section>
 
 		<aside class="oracle-panel">
-			<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
-				{turnPill}
+			<div class="turn-pill-row">
+				<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
+					{turnPill}
+				</div>
+				<span class="ai-note-wrap">
+					<button
+						class="ghost ai-note-btn"
+						type="button"
+						aria-describedby="ai-note"
+						aria-label="About the AI behind the Oracle and Sköll"
+					>
+						i
+					</button>
+					<span id="ai-note" role="tooltip" class="ai-note-pop">
+						The Oracle and Sköll run on a live AI. It misreads and misplays sometimes — the runes
+						and rules are exact, the voices reading them are not. Blame the machine, not the writer.
+					</span>
+				</span>
 			</div>
 
 			<h2 class="oracle-title">The Oracle</h2>
@@ -650,6 +666,12 @@
 		gap: 0.8rem;
 	}
 
+	.turn-pill-row {
+		align-self: center;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+	}
 	.turn-pill {
 		align-self: center;
 		font-family: var(--font-display);
@@ -693,6 +715,7 @@
 	}
 
 	.oracle-panel {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		gap: 0.85rem;
@@ -880,6 +903,51 @@
 	button:focus-visible {
 		outline: 2px solid var(--gold-bright);
 		outline-offset: 2px;
+	}
+
+	/* AI-fallibility note: a meta affordance (not the rite's voice). CSS-only popover, shown on hover
+	   AND keyboard focus so it's reachable without a pointer. */
+	.ai-note-wrap {
+		display: inline-flex;
+	}
+	button.ghost.ai-note-btn {
+		inline-size: 1.5rem;
+		block-size: 1.5rem;
+		font-size: 0.8rem;
+		padding: 0;
+		border-radius: 50%;
+		font-family: var(--font-display);
+		font-style: italic;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+	/* Anchored to the panel (not the icon) so it spans the panel width and never spills past the
+	   .oracle-panel overflow clip. */
+	.ai-note-pop {
+		position: absolute;
+		inset-block-start: 2.9rem;
+		inset-inline: 0.6rem;
+		padding: 0.7rem 0.9rem;
+		border: 1px solid var(--gold-dim);
+		border-radius: 0.5rem;
+		background: var(--bg-panel);
+		color: var(--ink);
+		font-size: 0.85rem;
+		line-height: 1.5;
+		text-align: start;
+		text-transform: none;
+		letter-spacing: 0;
+		opacity: 0;
+		visibility: hidden;
+		transition: opacity 0.12s ease;
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+		z-index: 10;
+	}
+	/* Hover for pointer; focus-visible (keyboard only) so a mouse click never sticks it open. */
+	.ai-note-wrap:hover .ai-note-pop,
+	.ai-note-btn:focus-visible ~ .ai-note-pop {
+		opacity: 1;
+		visibility: visible;
 	}
 
 	.wolf {
