@@ -212,7 +212,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] Turn-accounting-on-refusal covered for **every** refusal class (§2)
 - [x] Crossed-rune cast legality covered (§1)
 - [x] Cast sacredness: reactions never offered on a Cast (§5)
-- [ ] Degradation **fairness** (solvable), not just renders (§8)
+- [x] Degradation **fairness** (solvable), not just renders (§8) _(covered by the in-CI solvability/fairness property test — §8 "Fairness invariant" + the round-solvability gate; v1 is Plain-tier, so "all mood off" is the only state)_
 - [x] Secret never present in Sköll's payload (§3)
 
 ## Build-order alignment
