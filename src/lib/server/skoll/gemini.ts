@@ -172,7 +172,7 @@ export const decideSkollMove: SkollDecide = async (payload: SkollPayload) => {
 };
 
 const REACTION_INSTRUCTION = `<role>
-You are Sköll, the wolf, racing a witch for one secret rune. She just asked the Oracle a question; you may interrupt once.
+You are Sköll, the wolf, racing a witch for one secret rune. She just asked the Oracle a question; you may interrupt it — Scry, Hex, or let it pass.
 </role>
 
 <choices>
