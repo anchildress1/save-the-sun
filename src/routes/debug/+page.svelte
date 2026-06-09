@@ -38,22 +38,7 @@
 
 <main>
 	<header>
-		<h1>Debug log 🔧</h1>
-		<p>
-			Chronological stream — human questions, Sköll's move + reasoning each turn, the engine's
-			verdicts, and (verbose) the secret + raw Gemini I/O. Level: <code>{level}</code> (set
-			<code>DEBUG_LOG</code> to <code>verbose</code> / <code>demo</code> / <code>off</code>).
-		</p>
-		<p class="legend">
-			Colour = owner:
-			<span class="tag human">Human</span>
-			<span class="tag oracle">Oracle</span>
-			<span class="tag skoll">Sköll</span>
-			<span class="tag engine">Engine</span>. Badge = kind:
-			<span class="badge input">input</span>
-			<span class="badge llm">LLM</span>
-			<span class="badge deterministic">deterministic</span>. The part chip names the turn phase.
-		</p>
+		<h1>Debug log 🐞</h1>
 	</header>
 
 	{#if level === 'off'}
@@ -104,16 +89,7 @@
 		font-family: var(--font-body);
 	}
 	h1 {
-		margin: 0 0 0.25rem;
-	}
-	header p {
-		margin: 0 0 0.6rem;
-		color: #b8b8c0;
-		line-height: 1.5;
-	}
-	header p.legend {
-		margin-block-end: clamp(1rem, 0.5rem + 1.5vw, 1.75rem);
-		font-size: 0.9rem;
+		margin: 0 0 clamp(1rem, 0.5rem + 1.5vw, 1.75rem);
 	}
 	code {
 		background: #2c2c34;
@@ -223,28 +199,6 @@
 	.badge.error {
 		background: #5a1f1f;
 		color: #ff9d9d;
-	}
-	.legend .tag {
-		padding: 0.05rem 0.4rem;
-		border-radius: 0.25rem;
-		font-weight: 600;
-		font-size: 0.85em;
-		color: #16161a;
-	}
-	.legend .tag.human {
-		background: var(--human);
-	}
-	.legend .tag.oracle {
-		background: var(--oracle);
-	}
-	.legend .tag.skoll {
-		background: var(--skoll);
-	}
-	.legend .tag.engine {
-		background: var(--engine);
-	}
-	.legend .badge {
-		font-size: 0.85em;
 	}
 	.msg {
 		margin: 0;
