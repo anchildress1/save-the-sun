@@ -17,9 +17,7 @@
 		castMode?: boolean;
 		boardSeed: number;
 		onSelectTarget: (id: number) => void;
-		// Crossed rune ids to seed on a resumed round (applied once, post-mount); empty on a fresh board.
 		restoreCrossed?: number[];
-		// Fired with the full crossed-id set after every cross/restore so the parent can persist it.
 		onCrossChange?: (ids: number[]) => void;
 	} = $props();
 
@@ -33,9 +31,6 @@
 	let selectedId: number | null = $state(null);
 	let gridContainer: HTMLElement;
 
-	// Seed the resumed crossings exactly once. The parent supplies them post-mount (after reading
-	// storage), so this fires when restoreCrossed first arrives — never re-seeding after a user edit,
-	// and never reporting back up (the parent already holds these).
 	let seeded = false;
 	$effect(() => {
 		if (seeded || restoreCrossed.length === 0) return;
