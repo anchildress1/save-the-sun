@@ -60,8 +60,9 @@
 	let aiNoteButton: HTMLButtonElement | null = $state(null);
 	let aiNotePopover: HTMLElement | null = $state(null);
 
-	// Shown once over the live board, then remembered — a refresh resumes the same round, so the title
-	// must not nag the returning player.
+	// The title greets every load — the returning player is nagged by design. The flag is only a
+	// suppression hook for automated runs (tests/e2e seed it); production never persists it, so onMount
+	// shows the title each time.
 	const ONBOARDED_KEY = 'save-the-sun:onboarded';
 	let showOnboarding = $state(false);
 	let onboardingStart = $state<'title' | 'tour'>('title');
@@ -285,13 +286,8 @@
 	}
 
 	function finishOnboarding() {
+		// Not persisted — the title nags every load by design (the flag is only a test suppression hook).
 		showOnboarding = false;
-		// A failed write just means the title shows again next load — degrade, don't break play.
-		try {
-			localStorage.setItem(ONBOARDED_KEY, '1');
-		} catch {
-			/* storage unavailable — non-fatal */
-		}
 	}
 
 	function showInstructions() {
@@ -446,17 +442,11 @@
 	}
 
 	// "Leave the fire." — step back from the closing rite to the threshold. A fresh round is prepared
-	// behind the title (so the resolved one is discarded, not re-entered), then the title screen returns;
-	// the onboarded flag is cleared so the rite opens as a fresh arrival, not a mid-round resume.
+	// behind the title (so the resolved one is discarded, not re-entered), then the title screen returns.
 	async function leaveFire() {
 		await newGame();
 		onboardingStart = 'title';
 		showOnboarding = true;
-		try {
-			localStorage.removeItem(ONBOARDED_KEY);
-		} catch {
-			/* storage unavailable — non-fatal */
-		}
 	}
 
 	async function commitCast() {

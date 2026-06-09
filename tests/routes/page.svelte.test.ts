@@ -607,11 +607,11 @@ describe('Save the Sun page — first-run onboarding (S7)', () => {
 		expect(screen.container.querySelector('main')).not.toBeNull();
 	});
 
-	it('dismisses on "Light the fire." and remembers it for the next load', async () => {
+	it('dismisses on "Light the fire." but does not persist — the title nags on the next load', async () => {
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Light the fire.' }).click();
 		expect(screen.container.querySelector('[data-testid="onboarding"]')).toBeNull();
-		expect(localStorage.getItem(ONBOARDED_KEY)).toBe('1');
+		expect(localStorage.getItem(ONBOARDED_KEY)).toBeNull();
 	});
 
 	it('does not show the title screen for a returning player', async () => {
@@ -884,7 +884,7 @@ describe('Save the Sun page — end screen + replay (S9)', () => {
 		expect(spy).toHaveBeenCalledWith('/api/new-game', expect.objectContaining({ method: 'POST' }));
 	});
 
-	it('leaves the fire — resets the round and returns to the title, forgetting the onboarded flag', async () => {
+	it('leaves the fire — resets the round and returns to the title', async () => {
 		stubFetch(async (url) => {
 			if (url.includes('/api/new-game'))
 				return new Response(
@@ -900,7 +900,5 @@ describe('Save the Sun page — end screen + replay (S9)', () => {
 			.element(screen.getByRole('button', { name: 'Light the fire.' }))
 			.toBeInTheDocument();
 		expect(screen.container.querySelector('[data-testid="end-screen"]')).toBeNull();
-		// The flag is cleared so a reload opens the title too, not a mid-round resume.
-		expect(localStorage.getItem(ONBOARDED_KEY)).toBeNull();
 	});
 });
