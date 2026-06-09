@@ -219,13 +219,15 @@
 		<h2 id="onboarding-heading">{STEPS[step].label}</h2>
 		<p class="step-body" data-testid="step-body">{STEPS[step].body}</p>
 		<div class="actions">
-			<button
-				class="ghost ritual-button ritual-button--ghost"
-				type="button"
-				onclick={() => onDone()}
-			>
-				Skip
-			</button>
+			{#if !isLast}
+				<button
+					class="ghost ritual-button ritual-button--ghost"
+					type="button"
+					onclick={() => onDone()}
+				>
+					Skip
+				</button>
+			{/if}
 			<button class="primary ritual-button ritual-button--primary" type="button" onclick={next}>
 				{isLast ? 'Take up the runes.' : 'Next'}
 			</button>
