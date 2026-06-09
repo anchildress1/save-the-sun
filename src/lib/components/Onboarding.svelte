@@ -184,9 +184,11 @@
 			aria-labelledby="onboarding-heading"
 			use:trapFocus
 		>
-			<h1 id="onboarding-heading">Save the Sun</h1>
-			<hr class="title-divider" aria-hidden="true" />
-			<p class="tagline">A race to beat Sköll and save the light.</p>
+			<div class="title-top">
+				<h1 id="onboarding-heading">Save the Sun</h1>
+				<hr class="title-divider" aria-hidden="true" />
+				<p class="tagline">A race to beat Sköll and save the light.</p>
+			</div>
 			<div class="title-actions">
 				<button class="rite-cta rite-cta--primary" type="button" onclick={() => onDone()}>
 					Light the fire.
@@ -255,6 +257,8 @@
 		background: var(--bg-deep);
 		backdrop-filter: none;
 		overflow: hidden;
+		align-items: stretch;
+		justify-content: stretch;
 	}
 
 	.title-splash {
@@ -267,16 +271,35 @@
 		object-position: 50% 40%;
 	}
 
+	/* Title + CTAs sit at the top and bottom edges, framing the lit rune in the middle of the art
+	   rather than covering it. */
 	.title-card {
 		position: relative;
 		z-index: 2;
+		flex: 1;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 1rem;
-		max-width: 44rem;
-		padding: 2rem;
+		justify-content: space-between;
+		gap: 1.5rem;
+		padding: clamp(2.5rem, 9vh, 6rem) 2rem clamp(2.5rem, 8vh, 5rem);
 		text-align: center;
+	}
+
+	.title-top {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.7rem;
+		padding: 1.4rem 2.4rem;
+		border-radius: 16px;
+		/* Local halo — darkens only behind the wordmark so it reads over the bright rune-glow; no scrim. */
+		background: radial-gradient(
+			ellipse 80% 140% at 50% 45%,
+			rgba(6, 9, 18, 0.66) 0%,
+			rgba(6, 9, 18, 0.24) 55%,
+			transparent 78%
+		);
 	}
 
 	.title-divider {
