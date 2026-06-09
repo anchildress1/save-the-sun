@@ -55,6 +55,7 @@
 
 	/* Ornate UI assets */
 	--ui-divider: url('../assets/ui/divider.png');
+	--modal-bg: url('../assets/banners/modal-background.jpg');
 }
 
 .ritual-button {
@@ -114,6 +115,55 @@
 	box-shadow: none;
 	transform: none;
 	filter: saturate(0.55);
+}
+
+/* Splash-surface CTA — the POC's gold-bordered serif button (title screen + end screens). Distinct from
+   the uppercase Cinzel chrome buttons: lowercase IM Fell English, larger, for the cinematic rites. */
+.rite-cta {
+	min-width: 13rem;
+	padding: 0.85rem 1.6rem;
+	font-family: var(--font-story-body);
+	font-size: 1.05rem;
+	letter-spacing: 0.02em;
+	color: var(--gold-bright);
+	background: rgba(6, 9, 18, 0.5);
+	border: 1px solid var(--gold-dim);
+	border-radius: 6px;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+	cursor: pointer;
+	transition:
+		background 0.2s ease,
+		border-color 0.2s ease,
+		box-shadow 0.2s ease,
+		color 0.2s ease;
+}
+
+.rite-cta:hover,
+.rite-cta:focus-visible {
+	border-color: var(--gold-bright);
+	background: rgba(217, 169, 74, 0.12);
+	box-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
+}
+
+.rite-cta:focus-visible {
+	outline: none;
+	box-shadow:
+		var(--focus-ring),
+		0 0 18px rgba(217, 169, 74, 0.3);
+}
+
+/* Dark ink on solid gold — a high-contrast primary (≈12:1), unlike the cream-on-translucent-gold it
+   replaces, which read as low contrast to a static analyzer regardless of the dark art behind it. */
+.rite-cta--primary {
+	color: var(--bg-deep);
+	background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+	border-color: var(--gold-bright);
+	text-shadow: none;
+}
+
+.rite-cta--primary:hover,
+.rite-cta--primary:focus-visible {
+	background: linear-gradient(180deg, #f3dca0, var(--gold-bright));
 }
 
 body {

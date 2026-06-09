@@ -64,6 +64,19 @@ describe('Onboarding — title screen + first-run tour (S7)', () => {
 		expect(onDone).toHaveBeenCalledOnce();
 	});
 
+	it('drops Skip on the last step — only "Take up the runes."', async () => {
+		const screen = render(Onboarding, { onDone: vi.fn() });
+		await screen.getByRole('button', { name: 'How the rite works' }).click();
+		for (let i = 0; i < 4; i++) await screen.getByRole('button', { name: 'Next' }).click();
+		await expect
+			.element(screen.getByRole('button', { name: 'Take up the runes.' }))
+			.toBeInTheDocument();
+		expect(screen.container.querySelector('button')?.textContent).not.toContain('Skip');
+		expect(
+			[...screen.container.querySelectorAll('button')].map((b) => b.textContent?.trim())
+		).not.toContain('Skip');
+	});
+
 	it('skips cleanly mid-tour', async () => {
 		const onDone = vi.fn();
 		const screen = render(Onboarding, { onDone });

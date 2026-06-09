@@ -159,7 +159,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [I] Engine fact vs LLM inference cleanly separated: a verdict is the ENGINE's (`owner: Engine, kind: deterministic`), never the actor's; a human Ask splits into her `input`, the Oracle's `llm` reading, and the engine's `deterministic` verdict
 - [x] [I] A floored Sköll move is `kind: deterministic` + `level: warn` (not a message string)
 - [x] [U] Per-session event stream: seq, bounded trim, session isolation; lifecycle-linked — reset on a new round (reseeded with the new secret) **and** evicted with the session
-- [x] [U][I] `DEBUG_LOG` verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev / off in prod; filtered server-side (`/api/debug` + page load)
+- [x] [U][I] `DEBUG_LOG` verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev / demo on deploy (the public `/debug` view is the demo); filtered server-side (`/api/debug` + page load)
 - [x] [I][U] Raw Gemini I/O captured (verbose) as a sensitive event, **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe snapshot so neither the API nor the load 500s
 - [x] [I] Sköll's move event shows the cross-offs made **this** turn (the delta), consistent with the pre-move reasoning
 - [x] [C] Cards coloured by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine), badged by **kind** (`input` / `llm` / `deterministic`; Sköll's gemini move = llm, floor = deterministic), chipped by **part** (Ask / Cast / React / Round)
@@ -176,7 +176,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C] Sköll's transient stall line is **not** persisted — storage keeps the last good line so a reload (which re-drives his move) resumes a coherent view, not a dead end
 - [x] [C] Storage-read failure (private mode) degrades to no restore — board renders, play stays live
 - [x] [E] Cross a rune + earn a voiced line, then a real reload restores both over the resumed round; the crossing rides through the board reshuffle (keyed by rune id)
-- [ ] [I] Automated cross-check that the restored marks + line agree with the **debug log** for the same round _(→ v2: the debug log is env-gated off in prod and runs as a separate unlinked stream; v1 proves view ↔ round agreement, the log ↔ view cross-check is a manual demo observation until then)_
+- [ ] [I] Automated cross-check that the restored marks + line agree with the **debug log** for the same round _(→ v2: the debug log runs as a separate unlinked stream; v1 proves view ↔ round agreement, the log ↔ view cross-check is a manual demo observation until then)_
 
 ## 11. Voice / copy conformance (lint + eval, not coverage-gated)
 
@@ -212,7 +212,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] Turn-accounting-on-refusal covered for **every** refusal class (§2)
 - [x] Crossed-rune cast legality covered (§1)
 - [x] Cast sacredness: reactions never offered on a Cast (§5)
-- [ ] Degradation **fairness** (solvable), not just renders (§8)
+- [x] Degradation **fairness** (solvable), not just renders (§8) _(covered by the in-CI solvability/fairness property test — §8 "Fairness invariant" + the round-solvability gate; v1 is Plain-tier, so "all mood off" is the only state)_
 - [x] Secret never present in Sköll's payload (§3)
 
 ## Build-order alignment

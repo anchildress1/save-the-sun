@@ -104,6 +104,20 @@ describe('Save the Sun page', () => {
 		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
 	});
 
+	it('reopens the title splash from the header wordmark, without resetting the round', async () => {
+		const spy = stubFetch(async () => new Response('{}'));
+		const screen = render(Page, pageProps);
+		// Onboarded player opens on the board, no overlay.
+		expect(screen.container.querySelector('[data-testid="onboarding"]')).toBeNull();
+		await screen.getByRole('button', { name: /save the sun — return to the title/i }).click();
+		// The title splash is back; "Light the fire." drops them into the same round (no new-game call).
+		await expect.element(screen.getByTestId('onboarding')).toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: 'Light the fire.' }))
+			.toBeInTheDocument();
+		expect(spy).not.toHaveBeenCalledWith('/api/new-game', expect.anything());
+	});
+
 	it('carries a meta Gemini-AI note, keyboard-reachable and crediting Gemini', async () => {
 		const { container } = render(Page, pageProps);
 		const btn = container.querySelector('button.ai-note-btn')!;
@@ -780,5 +794,126 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('');
 		expect(screen.container.querySelectorAll('.rune-card')).toHaveLength(24);
+	});
+});
+
+// S9: the end-screen rite takes over when the round resolves — the victory/defeat sequence and the
+// replay/leave CTAs. These prove it shows on the right outcome, owns the single replay surface, and
+// drives newGame / back-to-title.
+describe('Save the Sun page — end screen + replay (S9)', () => {
+	beforeEach(() => {
+		localStorage.setItem(ONBOARDED_KEY, '1'); // past the title; the end screen is the subject here
+		respond({}); // onMount fires advanceSkoll on active-round renders — keep it a harmless no-op
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+		localStorage.clear();
+	});
+
+	it('shows no end screen while the round is still live', async () => {
+		const screen = render(Page, pageProps);
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
+		expect(screen.container.querySelector('[data-testid="end-screen"]')).toBeNull();
+	});
+
+	it('opens the victory rite on a resumed human win — Sól speaks, and it owns the only replay', async () => {
+		const screen = render(Page, propsWith(HUMAN_WON));
+		const end = screen.getByTestId('end-screen').element();
+		expect(end.getAttribute('data-outcome')).toBe('win');
+		await expect
+			.element(
+				screen.getByText(
+					'The offering is made. The longest day breaks — and the light is yours to keep.'
+				)
+			)
+			.toBeInTheDocument();
+		// The header's own "Begin another night" folds away — the end screen is the single replay surface,
+		// so the name resolves to exactly one button.
+		expect(screen.container.querySelector('[data-testid="show-instructions"]')).toBeNull();
+		await expect
+			.element(screen.getByRole('button', { name: 'Begin another night' }))
+			.toBeInTheDocument();
+		expect(screen.getByTestId('end-replay').element().textContent?.trim()).toBe(
+			'Begin another night'
+		);
+	});
+
+	it('opens the defeat rite on a Sköll win — "Stand against him again"', async () => {
+		const screen = render(Page, propsWith(SKOLL_WON));
+		const end = screen.getByTestId('end-screen').element();
+		expect(end.getAttribute('data-outcome')).toBe('lose');
+		// The toll also sits in the answer panel behind — scope to the end screen's own lead + coda.
+		expect(end.querySelector('.lead')?.textContent?.trim()).toBe('Sköll takes the sun.');
+		expect(end.querySelector('.coda')?.textContent?.trim()).toBe(
+			'The longest day never breaks. The year falls to dark.'
+		);
+		expect(screen.getByTestId('end-replay').element().textContent?.trim()).toBe(
+			'Stand against him again'
+		);
+	});
+
+	it('raises the end screen the moment a winning cast lands', async () => {
+		castResult({ ok: true, won: true, rune: { name: 'Sowilo' }, turnConsumed: true }, HUMAN_WON);
+		const screen = render(Page, pageProps);
+		expect(screen.container.querySelector('[data-testid="end-screen"]')).toBeNull();
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await screen.getByRole('button', { name: 'Name it' }).click();
+		await expect.element(screen.getByTestId('end-screen')).toBeInTheDocument();
+		await expect
+			.element(screen.getByTestId('end-screen').element())
+			.toHaveAttribute('data-outcome', 'win');
+	});
+
+	it('replays a fresh round from the end screen — calls new-game and dismisses the rite', async () => {
+		const spy = stubFetch(async (url) => {
+			if (url.includes('/api/new-game'))
+				return new Response(
+					JSON.stringify({ boardSeed: 99, roundId: 'next-round', state: HUMAN_TURN })
+				);
+			return new Response('{}');
+		});
+		const screen = render(Page, propsWith(HUMAN_WON));
+		await screen.getByTestId('end-replay').click();
+		await expect
+			.poll(() => screen.container.querySelector('[data-testid="end-screen"]'))
+			.toBeNull();
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
+		expect(spy).toHaveBeenCalledWith('/api/new-game', expect.objectContaining({ method: 'POST' }));
+	});
+
+	it('leaves the fire — resets the round and returns to the title, forgetting the onboarded flag', async () => {
+		stubFetch(async (url) => {
+			if (url.includes('/api/new-game'))
+				return new Response(
+					JSON.stringify({ boardSeed: 99, roundId: 'next-round', state: HUMAN_TURN })
+				);
+			return new Response('{}');
+		});
+		const screen = render(Page, propsWith(HUMAN_WON));
+		await screen.getByTestId('end-leave').click();
+		// Back to the threshold: the title returns and the end screen is gone.
+		await expect.element(screen.getByTestId('onboarding')).toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: 'Light the fire.' }))
+			.toBeInTheDocument();
+		expect(screen.container.querySelector('[data-testid="end-screen"]')).toBeNull();
+		// The flag is cleared so a reload opens the title too, not a mid-round resume.
+		expect(localStorage.getItem(ONBOARDED_KEY)).toBeNull();
+	});
+
+	it('keeps the end screen up when leaving fails — never strands the player on the title', async () => {
+		const error = expectConsole('error');
+		// new-game fails: the round never resets, so leaveFire must not advance to the title.
+		stubFetch(async () => new Response('nope', { status: 500 }));
+		const screen = render(Page, propsWith(HUMAN_WON));
+		await screen.getByTestId('end-leave').click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+		// The end screen stays mounted (round still resolved); no title overlay over a stale round.
+		await expect.element(screen.getByTestId('end-screen')).toBeInTheDocument();
+		expect(screen.container.querySelector('[data-testid="onboarding"]')).toBeNull();
+		expect(error).toHaveBeenCalled();
 	});
 });

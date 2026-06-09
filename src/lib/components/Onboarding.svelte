@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
+	import introSplash from '$lib/assets/banners/intro-splash.jpg';
 
 	// Title screen + first-run coach-mark tour: the tour spotlights the live board region each step
 	// describes, so the how-to lives in the steps rather than as persistent on-board text. `onDone`
@@ -174,27 +175,25 @@
 </script>
 
 {#if phase === 'title'}
-	<div class="backdrop" data-testid="onboarding">
+	<div class="backdrop title-backdrop" data-testid="onboarding">
+		<img class="title-splash" src={introSplash} alt="" aria-hidden="true" decoding="async" />
 		<div
-			class="panel"
+			class="title-card"
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="onboarding-heading"
 			use:trapFocus
 		>
-			<h1 id="onboarding-heading">Save the Sun</h1>
-			<p class="tagline">A race to beat Sköll and save the light.</p>
-			<div class="actions">
-				<button
-					class="primary ritual-button ritual-button--primary"
-					type="button"
-					onclick={() => onDone()}
-				>
+			<div class="title-top">
+				<h1 id="onboarding-heading">Save the Sun</h1>
+				<hr class="title-divider" aria-hidden="true" />
+				<p class="tagline">A race to beat Sköll and save the light.</p>
+			</div>
+			<div class="title-actions">
+				<button class="rite-cta rite-cta--primary" type="button" onclick={() => onDone()}>
 					Light the fire.
 				</button>
-				<button class="ghost ritual-button ritual-button--ghost" type="button" onclick={beginTour}>
-					How the rite works
-				</button>
+				<button class="rite-cta" type="button" onclick={beginTour}> How the rite works </button>
 			</div>
 		</div>
 	</div>
@@ -219,13 +218,15 @@
 		<h2 id="onboarding-heading">{STEPS[step].label}</h2>
 		<p class="step-body" data-testid="step-body">{STEPS[step].body}</p>
 		<div class="actions">
-			<button
-				class="ghost ritual-button ritual-button--ghost"
-				type="button"
-				onclick={() => onDone()}
-			>
-				Skip
-			</button>
+			{#if !isLast}
+				<button
+					class="ghost ritual-button ritual-button--ghost"
+					type="button"
+					onclick={() => onDone()}
+				>
+					Skip
+				</button>
+			{/if}
 			<button class="primary ritual-button ritual-button--primary" type="button" onclick={next}>
 				{isLast ? 'Take up the runes.' : 'Next'}
 			</button>
@@ -245,6 +246,69 @@
 		padding: 2rem;
 		background: rgba(6, 9, 18, 0.78);
 		backdrop-filter: blur(2px);
+	}
+
+	/* The first-run title is its own cinematic splash — the intro art fills the screen behind a
+	   centered scrim so the wordmark + CTAs always read over the busy scene. */
+	.title-backdrop {
+		padding: 0;
+		background: var(--bg-deep);
+		backdrop-filter: none;
+		overflow: hidden;
+	}
+
+	.title-splash {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		object-position: 50% 40%;
+	}
+
+	/* Centred over the art; a local halo keeps the wordmark + CTAs legible over the bright glow — no scrim. */
+	.title-card {
+		position: relative;
+		z-index: 2;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1.1rem;
+		max-width: 42rem;
+		padding: 2.2rem 2.8rem;
+		border-radius: 18px;
+		text-align: center;
+		background: radial-gradient(
+			ellipse 92% 124% at 50% 50%,
+			rgba(6, 9, 18, 0.66) 0%,
+			rgba(6, 9, 18, 0.28) 58%,
+			transparent 82%
+		);
+	}
+
+	.title-top {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.7rem;
+	}
+
+	.title-divider {
+		width: min(22rem, 70%);
+		height: 1.6rem;
+		margin: 0.1rem 0;
+		border: 0;
+		background: var(--ui-divider) center / 100% 100% no-repeat;
+		opacity: 0.9;
+	}
+
+	.title-actions {
+		display: flex;
+		gap: 0.9rem;
+		flex-wrap: wrap;
+		justify-content: center;
+		margin-top: 0.8rem;
 	}
 
 	.catcher {
@@ -273,24 +337,19 @@
 			height 0.25s ease;
 	}
 
-	.panel,
 	.popover {
 		display: flex;
 		flex-direction: column;
 		gap: 0.9rem;
 		padding: 1.6rem 1.8rem;
 		text-align: center;
+		/* Faint sunrise under a warm-dark wash — visible but soft, never harsh, never blue. */
 		background:
-			radial-gradient(circle at 50% 0%, rgba(217, 169, 74, 0.08) 0%, transparent 50%),
-			linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-deep) 100%);
+			linear-gradient(180deg, rgba(18, 14, 10, 0.88) 0%, rgba(28, 18, 8, 0.85) 100%),
+			var(--modal-bg) center / cover no-repeat;
 		border: 1px solid var(--gold-dim);
 		border-radius: 12px;
 		box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
-	}
-
-	.panel {
-		max-width: 32rem;
-		padding: 2rem 2.2rem;
 	}
 
 	.popover {
@@ -309,12 +368,15 @@
 
 	h1 {
 		margin: 0;
-		font-family: var(--font-display);
-		font-size: 2.2rem;
-		font-weight: 600;
-		letter-spacing: 0.06em;
+		font-family: var(--font-story-title);
+		font-size: clamp(2.8rem, 7vw, 4.6rem);
+		font-weight: 400;
+		letter-spacing: 0.03em;
+		line-height: 1.05;
 		color: var(--gold-bright);
-		text-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
+		text-shadow:
+			0 2px 6px rgba(0, 0, 0, 0.7),
+			0 0 34px rgba(217, 169, 74, 0.5);
 	}
 
 	h2 {
@@ -329,8 +391,9 @@
 		margin: 0;
 		font-family: var(--font-story-body);
 		font-style: italic;
-		font-size: 1.05rem;
-		color: var(--ink-muted);
+		font-size: clamp(1.05rem, 2.2vw, 1.3rem);
+		color: var(--ink);
+		text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
 	}
 
 	.step-count {

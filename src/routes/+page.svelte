@@ -3,6 +3,7 @@
 	import RuneGrid from '$lib/components/RuneGrid.svelte';
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 	import Onboarding from '$lib/components/Onboarding.svelte';
+	import EndScreen from '$lib/components/EndScreen.svelte';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets/ui/app-icon.png';
@@ -86,6 +87,10 @@
 	let humanWon = $derived(roundOver && winner === 'Human');
 	let skollWon = $derived(roundOver && winner === 'Sköll');
 	let outcomeLine = $derived(humanWon ? RITE.sunCrests : RITE.skollTakes);
+	// The end-screen rite takes over the moment the round resolves (S9). It owns the replay surface, so
+	// the header's own controls fold away while it is up — one "Begin another night" on screen, not two.
+	let showEndScreen = $derived(roundOver);
+	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
 	let nightProgress = $derived(
 		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
 	);
@@ -294,6 +299,14 @@
 		showOnboarding = true;
 	}
 
+	// The wordmark is the way back to the intro splash. Non-destructive: it only raises the title over
+	// the live round (the engine state is untouched), so "Light the fire." drops the player back into the
+	// same round they left.
+	function returnToTitle() {
+		onboardingStart = 'title';
+		showOnboarding = true;
+	}
+
 	async function submitAsk() {
 		const question = askValue.trim();
 		if (question === '') {
@@ -389,7 +402,8 @@
 		crossings = ids;
 	}
 
-	async function newGame() {
+	// Returns whether the reset landed, so callers (leaveFire) don't advance the view on a failed reset.
+	async function newGame(): Promise<boolean> {
 		pending = true;
 		let res: Response | undefined;
 		try {
@@ -424,11 +438,29 @@
 			heldHex = true;
 			applyState(state);
 			cancelCast();
+			return true;
 		} catch (err) {
 			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
 			answer = RITE.oracleSilent;
+			return false;
 		} finally {
 			pending = false;
+		}
+	}
+
+	// "Leave the fire." — step back from the closing rite to the threshold. A fresh round is prepared
+	// behind the title (so the resolved one is discarded, not re-entered), then the title screen returns;
+	// the onboarded flag is cleared so the rite opens as a fresh arrival, not a mid-round resume.
+	// Guarded on the reset: a failed newGame() leaves the end screen up with its in-world error line,
+	// rather than stranding the player on the title over a round the server never reset.
+	async function leaveFire() {
+		if (!(await newGame())) return;
+		onboardingStart = 'title';
+		showOnboarding = true;
+		try {
+			localStorage.removeItem(ONBOARDED_KEY);
+		} catch {
+			/* storage unavailable — non-fatal */
 		}
 	}
 
@@ -476,7 +508,16 @@
 		<div class="title-block">
 			<img class="app-sigil" src={appIcon} alt="" aria-hidden="true" decoding="async" />
 			<div>
-				<h1>Save the Sun</h1>
+				<h1>
+					<button
+						class="title-home"
+						type="button"
+						onclick={returnToTitle}
+						aria-label="Save the Sun — return to the title"
+					>
+						Save the Sun
+					</button>
+				</h1>
 				<p class="tagline">A race to beat Sköll and save the light.</p>
 			</div>
 		</div>
@@ -514,24 +555,26 @@
 			</p>
 		</div>
 
-		<div class="header-controls">
-			<button
-				class="ghost ritual-button ritual-button--ghost"
-				type="button"
-				data-testid="show-instructions"
-				onclick={showInstructions}
-			>
-				How the rite works
-			</button>
-			<button
-				class="ghost new-game ritual-button ritual-button--ghost"
-				type="button"
-				onclick={newGame}
-				disabled={pending}
-			>
-				Begin another night
-			</button>
-		</div>
+		{#if !showEndScreen}
+			<div class="header-controls">
+				<button
+					class="ghost ritual-button ritual-button--ghost"
+					type="button"
+					data-testid="show-instructions"
+					onclick={showInstructions}
+				>
+					How the rite works
+				</button>
+				<button
+					class="ghost new-game ritual-button ritual-button--ghost"
+					type="button"
+					onclick={newGame}
+					disabled={pending}
+				>
+					Begin another night
+				</button>
+			</div>
+		{/if}
 	</header>
 
 	<div class="game-layout">
@@ -686,6 +729,10 @@
 	</div>
 </main>
 
+{#if showEndScreen}
+	<EndScreen outcome={endOutcome} onReplay={newGame} onLeave={leaveFire} />
+{/if}
+
 {#if showOnboarding}
 	<Onboarding onDone={finishOnboarding} start={onboardingStart} />
 {/if}
@@ -786,12 +833,37 @@
 
 	h1 {
 		margin: 0;
-		font-family: var(--font-display);
-		font-size: 1.8rem;
-		font-weight: 600;
-		letter-spacing: 0.06em;
+		font-family: var(--font-story-title);
+		font-size: 2rem;
+		font-weight: 400;
+		letter-spacing: 0.04em;
 		color: var(--gold-bright);
 		text-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
+	}
+
+	/* The wordmark doubles as the home affordance — back to the intro splash. Inherits the h1 look so it
+	   reads as the title, not a button. */
+	.title-home {
+		font: inherit;
+		letter-spacing: inherit;
+		color: inherit;
+		text-shadow: inherit;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		background: none;
+		cursor: pointer;
+		transition: color 0.2s ease;
+	}
+
+	.title-home:hover {
+		color: var(--gold);
+	}
+
+	.title-home:focus-visible {
+		outline: none;
+		border-radius: 4px;
+		box-shadow: var(--focus-ring);
 	}
 
 	.tagline {
@@ -1198,9 +1270,9 @@
 
 		.notice-title {
 			margin: 0;
-			font-family: var(--font-display);
-			font-size: 2rem;
-			letter-spacing: 0.06em;
+			font-family: var(--font-story-title);
+			font-size: 2.4rem;
+			letter-spacing: 0.04em;
 			color: var(--gold-bright);
 			text-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
 		}
