@@ -299,6 +299,14 @@
 		showOnboarding = true;
 	}
 
+	// The wordmark is the way back to the intro splash. Non-destructive: it only raises the title over
+	// the live round (the engine state is untouched), so "Light the fire." drops the player back into the
+	// same round they left.
+	function returnToTitle() {
+		onboardingStart = 'title';
+		showOnboarding = true;
+	}
+
 	async function submitAsk() {
 		const question = askValue.trim();
 		if (question === '') {
@@ -495,7 +503,16 @@
 		<div class="title-block">
 			<img class="app-sigil" src={appIcon} alt="" aria-hidden="true" decoding="async" />
 			<div>
-				<h1>Save the Sun</h1>
+				<h1>
+					<button
+						class="title-home"
+						type="button"
+						onclick={returnToTitle}
+						aria-label="Save the Sun — return to the title"
+					>
+						Save the Sun
+					</button>
+				</h1>
 				<p class="tagline">A race to beat Sköll and save the light.</p>
 			</div>
 		</div>
@@ -817,6 +834,31 @@
 		letter-spacing: 0.04em;
 		color: var(--gold-bright);
 		text-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
+	}
+
+	/* The wordmark doubles as the home affordance — back to the intro splash. Inherits the h1 look so it
+	   reads as the title, not a button. */
+	.title-home {
+		font: inherit;
+		letter-spacing: inherit;
+		color: inherit;
+		text-shadow: inherit;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		background: none;
+		cursor: pointer;
+		transition: color 0.2s ease;
+	}
+
+	.title-home:hover {
+		color: var(--gold);
+	}
+
+	.title-home:focus-visible {
+		outline: none;
+		border-radius: 4px;
+		box-shadow: var(--focus-ring);
 	}
 
 	.tagline {

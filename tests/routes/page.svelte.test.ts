@@ -104,6 +104,20 @@ describe('Save the Sun page', () => {
 		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
 	});
 
+	it('reopens the title splash from the header wordmark, without resetting the round', async () => {
+		const spy = stubFetch(async () => new Response('{}'));
+		const screen = render(Page, pageProps);
+		// Onboarded player opens on the board, no overlay.
+		expect(screen.container.querySelector('[data-testid="onboarding"]')).toBeNull();
+		await screen.getByRole('button', { name: /save the sun — return to the title/i }).click();
+		// The title splash is back; "Light the fire." drops them into the same round (no new-game call).
+		await expect.element(screen.getByTestId('onboarding')).toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: 'Light the fire.' }))
+			.toBeInTheDocument();
+		expect(spy).not.toHaveBeenCalledWith('/api/new-game', expect.anything());
+	});
+
 	it('carries a meta Gemini-AI note, keyboard-reachable and crediting Gemini', async () => {
 		const { container } = render(Page, pageProps);
 		const btn = container.querySelector('button.ai-note-btn')!;

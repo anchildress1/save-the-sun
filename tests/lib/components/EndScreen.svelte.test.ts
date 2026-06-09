@@ -113,30 +113,35 @@ describe('EndScreen — accessibility & voice', () => {
 		expect(labelEl?.textContent?.trim()).toBe('The rune is true.');
 	});
 
-	it('moves focus onto the primary CTA on open', async () => {
+	it('opens focus on the primary CTA, not the wordmark that precedes it', async () => {
 		render(EndScreen, { outcome: 'win', onReplay: vi.fn(), onLeave: vi.fn() });
-		await expect
-			.poll(() => document.activeElement?.textContent?.trim())
-			.toBe('Begin another night');
+		await expect.poll(() => document.activeElement?.getAttribute('data-testid')).toBe('end-replay');
 	});
 
-	it('traps Tab inside the dialog — wraps at both ends', async () => {
-		render(EndScreen, { outcome: 'lose', onReplay: vi.fn(), onLeave: vi.fn() });
-		await expect
-			.poll(() => document.activeElement?.textContent?.trim())
-			.toBe('Stand against him again');
-		// Shift+Tab off the first focusable wraps to the last.
-		document.activeElement?.dispatchEvent(
+	it('traps Tab inside the dialog — wraps across wordmark + both CTAs', async () => {
+		const screen = render(EndScreen, { outcome: 'lose', onReplay: vi.fn(), onLeave: vi.fn() });
+		await expect.poll(() => document.activeElement?.getAttribute('data-testid')).toBe('end-replay');
+		const wordmark = screen.getByTestId('end-wordmark').element() as HTMLElement;
+		const leave = screen.getByTestId('end-leave').element() as HTMLElement;
+		// Shift+Tab off the first focusable (the wordmark) wraps to the last (Leave the fire).
+		wordmark.focus();
+		wordmark.dispatchEvent(
 			new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true })
 		);
-		await expect.poll(() => document.activeElement?.textContent?.trim()).toBe('Leave the fire.');
+		await expect.poll(() => document.activeElement?.getAttribute('data-testid')).toBe('end-leave');
 		// Tab off the last wraps back to the first.
-		document.activeElement?.dispatchEvent(
-			new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })
-		);
+		leave.focus();
+		leave.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
 		await expect
-			.poll(() => document.activeElement?.textContent?.trim())
-			.toBe('Stand against him again');
+			.poll(() => document.activeElement?.getAttribute('data-testid'))
+			.toBe('end-wordmark');
+	});
+
+	it('returns to the title from the wordmark — fires onLeave', async () => {
+		const onLeave = vi.fn();
+		const screen = render(EndScreen, { outcome: 'win', onReplay: vi.fn(), onLeave });
+		await screen.getByTestId('end-wordmark').click();
+		expect(onLeave).toHaveBeenCalledOnce();
 	});
 
 	it('carries no arcade tone or exclamation at the heaviest beat', async () => {

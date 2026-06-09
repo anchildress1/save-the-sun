@@ -57,7 +57,9 @@
 	function trapFocus(node: HTMLElement) {
 		const focusable = () =>
 			Array.from(node.querySelectorAll<HTMLElement>('button:not([disabled])'));
-		focusable()[0]?.focus();
+		// Open focus on the primary action, not the wordmark (which is first in DOM order); the wordmark
+		// stays in the Tab cycle as the way back to the title.
+		(node.querySelector<HTMLElement>('[data-testid="end-replay"]') ?? focusable()[0])?.focus();
 
 		function onKeydown(e: KeyboardEvent) {
 			if (e.key !== 'Tab') return;
@@ -93,13 +95,19 @@
 	<img class="splash" src={scene.splash} alt="" aria-hidden="true" decoding="async" />
 	<div class="scrim" aria-hidden="true"></div>
 
-	<div class="wordmark">
+	<button
+		class="wordmark"
+		type="button"
+		data-testid="end-wordmark"
+		onclick={onLeave}
+		aria-label="Save the Sun — leave the fire and return to the title"
+	>
 		<img class="wordmark-sigil" src={appIcon} alt="" aria-hidden="true" decoding="async" />
-		<div>
-			<p class="wordmark-title">Save the Sun</p>
-			<p class="wordmark-sub">A race to beat Sköll and save the light.</p>
-		</div>
-	</div>
+		<span class="wordmark-text">
+			<span class="wordmark-title">Save the Sun</span>
+			<span class="wordmark-sub">A race to beat Sköll and save the light.</span>
+		</span>
+	</button>
 
 	<div class="rite">
 		<p class="line lead" id="end-screen-lead" style="--i:0">{scene.lead}</p>
@@ -182,13 +190,35 @@
 		);
 	}
 
-	/* Small persistent wordmark across every screen (POC). */
+	/* Small persistent wordmark across every screen (POC) — also the way back to the title. */
 	.wordmark {
 		position: relative;
 		z-index: 2;
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		margin: 0;
+		padding: 0.3rem 0.4rem;
+		border: 0;
+		border-radius: 6px;
+		background: none;
+		cursor: pointer;
+	}
+
+	.wordmark-text {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.wordmark:hover .wordmark-title,
+	.wordmark:focus-visible .wordmark-title {
+		color: #fff3cf;
+	}
+
+	.wordmark:focus-visible {
+		outline: none;
+		box-shadow: var(--focus-ring);
 	}
 
 	.wordmark-sigil {
