@@ -483,7 +483,7 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('You hold your hand. Let him have his answer.');
 	});
 
-	it('announces the Hex in Sköll box, leaves the Oracle silent', async () => {
+	it('voices the Hex in the Oracle text when Sköll silences the human Ask', async () => {
 		gameStub({
 			// No oracle line — the question was silenced before any answer; then his own Advance move.
 			ask: { type: 'Ask', skollVsYou: { reaction: 'Hex' }, state: SKOLL_TURN },
@@ -491,24 +491,24 @@ describe('Save the Sun page', () => {
 		});
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		// His own box names the skill he played; the Oracle has nothing to speak.
+		// The Oracle text names Sköll in the rite's voice — NOT his first-person gloat.
 		await expect
-			.element(screen.getByTestId('skoll-skill'))
-			.toHaveTextContent('Sköll Hexes your question. It dies unanswered.');
-		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Sköll closes the Oracle’s lips. Your question dies unanswered.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain('My doing');
 	});
 
-	it('announces the Scry in Sköll box and still speaks the answer in the Oracle', async () => {
+	it('voices the Scry after the answer in the Oracle text when Sköll overhears', async () => {
 		gameStub({
 			ask: defaultAsk({ reaction: 'Scry' }),
 			advance: advanceCast()
 		});
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		await expect.element(screen.getByTestId('skoll-skill')).toHaveTextContent('Sköll Scries');
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
+		// The answer he overheard, then the Scry noted in the same Oracle text.
+		const text = () => screen.getByTestId('answer').element().textContent ?? '';
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('Sköll listened');
+		expect(text()).toContain('No. Sól is not reaching for a fire rune.');
 	});
 
 	it('falls to defeat when Sköll casts true on his Advance turn', async () => {

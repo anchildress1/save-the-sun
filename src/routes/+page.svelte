@@ -32,9 +32,10 @@
 		wolfStalled: 'The wolf stalls in the dark. Rouse him to move.',
 		hexHim: "You close the Oracle's lips. His question dies unanswered — his turn with it.",
 		passHim: 'You hold your hand. Let him have his answer.',
-		// His skill plays, announced in his own box (third person, templated — no first-person gloat).
-		skollHexes: 'Sköll Hexes your question. It dies unanswered.',
-		skollScries: 'Sköll Scries your question — he hears the answer too.',
+		// Sköll's skill plays, voiced in the Oracle's text (rite voice, third person — never his gloat).
+		// Hex replaces the answer (the question died); the Scry note trails the answer he overheard.
+		skollHexes: 'Sköll closes the Oracle’s lips. Your question dies unanswered.',
+		skollScried: 'Sköll listened at the threshold — the answer is his too.',
 		sunCrests: 'Sól crests the rim of the world.',
 		skollTakesSun: 'Sköll takes the sun. The longest day never breaks. The year falls to dark.',
 		skollTakes: 'Sköll takes the sun.',
@@ -62,9 +63,6 @@
 	// from the load (the window lives server-side). The engine stays authoritative, so they can't over-grant.
 	let skollEcho = $state(untrack(() => data.pendingReaction?.echo ?? ''));
 	let skollAsking = $state(untrack(() => data.pendingReaction != null));
-	// The skill he last played against your Ask (Hex/Scry). Its own slot so his follow-up move (which
-	// overwrites skollEcho) can't clobber it; cleared when you Ask again or start a new round.
-	let skollSkillLine = $state('');
 	let heldScry = $state(untrack(() => data.pendingReaction?.held.Scry ?? true));
 	let heldHex = $state(untrack(() => data.pendingReaction?.held.Hex ?? true));
 	// His turn stalled (an Advance request failed); it's still his turn server-side, so the controls
@@ -217,7 +215,6 @@
 			return;
 		}
 		pending = true;
-		skollSkillLine = ''; // a fresh Ask clears the wolf's last skill play
 		try {
 			const { oracle, state, skollVsYou } = await dispatch({
 				type: 'Ask',
@@ -226,14 +223,12 @@
 			});
 			applyState(state);
 			if (skollVsYou?.reaction === 'Hex') {
-				// His box names the Hex; the Oracle has nothing to speak — the question died.
-				skollSkillLine = RITE.skollHexes;
-				answer = '';
+				// The Oracle text names the Hex — the question died, so it replaces the answer.
+				answer = RITE.skollHexes;
 				askValue = '';
-			} else if (skollVsYou?.reaction === 'Scry') {
-				// His box names the Scry; the Oracle still speaks your answer (he overheard it).
-				skollSkillLine = RITE.skollScries;
-				answer = oracle?.ok ? oracle.answer : RITE.oracleSilent;
+			} else if (skollVsYou?.reaction === 'Scry' && oracle?.ok) {
+				// The Oracle still speaks your answer (he overheard it), with his Scry noted after it.
+				answer = `${oracle.answer} ${RITE.skollScried}`;
 				askValue = '';
 			} else if (oracle?.ok) {
 				answer = oracle.answer;
@@ -319,7 +314,6 @@
 			answer = '';
 			askValue = '';
 			skollEcho = '';
-			skollSkillLine = '';
 			skollAsking = false;
 			heldScry = true;
 			heldHex = true;
@@ -485,12 +479,9 @@
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
-			<!-- His templated Ask and any skill he played against your Ask; blank when he's done neither. -->
+			<!-- Always present; carries ONLY his templated question when he Asks, blank otherwise. -->
 			<div class="skoll-frame" data-testid="skoll-frame">
 				<h2 class="skoll-title">Sköll</h2>
-				{#if skollSkillLine}
-					<p class="skoll-skill" data-testid="skoll-skill">{skollSkillLine}</p>
-				{/if}
 				{#if skollEcho}
 					<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
 				{/if}
@@ -801,21 +792,6 @@
 		font-family: var(--font-display);
 		font-size: 0.88rem;
 		color: var(--ink);
-	}
-
-	/* The skill he played — set apart from his Ask: smaller, steel-tinted, with a faint divider. */
-	.skoll-skill {
-		margin: 0;
-		padding-block-end: 0.3rem;
-		border-block-end: 1px solid rgba(139, 147, 166, 0.22);
-		font-family: var(--font-display);
-		font-size: 0.8rem;
-		font-style: italic;
-		color: #aab2c4;
-	}
-	.skoll-skill:only-of-type {
-		border-block-end: none;
-		padding-block-end: 0;
 	}
 
 	.reactions {
