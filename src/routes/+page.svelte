@@ -624,6 +624,7 @@
 					id="oracle-ask"
 					type="text"
 					placeholder="Type your question…"
+					autocomplete="off"
 					bind:value={askValue}
 					disabled={castMode || pending || !canAct}
 				/>
@@ -1027,6 +1028,25 @@
 		outline: none;
 		border-color: var(--gold-bright);
 		box-shadow: 0 0 0 2px rgba(217, 169, 74, 0.2);
+	}
+
+	/* Chrome paints a light background over an autofilled/history-matched field, breaking the dark
+	   panel. The inset box-shadow overpaints it, the text-fill-color keeps the ink legible, and the
+	   absurd transition delay defeats the autofill colour flash. */
+	.ask input:-webkit-autofill,
+	.ask input:-webkit-autofill:hover,
+	.ask input:-webkit-autofill:active {
+		-webkit-text-fill-color: var(--ink);
+		-webkit-box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.35) inset;
+		caret-color: var(--ink);
+		transition: background-color 9999s ease-in-out 0s;
+	}
+
+	.ask input:-webkit-autofill:focus {
+		/* Keep the gold focus ring stacked over the dark overpaint. */
+		-webkit-box-shadow:
+			0 0 0 2px rgba(217, 169, 74, 0.2),
+			0 0 0 1000px rgba(0, 0, 0, 0.35) inset;
 	}
 
 	.cast {

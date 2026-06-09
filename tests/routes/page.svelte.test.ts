@@ -114,6 +114,12 @@ describe('Save the Sun page', () => {
 		expect(note.textContent).toMatch(/AI/);
 	});
 
+	it('turns off browser autofill on the question field so it keeps the dark panel background', async () => {
+		const screen = render(Page, pageProps);
+		const input = screen.getByLabelText(/ask the oracle/i).element();
+		expect(input.getAttribute('autocomplete')).toBe('off');
+	});
+
 	it('refuses an empty Ask without dispatching', async () => {
 		const spy = stubFetch(async () => new Response('{}'));
 		const screen = render(Page, pageProps);
