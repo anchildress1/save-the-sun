@@ -103,15 +103,10 @@
 		<p class="line coda" style="--i:{delays.coda}">{scene.coda}</p>
 
 		<div class="actions" style="--i:{delays.actions}">
-			<button
-				class="rite-cta rite-cta--primary"
-				type="button"
-				data-testid="end-replay"
-				onclick={onReplay}
-			>
+			<button class="btn btn--primary" type="button" data-testid="end-replay" onclick={onReplay}>
 				{scene.replay}
 			</button>
-			<button class="rite-cta" type="button" data-testid="end-leave" onclick={onLeave}>
+			<button class="btn btn--secondary" type="button" data-testid="end-leave" onclick={onLeave}>
 				Leave the fire.
 			</button>
 		</div>
@@ -249,6 +244,13 @@
 		opacity: 0;
 		animation: rise 0.8s ease forwards;
 		animation-delay: calc(var(--i) * 0.7s);
+	}
+
+	/* The closing rite scales the two buttons up — a container concern, not a third button class. */
+	.actions .btn {
+		min-width: 12rem;
+		padding: 0.85rem 1.5rem;
+		font-size: 0.9rem;
 	}
 
 	@keyframes rise {

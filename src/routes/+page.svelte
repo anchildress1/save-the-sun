@@ -558,7 +558,7 @@
 		{#if !showEndScreen}
 			<div class="header-controls">
 				<button
-					class="ghost ritual-button ritual-button--ghost"
+					class="btn btn--secondary"
 					type="button"
 					data-testid="show-instructions"
 					onclick={showInstructions}
@@ -566,7 +566,7 @@
 					How the rite works
 				</button>
 				<button
-					class="ghost new-game ritual-button ritual-button--ghost"
+					class="btn btn--secondary new-game"
 					type="button"
 					onclick={newGame}
 					disabled={pending}
@@ -647,18 +647,14 @@
 				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
 			{:else}
 				<div class="reactions" data-coach="reactions">
-					<button class="ritual-button ritual-button--ghost reaction-btn" type="button" disabled>
-						Scry
-					</button>
-					<button class="ritual-button ritual-button--ghost reaction-btn" type="button" disabled>
-						Hex
-					</button>
+					<button class="btn btn--secondary reaction-btn" type="button" disabled> Scry </button>
+					<button class="btn btn--secondary reaction-btn" type="button" disabled> Hex </button>
 				</div>
 			{/if}
 
 			{#if skollStalled}
 				<button
-					class="rouse-wolf ritual-button ritual-button--ghost"
+					class="btn btn--secondary rouse-wolf"
 					type="button"
 					data-testid="rouse-wolf"
 					onclick={advanceSkoll}
@@ -687,11 +683,7 @@
 					bind:value={askValue}
 					disabled={castMode || pending || !canAct}
 				/>
-				<button
-					class="ritual-button ritual-button--primary"
-					type="submit"
-					disabled={castMode || pending || !canAct}
-				>
+				<button class="btn btn--primary" type="submit" disabled={castMode || pending || !canAct}>
 					Ask the Oracle
 				</button>
 			</form>
@@ -703,20 +695,18 @@
 					</p>
 					<div class="cast-actions">
 						<button
-							class="ritual-button ritual-button--primary"
+							class="btn btn--primary"
 							type="button"
 							onclick={commitCast}
 							disabled={!selectedRune || pending}
 						>
 							Name it
 						</button>
-						<button class="ritual-button ritual-button--ghost" type="button" onclick={cancelCast}>
-							Not yet
-						</button>
+						<button class="btn btn--secondary" type="button" onclick={cancelCast}> Not yet </button>
 					</div>
 				{:else}
 					<button
-						class="cast-arm ritual-button ritual-button--primary"
+						class="btn btn--primary cast-arm"
 						type="button"
 						onclick={armCast}
 						disabled={pending || !canAct}

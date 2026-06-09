@@ -21,28 +21,12 @@
 >
 	<div class="choices">
 		{#if held.Scry}
-			<button
-				class="ritual-button ritual-button--primary"
-				type="button"
-				onclick={() => onReact('Scry')}
-			>
-				Scry
-			</button>
+			<button class="btn btn--primary" type="button" onclick={() => onReact('Scry')}> Scry </button>
 		{/if}
 		{#if held.Hex}
-			<button
-				class="ritual-button ritual-button--primary"
-				type="button"
-				onclick={() => onReact('Hex')}
-			>
-				Hex
-			</button>
+			<button class="btn btn--primary" type="button" onclick={() => onReact('Hex')}> Hex </button>
 		{/if}
-		<button
-			class="ritual-button ritual-button--ghost"
-			type="button"
-			onclick={() => onReact('Pass')}
-		>
+		<button class="btn btn--secondary" type="button" onclick={() => onReact('Pass')}>
 			Let it pass
 		</button>
 	</div>

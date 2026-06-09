@@ -190,10 +190,12 @@
 				<p class="tagline">A race to beat Sköll and save the light.</p>
 			</div>
 			<div class="title-actions">
-				<button class="rite-cta rite-cta--primary" type="button" onclick={() => onDone()}>
+				<button class="btn btn--primary" type="button" onclick={() => onDone()}>
 					Light the fire.
 				</button>
-				<button class="rite-cta" type="button" onclick={beginTour}> How the rite works </button>
+				<button class="btn btn--secondary" type="button" onclick={beginTour}>
+					How the rite works
+				</button>
 			</div>
 		</div>
 	</div>
@@ -219,15 +221,9 @@
 		<p class="step-body" data-testid="step-body">{STEPS[step].body}</p>
 		<div class="actions">
 			{#if !isLast}
-				<button
-					class="ghost ritual-button ritual-button--ghost"
-					type="button"
-					onclick={() => onDone()}
-				>
-					Skip
-				</button>
+				<button class="btn btn--secondary" type="button" onclick={() => onDone()}> Skip </button>
 			{/if}
-			<button class="primary ritual-button ritual-button--primary" type="button" onclick={next}>
+			<button class="btn btn--primary" type="button" onclick={next}>
 				{isLast ? 'Take up the runes.' : 'Next'}
 			</button>
 		</div>
@@ -419,15 +415,16 @@
 		margin-top: 0.4rem;
 	}
 
-	button.primary,
-	button.ghost {
-		min-height: 3rem;
-		padding: 0.72rem 1.05rem;
-		font-size: 0.8rem;
+	/* The title splash scales its two buttons up for the opening beat; the tour nav keeps them compact —
+	   both container concerns, not new button classes. Focus styling is the shared `.btn` rule (theme.css). */
+	.title-actions .btn {
+		min-width: 12rem;
+		padding: 0.85rem 1.5rem;
+		font-size: 0.9rem;
 	}
 
-	button:focus-visible {
-		outline: 2px solid var(--gold-bright);
-		outline-offset: 2px;
+	.actions .btn {
+		min-height: 3rem;
+		padding: 0.72rem 1.05rem;
 	}
 </style>

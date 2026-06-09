@@ -58,15 +58,19 @@
 	--modal-bg: url('../assets/banners/modal-background.jpg');
 }
 
-.ritual-button {
+/* The app's two — and only two — buttons. Both read on a bright dawn splash AND a dark panel:
+   `--primary` is dark ink on solid gold (≈12:1 on any backdrop); `--secondary` carries its own
+   near-opaque dark surface, so its gold text/border stay legible over light art too. Cinzel,
+   uppercase, one size. Splash surfaces scale them up via their own container, not a third class. */
+.btn {
 	min-height: 2.9rem;
-	padding: 0.68rem 1rem;
+	padding: 0.68rem 1.15rem;
 	font-family: var(--font-display);
 	font-size: 0.82rem;
 	letter-spacing: 0.11em;
 	text-transform: uppercase;
+	border: 1px solid transparent;
 	border-radius: 6px;
-	text-shadow: 0 1px 1px rgba(0, 0, 0, 0.82);
 	cursor: pointer;
 	transition:
 		background 0.2s ease,
@@ -76,94 +80,51 @@
 		transform 0.1s ease;
 }
 
-.ritual-button--primary {
-	color: #f3e8cf;
-	background:
-		linear-gradient(180deg, rgba(90, 72, 42, 0.62), rgba(26, 28, 31, 0.86)), rgba(13, 16, 24, 0.86);
-	border: 1px solid rgba(217, 169, 74, 0.5);
-	box-shadow:
-		inset 0 0 0 1px rgba(255, 238, 188, 0.08),
-		0 0 14px rgba(217, 169, 74, 0.12);
-}
-
-.ritual-button--ghost {
-	color: #d9ccb0;
-	background:
-		linear-gradient(180deg, rgba(34, 39, 50, 0.62), rgba(10, 13, 22, 0.78)), rgba(6, 9, 18, 0.76);
-	border: 1px solid rgba(217, 169, 74, 0.26);
-	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035);
-}
-
-.ritual-button:hover:not(:disabled) {
-	border-color: rgba(233, 200, 119, 0.72);
-	box-shadow:
-		inset 0 0 0 1px rgba(255, 238, 188, 0.1),
-		0 0 16px rgba(217, 169, 74, 0.16);
-	transform: translateY(-1px);
-}
-
-.ritual-button:focus-visible {
-	outline: none;
-	border-color: var(--gold-bright);
-	box-shadow: var(--focus-ring);
-}
-
-.ritual-button:disabled {
-	cursor: not-allowed;
-	color: var(--ink-muted);
-	border-color: var(--gold-faint);
-	box-shadow: none;
-	transform: none;
-	filter: saturate(0.55);
-}
-
-/* Splash-surface CTA — the POC's gold-bordered serif button (title screen + end screens). Distinct from
-   the uppercase Cinzel chrome buttons: lowercase IM Fell English, larger, for the cinematic rites. */
-.rite-cta {
-	min-width: 13rem;
-	padding: 0.85rem 1.6rem;
-	font-family: var(--font-story-body);
-	font-size: 1.05rem;
-	letter-spacing: 0.02em;
-	color: var(--gold-bright);
-	background: rgba(6, 9, 18, 0.5);
-	border: 1px solid var(--gold-dim);
-	border-radius: 6px;
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-	cursor: pointer;
-	transition:
-		background 0.2s ease,
-		border-color 0.2s ease,
-		box-shadow 0.2s ease,
-		color 0.2s ease;
-}
-
-.rite-cta:hover,
-.rite-cta:focus-visible {
-	border-color: var(--gold-bright);
-	background: rgba(217, 169, 74, 0.12);
-	box-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
-}
-
-.rite-cta:focus-visible {
-	outline: none;
-	box-shadow:
-		var(--focus-ring),
-		0 0 18px rgba(217, 169, 74, 0.3);
-}
-
-/* Dark ink on solid gold — a high-contrast primary (≈12:1), unlike the cream-on-translucent-gold it
-   replaces, which read as low contrast to a static analyzer regardless of the dark art behind it. */
-.rite-cta--primary {
+.btn--primary {
 	color: var(--bg-deep);
 	background: linear-gradient(180deg, var(--gold-bright), var(--gold));
 	border-color: var(--gold-bright);
-	text-shadow: none;
+	box-shadow: 0 0 14px rgba(217, 169, 74, 0.18);
 }
 
-.rite-cta--primary:hover,
-.rite-cta--primary:focus-visible {
+.btn--secondary {
+	color: var(--gold-bright);
+	background: rgba(6, 9, 18, 0.88);
+	border-color: var(--gold-dim);
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.btn:hover:not(:disabled) {
+	transform: translateY(-1px);
+}
+
+.btn--primary:hover:not(:disabled) {
 	background: linear-gradient(180deg, #f3dca0, var(--gold-bright));
+	box-shadow: 0 0 18px rgba(217, 169, 74, 0.32);
+}
+
+.btn--secondary:hover:not(:disabled) {
+	border-color: var(--gold-bright);
+	background: rgba(217, 169, 74, 0.14);
+}
+
+/* Outline + ring together, so the focus indicator stays visible on bright art and dark panel alike. */
+.btn:focus-visible {
+	outline: 2px solid var(--gold-bright);
+	outline-offset: 2px;
+	box-shadow: var(--focus-ring);
+}
+
+.btn:disabled {
+	cursor: not-allowed;
+	transform: none;
+	box-shadow: none;
+	filter: saturate(0.5) brightness(0.92);
+}
+
+.btn--secondary:disabled {
+	color: var(--ink-muted);
+	border-color: var(--gold-faint);
 }
 
 body {
