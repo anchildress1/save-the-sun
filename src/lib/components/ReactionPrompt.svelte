@@ -13,8 +13,12 @@
 	} = $props();
 </script>
 
-<div class="reaction-prompt" role="group" aria-label="Sköll asks. Answer it?">
-	<p class="prompt" data-testid="reaction-prompt">Sköll asks. Answer it?</p>
+<div
+	class="reaction-prompt"
+	role="group"
+	aria-label="Sköll asks. Answer it?"
+	data-testid="reaction-prompt"
+>
 	<div class="choices">
 		{#if held.Scry}
 			<button
@@ -55,13 +59,6 @@
 		border: 1px solid var(--gold-dim);
 		border-radius: 6px;
 		background: var(--surface-inset);
-	}
-
-	.prompt {
-		margin: 0;
-		font-family: var(--font-display);
-		font-size: 0.92rem;
-		color: var(--gold-bright);
 	}
 
 	.choices {

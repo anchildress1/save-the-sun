@@ -241,6 +241,27 @@
 		};
 	});
 
+	let aiNoteHideTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function showAiNote() {
+		clearTimeout(aiNoteHideTimer);
+		if (aiNotePopover && !aiNotePopover.matches(':popover-open')) {
+			positionAiNotePopover();
+			aiNotePopover.showPopover();
+		}
+	}
+
+	function hideAiNote() {
+		clearTimeout(aiNoteHideTimer);
+		if (aiNotePopover?.matches(':popover-open')) aiNotePopover.hidePopover();
+	}
+
+	// Debounced so crossing the gap from the button onto the displaced popover doesn't close it.
+	function scheduleHideAiNote() {
+		clearTimeout(aiNoteHideTimer);
+		aiNoteHideTimer = setTimeout(hideAiNote, 120);
+	}
+
 	function positionAiNotePopover() {
 		if (!aiNoteButton || !aiNotePopover) return;
 		const margin = 16;
@@ -537,11 +558,15 @@
 						class="ai-note-btn"
 						type="button"
 						aria-describedby="ai-note"
-						aria-haspopup="dialog"
-						aria-label="About the AI behind the Oracle and Sköll"
-						popovertarget="ai-note"
+						aria-label="About the Gemini AI behind the Oracle and Sköll"
 						bind:this={aiNoteButton}
-						onclick={positionAiNotePopover}
+						onmouseenter={showAiNote}
+						onmouseleave={scheduleHideAiNote}
+						onfocus={showAiNote}
+						onblur={hideAiNote}
+						onkeydown={(e) => {
+							if (e.key === 'Escape') hideAiNote();
+						}}
 					>
 						i
 					</button>
@@ -549,11 +574,13 @@
 						id="ai-note"
 						role="tooltip"
 						class="ai-note-pop"
-						popover="auto"
+						popover="manual"
 						bind:this={aiNotePopover}
+						onmouseenter={showAiNote}
+						onmouseleave={scheduleHideAiNote}
 					>
-						The Oracle and Sköll are live AI driving answers and rival moves. They can misread,
-						misplay, and make mistakes; the rules and rune data are exact.
+						The Oracle and Sköll are live Gemini AI driving answers and rival moves. They can
+						misread, misplay, and make mistakes; the rules and rune data are exact.
 					</span>
 				</span>
 			</div>
@@ -1065,8 +1092,8 @@
 		display: inline-flex;
 	}
 	.ai-note-btn {
-		inline-size: 1.05rem;
-		block-size: 1.05rem;
+		inline-size: 1.5rem;
+		block-size: 1.5rem;
 		display: inline-grid;
 		place-items: center;
 		padding: 0;
@@ -1075,7 +1102,7 @@
 		background: rgba(6, 9, 18, 0.45);
 		color: var(--ink-muted);
 		font-family: var(--font-body);
-		font-size: 0.68rem;
+		font-size: 0.85rem;
 		font-weight: 700;
 		line-height: 1;
 		text-transform: none;

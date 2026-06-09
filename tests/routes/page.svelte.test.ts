@@ -104,14 +104,25 @@ describe('Save the Sun page', () => {
 		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
 	});
 
-	it('carries a meta AI-fallibility note, keyboard-reachable and naming both AI actors', async () => {
+	it('carries a meta Gemini-AI note, keyboard-reachable and crediting Gemini', async () => {
 		const { container } = render(Page, pageProps);
 		const btn = container.querySelector('button.ai-note-btn')!;
 		expect(btn.getAttribute('aria-describedby')).toBe('ai-note');
 		const note = container.querySelector('#ai-note')!;
 		expect(note.getAttribute('role')).toBe('tooltip');
 		expect(note.textContent).toMatch(/Oracle and Sköll/);
-		expect(note.textContent).toMatch(/AI/);
+		expect(note.textContent).toMatch(/Gemini AI/);
+	});
+
+	it('reveals the note on focus and keeps it hidden at rest — not click-gated', async () => {
+		const screen = render(Page, pageProps);
+		const note = screen.container.querySelector('#ai-note') as HTMLElement;
+		expect(note.matches(':popover-open')).toBe(false);
+		screen
+			.getByRole('button', { name: /about the gemini ai/i })
+			.element()
+			.focus();
+		await vi.waitFor(() => expect(note.matches(':popover-open')).toBe(true));
 	});
 
 	it('turns off browser autofill on the question field so it keeps the dark panel background', async () => {
@@ -416,9 +427,7 @@ describe('Save the Sun page', () => {
 			Page,
 			props(SKOLL_TURN, { echo: 'Sköll asks after a gold rune.', held: { Scry: true, Hex: true } })
 		);
-		await expect
-			.element(screen.getByTestId('reaction-prompt'))
-			.toHaveTextContent('Sköll asks. Answer it?');
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
 		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('a gold rune');
 		// A parked Ask must NOT fire an Advance on mount — the human owes a reaction first.
 		expect(spy).not.toHaveBeenCalled();
@@ -450,9 +459,7 @@ describe('Save the Sun page', () => {
 		await expect
 			.element(screen.getByTestId('skoll-echo'))
 			.toHaveTextContent('Sköll asks after a gold rune.');
-		await expect
-			.element(screen.getByTestId('reaction-prompt'))
-			.toHaveTextContent('Sköll asks. Answer it?');
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
 		await expect.element(screen.getByRole('button', { name: 'Let it pass' })).toBeInTheDocument();
 	});
 

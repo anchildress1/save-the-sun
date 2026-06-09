@@ -199,7 +199,7 @@ test.describe('the live board (past the title screen)', () => {
 		await page.getByLabel(/ask the oracle/i).fill('Is it gold?');
 		await page.getByRole('button', { name: 'Ask the Oracle' }).click();
 
-		await expect(page.getByText('Sköll asks. Answer it?')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Let it pass' })).toBeVisible();
 		await page.getByRole('button', { name: 'Let it pass' }).click({ trial: true });
 		await page.getByRole('button', { name: 'Let it pass' }).click();
 		await expect(page.getByTestId('answer')).toContainText('You hold your hand');

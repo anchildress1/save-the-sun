@@ -97,7 +97,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [I] At most one reaction per interrupt window; Hex leaves no answer for Scry
 - [x] [I] Scry → rival also receives private answer
 - [x] [I] Hex → question dies, no answer to anyone _(kill + no-answer tested in S5; the asker's turn-spend on a hexed Ask lands with S6's hexed-Ask orchestration — the window now precedes the answer, so the Ask is never resolved on a Hex)_
-- [x] [C] Human prompt "Sköll asks. Answer it?" → Scry / Hex / Let it pass per `ux-copy.md`
+- [ ] [C] Human prompt "Sköll asks. Answer it?" → Scry / Hex / Let it pass _(→ v2: the visible prompt heading is cut pending a reaction-UI redesign; v1 shows only the buttons under an SR-only group label)_
 - [x] [I] Sköll's reaction is refereed Gemini response with deterministic-floor fallback _(both directions live: the human reacts to his Ask, and Sköll (Gemini, floor = Pass) reacts to hers — Hex before any answer, Scry as his earned fact)_
 
 ## 6. UI / graphics presentation

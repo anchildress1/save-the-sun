@@ -31,7 +31,7 @@
 	const pretty = (d: unknown) => JSON.stringify(d, null, 2);
 
 	const ownerClass = (e: DebugEvent) => e.owner.toLowerCase().replace('ö', 'o'); // 'Sköll' → 'skoll'
-	const KIND_LABEL = { input: 'input', llm: 'LLM', deterministic: 'deterministic' } as const;
+	const KIND_LABEL = { input: 'input', llm: 'Gemini AI', deterministic: 'deterministic' } as const;
 </script>
 
 <svelte:head><title>Save the Sun — debug</title></svelte:head>

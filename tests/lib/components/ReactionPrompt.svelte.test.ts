@@ -5,11 +5,12 @@ import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 const bothHeld = { Scry: true, Hex: true };
 
 describe('ReactionPrompt — the human-side interrupt on Sköll’s Ask (S5)', () => {
-	it('asks whether to answer and offers Scry, Hex, and Let it pass', async () => {
+	it('offers Scry, Hex, and Let it pass under an accessible group label', async () => {
 		const screen = render(ReactionPrompt, { held: bothHeld, onReact: vi.fn() });
-		await expect
-			.element(screen.getByTestId('reaction-prompt'))
-			.toHaveTextContent('Sköll asks. Answer it?');
+		// The prompt heading copy is not displayed (v2 redesign); the group keeps its SR label.
+		expect(screen.getByTestId('reaction-prompt').element().getAttribute('aria-label')).toBe(
+			'Sköll asks. Answer it?'
+		);
 		await expect.element(screen.getByRole('button', { name: 'Scry' })).toBeInTheDocument();
 		await expect.element(screen.getByRole('button', { name: 'Hex' })).toBeInTheDocument();
 		await expect.element(screen.getByRole('button', { name: 'Let it pass' })).toBeInTheDocument();
