@@ -350,9 +350,10 @@
 		gap: 0.9rem;
 		padding: 1.6rem 1.8rem;
 		text-align: center;
+		/* Faint sunrise under a warm-dark wash — visible but soft, never harsh, never blue. */
 		background:
-			radial-gradient(circle at 50% 0%, rgba(217, 169, 74, 0.08) 0%, transparent 50%),
-			linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-deep) 100%);
+			linear-gradient(180deg, rgba(18, 14, 10, 0.88) 0%, rgba(28, 18, 8, 0.85) 100%),
+			var(--modal-bg) center / cover no-repeat;
 		border: 1px solid var(--gold-dim);
 		border-radius: 12px;
 		box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);

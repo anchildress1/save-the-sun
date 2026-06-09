@@ -55,6 +55,7 @@
 
 	/* Ornate UI assets */
 	--ui-divider: url('../assets/ui/divider.png');
+	--modal-bg: url('../assets/banners/modal-background.jpg');
 }
 
 .ritual-button {
