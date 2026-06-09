@@ -195,11 +195,11 @@ describe('raw Gemini sink (per session)', () => {
 });
 
 describe('debugLevel in prod', () => {
-	it('defaults to demo when DEBUG_LOG is unset — screen-shareable, no secret', async () => {
+	it('defaults to off when DEBUG_LOG is unset — the unauthenticated view stays dark unless opted in', async () => {
 		vi.resetModules();
 		vi.doMock('$app/environment', () => ({ dev: false }));
 		vi.doMock('$env/dynamic/private', () => ({ env: {} }));
 		const mod = await import('$lib/server/debug/log');
-		expect(mod.debugLevel()).toBe('demo');
+		expect(mod.debugLevel()).toBe('off');
 	});
 });
