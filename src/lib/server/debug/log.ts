@@ -6,9 +6,10 @@
 //   verbose — everything, including `sensitive` events (the secret, raw model request/response)
 //   demo    — the screen-shareable subset: sensitive events stripped (no secret, no raw model I/O)
 //   off     — the view is disabled
-// Default: verbose in dev, off on deploy — /debug + /api/debug are unauthenticated, so even the
-// non-sensitive turn log (player inputs, engine events, reasoning summaries) must not be public unless
-// explicitly opted in. A demo deploy sets DEBUG_LOG=demo; production stays dark by default.
+// Default: verbose in dev, demo on deploy. The public /debug view IS the demo — its whole point is to
+// show the engine-vs-LLM stream live and unauthenticated. demo strips `sensitive` (the secret + raw
+// model I/O), so the answer never leaks; what's public (player inputs, engine events, reasoning
+// summaries) is exactly what the demo means to show. Set DEBUG_LOG=off to disable it on a deploy.
 //
 // Recorded server-side regardless of level (bounded, no client exposure); the level only decides
 // what the /debug API hands back. Lifecycle-linked to the round through session.ts.
@@ -62,11 +63,11 @@ export function resetLog(sessionId: string): void {
 	geminiSinks.delete(sessionId);
 }
 
-/** The exposure level from DEBUG_LOG, validated; default verbose in dev, off on deploy. */
+/** The exposure level from DEBUG_LOG, validated; default verbose in dev, demo on deploy. */
 export function debugLevel(): DebugLevel {
 	const raw = env.DEBUG_LOG;
 	if (raw === 'verbose' || raw === 'demo' || raw === 'off') return raw;
-	return dev ? 'verbose' : 'off';
+	return dev ? 'verbose' : 'demo';
 }
 
 /** What the view may show at a level: nothing when off, sensitive stripped for demo, all for verbose. */
