@@ -192,11 +192,16 @@
 		--stone-brightness: 1;
 		--stone-contrast: 1;
 		--card-glow-opacity: 0.14;
+		--card-hover-lift: 0px;
+		--card-action-scale: 1;
+		--card-action-brightness: 1;
+		transform: translateY(var(--card-hover-lift)) scale(var(--card-action-scale));
+		filter: brightness(var(--card-action-brightness));
 		transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
 	}
 
 	.rune-card:hover {
-		transform: translateY(-3px);
+		--card-hover-lift: -3px;
 		--stone-brightness: 1.07;
 		--stone-contrast: 1.03;
 		--card-glow-opacity: 0.24;
