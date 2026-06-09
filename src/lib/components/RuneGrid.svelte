@@ -10,11 +10,15 @@
 	let {
 		castMode = false,
 		boardSeed,
-		onSelectTarget
+		onSelectTarget,
+		restoreCrossed = [],
+		onCrossChange
 	}: {
 		castMode?: boolean;
 		boardSeed: number;
 		onSelectTarget: (id: number) => void;
+		restoreCrossed?: number[];
+		onCrossChange?: (ids: number[]) => void;
 	} = $props();
 
 	// Shuffled on-screen order, fixed per seed. Depends only on boardSeed, so cross-off
@@ -26,6 +30,13 @@
 	// The armed cast target — only this card highlights; the rest of the board is untouched.
 	let selectedId: number | null = $state(null);
 	let gridContainer: HTMLElement;
+
+	let seeded = false;
+	$effect(() => {
+		if (seeded || restoreCrossed.length === 0) return;
+		for (const id of restoreCrossed) crossedOff.add(id);
+		seeded = true;
+	});
 
 	// Leaving cast mode (commit or cancel) clears the highlight.
 	$effect(() => {
@@ -70,6 +81,7 @@
 				);
 			}
 		}
+		onCrossChange?.([...crossedOff]);
 	}
 
 	onMount(() => {

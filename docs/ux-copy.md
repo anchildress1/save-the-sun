@@ -130,7 +130,7 @@ One-use reactions, **not cards** — no deck, no hand. Both trigger on an **Ask*
 | **Hex** | "When your rival asks, silence the Oracle — their question dies, their turn with it." |
 
 ### You use a reaction (on Sköll's Ask)
-**Interrupt prompt:** **"Sköll asks. Answer it?"** — buttons: **"Scry"** · **"Hex"** · **"Let it pass"**
+**Interrupt prompt:** buttons **"Scry"** · **"Hex"** · **"Let it pass"**. The **"Sköll asks. Answer it?"** heading is **not displayed** in v1 — it survives only as the buttons' accessibility group label (`aria-label`); the visible reaction-prompt copy is deferred to a v2 reaction-UI redesign.
 - **You Scry:** "You lean into the dark and listen. His answer is yours too."
 - **You Hex:** "You close the Oracle's lips. His question dies unanswered — his turn with it."
 - **You let it pass:** "You hold your hand. Let him have his answer."

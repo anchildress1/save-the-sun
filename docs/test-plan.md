@@ -136,7 +136,7 @@ Covers R3, R4, and the casting flow. One shared action interface serves both the
 | Interrupt window | Integration | At most one reaction per window; if Hex is used there is no answer left for Scry. |
 | Scry effect | Integration | Rival also receives the private answer. |
 | Hex effect | Integration | Question dies, no answer to anyone, active player's turn spent. |
-| Human-side prompt | Component | On Sköll's Ask: "Sköll asks. Answer it?" → Scry / Hex / Let it pass behave per `ux-copy.md`. |
+| Human-side prompt | Component | On Sköll's Ask: Scry / Hex / Let it pass behave per `ux-copy.md`. The "Sköll asks. Answer it?" heading is SR-only (the buttons' `aria-label`); the visible copy is deferred to a v2 reaction-UI redesign. |
 | Sköll-side reaction | Integration | Sköll's reaction is a refereed Gemini response with deterministic-floor fallback (per R5). |
 
 ---

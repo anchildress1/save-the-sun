@@ -3,6 +3,7 @@ import { GameEngine, selectSecret } from '$lib/server/engine/engine';
 import {
 	getEngine,
 	getSkoll,
+	getRoundId,
 	resetEngine,
 	sessionCount,
 	MAX_SESSIONS
@@ -108,6 +109,29 @@ describe('session engine registry', () => {
 		expect(getEvents('log-victim').length).toBeGreaterThan(0);
 		for (let i = 0; i <= MAX_SESSIONS; i++) getEngine(`log-flood-${i}`);
 		expect(getEvents('log-victim')).toEqual([]); // evicted → log gone, not re-created
+	});
+
+	it('mints a stable per-round token that survives a refresh and isolates per session', () => {
+		const id = getRoundId('round-token');
+		expect(id).toMatch(/[0-9a-f-]{36}/i); // a uuid-shaped opaque token, not the seed
+		// A bare getEngine (refresh) keeps the same token — the round resumed.
+		getEngine('round-token');
+		expect(getRoundId('round-token')).toBe(id);
+		// A parallel session gets its own token.
+		expect(getRoundId('round-token-other')).not.toBe(id);
+	});
+
+	it('regenerates the round token on a new round so a stale view never resumes', () => {
+		const before = getRoundId('round-token-reset');
+		resetEngine('round-token-reset', SEED);
+		expect(getRoundId('round-token-reset')).not.toBe(before);
+	});
+
+	it('evicts the round token with its engine', () => {
+		const id = getRoundId('round-token-victim');
+		for (let i = 0; i <= MAX_SESSIONS; i++) getEngine(`token-flood-${i}`);
+		// Evicted → a fresh token on next access, not the old one resurrected.
+		expect(getRoundId('round-token-victim')).not.toBe(id);
 	});
 
 	it('never grows past the session cap', () => {

@@ -164,6 +164,28 @@ describe('POST /api/action', () => {
 		expect(data.state.activePlayer).toBe('Human');
 	});
 
+	it('surfaces the human’s reaction to Sköll’s Ask in the debug stream', async () => {
+		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+		await ask();
+		await advance();
+		await call({ type: 'React', player: 'Human', reaction: 'Scry' });
+		// Her choice is her own input event (owner Human, part React), distinct from the engine's
+		// verdict on the now-resolved Ask — without it the demo log jumps straight to the answer.
+		const react = getEvents(SID).find((e) => e.owner === 'Human' && e.part === 'React');
+		expect(react).toMatchObject({ owner: 'Human', kind: 'input', part: 'React' });
+		expect(react?.message).toContain('Scry');
+	});
+
+	it('keeps play moving across repeated Sköll-Ask → human-React cycles (no wedge)', async () => {
+		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+		for (let cycle = 0; cycle < 3; cycle++) {
+			expect((await json(await ask())).state.activePlayer).toBe('Sköll');
+			await advance(); // Sköll parks his Ask
+			const reacted = await json(await call({ type: 'React', player: 'Human', reaction: 'Pass' }));
+			expect(reacted.state.activePlayer).toBe('Human'); // control always returns to her
+		}
+	});
+
 	it('ends the round in defeat when Sköll casts true on Advance', async () => {
 		skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
 		await ask();

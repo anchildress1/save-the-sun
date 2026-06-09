@@ -12,6 +12,11 @@ export const MAX_SESSIONS = 1000;
 const engines = new Map<string, GameEngine>();
 // Sköll's per-round memory, lifecycle-linked to the engine so the two can never drift.
 const skolls = new Map<string, SkollState>();
+// A per-round opaque token for the client's view-state storage key — minted on demand,
+// dropped on a new round/eviction so it changes exactly when the secret does. It is NOT
+// derived from the seed (which would let the client brute-force the secret), so exposing it
+// can never leak the answer.
+const roundIds = new Map<string, string>();
 
 function randomSeed(): number {
 	return crypto.getRandomValues(new Uint32Array(1))[0];
@@ -47,6 +52,7 @@ function remember(sessionId: string, engine: GameEngine): GameEngine {
 		const [lru] = engines.keys();
 		engines.delete(lru);
 		skolls.delete(lru); // his memory dies with the round it belonged to
+		roundIds.delete(lru); // and the view-state token keyed to that round
 		resetLog(lru); // and the demo log, lifecycle-linked to the same round
 		// Rare, but the resulting fresh-secret-on-next-access desync is otherwise invisible.
 		console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
@@ -65,8 +71,25 @@ export function getEngine(sessionId: string): GameEngine {
 export function resetEngine(sessionId: string, seed?: number): GameEngine {
 	requireId(sessionId);
 	skolls.delete(sessionId); // a new round wipes the wolf's memory; recreated lazily on his turn
+	roundIds.delete(sessionId); // and the view-state token — the next read mints a fresh round id
 	resetLog(sessionId); // and the demo log — a fresh round starts the on-stage record over
 	return remember(sessionId, create(sessionId, seed ?? randomSeed()));
+}
+
+/**
+ * The session's per-round token for the client's view-state storage key. Stable across a
+ * refresh (same round), regenerated on a new round so persisted crossings/transcript never
+ * restore onto a fresh secret. Opaque and independent of the secret seed.
+ */
+export function getRoundId(sessionId: string): string {
+	requireId(sessionId);
+	getEngine(sessionId); // ensure the round exists (and re-marks it most-recently-used)
+	let id = roundIds.get(sessionId);
+	if (id === undefined) {
+		id = crypto.randomUUID();
+		roundIds.set(sessionId, id);
+	}
+	return id;
 }
 
 /** The session's Sköll memory, lazily created on his first move and reset with the round. */

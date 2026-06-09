@@ -4,6 +4,7 @@
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 	import Onboarding from '$lib/components/Onboarding.svelte';
 	import { runes } from '$lib/board';
+	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets/ui/app-icon.png';
 	import moonSplash from '$lib/assets/banners/moon-splash-header.jpg';
 	import skollBanner from '$lib/assets/banners/skoll-banner.jpg';
@@ -125,6 +126,17 @@
 	let seedOverride: number | null = $state(null);
 	let boardSeed = $derived(seedOverride ?? data.boardSeed);
 
+	// View-state resume (S8.5): the engine resumes server-side, but the client's presentation — the
+	// crossings and the voiced Oracle line — is otherwise thrown away on reload. Persist it keyed by a
+	// stable per-round token (boardSeed reshuffles, so it can't be the key) and restore it on mount.
+	let roundIdOverride: string | null = $state(null);
+	let roundId = $derived(roundIdOverride ?? data.roundId);
+	let crossings = $state<number[]>([]);
+	let restoreCrossed = $state<number[]>([]);
+	// Gate persistence until the post-mount restore has run, so the empty pre-restore state can't
+	// overwrite a saved round before it is read back.
+	let restored = $state(false);
+
 	// The Oracle surface — one response at a time. A resumed won round opens on its victory line so the
 	// panel and pill agree.
 	let answer = $state(
@@ -136,6 +148,16 @@
 					: RITE.runeTrue
 		)
 	);
+
+	$effect(() => {
+		// Track the view; write only once restoration is done. `crossings` reassigns on every edit and
+		// `answer` on every voiced line, so this captures both without an explicit call at each site.
+		// Skip while Sköll is stalled: that's a transient error line whose companion `skollStalled`
+		// (and its retry button) isn't persisted, and onMount re-drives his move anyway — so keep the
+		// last good line in storage instead of resuming a dead-end error the engine has moved past.
+		const snapshot = { crossings: [...crossings], answer };
+		if (restored && !skollStalled) writeViewState(roundId, snapshot);
+	});
 
 	let selectedRune = $derived(
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
@@ -190,6 +212,17 @@
 	// own guard no-ops otherwise). Wrapped so the async return isn't mistaken for an onMount cleanup.
 	onMount(() => {
 		advanceSkoll();
+		// Restore the resumed round's view over the server-hydrated engine state — crossings onto the
+		// board, the last voiced line into the panel. Layered on top: the engine stays the source of
+		// truth (turn pill, status, pending reaction), this only restores presentation. A blank stored
+		// line never overwrites a server-derived one (e.g. a resumed won round's victory line).
+		const saved = readViewState(roundId);
+		if (saved) {
+			restoreCrossed = saved.crossings;
+			crossings = saved.crossings;
+			if (saved.answer) answer = saved.answer;
+		}
+		restored = true;
 		// Storage can throw (private mode) — first-run is the safe default, so show it then.
 		try {
 			showOnboarding = localStorage.getItem(ONBOARDED_KEY) === null;
@@ -205,8 +238,30 @@
 		return () => {
 			window.removeEventListener('resize', onReposition);
 			window.removeEventListener('scroll', onReposition, true);
+			clearTimeout(aiNoteHideTimer); // don't let a scheduled hide fire after teardown
 		};
 	});
+
+	let aiNoteHideTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function showAiNote() {
+		clearTimeout(aiNoteHideTimer);
+		if (aiNotePopover && !aiNotePopover.matches(':popover-open')) {
+			positionAiNotePopover();
+			aiNotePopover.showPopover();
+		}
+	}
+
+	function hideAiNote() {
+		clearTimeout(aiNoteHideTimer);
+		if (aiNotePopover?.matches(':popover-open')) aiNotePopover.hidePopover();
+	}
+
+	// Debounced so crossing the gap from the button onto the displaced popover doesn't close it.
+	function scheduleHideAiNote() {
+		clearTimeout(aiNoteHideTimer);
+		aiNoteHideTimer = setTimeout(hideAiNote, 120);
+	}
 
 	function positionAiNotePopover() {
 		if (!aiNoteButton || !aiNotePopover) return;
@@ -329,20 +384,38 @@
 		selectedTargetId = id;
 	}
 
+	// RuneGrid owns the crossings; mirror them here so the persistence effect captures each edit.
+	function handleCrossChange(ids: number[]) {
+		crossings = ids;
+	}
+
 	async function newGame() {
 		pending = true;
 		let res: Response | undefined;
 		try {
 			res = await fetch('/api/new-game', { method: 'POST' });
 			if (!res.ok) throw new Error(`New game rejected (${res.status})`);
-			const { boardSeed: seed, state } = (await res.json()) as {
+			const {
+				boardSeed: seed,
+				roundId: nextRoundId,
+				state
+			} = (await res.json()) as {
 				boardSeed: number;
+				roundId: string;
 				state: GameState;
 			};
-			// A 200 with no usable seed would leave the board un-remounted while the server
-			// reset — treat it as a hard failure, not a silent no-op.
+			// A 200 with no usable seed/token would leave the view keyed to the OLD round while the
+			// server reset — treat it as a hard failure, not a silent no-op that mis-keys persistence.
 			if (!Number.isFinite(seed)) throw new Error('New game response missing boardSeed');
-			seedOverride = seed; // remounts RuneGrid → crossings + highlight clear
+			if (!nextRoundId) throw new Error('New game response missing roundId');
+			seedOverride = seed; // remounts RuneGrid → its internal crossedOff clears
+			// Re-key the persisted view to the new round and drop the old crossings: restoreCrossed = []
+			// keeps the remounted grid from re-seeding, the `crossings` mirror resets so the persist
+			// effect overwrites the single record with the fresh round's empty state — stale marks never
+			// resume. (`crossings` here is the parent's mirror, distinct from the grid's own crossedOff.)
+			roundIdOverride = nextRoundId;
+			restoreCrossed = [];
+			crossings = [];
 			answer = '';
 			askValue = '';
 			skollEcho = '';
@@ -464,7 +537,13 @@
 	<div class="game-layout">
 		<section class="board-section" data-coach="board">
 			{#key boardSeed}
-				<RuneGrid {castMode} {boardSeed} onSelectTarget={handleTargetSelect} />
+				<RuneGrid
+					{castMode}
+					{boardSeed}
+					{restoreCrossed}
+					onSelectTarget={handleTargetSelect}
+					onCrossChange={handleCrossChange}
+				/>
 			{/key}
 		</section>
 
@@ -480,11 +559,15 @@
 						class="ai-note-btn"
 						type="button"
 						aria-describedby="ai-note"
-						aria-haspopup="dialog"
-						aria-label="About the AI behind the Oracle and Sköll"
-						popovertarget="ai-note"
+						aria-label="About the Gemini AI behind the Oracle and Sköll"
 						bind:this={aiNoteButton}
-						onclick={positionAiNotePopover}
+						onmouseenter={showAiNote}
+						onmouseleave={scheduleHideAiNote}
+						onfocus={showAiNote}
+						onblur={hideAiNote}
+						onkeydown={(e) => {
+							if (e.key === 'Escape') hideAiNote();
+						}}
 					>
 						i
 					</button>
@@ -492,25 +575,26 @@
 						id="ai-note"
 						role="tooltip"
 						class="ai-note-pop"
-						popover="auto"
+						popover="manual"
 						bind:this={aiNotePopover}
+						onmouseenter={showAiNote}
+						onmouseleave={scheduleHideAiNote}
 					>
-						The Oracle and Sköll are live AI driving answers and rival moves. They can misread,
-						misplay, and make mistakes; the rules and rune data are exact.
+						The Oracle and Sköll are live Gemini AI driving answers and rival moves. They can
+						misread, misplay, and make mistakes; the rules and rune data are exact.
 					</span>
 				</span>
 			</div>
 
-			<h2 class="oracle-title">The Oracle</h2>
 			<hr class="ornate-divider oracle-divider" aria-hidden="true" />
 
+			<h2 class="oracle-title">The Oracle</h2>
 			<div class="oracle-frame">
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
-			<!-- Always present; carries ONLY his templated question when he Asks, blank otherwise. -->
+			<h2 class="skoll-title" data-testid="skoll-title">Sköll</h2>
 			<div class="skoll-frame" data-testid="skoll-frame">
-				<h2 class="skoll-title">Sköll</h2>
 				{#if skollEcho}
 					<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
 				{/if}
@@ -520,20 +604,10 @@
 				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
 			{:else}
 				<div class="reactions" data-coach="reactions">
-					<button
-						class="ritual-button ritual-button--ghost"
-						type="button"
-						disabled
-						title="When your rival asks, hear the answer too."
-					>
+					<button class="ritual-button ritual-button--ghost reaction-btn" type="button" disabled>
 						Scry
 					</button>
-					<button
-						class="ritual-button ritual-button--ghost"
-						type="button"
-						disabled
-						title="When your rival asks, silence the Oracle — their question dies."
-					>
+					<button class="ritual-button ritual-button--ghost reaction-btn" type="button" disabled>
 						Hex
 					</button>
 				</div>
@@ -541,7 +615,7 @@
 
 			{#if skollStalled}
 				<button
-					class="ghost rouse-wolf ritual-button ritual-button--ghost"
+					class="rouse-wolf ritual-button ritual-button--ghost"
 					type="button"
 					data-testid="rouse-wolf"
 					onclick={advanceSkoll}
@@ -566,11 +640,12 @@
 					id="oracle-ask"
 					type="text"
 					placeholder="Type your question…"
+					autocomplete="off"
 					bind:value={askValue}
 					disabled={castMode || pending || !canAct}
 				/>
 				<button
-					class="primary ritual-button ritual-button--primary"
+					class="ritual-button ritual-button--primary"
 					type="submit"
 					disabled={castMode || pending || !canAct}
 				>
@@ -585,24 +660,20 @@
 					</p>
 					<div class="cast-actions">
 						<button
-							class="primary ritual-button ritual-button--primary"
+							class="ritual-button ritual-button--primary"
 							type="button"
 							onclick={commitCast}
 							disabled={!selectedRune || pending}
 						>
 							Name it
 						</button>
-						<button
-							class="ghost ritual-button ritual-button--ghost"
-							type="button"
-							onclick={cancelCast}
-						>
+						<button class="ritual-button ritual-button--ghost" type="button" onclick={cancelCast}>
 							Not yet
 						</button>
 					</div>
 				{:else}
 					<button
-						class="primary cast-arm ritual-button ritual-button--primary"
+						class="cast-arm ritual-button ritual-button--primary"
 						type="button"
 						onclick={armCast}
 						disabled={pending || !canAct}
@@ -679,7 +750,7 @@
 	.oracle-divider {
 		align-self: stretch;
 		height: 1.25rem;
-		margin: -0.4rem 0 -0.1rem;
+		margin: -0.15rem 0 0.05rem;
 		opacity: 0.92;
 	}
 
@@ -819,6 +890,14 @@
 	}
 
 	.oracle-panel {
+		--speaker-title-size: 1.05rem;
+		--speaker-title-tracking: 0.32em;
+		--frame-pad: 0.55rem 0.7rem;
+		--frame-min-h: 2.6rem;
+		--frame-radius: 6px;
+		--reaction-min-h: 2.65rem;
+		--reaction-font: 0.78rem;
+
 		position: relative;
 		display: flex;
 		flex-direction: column;
@@ -868,17 +947,18 @@
 		margin: 0.2rem 0 0.1rem;
 		text-align: center;
 		font-family: var(--font-display);
-		font-size: 1.05rem;
-		letter-spacing: 0.32em;
+		font-size: var(--speaker-title-size);
+		letter-spacing: var(--speaker-title-tracking);
 		text-transform: uppercase;
 		color: var(--gold-bright);
 	}
 
 	.oracle-frame {
+		min-height: var(--frame-min-h);
+		padding: var(--frame-pad);
 		border: 1px solid var(--gold-faint);
-		border-radius: 6px;
-		padding: 0.55rem 0.7rem;
-		background: rgba(0, 0, 0, 0.25);
+		border-radius: var(--frame-radius);
+		background: var(--surface-inset);
 	}
 
 	.frame-text {
@@ -893,30 +973,25 @@
 		color: var(--gold-bright);
 	}
 
-	/* Cold steel to the Oracle's gold, so the duel reads as two voices. */
-	.skoll-frame {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-		padding: 0.55rem 0.7rem;
-		border: 1px solid rgba(139, 147, 166, 0.32);
-		border-radius: 6px;
-		background:
-			radial-gradient(circle at 50% 0%, rgba(139, 147, 166, 0.08) 0%, transparent 60%),
-			rgba(0, 0, 0, 0.28);
-	}
-
 	.skoll-title {
-		margin: 0;
+		margin: 0.2rem 0 0.1rem;
 		text-align: center;
 		font-family: var(--font-display);
-		font-size: 0.92rem;
-		letter-spacing: 0.32em;
+		font-size: var(--speaker-title-size);
+		letter-spacing: var(--speaker-title-tracking);
 		text-transform: uppercase;
-		color: #c2cad8; /* moon-cold, deliberately not the Oracle's gold */
+		color: var(--steel);
 	}
 
-	/* His Ask, echoed so the human knows what they're choosing to Scry, Hex, or let pass. */
+	.skoll-frame {
+		min-height: var(--frame-min-h);
+		padding: var(--frame-pad);
+		border: 1px solid var(--steel-line);
+		border-radius: var(--frame-radius);
+		background:
+			radial-gradient(circle at 50% 0%, var(--steel-glow) 0%, transparent 60%), var(--surface-inset);
+	}
+
 	.skoll-echo {
 		margin: 0;
 		font-family: var(--font-story-body);
@@ -930,12 +1005,17 @@
 		gap: 0.6rem;
 	}
 
-	.reactions button {
+	.reaction-btn {
 		flex: 1;
-		min-height: 2.35rem;
-		padding: 0.45rem 0.65rem;
-		font-size: 0.72rem;
-		letter-spacing: 0.13em;
+		min-height: var(--reaction-min-h);
+		font-size: var(--reaction-font);
+	}
+
+	.reaction-btn:disabled {
+		color: var(--ink);
+		border-color: var(--gold-dim);
+		filter: none;
+		cursor: not-allowed;
 	}
 
 	.ask {
@@ -958,7 +1038,7 @@
 
 	.ask input {
 		padding: 0.65rem 0.7rem;
-		background: rgba(0, 0, 0, 0.35);
+		background: var(--surface-inset);
 		border: 1px solid var(--gold-dim);
 		border-radius: 5px;
 		color: var(--ink);
@@ -968,7 +1048,22 @@
 	.ask input:focus-visible {
 		outline: none;
 		border-color: var(--gold-bright);
-		box-shadow: 0 0 0 2px rgba(217, 169, 74, 0.2);
+		box-shadow: var(--focus-ring);
+	}
+
+	.ask input:-webkit-autofill,
+	.ask input:-webkit-autofill:hover,
+	.ask input:-webkit-autofill:active {
+		-webkit-text-fill-color: var(--ink);
+		-webkit-box-shadow: 0 0 0 1000px var(--surface-inset) inset;
+		caret-color: var(--ink);
+		transition: background-color 9999s ease-in-out 0s;
+	}
+
+	.ask input:-webkit-autofill:focus {
+		-webkit-box-shadow:
+			var(--focus-ring),
+			0 0 0 1000px var(--surface-inset) inset;
 	}
 
 	.cast {
@@ -989,23 +1084,8 @@
 		gap: 0.6rem;
 	}
 
-	/* The cast row splits its width evenly; flex: 1 lives here, not on the .ghost variant. */
-	.cast-actions .primary,
-	.cast-actions .ghost {
+	.cast-actions > button {
 		flex: 1;
-	}
-
-	button.primary {
-		min-height: 3rem;
-	}
-
-	button.ghost {
-		min-height: 3rem;
-	}
-
-	button:focus-visible {
-		outline: 2px solid var(--gold-bright);
-		outline-offset: 2px;
 	}
 
 	/* AI-fallibility note: a meta affordance (not the rite's voice), opened as a browser popover. */
@@ -1013,8 +1093,8 @@
 		display: inline-flex;
 	}
 	.ai-note-btn {
-		inline-size: 1.05rem;
-		block-size: 1.05rem;
+		inline-size: 1.5rem;
+		block-size: 1.5rem;
 		display: inline-grid;
 		place-items: center;
 		padding: 0;
@@ -1023,7 +1103,7 @@
 		background: rgba(6, 9, 18, 0.45);
 		color: var(--ink-muted);
 		font-family: var(--font-body);
-		font-size: 0.68rem;
+		font-size: 0.85rem;
 		font-weight: 700;
 		line-height: 1;
 		text-transform: none;
@@ -1036,6 +1116,11 @@
 		color: var(--gold-bright);
 		border-color: var(--gold-bright);
 		background: rgba(217, 169, 74, 0.08);
+	}
+
+	.ai-note-btn:focus-visible {
+		outline: none;
+		box-shadow: var(--focus-ring);
 	}
 	.ai-note-pop {
 		position: fixed;
@@ -1079,13 +1164,13 @@
 		z-index: 0;
 		display: block;
 		width: 100%;
-		height: min(68%, 42rem);
+		height: min(92%, 54rem);
 		object-fit: cover;
-		object-position: 50% 16%;
+		object-position: 50% 0%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
 			contrast(var(--skoll-contrast));
-		mask-image: linear-gradient(180deg, transparent 0%, black 12%, black 100%);
-		-webkit-mask-image: linear-gradient(180deg, transparent 0%, black 12%, black 100%);
+		mask-image: linear-gradient(180deg, transparent 0%, black 7%, black 100%);
+		-webkit-mask-image: linear-gradient(180deg, transparent 0%, black 7%, black 100%);
 		pointer-events: none;
 	}
 

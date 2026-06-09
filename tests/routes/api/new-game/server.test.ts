@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { POST } from '$routes/api/new-game/+server';
-import { getEngine, resetEngine } from '$lib/server/engine/session';
+import { getEngine, getRoundId, resetEngine } from '$lib/server/engine/session';
 import { selectSecret } from '$lib/server/engine/engine';
 
 const SEED = 1;
@@ -17,11 +17,21 @@ describe('POST /api/new-game', () => {
 		expect(boardSeed).toBeLessThan(2 ** 32);
 	});
 
-	it('returns the board seed and a fresh turn snapshot — no secret-bearing fields', async () => {
+	it('returns the board seed, round token, and a fresh turn snapshot — no secret-bearing fields', async () => {
 		const body = await (await call('shape-session')).json();
-		expect(Object.keys(body).sort()).toEqual(['boardSeed', 'state']);
+		expect(Object.keys(body).sort()).toEqual(['boardSeed', 'roundId', 'state']);
+		expect(typeof body.roundId).toBe('string');
+		expect(body.roundId.length).toBeGreaterThan(0);
 		// The snapshot is the public turn state only — winner is null pre-cast, never the secret.
 		expect(body.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null, turns: 0 });
+	});
+
+	it('hands back a fresh round token so the client re-keys its persisted view', async () => {
+		const before = getRoundId('token-newgame');
+		const { roundId } = await (await call('token-newgame')).json();
+		// The reset minted a new token; it matches what the session now reports, and is not the old one.
+		expect(roundId).not.toBe(before);
+		expect(roundId).toBe(getRoundId('token-newgame'));
 	});
 
 	it('resets the session to a fresh active round', async () => {

@@ -157,6 +157,14 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 	// Scry shares it back. Distinct path — it closes a turn Sköll already opened.
 	if (action.type === 'React' && skoll.pendingAsk !== null && engine.reactionWindow === 'Sköll') {
 		const askedQuery = skoll.pendingAsk;
+		logEvent(sessionId, {
+			owner: 'Human',
+			kind: 'input',
+			part: 'React',
+			level: 'info',
+			message: `reacts to Sköll's Ask: ${action.reaction}`,
+			data: { choice: action.reaction }
+		});
 		const reaction = resolveReaction(engine, 'Human', action.reaction);
 		const answer = resolveSkollAsk(engine, skoll, reaction);
 		engineVerdict(

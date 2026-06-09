@@ -20,6 +20,17 @@
 	--ink-muted: #a9a392;
 	--ink-faint: #6f6c62;
 
+	/* Steel (Sköll's cold accent) */
+	--steel: #c2cad8;
+	--steel-line: rgba(139, 147, 166, 0.32);
+	--steel-glow: rgba(139, 147, 166, 0.08);
+
+	/* Inset surface (framed boxes, inputs) */
+	--surface-inset: rgba(0, 0, 0, 0.3);
+
+	/* Focus ring */
+	--focus-ring: 0 0 0 2px rgba(233, 200, 119, 0.55);
+
 	/* Stone (rune tablet surface, on the midnight board) */
 	--stone-top: #b2ada3;
 	--stone-bottom: #948f85;
@@ -90,10 +101,19 @@
 	transform: translateY(-1px);
 }
 
+.ritual-button:focus-visible {
+	outline: none;
+	border-color: var(--gold-bright);
+	box-shadow: var(--focus-ring);
+}
+
 .ritual-button:disabled {
-	opacity: 0.55;
 	cursor: not-allowed;
+	color: var(--ink-muted);
+	border-color: var(--gold-faint);
+	box-shadow: none;
 	transform: none;
+	filter: saturate(0.55);
 }
 
 body {

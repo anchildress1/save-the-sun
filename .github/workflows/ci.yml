@@ -28,6 +28,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # full history so SonarCloud has SCM blame — avoids the shallow-clone warning
 
       - name: Setup Node
         uses: actions/setup-node@v6
