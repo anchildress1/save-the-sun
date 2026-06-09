@@ -1,4 +1,4 @@
-// Oracle pipeline types (S2): free text → one structured Query (or a refusal), voiced.
+// Oracle pipeline types: free text → one structured Query (or a refusal), voiced.
 
 import type { Query } from '$lib/server/engine/queries';
 import type { InvalidReason } from '$lib/server/engine/engine';

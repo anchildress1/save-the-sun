@@ -1,4 +1,4 @@
-// Reaction resolution (S5) — the rules of Scry & Hex over a rival's *pending* Ask.
+// Reaction resolution — the rules of Scry & Hex over a rival's *pending* Ask.
 //
 // The engine owns the state (charges + the open window, tied to the round lifecycle); this
 // owns the policy. The window is opened around a pending Ask, before it is answered, so a

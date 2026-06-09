@@ -7,6 +7,7 @@ import {
 	sessionCount,
 	MAX_SESSIONS
 } from '$lib/server/engine/session';
+import { getEvents, logEvent } from '$lib/server/debug/log';
 
 const SEED = 1;
 const A = 'session-a';
@@ -82,6 +83,31 @@ describe('session engine registry', () => {
 		for (let i = 0; i <= MAX_SESSIONS; i++) getEngine(`wolf-flood-${i}`);
 		// Evicted alongside the engine → a fresh, empty memory on next access.
 		expect(getSkoll('wolf-victim').facts).toEqual([]);
+	});
+
+	// The debug log is lifecycle-linked to the round through this registry — the wiring, not just
+	// resetLog in isolation.
+	it('wipes the debug log on a new round, reseeded with the new secret', () => {
+		getEngine('log-reset'); // create → logs the round's secret event
+		logEvent('log-reset', {
+			owner: 'Human',
+			kind: 'input',
+			part: 'Ask',
+			level: 'info',
+			message: 'mid-round'
+		});
+		expect(getEvents('log-reset').length).toBeGreaterThan(1);
+		resetEngine('log-reset', SEED); // resetLog clears, then create reseeds the secret
+		const events = getEvents('log-reset');
+		expect(events).toHaveLength(1); // only the new round's secret event remains
+		expect(events[0]).toMatchObject({ owner: 'Engine', part: 'Round', sensitive: true });
+	});
+
+	it('evicts the debug log with its engine', () => {
+		getEngine('log-victim'); // log holds the secret event
+		expect(getEvents('log-victim').length).toBeGreaterThan(0);
+		for (let i = 0; i <= MAX_SESSIONS; i++) getEngine(`log-flood-${i}`);
+		expect(getEvents('log-victim')).toEqual([]); // evicted → log gone, not re-created
 	});
 
 	it('never grows past the session cap', () => {

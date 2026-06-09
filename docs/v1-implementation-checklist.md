@@ -61,6 +61,8 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 **Implementation (S2):** Gemini reads free text into one structured query (or a refusal class) via the `@google/genai` SDK — model `gemini-3.5-flash`, thinking pinned to **MINIMAL** for speed, structured-JSON output. There is no negation operator — a negated Ask ("is it not fire?") is refused (the Oracle speaks of what is). The LLM is the `interpret` seam (`src/lib/server/oracle/gemini.ts`, excluded from coverage); the deterministic core (`oracle.ts`) re-validates that interpretation against the engine's own query grammar (a hallucinated query can never reach the engine), resolves it through `engine.ask`, and voices the answer. Key in `.env` as `GEMINI_API_KEY`.
 
+**Refinement (S8 branch):** the board encodes light/dark as the colour of the power pips (white = Light, black = Dark), so "Is the power white?" / "Is the power black?" now read as the **fill** axis — white always means Light (never a hue), and black means Dark only when it describes the power/pips, so a bare "is it black?" stays the Black hue. Prompt-only change to the interpret seam; the deterministic grammar is unchanged. Verified live; phrasings in `oracle-eval-corpus.md`.
+
 **Tests to land:** [I] one-query mapping, turn accounting · [C] echo placement, answer voicing, each refusal class (covered at the data-contract level — no Oracle Svelte component in v1) · [Sec] secret-seeking + prompt-injection refused, no leak.
 
 > [Eval] The ~40-phrasing corpus scores the **live** Gemini classifier, so it needs a key and the network — it is a manual/offline check, deliberately out of the deterministic CI suite. CI proves the mapping + voicing + refusal logic; the eval proves Gemini's reading. Run it before the demo.
@@ -94,7 +96,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [x] Cast arming flow: "Cast the rune" arms Cast mode; while armed a card select **chooses target** (no cross-off), chrome reads "Cast?"; "Name it" commits; "Not yet" cancels with **no turn spent**
 - [x] Two scoped card behaviors (cross-off normally, select-target while armed) never collide
 - [x] Wrong cast costs the turn only; crossings + round state preserved
-- [x] Pre-Ask panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle." (not blank)
+- [x] Oracle panel opens **blank** — it voices a response only (an answer, refusal, or resolution), never idle filler _(revised: the original "Twenty-four runes stand…" pre-Ask line was cut — the box is blank until the Oracle has something to say)_
 - [x] Win on correct cast resolves the round
 
 **Implementation (S3):** every `api/action` response carries a `state` snapshot (`activePlayer`, `status`, `winner`) read from the engine **after** the route's pre-Sköll shim (`actions.ts` → `gameState`). The page drives the turn pill, the Ask/Cast disabling, and the round-over lock from it; cross-off lives in `RuneGrid` and is never turn-gated. In v1 the shim hands play back to the human every turn, so `activePlayer` reads `Human` in real play — the `Sköll` branch (pill flip, Ask/Cast disabled, "The wolf is moving. Hold.") is the same machinery S6 lights up when the shim is removed, exercised today via mocked responses. A resolved round flips the turn pill to the victory line ("The rune is true.") and locks Ask/Cast, leaving "Begin another night" as the next step — the full S9 victory sequence (Sól's line, defeat, choreography) builds on this minimal win state. Initial turn/round state is **hydrated from the page load** (`+page.server.ts` returns `gameState`), not guessed, so a resumed round — including one already won (S2.5 resume) — renders true on refresh instead of flipping on the first action.
@@ -185,11 +187,11 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 *Needs a live board to coach-mark over. Depends on: S4.*
 
 - [x] Title screen: title, tagline, primary CTA "Light the fire.", secondary "How the rite works"
-- [x] First-run onboarding, one concept per step, dismissable, board visible behind (`ux-copy.md` §5 steps 1–4)
+- [x] First-run onboarding, one concept per step, dismissable, board visible behind (`ux-copy.md` §5 steps 1–5, incl. Scry & Hex)
 - [x] Skippable coach-mark tour over the live board; final button "Take up the runes."
 - [x] How-to-play guidance ("Ask. Cross off what it can't be. Cast when you're ready.") lives here in the popovers — not as a persistent on-board explainer
 
-**Implementation (S7):** `Onboarding.svelte` overlays the live board (`+page.svelte`). The **title** phase is a centered card (title, tagline, "Light the fire." → straight to play, "How the rite works" → tour). The **tour** is a real coach-mark walk of the four §5 concepts. Step 1 ("the stakes") is a scene-setting centered intro over the dimmed page — no anchor, so the board stays unhighlighted. Steps 2–4 spotlight the region each describes (the Ask, then the board at "read & cross," then the Cast) by anchoring to a `data-coach` hook on the page — a gold ring whose oversized box-shadow dims everything else — with the popover positioned beside the lit region (a transparent catcher keeps the board inert mid-tour). A step with no anchor falls back to a centered popover; each anchored step re-measures on the next frame so the opening anchored step never sticks on a stale (pre-layout) rect. Each step has a Skip; the last reads "Take up the runes." A persistent "How the rite works" button in the header reopens the tour directly (the page passes `start='tour'`). First-run is gated on a `localStorage` flag (`save-the-sun:onboarded`) set on any exit — a refresh resumes the same round (S2.5), so the title must not nag the returning player; storage failures (private mode) degrade to showing it, never to breaking play. Both dialogs are `aria-modal` with a focus trap — focus enters on open, Tab cycles inside (wrapping both ends), Escape exits — so the board and header behind them stay untabbable while the overlay is up.
+**Implementation (S7):** `Onboarding.svelte` overlays the live board (`+page.svelte`). The **title** phase is a centered card (title, tagline, "Light the fire." → straight to play, "How the rite works" → tour). The **tour** is a real coach-mark walk of the five §5 concepts. Step 1 ("the stakes") is a scene-setting centered intro over the dimmed page — no anchor, so the board stays unhighlighted. Steps 2–5 spotlight the region each describes (the Ask, then the board at "read & cross," then the Cast, then the Scry/Hex reactions panel) by anchoring to a `data-coach` hook on the page — a gold ring whose oversized box-shadow dims everything else — with the popover positioned beside the lit region (a transparent catcher keeps the board inert mid-tour). A step with no anchor falls back to a centered popover; each anchored step re-measures on the next frame so the opening anchored step never sticks on a stale (pre-layout) rect. Each step has a Skip; the last reads "Take up the runes." A persistent "How the rite works" button in the header reopens the tour directly (the page passes `start='tour'`). First-run is gated on a `localStorage` flag (`save-the-sun:onboarded`) set on any exit — a refresh resumes the same round (S2.5), so the title must not nag the returning player; storage failures (private mode) degrade to showing it, never to breaking play. Both dialogs are `aria-modal` with a focus trap — focus enters on open, Tab cycles inside (wrapping both ends), Escape exits — so the board and header behind them stay untabbable while the overlay is up.
 
 **Chrome cleanup landed alongside S7:** the turn pill moved off the header to the top of the Oracle panel (beside the Ask/Cast controls it gates), "How the rite works" became a header button next to "Begin another night," and the redundant "Cast a Rune" label above the Cast button was dropped.
 
@@ -203,14 +205,40 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *The on-stage proof that the engine owns truth. Depends on: S1, S2, S6.*
 
-- [ ] Every result logged tagged **deterministic-engine** vs **LLM-inference**
-- [ ] Any turn the deterministic floor fired is flagged
-- [ ] Engine truth shown beside Gemini's reasoning — the demo contrast holds
-- [ ] Surface Gemini's **reasoning output for Sköll's move** when available — the chain of deduction that led to his Ask/Cast — so the debug view shows *how* he reached the guess, not just the chosen tool call. (Needs the move seam to capture the model's reasoning/thinking trace; if the API returns none, show the earned-only payload it reasoned from as the fallback.)
+- [x] Every result logged tagged **deterministic-engine** vs **LLM-inference**
+- [x] Any turn the deterministic floor fired is flagged
+- [x] Engine truth shown beside Gemini's reasoning — the demo contrast holds
+- [x] Surface Gemini's **reasoning output for Sköll's move** when available — the chain of deduction that led to his Ask/Cast — so the debug view shows *how* he reached the guess, not just the chosen tool call. (Needs the move seam to capture the model's reasoning/thinking trace; if the API returns none, show the earned-only payload it reasoned from as the fallback.)
 
-**Tests to land:** [I] result tagging, fallback flag, truth-vs-reasoning.
+**Implementation (S8):** a per-session **chronological event log** (`src/lib/server/debug/log.ts`). Each `DebugEvent` carries **three orthogonal facts**, each set explicitly at the source so the view never re-derives them: **owner** (who produced it → the card's colour), **kind** (`input` raw player text · `llm` model inference · `deterministic` engine truth → the badge), and **part** (the turn phase → the chip). Lifecycle-linked to the round through `session.ts` (reset on a new round, evicted with the session), bounded, written from the one place every move resolves — the `api/action` route. The view's axis is **engine fact vs LLM inference**, and the key invariant is that **a verdict is the ENGINE's** (`owner: Engine, kind: deterministic`), never borrowed from the actor whose turn it was — an answer or a cast result is the referee's truth, not the asker's. A human **Ask** splits into three events: her raw question (`owner: Human, kind: input`), the Oracle's reading of it (`owner: Oracle, kind: llm`), and the engine's answer (`owner: Engine, kind: deterministic`). A human/Sköll **Cast** logs the caster's input then the engine's verdict. A Sköll move logs his action + `reasoning` + `source` (`owner: Sköll`; `kind: llm` when Gemini decided, `kind: deterministic` + `warn` on the floor fallback) + this-turn cross-offs, and his **Ask**'s engine verdict lands once the human reacts (no parked decision — the reasoning already sits on his move event). His Scry/Hex/Pass on the human's Ask is `owner: Sköll, part: React`. The shown reasoning is the grounded `summarizePayload` (earned facts + sheet, or the opening hunch) — **not** a model thought-trace: `includeThoughts` was tried and reverted (on MINIMAL thinking + structured JSON the trace is off-persona noise). Instead the **raw Gemini request/response** is teed from the move/reaction seams into a **per-session sink** (`captureGemini`, scoped by an `AsyncLocalStorage` the route opens — no cross-session bleed) and drained onto the log as `sensitive` events owned by **Sköll** (it IS his move/reaction call), `kind: llm`; the snapshot is a cycle-safe sanitizer (strips functions, breaks cycles, marker on throw) so neither `json()` nor the load serializer 500s. The round's **secret** opens the log as a `sensitive` `owner: Engine, part: Round` event. The view paints the card border + name by **owner** from the game's own rune-gem palette (green Human · gold Oracle · blue Sköll · purple Engine; red is held back for warn/error so a severity badge never reads as an owner), badges the **kind** (quiet outline `input` · gold `llm` · green `deterministic`), and chips the **part** (Ask / Cast / React / Round). Severity stays a separate badge.
+
+**Exposure is env-gated** by `DEBUG_LOG` (`verbose` | `demo` | `off`): verbose shows everything incl. the secret + raw Gemini I/O; demo strips `sensitive` (screen-shareable); off disables the view. Default **verbose in dev, off in prod** when unset — so a deployed build never leaks the secret unless explicitly opted in. The filter runs server-side (`filterForLevel`) in `GET /api/debug` and the `/debug` load, so sensitive events never reach the wire below verbose. The view (`/debug`) is one chronological stream, newest first, polled live for screen-sharing; unlinked from the game.
+
+**Tests landed:** [I] secret as a sensitive `Engine`/`Round` event, a human Ask split into her `input` + the Oracle's `llm` reading + the engine's `deterministic` verdict, human/Sköll cast input + verdict, his move owner/kind/source/cross-offs, floored move flagged `deterministic` + `warn`, engine-verdict on a hexed Ask, his React logged, per-session raw Gemini I/O drained as a sensitive Sköll `llm` event (`action/server.test`) · [U] event store seq/trim/isolation/reset, `debugLevel` env + dev/prod defaults, `filterForLevel` strip/off, the **per-session** Gemini sink (isolation, no-context no-op, cycle/function sanitizer, marker-on-throw), `summarizePayload` (`debug/log.test`, `skoll.test`) · [I] `/api/debug` + `/debug` load level-filtering — verbose/demo/off (`api/debug/server.test`) · [C] an engine verdict renders as a deterministic Engine card, cards coloured by owner + badged by kind (LLM vs deterministic), message + JSON detail, sensitive badge, newest-first, no-overflow, empty + off states (`debug/page.svelte.test`). _(The live model's behaviour stays the deferred persona eval; the raw-I/O events are the diagnostic that replaces trusting a thought-trace.)_
 
 **Done when:** the debug view can be screen-shared during the demo and visibly separates fact from inference for every turn.
+
+---
+
+## S8.5 — Resume the view on reload (view ↔ round ↔ log consistency)
+
+*Closes the gap S8 surfaced. Depends on: S2.5 (session resume), S3 (crossings + transcript), S8 (the debug log the view should match).*
+
+**The mismatch:** a refresh resumes the round server-side (same secret, same turn — S2.5) and the debug log keeps the full history (S8), but the **client** play state is not persisted, so the visible game resets to its opening — crossings gone, the Rite transcript back to "Twenty-four runes stand…" — while the turn pill / night-progress (hydrated from the engine) still read mid-round. The view *looks* reset though nothing reset; the debug stream and the board now disagree, with no event explaining why. This story makes the view resume so all three agree.
+
+- [ ] Persist the human's **crossings** (rune **ids**, not positions) for the round; restore them on load so the board shows the same marks after a reload
+- [ ] Persist the **Rite transcript** (the Ask/answer/reaction history shown in the panel); restore it on load instead of resetting to the opening line
+- [ ] Restore layered **on top of** the server-hydrated engine state (turn pill, round status, night-progress, pending reaction) — the engine stays the source of truth; the view history is presentation only
+- [ ] **Scope to the current round/session:** a new round (new secret via `/api/new-game` or a new session) clears the persisted view state — never restore stale crossings/transcript onto a fresh secret
+- [ ] **Board reshuffle stays** (`boardSeed` is display-only and still reseeds on refresh — see `boardseed-display-only-dont-persist`); because crossings are keyed by rune **id**, they survive the reshuffle and land on the right runes in the new order
+- [ ] Storage via `localStorage` keyed by session/round; storage failure (private mode) degrades to the current reset-on-reload behavior, never to broken play
+- [ ] Consistency check: after a mid-round reload the board marks + transcript match what the **debug log** shows for the same round — no silent divergence
+
+**Implementation (planned, not built):** the client owns this — `+page.svelte` reads/writes a per-round `localStorage` record (crossings set + transcript entries) keyed by a round id, and rehydrates it on mount after the server `data` (engine state) is applied. A round id distinct from `boardSeed` (which reshuffles) ties the persisted view to the secret's lifetime; `/api/new-game` and a fresh session clear it. No server or engine change — the engine already resumes; this only restores the *presentation* the client currently throws away. (If a server round id isn't already exposed, surface a stable per-round token from the load — not the secret — for the storage key.)
+
+**Tests to land:** [C] crossings restore on reload, transcript restore, new-round clears persisted state, storage-failure degradation · [E] reload mid-round restores the board marks + transcript over the resumed round.
+
+**Done when:** a mid-round reload restores the visible crossings + transcript to match the resumed round and the debug log — the view, the round, and the log all agree, with no silent reset.
 
 ---
 
@@ -239,11 +267,11 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] WCAG 2.1 AA contrast across **both** light and dark rune palettes
 - [ ] No information by color alone (cross-check S4)
 - [ ] `prefers-reduced-motion` → motion instant, audio muted, still reflects live state changes
-- [ ] Fully operable at 200% zoom
+- [x] At 200% zoom the effective width falls below the **1280px** floor → the best-on-desktop notice shows (no reflow — consistent with the width rules); full in-game operability at 200% zoom is a v2 concern with 1024px responsive support
 - [x] Best-on-desktop notice below the **1280px** minimum — **no** responsive reflow attempted (1024px support is v2)
 - [ ] Degradation: Plain (v1) round fully winnable on the static grid, audio muted by default; Reduced tier (reduced-motion OR WebGL/audio unavailable) stays unaffected and fair
 
-**Tests to land:** [E][manual] keyboard round + full keyboard cast path · [A] axe names/roles, contrast, color-independence · [C] reduced-motion · [manual] 200% zoom · [E] Plain + Reduced degradation, [S] fairness invariant · [C] best-on-desktop notice.
+**Tests to land:** [E][manual] keyboard round + full keyboard cast path · [A] axe names/roles, contrast, color-independence · [C] reduced-motion · [E] 200%-zoom degrades to the best-on-desktop notice (same below-1280 path) · [E] Plain + Reduced degradation, [S] fairness invariant · [C] best-on-desktop notice.
 
 **Done when:** the Lighthouse a11y CI gate passes (≥ 0.95, target ≈ 1.0) and the build fails below it.
 
@@ -253,13 +281,13 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *Cross-cutting lint, runs once the strings exist. Depends on: S2–S9.*
 
-- [ ] No emoji in diegetic copy; no exclamation in Oracle/Sól lines (Sköll's single winning-cast exclamation allowlisted)
+- [ ] No emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line — the old winning-cast exclamation allowlist — was cut)
 - [ ] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
 - [ ] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
-- [ ] Sköll vs Oracle lines attributable to the correct speaker; Sköll taunt pool does not repeat within a game
+- [ ] Sköll vs Oracle lines attributable to the correct speaker _(Sköll's taunts were cut from the UI — his only on-board line is his templated Ask; no taunt pool to de-dup)_
 - [ ] Connection/engine error shown in-world ("The Oracle falls silent…") **without** losing crossings or turn state
 
-**Tests to land:** [A] string + terminology lint · [Eval] speaker-distinctness · [I] no-repeat taunts, error-state preserves crossings/turn.
+**Tests to land:** [A] string + terminology lint · [Eval] speaker-distinctness · [I] error-state preserves crossings/turn.
 
 **Done when:** the voice/terminology lint reports zero diegetic violations in CI.
 

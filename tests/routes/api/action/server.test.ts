@@ -18,6 +18,7 @@ vi.mock('$lib/server/skoll/gemini', () => ({
 import { POST } from '$routes/api/action/+server';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
 import { resetEngine, getEngine, getSkoll } from '$lib/server/engine/session';
+import { getEvents, captureGemini, runWithSession } from '$lib/server/debug/log';
 import { selectSecret } from '$lib/server/engine/engine';
 import { runes } from '$lib/board';
 
@@ -72,10 +73,9 @@ describe('POST /api/action', () => {
 	it('runs Sköll’s turn only on Advance, handing play back after a wrong cast', async () => {
 		await ask(); // turn now sits with Sköll
 		const data = await json(await advance());
-		expect(data).toMatchObject({
-			type: 'Advance',
-			skoll: { cast: { line: `I name it. ${WRONG}.`, won: false } }
-		});
+		expect(data.type).toBe('Advance');
+		// A Cast carries no flavor line — the outcome is in the turn state (play handed back, round on).
+		expect(data.skoll).toEqual({});
 		expect(data.state).toMatchObject({ activePlayer: 'Human', status: 'active' });
 	});
 
@@ -168,7 +168,8 @@ describe('POST /api/action', () => {
 		skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
 		await ask();
 		const data = await json(await advance());
-		expect(data.skoll.cast).toEqual({ line: `The hunt ends. ${SECRET}.`, won: true });
+		// The defeat is engine truth in the turn state, not a Sköll flavor line.
+		expect(data.skoll).toEqual({});
 		expect(data.state).toMatchObject({ status: 'won', winner: 'Sköll' });
 	});
 
@@ -178,7 +179,8 @@ describe('POST /api/action', () => {
 		});
 		await ask();
 		const data = await json(await advance());
-		expect(data.skoll.asks ?? data.skoll.cast).toBeDefined();
+		// Floor either casts ({}), or asks ({ asks }) — both are valid "he still moved".
+		expect(data.skoll.asks !== undefined || Object.keys(data.skoll).length === 0).toBe(true);
 	});
 
 	it('lets Sköll Hex the human Ask — no answer comes back, her turn is spent', async () => {
@@ -281,6 +283,144 @@ describe('POST /api/action', () => {
 		await expect(call(body)).rejects.toMatchObject({
 			status: 400,
 			body: expect.objectContaining({ message: 'Malformed action payload.' })
+		});
+	});
+
+	// Debug log — the chronological stream the /debug view reads. Three orthogonal facts per event:
+	// owner (who), kind (input · llm · deterministic), part (turn phase). A verdict is the ENGINE's,
+	// never the actor's; the inference that reached a move is its own owner.
+	const events = () => getEvents(SID);
+	const byOwner = (owner: string) => events().filter((e) => e.owner === owner);
+	// Engine verdicts — the deterministic truth rows (the round's opening secret is part 'Round').
+	const verdicts = () => byOwner('Engine').filter((e) => e.part !== 'Round');
+	const lastVerdict = () => verdicts().at(-1)!;
+	// Sköll's on-stage move/reaction events, apart from the raw model I/O (sensitive) he also owns.
+	const skollMoves = () => byOwner('Sköll').filter((e) => !e.sensitive);
+	const geminiIO = () => byOwner('Sköll').filter((e) => e.sensitive);
+
+	describe('debug log (S8)', () => {
+		it('opens the round with the secret as a sensitive Engine event tagged Round', () => {
+			const secretEv = byOwner('Engine').find((e) => e.part === 'Round')!;
+			expect(secretEv).toMatchObject({ kind: 'deterministic', sensitive: true, part: 'Round' });
+			expect(secretEv.data).toMatchObject({ secret: SECRET });
+		});
+
+		it('splits a human Ask into her input, the Oracle’s reading, and the engine’s verdict', async () => {
+			await ask();
+			// Her raw free-text — hers (input), distinct from the Oracle's reading of it.
+			const human = byOwner('Human').at(-1)!;
+			expect(human).toMatchObject({ kind: 'input', part: 'Ask' });
+			expect(human.message).toContain('is it light?');
+			expect(human.data).toMatchObject({ question: 'is it light?' });
+			// The Oracle's LLM reading — its own event, not bolted onto the engine's verdict.
+			const reading = byOwner('Oracle').at(-1)!;
+			expect(reading).toMatchObject({ kind: 'llm', part: 'Ask' });
+			expect(reading.message).toContain('whether it is light'); // the Oracle's read, in the message
+			expect(reading.data).toMatchObject({ query: { axis: 'fill', value: 'Light' } });
+			// The verdict is the engine fact — deterministic, no inference attached.
+			const v = lastVerdict();
+			expect(v).toMatchObject({ kind: 'deterministic', part: 'Ask' });
+			expect(v.data).toBeUndefined();
+			expect(v.message).toMatch(/^(Yes|No)\. Sól is/);
+		});
+
+		it('logs a human Cast as her input plus the engine verdict', async () => {
+			await call({ type: 'Cast', player: 'Human', runeName: WRONG });
+			const input = byOwner('Human').at(-1)!;
+			expect(input).toMatchObject({ kind: 'input', part: 'Cast' });
+			expect(input.message).toContain(`casts ${WRONG}`);
+			const v = lastVerdict();
+			expect(v).toMatchObject({ kind: 'deterministic', part: 'Cast' });
+			expect(v.message).toContain('wrong');
+		});
+
+		it('logs a Sköll Cast as his llm move plus the engine verdict', async () => {
+			await ask(); // hand him the turn
+			await advance(); // he casts (default mock: wrong, payload fallback for reasoning)
+			const v = lastVerdict();
+			expect(v).toMatchObject({ kind: 'deterministic', part: 'Cast' });
+			expect(v.message).toContain('wrong'); // engine fact only
+			const move = skollMoves().at(-1)!;
+			expect(move).toMatchObject({ kind: 'llm', part: 'Cast' });
+			expect(move.message).toContain('casts');
+			expect(move.data).toMatchObject({ source: 'gemini' });
+			expect(String(move.data?.reasoning)).toContain('hunch'); // the earned-only fallback
+		});
+
+		it('marks a floored Sköll move deterministic and warns', async () => {
+			skollDecides(async () => {
+				throw new Error('timeout');
+			});
+			await ask();
+			await advance(); // Gemini throws → floor plays
+			const move = skollMoves().at(-1)!;
+			expect(move).toMatchObject({ kind: 'deterministic', level: 'warn' });
+			expect(move.data).toMatchObject({ source: 'floor' });
+		});
+
+		it('parks a Sköll Ask: his move now, the engine verdict only after the human reacts', async () => {
+			skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+			await ask();
+			await advance(); // his Ask is parked — his move event logged, no verdict on it yet
+			expect(verdicts().some((e) => /gold rune/i.test(e.message))).toBe(false);
+			const move = skollMoves().at(-1)!;
+			expect(move).toMatchObject({ kind: 'llm', part: 'Ask' });
+			expect(move.data).toMatchObject({ source: 'gemini' });
+			expect(String(move.data?.reasoning)).toContain('hunch');
+
+			await call({ type: 'React', player: 'Human', reaction: 'Pass' });
+			const v = lastVerdict();
+			expect(v).toMatchObject({ kind: 'deterministic', part: 'Ask' });
+			expect(v.message).toMatch(/Sól is (not )?reaching for a gold rune\./); // engine verdict
+			expect(v.data).toBeUndefined();
+		});
+
+		it('records the engine’s verdict, not a Hex, on a hexed Sköll Ask', async () => {
+			skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
+			await ask();
+			await advance();
+			await call({ type: 'React', player: 'Human', reaction: 'Hex' });
+			expect(lastVerdict().message).toContain('Hexed');
+		});
+
+		it('logs Sköll reacting to the human’s Ask (React part, gemini source → llm)', async () => {
+			skollReacts(async () => ({ reaction: 'Pass' }));
+			openGate(); // gate open → Gemini decided → source gemini (drives the LLM badge)
+			await ask();
+			const react = skollMoves().find((e) => e.part === 'React')!;
+			expect(react).toMatchObject({ kind: 'llm', part: 'React' });
+			expect(react.message).toContain('reacts to your Ask: Pass');
+			expect(react.data).toMatchObject({ choice: 'Pass', source: 'gemini' });
+		});
+
+		it('shows only what Sköll crossed off THIS move, matching the pre-move reasoning', async () => {
+			// His move bundles an Ask + cross-offs. The event must show the delta he crossed this turn,
+			// not the post-move cumulative sheet (which read one move ahead of the reasoning beside it).
+			skollDecides(async () => ({
+				kind: 'ask',
+				query: { axis: 'color', value: 'Gold' },
+				crossOff: [4, 8]
+			}));
+			await ask(); // hand him the turn (Pass gate closed → he learns nothing first)
+			await advance();
+			const move = skollMoves().at(-1)!;
+			expect(move.data?.crossedThisMove).toEqual([4, 8]);
+			// Reasoning is the state he reasoned FROM — no facts yet → the opening-hunch line, 0 crossed.
+			expect(String(move.data?.reasoning)).toContain('hunch');
+		});
+
+		it('drains raw Gemini I/O onto the log as a sensitive Sköll llm event (verbose)', async () => {
+			// The real seam is mocked here, so seed THIS session's sink the way gemini.ts would (inside
+			// the session context), then advance — the route drains it as a sensitive Sköll llm event.
+			await ask(); // hand the wolf his turn
+			runWithSession(SID, () =>
+				captureGemini({ label: 'move', request: { contents: 'board…' }, response: { text: '{}' } })
+			);
+			await advance();
+			const io = geminiIO().at(-1)!;
+			expect(io).toMatchObject({ kind: 'llm', sensitive: true });
+			expect(io.message).toContain('move');
+			expect(io.data).toMatchObject({ response: { text: '{}' } });
 		});
 	});
 

@@ -1,6 +1,5 @@
-// Sköll's Gemini brain (S6) — the LLM seam that decides his move. Excluded from coverage:
-// skoll.ts re-validates everything it returns and drops to the deterministic floor on any
-// failure. gemini-3.5-flash, MINIMAL thinking, structured JSON out (responseSchema).
+// Sköll's Gemini brain — the LLM seam that decides his move. Not coverage-gated: skoll.ts re-validates
+// everything it returns and drops to the floor on any failure. gemini-3.5-flash, MINIMAL thinking.
 //
 // Prompts are tuned for Gemini 3.5 Flash (directness over verbosity): XML-tagged sections, explicit
 // negative constraints, a few-shot anchor, data-before-task ordering. The challenge here is the
@@ -12,6 +11,7 @@
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
 import { runes } from '$lib/board';
+import { captureGemini, debugLevel } from '$lib/server/debug/log';
 import type { PowerOp, Query } from '$lib/server/engine/queries';
 import type {
 	RawSkollDecision,
@@ -146,20 +146,29 @@ export const decideSkollMove: SkollDecide = async (payload: SkollPayload) => {
 		data.answers.length === 0
 			? `\n\nYou have learned nothing yet. The hunch you woke with this round: ${hunch}. Open on that — or another plain hunch — never the cleanest split.`
 			: '';
-	const response = await ai().models.generateContent({
-		model: MODEL,
-		// Data first, task last — the ordering Flash anchors best on.
-		contents: `Your board and what you have learned so far:\n${JSON.stringify(data)}${opener}\n\nIt is your move.`,
-		config: {
-			systemInstruction: SYSTEM_INSTRUCTION,
-			responseMimeType: 'application/json',
-			responseSchema: RESPONSE_SCHEMA,
-			// MINIMAL keeps him from reasoning his way to the optimal play — he reacts, he doesn't solve.
-			thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-			temperature: 1
-		}
-	});
-	return normalize(JSON.parse(response.text ?? '{}') as RawResponse);
+	const contents = `Your board and what you have learned so far:\n${JSON.stringify(data)}${opener}\n\nIt is your move.`;
+	const request = { systemInstruction: SYSTEM_INSTRUCTION, contents };
+	try {
+		const response = await ai().models.generateContent({
+			model: MODEL,
+			// Data first, task last — the ordering Flash anchors best on.
+			contents,
+			config: {
+				systemInstruction: SYSTEM_INSTRUCTION,
+				responseMimeType: 'application/json',
+				responseSchema: RESPONSE_SCHEMA,
+				// MINIMAL keeps him from reasoning his way to the optimal play — he reacts, he doesn't solve.
+				thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+				temperature: 1
+			}
+		});
+		// Tee the raw I/O for the verbose debug view — the actual thing the model received and returned.
+		if (debugLevel() === 'verbose') captureGemini({ label: 'move', request, response });
+		return normalize(JSON.parse(response.text ?? '{}') as RawResponse);
+	} catch (error) {
+		if (debugLevel() === 'verbose') captureGemini({ label: 'move', request, error: String(error) });
+		throw error; // skoll.ts catches it and plays the deterministic floor
+	}
 };
 
 const REACTION_INSTRUCTION = `<role>
@@ -187,16 +196,25 @@ const REACTION_SCHEMA = {
 
 // Throws on transport/parse failure — skoll.ts catches it and passes (the reaction floor).
 export const decideSkollReaction: SkollReactionDecide = async (view: SkollReactionView) => {
-	const response = await ai().models.generateContent({
-		model: MODEL,
-		contents: JSON.stringify(view),
-		config: {
-			systemInstruction: REACTION_INSTRUCTION,
-			responseMimeType: 'application/json',
-			responseSchema: REACTION_SCHEMA,
-			thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-			temperature: 1
-		}
-	});
-	return JSON.parse(response.text ?? '{}') as { reaction?: string };
+	const contents = JSON.stringify(view);
+	const request = { systemInstruction: REACTION_INSTRUCTION, contents };
+	try {
+		const response = await ai().models.generateContent({
+			model: MODEL,
+			contents,
+			config: {
+				systemInstruction: REACTION_INSTRUCTION,
+				responseMimeType: 'application/json',
+				responseSchema: REACTION_SCHEMA,
+				thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+				temperature: 1
+			}
+		});
+		if (debugLevel() === 'verbose') captureGemini({ label: 'reaction', request, response });
+		return JSON.parse(response.text ?? '{}') as { reaction?: string };
+	} catch (error) {
+		if (debugLevel() === 'verbose')
+			captureGemini({ label: 'reaction', request, error: String(error) });
+		throw error; // skoll.ts catches it and passes
+	}
 };

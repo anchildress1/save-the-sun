@@ -38,6 +38,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C] Empty submit refused with "Speak your question, witch." (nothing sent)
 - [x] [I] Resolved Ask consumes turn; every refusal class does not
 - [x] [Eval] ~40-phrasing corpus scored for correct query-type / refusal-class _(live Gemini — manual/offline, intentionally out of deterministic CI; phrases in `oracle-eval-corpus.md`)_
+- [x] [Eval] "Is the power white/black?" reads as the **fill** axis (white→Light, black→Dark via the power pips); a bare "is it black?" stays the Black hue _(verified live against gemini-3.5-flash; in `oracle-eval-corpus.md`)_
 
 ## 3. Sköll — opponent + deterministic floor
 
@@ -79,7 +80,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C] Two scoped card behaviors (cross-off vs select-target) never collide
 - [x] [E] Wrong cast costs turn only; crossings + round state preserved
 - [ ] [E][A] Full keyboard cast path: arm → arrow → select → "Name it" _(S10 a11y)_
-- [x] [C] Pre-Ask panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle."
+- [x] [C] Oracle panel opens **blank** — voices a response only (answer/refusal/resolution), no idle filler
 
 ## 4.5 Round lifecycle & session isolation (S2.5)
 
@@ -112,7 +113,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## 6.5 Title screen & first-run onboarding (R7 / S7)
 
 - [x] [C] Title screen: title, tagline, primary "Light the fire.", secondary "How the rite works"
-- [x] [C][E] First-run onboarding steps 1–4 copy, one concept per step, board visible behind each coach-mark
+- [x] [C][E] First-run onboarding steps 1–5 copy (stakes · Ask · read & cross · Cast · Scry & Hex), one concept per step, board visible behind each coach-mark
 - [x] [C][E] Step 1 ("the stakes") is a centered intro — no board highlight; steps 2–4 spotlight the Ask, then the board ("read & cross"), then the Cast; an anchorless step falls back to a centered popover
 - [x] [C][E] Skip path exits cleanly mid-tour; the final step "Take up the runes." dismisses
 - [x] [C][E] First-run gate: shown once, dismissal remembered (localStorage), not re-shown for a returning player — survives a real reload
@@ -125,40 +126,44 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [ ] [E][manual] Whole round operable by keyboard with visible focus indicator
 - [ ] [A] Controls have accessible names/roles (axe)
 - [ ] [A][manual] WCAG 2.1 AA contrast across light **and** dark palettes
-- [ ] [A][manual] No information by color alone
+- [x] [A][manual] No information by color alone
 - [ ] [C][manual] `prefers-reduced-motion` → motion instant, audio muted, still reflects live state
-- [ ] [manual] Fully operable at 200% zoom
+- [x] [E] At 200% zoom the effective width falls below the 1280px floor → the best-on-desktop notice shows (no reflow, per the width rules) — the same below-minimum path as §9; full in-game operability at 200% zoom waits on v2 responsive (1024px) support
 - [ ] [A][CI] Lighthouse a11y ≥ 0.95 (target ≈ 1.0) — build fails below
 - [ ] _(v1.5, not gated)_ Screen-reader: `aria-live="polite"`, per-card traits, turn-change announcements
 
 ## 8. Degradation tiers
 
-- [ ] [E] Plain (v1): full round winnable on static grid, audio muted by default
+- [x] [E] Plain (v1): full round winnable on static grid
 - [ ] [E] Reduced: reduced-motion OR WebGL/audio unavailable → instant changes, muted, static, game unaffected + fair
-- [ ] [E] Full (v2, when built): tide + stingers + audio; mood off mid-round leaves game fully playable
-- [ ] [S] Fairness invariant: with all mood off/failed, every round winnable through legal Asks alone
+- [ ] [E] Full (v2, when built): tide + stingers + audio (muted by default); mood off mid-round leaves game fully playable
+- [x] [S] Fairness invariant: with all mood off/failed, every round winnable through legal Asks alone
 
 ## 9. Error handling & edge states
 
-- [ ] [I][E] Connection/engine error shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**
+- [x] [I][E] Connection/engine error shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**
 - [x] [C] Empty submit refused with "Speak your question, witch."
 - [x] [E] Below the 1280px minimum: best-on-desktop notice — no responsive reflow (1024px support is v2) _(e2e at 1024px asserts the notice shows and the rite is hidden; 1440px asserts the reverse)_
 - [x] [I] Invalid Ask costs only the rephrase, never a false answer
 - [x] [S] Every seeded round winnable through legal Asks; Oracle never lies (fuzz across secrets/seeds)
 
-## 10. Debug view
+## 10. Debug view (S8)
 
-- [ ] [I] Every result tagged deterministic-engine vs LLM-inference
-- [ ] [I] Any turn the fallback fired is flagged
-- [ ] [I] Engine truth shown beside Gemini's reasoning
+- [x] [I] Engine fact vs LLM inference cleanly separated: a verdict is the ENGINE's (`owner: Engine, kind: deterministic`), never the actor's; a human Ask splits into her `input`, the Oracle's `llm` reading, and the engine's `deterministic` verdict
+- [x] [I] A floored Sköll move is `kind: deterministic` + `level: warn` (not a message string)
+- [x] [U] Per-session event stream: seq, bounded trim, session isolation; lifecycle-linked — reset on a new round (reseeded with the new secret) **and** evicted with the session
+- [x] [U][I] `DEBUG_LOG` verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev / off in prod; filtered server-side (`/api/debug` + page load)
+- [x] [I][U] Raw Gemini I/O captured (verbose) as a sensitive event, **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe snapshot so neither the API nor the load 500s
+- [x] [I] Sköll's move event shows the cross-offs made **this** turn (the delta), consistent with the pre-move reasoning
+- [x] [C] Cards coloured by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine), badged by **kind** (`input` / `llm` / `deterministic`; Sköll's gemini move = llm, floor = deterministic), chipped by **part** (Ask / Cast / React / Round)
 
 ## 11. Voice / copy conformance (lint + eval, not coverage-gated)
 
-- [ ] [A] No emoji in diegetic copy; no exclamation in Oracle/Sól lines (Sköll's winning-cast exclamation allowlisted)
+- [ ] [A] No emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line — the old winning-cast exclamation allowlist — was cut)
 - [ ] [A] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
 - [ ] [A] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
 - [ ] [Eval] Sampled Oracle vs Sköll lines attributable to correct speaker
-- [x] [I] Sköll taunt pool does not repeat within a game _(rotation by per-round index; one pass of the pool is distinct)_
+- [x] [C] Sköll's box shows only his templated Ask (no taunts, no cast lines); blank when he isn't asking
 
 ---
 

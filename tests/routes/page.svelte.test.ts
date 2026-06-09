@@ -22,8 +22,8 @@ const props = (state: GameState, pendingReaction: PendingReaction = null) => ({
 const pageProps = props(HUMAN_TURN);
 const propsWith = (state: GameState) => props(state);
 
-// These tests drive the in-game board, so the first-run title screen (S7) must be out of the way —
-// mark the player onboarded before each render. The onboarding flow itself is covered below.
+// These tests drive the in-game board, so mark the player onboarded before each render to clear the
+// first-run title screen. The onboarding flow itself is covered below.
 beforeEach(() => {
 	localStorage.setItem(ONBOARDED_KEY, '1');
 });
@@ -48,7 +48,7 @@ const askResult = (oracle: object, state: GameState = HUMAN_TURN) =>
 const castResult = (cast: object, state: GameState = HUMAN_TURN) =>
 	respond({ type: 'Cast', cast, state });
 
-// --- S6: Sköll's surfaced turn + the human's reactions ---
+// --- Sköll's surfaced turn + the human's reactions ---
 
 // Sköll's move arrives on a SEPARATE Advance request now, so the stub routes by action type:
 // the Ask returns the human's answer (turn handed to Sköll), Advance returns the wolf's move, and
@@ -72,14 +72,11 @@ const defaultAsk = (skollVsYou: object = { reaction: 'Pass' }) => ({
 	skollVsYou,
 	state: SKOLL_TURN
 });
-const advanceCast = (line: string, won: boolean, state: GameState = HUMAN_TURN) => ({
-	type: 'Advance',
-	skoll: { taunt: 'You circle. I close.', cast: { line, won } },
-	state
-});
+// A Cast carries no flavor line — his box stays blank; the outcome rides the turn state.
+const advanceCast = (state: GameState = HUMAN_TURN) => ({ type: 'Advance', skoll: {}, state });
 const advanceAsk = (echo = 'Sköll asks after a gold rune.') => ({
 	type: 'Advance',
-	skoll: { taunt: 'You circle. I close.', asks: { echo } },
+	skoll: { asks: { echo } },
 	state: SKOLL_TURN
 });
 const reactResult = (skollReaction: object) => ({
@@ -95,11 +92,19 @@ async function humanAsks(screen: ReturnType<typeof render>) {
 }
 
 describe('Save the Sun page', () => {
-	it('starts with a ready Rite state, not a blank panel', async () => {
+	it('opens with a blank Oracle panel — the Oracle speaks only when it has a response', async () => {
 		const screen = render(Page, pageProps);
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('Twenty-four runes stand. None ruled out. Ask the Oracle.');
+		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
+	});
+
+	it('carries a meta AI-fallibility note, keyboard-reachable and naming both AI actors', async () => {
+		const { container } = render(Page, pageProps);
+		const btn = container.querySelector('button.ai-note-btn')!;
+		expect(btn.getAttribute('aria-describedby')).toBe('ai-note');
+		const note = container.querySelector('#ai-note')!;
+		expect(note.getAttribute('role')).toBe('tooltip');
+		expect(note.textContent).toMatch(/Oracle and Sköll/);
+		expect(note.textContent).toMatch(/AI/);
 	});
 
 	it('refuses an empty Ask without dispatching', async () => {
@@ -240,9 +245,7 @@ describe('Save the Sun page', () => {
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('No. Sól is not reaching');
 
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('Twenty-four runes stand. None ruled out. Ask the Oracle.');
+		await expect.poll(() => screen.getByTestId('answer').element().textContent?.trim()).toBe('');
 		expect(spy).toHaveBeenCalledWith('/api/new-game', expect.objectContaining({ method: 'POST' }));
 	});
 
@@ -375,11 +378,10 @@ describe('Save the Sun page', () => {
 	});
 
 	it('drives Sköll on load when the round resumes on his turn — never opens stuck', async () => {
-		gameStub({ advance: advanceCast('I name it. Dagaz.', false) });
+		gameStub({ advance: advanceCast() });
 		// One engine per session: a refresh can land on his turn. The page must advance him, not
-		// open frozen on "Sköll moves."
+		// open frozen on "Sköll moves." His cast leaves no flavor line — play just returns to her.
 		const screen = render(Page, propsWith(SKOLL_TURN));
-		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
 		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
 	});
 
@@ -403,15 +405,16 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('His question dies unanswered');
 	});
 
-	it("voices Sköll's cast on his Advance turn", async () => {
-		gameStub({ advance: advanceCast('I name it. Dagaz.', false) });
+	it('leaves his box blank on a Cast — no flavor line, just the engine outcome', async () => {
+		gameStub({ advance: advanceCast() });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		// Your answer landed from the Ask; his cast arrives on the follow-up Advance.
+		// Your answer landed from the Ask; his cast adds NO Sköll line.
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('No. Sól is not reaching');
-		// He gets his own framed box, distinct from the Oracle's.
+		// His box persists (title) but carries no question and no taunt/cast text.
 		await expect.element(screen.getByTestId('skoll-frame')).toHaveTextContent('Sköll');
-		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
+		expect(screen.container.querySelector('[data-testid="skoll-echo"]')).toBeNull();
+		expect(screen.container.querySelector('[data-testid="skoll-voice"]')).toBeNull();
 	});
 
 	it('prompts the human to react when Sköll Asks (on Advance)', async () => {
@@ -480,42 +483,39 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('You hold your hand. Let him have his answer.');
 	});
 
-	it('shows the silenced line when Sköll Hexes the human Ask', async () => {
+	it('voices the Hex in the Oracle text when Sköll silences the human Ask', async () => {
 		gameStub({
 			// No oracle line — the question was silenced before any answer; then his own Advance move.
 			ask: { type: 'Ask', skollVsYou: { reaction: 'Hex' }, state: SKOLL_TURN },
-			advance: advanceCast('I name it. Dagaz.', false)
+			advance: advanceCast()
 		});
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		// The Oracle box names Sköll in the rite's voice — NOT his first-person gloat.
+		// The Oracle text names Sköll in the rite's voice — NOT his first-person gloat.
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('Sköll Hexes your question. It dies unanswered.');
+			.toHaveTextContent("Sköll closes the Oracle's lips. Your question dies unanswered.");
 		expect(screen.getByTestId('answer').element().textContent).not.toContain('My doing');
-		// His own move surfaces in his voice slot.
-		await expect.element(screen.getByTestId('skoll-voice')).toHaveTextContent('I name it. Dagaz.');
 	});
 
-	it('shows the answer when Sköll Scries the human Ask (covert — no extra line)', async () => {
+	it('voices the Scry after the answer in the Oracle text when Sköll overhears', async () => {
 		gameStub({
 			ask: defaultAsk({ reaction: 'Scry' }),
-			advance: advanceCast('I name it. Dagaz.', false)
+			advance: advanceCast()
 		});
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
+		// The answer he overheard, then the Scry noted in the same Oracle text.
+		const text = () => screen.getByTestId('answer').element().textContent ?? '';
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('Sköll listened');
+		expect(text()).toContain('No. Sól is not reaching for a fire rune.');
 	});
 
 	it('falls to defeat when Sköll casts true on his Advance turn', async () => {
-		gameStub({ advance: advanceCast('The hunt ends. Dagaz.', true, SKOLL_WON) });
+		gameStub({ advance: advanceCast(SKOLL_WON) });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		await expect
-			.element(screen.getByTestId('skoll-voice'))
-			.toHaveTextContent('The hunt ends. Dagaz.');
+		// The defeat is the engine outcome in the panel + pill — no Sköll flavor line.
 		await expect
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('Sköll takes the sun. The longest day never breaks.');
@@ -579,7 +579,7 @@ describe('Save the Sun page — first-run onboarding (S7)', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByTestId('show-instructions').click();
 		// Straight into the tour (no title screen) on the first concept.
-		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 4');
+		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 5');
 		expect(screen.container.querySelector('[data-testid="onboarding"]')).not.toBeNull();
 	});
 });

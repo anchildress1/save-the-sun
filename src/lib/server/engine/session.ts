@@ -1,40 +1,44 @@
-// Per-session engine registry (S2.5): one GameEngine per sessionId, no shared state.
+// Per-session engine registry: one GameEngine per sessionId, no shared state.
 
 import { dev } from '$app/environment';
 import { GameEngine, selectSecret } from './engine';
 import { freshSkollState, type SkollState } from '$lib/server/skoll/skoll';
+import { resetLog, logEvent } from '$lib/server/debug/log';
 
-// LRU-capped so abandoned rounds can't grow memory without bound. Map keeps insertion
-// order, so the first key is the least-recently-used; every access re-inserts to the end.
-// Eviction is by access recency, not engine status — a game in active play is touched each
-// move so it stays warm, but a round nobody touches can still be evicted. 1000 is far above
-// any plausible concurrent jam load while staying trivially small in memory.
+// LRU-capped so abandoned rounds can't grow memory without bound — Map insertion order makes the
+// first key the least-recently-used; every access re-inserts to the end. 1000 is far above any
+// plausible jam load.
 export const MAX_SESSIONS = 1000;
 const engines = new Map<string, GameEngine>();
-// Sköll's per-round memory, lifecycle-linked to the engine: reset on a new round, evicted with
-// it. Kept here so the two can never drift — one session, one secret, one wolf.
+// Sköll's per-round memory, lifecycle-linked to the engine so the two can never drift.
 const skolls = new Map<string, SkollState>();
 
 function randomSeed(): number {
 	return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
-// Dev-only: log the secret so a new round is visible in the server log.
+// Open the round's log with the secret (a `sensitive` event — verbose only).
 function create(sessionId: string, seed: number): GameEngine {
-	if (dev)
-		console.debug(
-			`[session ${sessionId}] new round — secret: ${selectSecret(seed).name} (seed ${seed})`
-		);
+	const secret = selectSecret(seed).name;
+	if (dev) console.debug(`[session ${sessionId}] new round — secret: ${secret} (seed ${seed})`);
+	logEvent(sessionId, {
+		owner: 'Engine',
+		kind: 'deterministic',
+		part: 'Round',
+		level: 'info',
+		sensitive: true,
+		message: `New round — secret is ${secret}`,
+		data: { secret, seed }
+	});
 	return new GameEngine(seed);
 }
 
-// A falsy sessionId would key every caller to one shared engine — the isolation breach this
-// registry exists to prevent. Fail loud rather than poison the Map.
+// A falsy sessionId would key every caller to one shared engine — the isolation breach this registry
+// exists to prevent. Fail loud rather than poison the Map.
 function requireId(sessionId: string): void {
 	if (!sessionId) throw new Error('session registry called without a sessionId');
 }
 
-// Mark a session most-recently-used (re-insert at the end) and evict the LRU if over cap.
 function remember(sessionId: string, engine: GameEngine): GameEngine {
 	engines.delete(sessionId);
 	engines.set(sessionId, engine);
@@ -43,6 +47,7 @@ function remember(sessionId: string, engine: GameEngine): GameEngine {
 		const [lru] = engines.keys();
 		engines.delete(lru);
 		skolls.delete(lru); // his memory dies with the round it belonged to
+		resetLog(lru); // and the demo log, lifecycle-linked to the same round
 		// Rare, but the resulting fresh-secret-on-next-access desync is otherwise invisible.
 		console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
 	}
@@ -60,6 +65,7 @@ export function getEngine(sessionId: string): GameEngine {
 export function resetEngine(sessionId: string, seed?: number): GameEngine {
 	requireId(sessionId);
 	skolls.delete(sessionId); // a new round wipes the wolf's memory; recreated lazily on his turn
+	resetLog(sessionId); // and the demo log — a fresh round starts the on-stage record over
 	return remember(sessionId, create(sessionId, seed ?? randomSeed()));
 }
 
@@ -79,9 +85,8 @@ export function sessionCount(): number {
 	return engines.size;
 }
 
-// Per-session single-flight: a request can yield mid-action (takeSkollTurn awaits Gemini) on shared
-// engine/Sköll state, so without this a duplicate tab / retry / direct POST could interleave and
-// double-call Gemini, overwrite the parked Ask, or return a stale response. One action per session.
+// Per-session single-flight: an action yields mid-flight (takeSkollTurn awaits Gemini) on shared
+// state, so without this a duplicate tab / retry / direct POST could interleave and corrupt it.
 const locks = new Map<string, Promise<unknown>>();
 
 /** Run `fn` after any in-flight action for this session settles — serializing per-session mutation. */

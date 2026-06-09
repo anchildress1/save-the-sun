@@ -1,10 +1,9 @@
-// Deterministic floor (S6) — Sköll's fallback move, fired ONLY when Gemini errors, times
-// out, or emits an illegal/malformed call. Never a quality filter on a legal move.
+// Deterministic floor — Sköll's fallback move, fired ONLY when Gemini errors, times out, or emits an
+// illegal/malformed call. Never a quality filter on a legal move.
 //
-// Weighted-random, NOT argmax: the best-splitting question is the most likely, but every
-// legal splitting question keeps a real, non-zero chance. Taking the max would make Sköll
-// inferable — a puzzle, not an opponent — so it is forbidden (prd.md R5). The floor reasons
-// from earned facts only (Sköll's own truthful answers), never the secret.
+// Weighted-random, NOT argmax: the best-splitting question is the most likely, but every legal
+// splitting question keeps a real, non-zero chance. Taking the max would make Sköll inferable — a
+// puzzle, not an opponent. The floor reasons from earned facts only, never the secret.
 
 import { runes, type Rune } from '$lib/board';
 import { resolveQuery, type PowerOp, type Query } from '$lib/server/engine/queries';

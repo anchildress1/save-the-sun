@@ -123,7 +123,7 @@ Covers R3, R4, and the casting flow. One shared action interface serves both the
 | Two scoped card behaviors | Component | Outside armed mode a tap crosses off; inside armed mode a tap selects target — the two never collide. |
 | Wrong cast continues | E2E | Wrong cast costs the turn only; crossings and round state preserved. |
 | Keyboard cast path | E2E + a11y | arm cast → arrow to rune → select → "Name it" works entirely by keyboard. |
-| Starting Rite state | Component | Before any Ask the panel reads "Twenty-four runes stand. None ruled out. Ask the Oracle." (not blank). |
+| Starting Rite state | Component | The Oracle panel opens **blank** and voices a response only (answer / refusal / resolution) — no idle filler. |
 
 ---
 
@@ -183,7 +183,7 @@ The lineage bar is Lighthouse a11y ≈ 1.0; this build inherits it.
 | Contrast — incl. dark palette | Automated + manual | WCAG 2.1 AA contrast across light and dark rune palettes. |
 | Color independence | Automated + manual | No information by color alone (see §6). |
 | Reduced motion | Component + manual | `prefers-reduced-motion` cuts motion to instant and keeps audio muted, while still reflecting live state changes. |
-| 200% zoom | Manual | Fully operable at 200% zoom. |
+| 200% zoom | E2E | At 200% zoom the effective width drops below the 1280px floor → the best-on-desktop notice shows (no reflow, per the width rules) — the same below-minimum path as §9. Full in-game operability at 200% zoom is v2 (1024px responsive). |
 | Lighthouse gate | **CI** | Automated Lighthouse a11y run in CI; build fails below threshold (target ≈ 1.0, floor 0.95). |
 | Screen reader (v1.5) | Deferred | `aria-live="polite"` announcements, per-card trait exposure, turn-change announcements — **planned, not gated in v1**. |
 
@@ -218,9 +218,13 @@ A mood feature that can't degrade to the tier below doesn't ship — so each tie
 
 | Area | Test type | What to test |
 |---|---|---|
-| Result tagging | Integration | Every result logged as **deterministic-engine** or **LLM-inference**. |
-| Fallback flag | Integration | Any turn the deterministic floor fired is flagged. |
-| Truth-vs-reasoning | Integration | Engine truth is shown beside Gemini's reasoning — the demo contrast holds. |
+| Engine fact vs LLM inference | Integration | A verdict is the ENGINE's (`owner: Engine, kind: deterministic`), never the actor's; the inference that reached the move — the Oracle's `llm` reading, Sköll's `llm` move + reasoning + source — is its own owner, never bolted onto the engine. A human Ask splits into her `input`, the Oracle's `llm` reading, and the engine's `deterministic` verdict. |
+| View encoding | Component | Each card's border + name is coloured by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine); a **kind** badge marks `input` vs `llm` vs `deterministic` (Sköll's source drives his: gemini = llm, floor = deterministic); a **part** chip (Ask / Cast / React / Round) names the phase. |
+| Fallback flag | Integration | A floored Sköll move is `kind: deterministic` + `level: warn` (not a message string). |
+| Event-log lifecycle | Unit | Per-session event stream: seq, bounded trim, session isolation; lifecycle-linked to the round — reset on a new round (reseeded with the new secret) and evicted with the session. |
+| Exposure level (`DEBUG_LOG`) | Unit + Integration | verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev, off in prod; filtered server-side (`/api/debug` + page load). |
+| Raw model I/O | Integration + Unit | The Gemini request+response captured (verbose) as a sensitive event, **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe sanitizer so neither `json()` nor the load serializer 500s. |
+| Cross-offs this move | Integration | Sköll's move event shows the cross-offs he made **this** turn (the delta), consistent with the pre-move reasoning. |
 
 ---
 
@@ -228,10 +232,10 @@ A mood feature that can't degrade to the tier below doesn't ship — so each tie
 
 Not a coverage-gated suite, but an automated lint + eval pass over player-facing strings.
 
-- **String lint (automated):** no emoji in diegetic copy; no exclamation in Oracle/Sól lines (Sköll's single winning-cast exclamation is the one allowlist); banned modern idiom and arcade phrases ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs) absent.
+- **String lint (automated):** no emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line, the old winning-cast exclamation allowlist, was cut); banned modern idiom and arcade phrases ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs) absent.
 - **Terminology lint:** world-nouns enforced (rune not "answer", Ask/Cast not "guess/submit", power not "pips", light/dark not "filled", hue not "color" in player copy, Scry/Hex never "card").
 - **Speaker-distinctness eval:** sampled Oracle vs Sköll lines are attributable to the correct speaker (the "rewrite until unmistakable" rule).
-- **No-repeat taunts:** Sköll taunt pool does not repeat within a single game.
+- **Sköll surface:** his box shows only his templated Ask — taunts and cast lines are cut from the v1 UI.
 
 ---
 

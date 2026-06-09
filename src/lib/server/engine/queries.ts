@@ -1,5 +1,5 @@
-// Structured query model for the deterministic engine (S1).
-// The engine never sees free text — the Oracle (S2) translates a human's words
+// Structured query model for the deterministic engine.
+// The engine never sees free text — the Oracle translates a human's words
 // into exactly one of these queries. Sköll's tool calls arrive here too. Every
 // query is a single axis: "mixed-type" intent is structurally unrepresentable,
 // so it can only be rejected at parse time, never half-resolved.

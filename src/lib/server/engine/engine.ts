@@ -1,4 +1,4 @@
-// Deterministic engine — the referee and single source of truth (S1).
+// Deterministic engine — the referee and single source of truth.
 //
 // Owns the board, the secret, turn order, legality, truthful query resolution,
 // and the win check. It is the strictest-tested module in the project: an
@@ -13,7 +13,7 @@ import type { Player } from './actions';
 
 export type InvalidReason = 'round-over' | 'not-your-turn' | 'malformed-query' | 'unknown-rune';
 
-/** One-use reactions (S5). Each player holds one of each per round; spending it is permanent. */
+/** One-use reactions. Each player holds one of each per round; spending it is permanent. */
 export type Reaction = 'Scry' | 'Hex';
 
 export type AskResult =
@@ -31,11 +31,10 @@ interface Round {
 	status: 'active' | 'won';
 	winner: Player | null;
 	wrongCasts: Record<Player, number>;
-	// Turns consumed this round — a resolved Ask or a resolved Cast each spend one. The shim's
-	// courtesy passTurn does NOT, so this counts real plays, not alternation flips. Drives the
-	// cosmetic night-progress chrome and stays S6-stable (Sköll's plays bump it too).
+	// Turns consumed this round — a resolved Ask or Cast each spend one. The courtesy passTurn does
+	// NOT, so this counts real plays, not alternation flips. Drives the cosmetic night-progress chrome.
 	turns: number;
-	// One Scry + one Hex per player, spent permanently within the round (S5).
+	// One Scry + one Hex per player, spent permanently within the round.
 	reactions: Record<Player, Record<Reaction, boolean>>;
 	// The open reaction window: the asker whose *pending* Ask the rival may react to before it is
 	// answered, or null when none is open. It is opened around a pending Ask (openReactionWindow),

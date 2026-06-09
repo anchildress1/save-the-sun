@@ -1,4 +1,4 @@
-// Sköll's turn orchestration (S6) — the seam where the Gemini opponent plays through the
+// Sköll's turn orchestration — the seam where the Gemini opponent plays through the
 // SAME engine interface as the human. Gemini decides; the engine referees. Every tool call is
 // validated here before the engine resolves it; an error, timeout, or illegal/malformed call
 // drops to the deterministic floor (never as a quality filter on a legal move).
@@ -30,8 +30,6 @@ export interface SkollState {
 	// His declared-but-unanswered Ask, awaiting the human's reaction (the interrupt window). The
 	// window opens before the answer, so a Hex kills the question before any answer is produced.
 	pendingAsk: Query | null;
-	// Rotates the taunt pool; no repeat within a round.
-	tauntIndex: number;
 	// A plain-hunch opener for the round, surfaced to Gemini on his first move only. Without it a
 	// capable model copies whatever opener its prompt last demonstrated (the "always gold" tell);
 	// a seeded, trait-level lean makes the first Ask vary per round while staying reproducible.
@@ -39,6 +37,12 @@ export interface SkollState {
 	// One persistent PRNG for the round — floor and reaction gate both draw from it, so variety comes
 	// from the advancing stream, not from re-seeding off a state counter each call.
 	rng: () => number;
+}
+
+/** How a move was reached: which seam decided it, and the reasoning to show on stage. */
+export interface SkollDecision {
+	source: SkollSource;
+	reasoning: string;
 }
 
 /**
@@ -64,7 +68,6 @@ export function freshSkollState(seed: number): SkollState {
 		facts: [],
 		crossed: new Set(),
 		pendingAsk: null,
-		tauntIndex: 0,
 		hunch: pickHunch(rng),
 		rng
 	};
@@ -99,6 +102,9 @@ export interface RawSkollDecision {
 	query?: unknown;
 	runeName?: string;
 	crossOff?: unknown;
+	// His thinking trace, when the model returns one. Untrusted display text only — never validated
+	// into a move; absent on MINIMAL thinking, in which case the floor's payload stands in.
+	reasoning?: string;
 }
 
 /** The Gemini seam: earned-only payload in, one (untrusted) tool call out. */
@@ -108,8 +114,8 @@ export type SkollMove = { kind: 'ask'; query: Query } | { kind: 'cast'; runeName
 export type SkollSource = 'gemini' | 'floor';
 
 export type SkollOutcome =
-	| { kind: 'cast'; source: SkollSource; runeName: string; result: CastResult }
-	| { kind: 'ask'; source: SkollSource; query: Query; echo: string };
+	| { kind: 'cast'; source: SkollSource; reasoning: string; runeName: string; result: CastResult }
+	| { kind: 'ask'; source: SkollSource; reasoning: string; query: Query; echo: string };
 
 /** The answer half of Sköll's Ask, produced after the human's reaction closes the window. */
 export type SkollAnswer = { hexed: true } | { hexed: false; affirmative: boolean; shared: boolean };
@@ -129,6 +135,18 @@ export function buildPayload(state: SkollState): SkollPayload {
 		crossedOff: [...state.crossed],
 		hunch: state.hunch
 	};
+}
+
+/**
+ * A readable one-line digest of the state Sköll reasoned from — the S8 fallback shown when the
+ * model returns no thinking trace (and the only "reasoning" available when the floor played, since
+ * the floor doesn't reason). Earned facts and his sheet, never the secret.
+ */
+export function summarizePayload(payload: SkollPayload): string {
+	if (payload.answers.length === 0) return `No facts yet; opening hunch: ${payload.hunch}.`;
+	const facts = payload.answers.map((a) => `${a.trait} → ${a.holds ? 'yes' : 'no'}`).join('; ');
+	const crossed = payload.crossedOff.length ? `; crossed ${payload.crossedOff.length}` : '';
+	return `Earned: ${facts}${crossed}.`;
 }
 
 const RUNE_IDS = new Set(runes.map((r) => r.id));
@@ -179,41 +197,48 @@ export async function takeSkollTurn(
 	decide: SkollDecide,
 	rng: () => number
 ): Promise<SkollOutcome> {
-	const { move, source } = await planMove(state, decide, rng);
+	const { move, source, reasoning } = await planMove(state, decide, rng);
 
 	if (move.kind === 'cast') {
 		const result = engine.cast('Sköll', move.runeName);
 		if (dev)
 			console.debug(`[skoll] cast ${move.runeName} via ${source} → won=${result.ok && result.won}`);
-		return { kind: 'cast', source, runeName: move.runeName, result };
+		return { kind: 'cast', source, reasoning, runeName: move.runeName, result };
 	}
 
 	engine.openReactionWindow('Sköll');
 	state.pendingAsk = move.query;
 	if (dev) console.debug(`[skoll] asks ${JSON.stringify(move.query)} via ${source}`);
-	return { kind: 'ask', source, query: move.query, echo: skollAskEcho(move.query) };
+	return { kind: 'ask', source, reasoning, query: move.query, echo: skollAskEcho(move.query) };
 }
 
 async function planMove(
 	state: SkollState,
 	decide: SkollDecide,
 	rng: () => number
-): Promise<{ move: SkollMove; source: SkollSource }> {
+): Promise<{ move: SkollMove } & SkollDecision> {
+	const payload = buildPayload(state);
 	try {
-		const raw = await decide(buildPayload(state));
+		const raw = await decide(payload);
 		const move = validateMove(raw);
 		if (move) {
 			for (const id of legalCrossOffs(raw.crossOff)) state.crossed.add(id);
 			if (dev && state.crossed.size)
 				console.debug(`[skoll] sheet: ${[...state.crossed].join(',')}`);
-			return { move, source: 'gemini' };
+			// His thinking trace when the model returns one; otherwise the facts he reasoned from.
+			return {
+				move,
+				source: 'gemini',
+				reasoning: raw.reasoning?.trim() || summarizePayload(payload)
+			};
 		}
 		console.warn(`[skoll] illegal/malformed decision, floor fires: ${JSON.stringify(raw)}`);
 	} catch (err) {
 		console.error('[skoll] Gemini decision failed, floor fires:', err);
 	}
+	// The floor doesn't reason — the demo shows the earned-only state it played from instead.
 	const floor = chooseFloorMove(state.facts, asked(state), rng);
-	return { move: floor, source: 'floor' };
+	return { move: floor, source: 'floor', reasoning: summarizePayload(payload) };
 }
 
 /** Already-asked queries — the answers he holds; the floor excludes them as redundant. */
@@ -232,8 +257,9 @@ export function resolveSkollAsk(
 	reaction: ReactionOutcome
 ): SkollAnswer {
 	const query = state.pendingAsk;
-	state.pendingAsk = null;
 	if (query === null) throw new Error('resolveSkollAsk called with no pending Ask');
+	// Clear only once we know there was an Ask — an unexpected call throws without mutating state.
+	state.pendingAsk = null;
 
 	if (reaction.ok && reaction.choice === 'Hex') {
 		engine.passTurn(); // his turn is spent unanswered; the question dies before any answer
@@ -253,7 +279,7 @@ export function resolveSkollAsk(
 	return { hexed: false, affirmative: result.answer, shared };
 }
 
-// --- Sköll reacting to the human's Ask (R12 reverse direction) ---
+// --- Sköll reacting to the human's Ask (the reverse direction) ---
 
 /** The earned-only view for a reaction decision: his state + the trait the human just asked. */
 export interface SkollReactionView {
@@ -267,11 +293,13 @@ export interface SkollReactionView {
 /** The Gemini reaction seam: a reaction view in, an (untrusted) choice out. */
 export type SkollReactionDecide = (view: SkollReactionView) => Promise<{ reaction?: string }>;
 
-/** What Sköll did to the human's Ask — `killed` means his Hex landed; `scried` means he overheard. */
+/** What Sköll did to the human's Ask — `killed` means his Hex landed; `scried` means he overheard.
+ *  `source` marks whether Gemini decided the reaction or the floor passed (drives the debug LLM badge). */
 export interface SkollVsHuman {
 	choice: ReactionChoice;
 	killed: boolean;
 	scried: boolean;
+	source: SkollSource;
 }
 
 function validateReaction(raw: unknown, canScry: boolean, canHex: boolean): ReactionChoice | null {
@@ -293,13 +321,14 @@ async function planReaction(
 	query: Query,
 	decide: SkollReactionDecide,
 	rng: () => number
-): Promise<ReactionChoice> {
+): Promise<{ choice: ReactionChoice; source: SkollSource }> {
+	const floorPass = { choice: 'Pass' as ReactionChoice, source: 'floor' as SkollSource };
 	const canScry = engine.reactionAvailable('Sköll', 'Scry');
 	const canHex = engine.reactionAvailable('Sköll', 'Hex');
-	if (!canScry && !canHex) return 'Pass'; // nothing left to spend — never bluff a reaction
+	if (!canScry && !canHex) return floorPass; // nothing left to spend — never bluff a reaction
 	// Dumb him down: most of the time he doesn't even think to react. Only on the occasional
 	// impulse does he consult his judgement (Gemini) at all.
-	if (rng() > REACTION_CHANCE) return 'Pass';
+	if (rng() > REACTION_CHANCE) return floorPass;
 	try {
 		const raw = await decide({
 			askedTrait: valuePhrase(query),
@@ -309,12 +338,12 @@ async function planReaction(
 			canHex
 		});
 		const choice = validateReaction(raw.reaction, canScry, canHex);
-		if (choice) return choice;
+		if (choice) return { choice, source: 'gemini' };
 		console.warn(`[skoll] illegal/unavailable reaction, passing: ${JSON.stringify(raw)}`);
 	} catch (err) {
 		console.error('[skoll] reaction decision failed, passing:', err);
 	}
-	return 'Pass'; // the safe floor — never spends a charge, never kills
+	return floorPass; // the safe floor — never spends a charge, never kills
 }
 
 /**
@@ -331,12 +360,13 @@ export async function reactToHumanAsk(
 	rng: () => number
 ): Promise<SkollVsHuman> {
 	engine.openReactionWindow('Human');
-	const choice = await planReaction(engine, state, query, decide, rng);
+	const { choice, source } = await planReaction(engine, state, query, decide, rng);
 	const outcome = resolveReaction(engine, 'Sköll', choice);
 	if (dev) console.debug(`[skoll] reacts to the human's Ask: ${choice} (landed=${outcome.ok})`);
 	return {
 		choice,
 		killed: outcome.ok && outcome.choice === 'Hex',
-		scried: outcome.ok && outcome.choice === 'Scry'
+		scried: outcome.ok && outcome.choice === 'Scry',
+		source
 	};
 }

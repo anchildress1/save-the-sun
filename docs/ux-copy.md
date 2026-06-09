@@ -2,7 +2,7 @@
 
 Every player-facing string, plus the voice rules that govern them. Diegetic (in-world) voice only — the dev.to submission post is a separate, judge-facing register and is out of scope here. Mechanics in `game-spec.md`, rune data in `rune-board.md`.
 
-Production notes: the Oracle's answers may be templated (engine fills `{trait}`/`{value}`). Sköll's taunts rotate from a pool, no repeat within a game. No emoji anywhere; no exclamation in Oracle/Sól lines (Sköll earns at most one, only on his winning cast).
+Production notes: the Oracle's answers may be templated (engine fills `{trait}`/`{value}`). Sköll's only player-facing line is his templated Ask — taunts and cast lines were cut from v1 (see §2). No emoji anywhere; no exclamation in any diegetic line.
 
 ---
 
@@ -112,27 +112,12 @@ Templated. **Both verdicts restate the trait** — `Yes. Sól is reaching for {v
 
 ## 2. Sköll
 
-### Idle / turn taunts (rotate, no repeat within a game)
-- "I have chased the sun across every sky there is. It tires. I do not."
-- "The sun already knows my teeth. You are only late to the news."
-- "Spend the night talking. I will spend it swallowing the dawn."
-- "Cross them off, one by one. I will cross off the morning in a single bite."
-- "You count runes, witch. I count the breaths left in the night."
-- "Every sign you read, I have already devoured its shadow."
-- "Two of us hunt one rune. Only one of us has tasted a star."
-- "Run for the dawn. I am the night that runs faster."
+Sköll's on-board surface carries **only his templated question** — the inference the human Scries, Hexes, or lets pass. No taunts, no cast lines: his box shows his Ask when he Asks and is blank otherwise. His casts read from the engine (the turn pill flips, the Oracle panel voices the resolution); the wolf's pressure is felt in how he plays, not in chatter.
 
-### Escalation tier (P2 — copy ready; Medium Sköll already tracks candidates, so the narrowing signal exists. P2 by priority, not capability — wire to candidate-count when time allows.)
-- "I can almost taste the dawn I mean to swallow."
-- "One sign left to me. Perhaps two for you. Perhaps too many."
-- "Closer. You feel it too — that's the cold."
+### His Ask (the only Sköll line shown)
+- "Sköll asks after {value-phrase}." — the `{value-phrase}` grammar of §1, so the human knows what they're choosing to Scry, Hex, or let pass.
 
-### His casts (public)
-| Situation | Line |
-|---|---|
-| Sköll casts (any) | "I name it. {Rune}." |
-| Sköll casts to win | "The hunt ends. {Rune}." *(his one permitted exclamation may land here)* |
-| Sköll casts wrong (P2 early-cast) | "{Rune}. …No. The scent was false." |
+_Cut from the v1 UI (flavor, not inference): the idle/turn taunts, the escalation tier (was P2), and the public cast lines ("I name it. {Rune}." / "The hunt ends. {Rune}.")._
 
 ## 3. Reactions — Scry & Hex
 
@@ -151,8 +136,11 @@ One-use reactions, **not cards** — no deck, no hand. Both trigger on an **Ask*
 - **You let it pass:** "You hold your hand. Let him have his answer."
 
 ### Sköll uses a reaction (on your Ask)
-- **Sköll Scries** (hears your answer): "I heard what the Oracle told you. Kind of her. Careless of you."
-- **Sköll Hexes** (silences your Ask): the Oracle frame names him in the rite's own voice so you know who silenced you — **"Sköll Hexes your question. It dies unanswered."** (third person; never his first-person gloat in the Oracle's mouth).
+
+Voiced in the **Oracle text**, in the rite's own voice (third person — never his first-person gloat).
+
+- **Sköll Scries** (hears your answer): the Oracle speaks your answer (you still get it), then notes he overheard — **"{answer} Sköll listened at the threshold — the answer is his too."**
+- **Sköll Hexes** (silences your Ask): the question died, so the Oracle text replaces the answer — **"Sköll closes the Oracle's lips. Your question dies unanswered."**
 
 ## 4. Win / Lose
 
@@ -163,9 +151,8 @@ One-use reactions, **not cards** — no deck, no hand. Both trigger on an **Ask*
 4. CTA: primary **"Begin another night"** · secondary **"Leave the fire."**
 
 ### Defeat — Sköll casts first
-1. On Sköll's correct cast: **"The hunt ends. {Rune}."**
-2. The loss resolves: **"Sköll takes the sun. The longest day never breaks. The year falls to dark."**
-3. CTA: primary **"Stand against him again"** · secondary **"Leave the fire."**
+1. The loss resolves: **"Sköll takes the sun. The longest day never breaks. The year falls to dark."** _(Sköll's cast carries no line of its own — the resolution is the Oracle panel's; see §2.)_
+2. CTA: primary **"Stand against him again"** · secondary **"Leave the fire."**
 
 Sól speaks only at victory — the goddess's rarity is the power.
 
@@ -182,6 +169,7 @@ Sól speaks only at victory — the goddess's rarity is the power.
 - **Step 2 — Ask:** "Ask the Oracle yes/no questions about the runes — their element, power, light, hue, or one rune by name. She answers the sign she reads. One question a turn."
 - **Step 3 — read & cross:** "Twenty-four runes stand in the open. Cross off what each answer rules out. The crossing is yours — the board never does it for you. That reading is the whole game."
 - **Step 4 — Cast:** "When you're sure, cast a rune. Cast true and dawn is yours. Cast wrong and the turn is gone. Sköll is racing you for the same rune."
+- **Step 5 — Scry & Hex:** "Sköll asks the Oracle too. When he does, you may answer back once — Scry to overhear her reply, or Hex to silence her and kill his question. One Scry and one Hex a night; a Cast is sacred, never interrupted."
 - **Final button:** **"Take up the runes."**
 
 ## 6. Chrome & States

@@ -60,6 +60,9 @@ Players type comparison symbols, not just words. A bare `> 4` must read as `gt`,
 - [x] "Is it a light rune?" → `fill = Light`
 - [x] "Is the rune dark?" → `fill = Dark`
 - [x] "Is it bright?" → `fill = Light` _(synonym)_
+- [x] "Is the power white?" → `fill = Light` _(white pips = light)_
+- [x] "Is the power black?" → `fill = Dark` _(black pips = dark — the pips, not the Black hue)_
+- [x] "Is it white?" → `fill = Light` _(white is not a rune hue)_
 
 ## Hue
 
@@ -67,7 +70,7 @@ Players type comparison symbols, not just words. A bare `> 4` must read as `gt`,
 - [x] "Is the rune blue?" → `color = Blue`
 - [x] "Red?" → `color = Red`
 - [x] "Is its hue purple?" → `color = Purple`
-- [x] "Is it black?" → `color = Black`
+- [x] "Is it black?" → `color = Black` _(bare black = the hue; "is the **power** black?" is `fill = Dark` — see Light / dark)_
 - [x] "A green rune?" → `color = Green`
 
 ## Single rune by name

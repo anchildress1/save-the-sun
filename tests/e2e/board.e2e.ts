@@ -2,9 +2,8 @@ import { expect, test } from '@playwright/test';
 
 const ONBOARDED_KEY = 'save-the-sun:onboarded';
 
-// S7 puts a first-run title overlay over the live board. These tests drive the board itself, so
-// seed the onboarded flag (via an init script that runs before the page's own scripts) to open
-// straight on the grid. The onboarding flow is exercised in its own describe below.
+// A first-run title overlay covers the live board. These tests drive the board itself, so seed the
+// onboarded flag (an init script that runs before the page's own) to open straight on the grid.
 test.describe('the live board (past the title screen)', () => {
 	test.beforeEach(async ({ page }) => {
 		await page.addInitScript((key) => {
@@ -184,9 +183,9 @@ test.describe('the live board (past the title screen)', () => {
 	});
 });
 
-// S7 title screen + coach-mark tour, end to end over the live board (what the component/page suites
-// can't prove: the real overlay against the real grid, and dismissal persisting across a reload).
-test.describe('first-run onboarding (S7)', () => {
+// Title screen + coach-mark tour end to end, what the component/page suites can't prove: the real
+// overlay against the real grid, and dismissal persisting across a reload.
+test.describe('first-run onboarding', () => {
 	test('shows the title over the live board, dismisses, and stays dismissed on reload', async ({
 		page
 	}) => {
@@ -213,12 +212,12 @@ test.describe('first-run onboarding (S7)', () => {
 			.getByTestId('onboarding')
 			.getByRole('button', { name: 'How the rite works' })
 			.click();
-		await expect(page.getByTestId('step-count')).toHaveText('1 / 4');
+		await expect(page.getByTestId('step-count')).toHaveText('1 / 5');
 		// The board stays visible behind each coach-mark.
 		await expect(page.locator('.rune-card')).toHaveCount(24);
 
-		for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Next' }).click();
-		await expect(page.getByTestId('step-count')).toHaveText('4 / 4');
+		for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Next' }).click();
+		await expect(page.getByTestId('step-count')).toHaveText('5 / 5');
 		await page.getByRole('button', { name: 'Take up the runes.' }).click();
 		await expect(page.getByTestId('onboarding')).toHaveCount(0);
 	});
@@ -235,7 +234,7 @@ test.describe('first-run onboarding (S7)', () => {
 		await expect(page.getByTestId('onboarding')).toHaveCount(0);
 		await page.getByTestId('show-instructions').click();
 		// Straight into the tour (no title), spotlighting the live board.
-		await expect(page.getByTestId('step-count')).toHaveText('1 / 4');
+		await expect(page.getByTestId('step-count')).toHaveText('1 / 5');
 		await expect(page.locator('.rune-card')).toHaveCount(24);
 	});
 });

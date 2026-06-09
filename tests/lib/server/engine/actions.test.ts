@@ -41,7 +41,7 @@ describe('Shared Action Interface — the single routing point', () => {
 
 	it('resolves a rival Scry over an open Ask window', async () => {
 		const d = deps();
-		// A window is open on the Human's pending Ask (S6 opens this when Sköll Asks); the rival reacts.
+		// A window is open on the Human's pending Ask; the rival reacts.
 		d.engine.openReactionWindow('Human');
 		const res = await handleAction({ type: 'React', player: 'Sköll', reaction: 'Scry' }, d);
 		expect(res).toEqual({

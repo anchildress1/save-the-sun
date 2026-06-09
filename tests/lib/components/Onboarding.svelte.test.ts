@@ -24,35 +24,41 @@ describe('Onboarding — title screen + first-run tour (S7)', () => {
 		expect(onDone).toHaveBeenCalledOnce();
 	});
 
-	it('walks the four concepts in order through the tour', async () => {
+	it('walks the five concepts in order through the tour', async () => {
 		const screen = render(Onboarding, { onDone: vi.fn() });
 		await screen.getByRole('button', { name: 'How the rite works' }).click();
 
-		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 4');
+		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 5');
 		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('one offering to Sól');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
-		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('2 / 4');
+		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('2 / 5');
 		await expect
 			.element(screen.getByTestId('step-body'))
 			.toHaveTextContent('Ask the Oracle yes/no questions');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
-		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('3 / 4');
+		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('3 / 5');
 		await expect
 			.element(screen.getByTestId('step-body'))
 			.toHaveTextContent('Cross off what each answer rules out');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
-		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('4 / 4');
+		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('4 / 5');
 		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('cast a rune');
+
+		await screen.getByRole('button', { name: 'Next' }).click();
+		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('5 / 5');
+		await expect
+			.element(screen.getByTestId('step-body'))
+			.toHaveTextContent('Scry to overhear her reply, or Hex to silence her');
 	});
 
 	it('finishes the tour with "Take up the runes."', async () => {
 		const onDone = vi.fn();
 		const screen = render(Onboarding, { onDone });
 		await screen.getByRole('button', { name: 'How the rite works' }).click();
-		for (let i = 0; i < 3; i++) await screen.getByRole('button', { name: 'Next' }).click();
+		for (let i = 0; i < 4; i++) await screen.getByRole('button', { name: 'Next' }).click();
 		await screen.getByRole('button', { name: 'Take up the runes.' }).click();
 		expect(onDone).toHaveBeenCalledOnce();
 	});

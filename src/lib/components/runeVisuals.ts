@@ -15,7 +15,6 @@ export const GEM_COLOR: Record<RuneColor, string> = {
 	Black: '#2e2c33'
 };
 
-// Alchemical / celestial element marks.
 export const ELEMENT_ICON: Record<RuneElement, string> = {
 	Sun: '☼',
 	Fire: '🜂',
