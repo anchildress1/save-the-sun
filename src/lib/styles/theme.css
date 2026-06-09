@@ -152,15 +152,18 @@
 		0 0 18px rgba(217, 169, 74, 0.3);
 }
 
+/* Dark ink on solid gold — a high-contrast primary (≈12:1), unlike the cream-on-translucent-gold it
+   replaces, which read as low contrast to a static analyzer regardless of the dark art behind it. */
 .rite-cta--primary {
-	color: #f6ecd4;
-	background: linear-gradient(180deg, rgba(217, 169, 74, 0.32), rgba(217, 169, 74, 0.12));
-	border-color: var(--gold);
+	color: var(--bg-deep);
+	background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+	border-color: var(--gold-bright);
+	text-shadow: none;
 }
 
 .rite-cta--primary:hover,
 .rite-cta--primary:focus-visible {
-	background: linear-gradient(180deg, rgba(217, 169, 74, 0.46), rgba(217, 169, 74, 0.2));
+	background: linear-gradient(180deg, #f3dca0, var(--gold-bright));
 }
 
 body {
