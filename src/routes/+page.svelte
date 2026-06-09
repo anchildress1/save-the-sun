@@ -34,7 +34,7 @@
 		passHim: 'You hold your hand. Let him have his answer.',
 		// Sköll's skill plays, voiced in the Oracle's text (rite voice, third person — never his gloat).
 		// Hex replaces the answer (the question died); the Scry note trails the answer he overheard.
-		skollHexes: 'Sköll closes the Oracle’s lips. Your question dies unanswered.',
+		skollHexes: "Sköll closes the Oracle's lips. Your question dies unanswered.",
 		skollScried: 'Sköll listened at the threshold — the answer is his too.',
 		sunCrests: 'Sól crests the rim of the world.',
 		skollTakesSun: 'Sköll takes the sun. The longest day never breaks. The year falls to dark.',

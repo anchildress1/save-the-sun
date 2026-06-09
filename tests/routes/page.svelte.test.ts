@@ -494,7 +494,7 @@ describe('Save the Sun page', () => {
 		// The Oracle text names Sköll in the rite's voice — NOT his first-person gloat.
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('Sköll closes the Oracle’s lips. Your question dies unanswered.');
+			.toHaveTextContent("Sköll closes the Oracle's lips. Your question dies unanswered.");
 		expect(screen.getByTestId('answer').element().textContent).not.toContain('My doing');
 	});
 
