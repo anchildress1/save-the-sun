@@ -558,16 +558,17 @@
 				</span>
 			</div>
 
-			<h2 class="oracle-title">The Oracle</h2>
 			<hr class="ornate-divider oracle-divider" aria-hidden="true" />
 
-			<div class="oracle-frame">
+			<h2 class="speaker-title oracle-title">The Oracle</h2>
+			<div class="speaker-frame oracle-frame">
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
-			<!-- Always present; carries ONLY his templated question when he Asks, blank otherwise. -->
-			<div class="skoll-frame" data-testid="skoll-frame">
-				<h2 class="skoll-title">Sköll</h2>
+			<!-- Mirrors the Oracle: a centered title over a framed box. The frame carries ONLY his
+			     templated question when he Asks, and is blank otherwise. -->
+			<h2 class="speaker-title skoll-title" data-testid="skoll-title">Sköll</h2>
+			<div class="speaker-frame skoll-frame" data-testid="skoll-frame">
 				{#if skollEcho}
 					<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
 				{/if}
@@ -736,7 +737,7 @@
 	.oracle-divider {
 		align-self: stretch;
 		height: 1.25rem;
-		margin: -0.4rem 0 -0.1rem;
+		margin: -0.15rem 0 0.05rem;
 		opacity: 0.92;
 	}
 
@@ -921,20 +922,31 @@
 		z-index: 4;
 	}
 
-	.oracle-title {
+	/* The Oracle and Sköll render identically — a centered title over a framed box — so the duel
+	   reads as two parallel voices. Only the colour differs (gold vs cold), set per speaker below. */
+	.speaker-title {
 		margin: 0.2rem 0 0.1rem;
 		text-align: center;
 		font-family: var(--font-display);
 		font-size: 1.05rem;
 		letter-spacing: 0.32em;
 		text-transform: uppercase;
+	}
+
+	.speaker-frame {
+		border-radius: 6px;
+		padding: 0.55rem 0.7rem;
+		/* Hold the box's shape even when empty so the two speakers stay aligned before either has
+		   spoken (the Oracle opens blank; Sköll's frame is empty until he Asks). */
+		min-height: 2.6rem;
+	}
+
+	.oracle-title {
 		color: var(--gold-bright);
 	}
 
 	.oracle-frame {
 		border: 1px solid var(--gold-faint);
-		border-radius: 6px;
-		padding: 0.55rem 0.7rem;
 		background: rgba(0, 0, 0, 0.25);
 	}
 
@@ -950,27 +962,16 @@
 		color: var(--gold-bright);
 	}
 
+	.skoll-title {
+		color: #c2cad8; /* moon-cold, deliberately not the Oracle's gold */
+	}
+
 	/* Cold steel to the Oracle's gold, so the duel reads as two voices. */
 	.skoll-frame {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-		padding: 0.55rem 0.7rem;
 		border: 1px solid rgba(139, 147, 166, 0.32);
-		border-radius: 6px;
 		background:
 			radial-gradient(circle at 50% 0%, rgba(139, 147, 166, 0.08) 0%, transparent 60%),
 			rgba(0, 0, 0, 0.28);
-	}
-
-	.skoll-title {
-		margin: 0;
-		text-align: center;
-		font-family: var(--font-display);
-		font-size: 0.92rem;
-		letter-spacing: 0.32em;
-		text-transform: uppercase;
-		color: #c2cad8; /* moon-cold, deliberately not the Oracle's gold */
 	}
 
 	/* His Ask, echoed so the human knows what they're choosing to Scry, Hex, or let pass. */

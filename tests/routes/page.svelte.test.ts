@@ -429,8 +429,9 @@ describe('Save the Sun page', () => {
 		await humanAsks(screen);
 		// Your answer landed from the Ask; his cast adds NO Sköll line.
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('No. Sól is not reaching');
-		// His box persists (title) but carries no question and no taunt/cast text.
-		await expect.element(screen.getByTestId('skoll-frame')).toHaveTextContent('Sköll');
+		// His title persists, but his framed box carries no question and no taunt/cast text.
+		await expect.element(screen.getByTestId('skoll-title')).toHaveTextContent('Sköll');
+		expect(screen.getByTestId('skoll-frame').element().textContent?.trim()).toBe('');
 		expect(screen.container.querySelector('[data-testid="skoll-echo"]')).toBeNull();
 		expect(screen.container.querySelector('.skoll-banner')).not.toBeNull();
 		expect(screen.container.querySelector('[data-testid="skoll-voice"]')).toBeNull();
