@@ -89,12 +89,18 @@ describe('session engine registry', () => {
 	// evicted with the session) — the wiring, not just resetLog in isolation.
 	it('wipes the debug log on a new round, reseeded with the new secret', () => {
 		getEngine('log-reset'); // create → logs the round's secret event
-		logEvent('log-reset', { channel: 'turn', level: 'info', message: 'mid-round' });
+		logEvent('log-reset', {
+			owner: 'Human',
+			kind: 'input',
+			part: 'Ask',
+			level: 'info',
+			message: 'mid-round'
+		});
 		expect(getEvents('log-reset').length).toBeGreaterThan(1);
 		resetEngine('log-reset', SEED); // resetLog clears, then create reseeds the secret
 		const events = getEvents('log-reset');
 		expect(events).toHaveLength(1); // only the new round's secret event remains
-		expect(events[0].channel).toBe('session');
+		expect(events[0]).toMatchObject({ owner: 'Engine', part: 'Round', sensitive: true });
 	});
 
 	it('evicts the debug log with its engine', () => {

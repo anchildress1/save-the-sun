@@ -14,29 +14,31 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
-import type { Player } from '$lib/server/engine/actions';
 
 export type DebugLevel = 'verbose' | 'demo' | 'off';
-export type DebugChannel = 'turn' | 'oracle' | 'skoll' | 'gemini' | 'session';
-// Which phase of the turn cycle an event belongs to (shown per card).
+
+// Three orthogonal facts, each carried explicitly so the view never has to re-derive them:
+//   owner — who produced the event → the card's colour
+//   kind  — what produced it → the badge (raw player input · LLM inference · deterministic engine)
+//   part  — the turn phase → the chip
+// A turn verdict is the ENGINE's (owner Engine, deterministic), never the actor's; the human's
+// question is HERS (owner Human, input); the Oracle's reading of it is the Oracle's (owner Oracle, llm).
+export type Owner = 'Human' | 'Oracle' | 'Sköll' | 'Engine';
+export type Kind = 'input' | 'llm' | 'deterministic';
 export type TurnPart = 'Ask' | 'Cast' | 'React' | 'Round';
 
 export interface DebugEvent {
 	// Monotonic within a round, so the view renders in order even after the buffer trims.
 	seq: number;
-	channel: DebugChannel;
+	owner: Owner;
+	kind: Kind;
+	part: TurnPart;
 	level: 'info' | 'warn' | 'error';
 	// Held back unless DEBUG_LOG=verbose: the secret and raw Gemini request/response.
 	sensitive?: boolean;
-	// Whose colour the card carries — the human, or Sköll (the channel names the Oracle/Gemini/round).
-	actor?: Player;
-	// The turn phase this belongs to. The view derives LLM-vs-deterministic from the channel + source
-	// (an LLM badge on the Oracle's read, Sköll's gemini moves, and raw Gemini I/O; deterministic
-	// otherwise) — that judgement is presentation, not stored here.
-	part?: TurnPart;
 	message: string;
 	// Structured detail rendered beneath the line — the interpreted query, the chosen move + source,
-	// the raw model I/O. `skoll` events carry `source` ('gemini'/'floor'), which drives the LLM badge.
+	// the raw model I/O.
 	data?: Record<string, unknown>;
 }
 

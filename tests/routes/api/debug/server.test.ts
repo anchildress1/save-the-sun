@@ -10,8 +10,21 @@ import { load } from '$routes/debug/+page.server';
 import { logEvent, resetLog } from '$lib/server/debug/log';
 
 const SID = 'debug-route';
-const safe = { channel: 'turn', level: 'info', message: 'safe move' } as const;
-const secret = { channel: 'session', level: 'info', sensitive: true, message: 'secret' } as const;
+const safe = {
+	owner: 'Engine',
+	kind: 'deterministic',
+	part: 'Ask',
+	level: 'info',
+	message: 'safe move'
+} as const;
+const secret = {
+	owner: 'Engine',
+	kind: 'deterministic',
+	part: 'Round',
+	level: 'info',
+	sensitive: true,
+	message: 'secret'
+} as const;
 
 const getJson = (sessionId: string) => (GET({ locals: { sessionId } } as never) as Response).json();
 const runLoad = (sessionId: string) =>

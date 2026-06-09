@@ -19,29 +19,30 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-const turn: DebugEvent = {
+const verdict: DebugEvent = {
 	seq: 1,
-	channel: 'turn',
-	level: 'info',
-	actor: 'Human',
+	owner: 'Engine',
+	kind: 'deterministic',
 	part: 'Ask',
+	level: 'info',
 	message: 'Yes. Sól is reaching for a light rune.'
 };
 const floor: DebugEvent = {
 	seq: 2,
-	channel: 'skoll',
-	level: 'warn',
-	actor: 'Sköll',
+	owner: 'Sköll',
+	kind: 'deterministic',
 	part: 'Ask',
-	message: 'Floor fired — Sköll asks after a gold rune.',
+	level: 'warn',
+	message: 'Sköll asks after a gold rune.',
 	data: { source: 'floor', reasoning: 'No facts yet; opening hunch: a gold rune.' }
 };
 const secret: DebugEvent = {
 	seq: 3,
-	channel: 'session',
+	owner: 'Engine',
+	kind: 'deterministic',
+	part: 'Round',
 	level: 'info',
 	sensitive: true,
-	part: 'Round',
 	message: 'New round — secret is Sowilo'
 };
 
@@ -49,81 +50,83 @@ const renderWith = (events: DebugEvent[], level: DebugLevel = 'verbose') =>
 	render(Page, { data: { events, level }, params: {}, form: null });
 
 describe('/debug view', () => {
-	it('renders a turn verdict as a deterministic card coloured by its actor, with its part', () => {
-		const { container } = renderWith([turn]);
+	it('renders an engine verdict as a deterministic Engine card, with its part', () => {
+		const { container } = renderWith([verdict]);
 		const li = container.querySelector('li')!;
-		expect(li.classList.contains('human')).toBe(true); // actor Human → Human colour
-		expect(li.querySelector('.who')?.textContent?.trim()).toBe('Human');
-		expect(li.querySelector('.badge.llm')?.classList.contains('det')).toBe(true); // deterministic
+		expect(li.classList.contains('engine')).toBe(true); // owner Engine → Engine colour
+		expect(li.querySelector('.who')?.textContent?.trim()).toBe('Engine');
+		expect(li.querySelector('.kind-badge')?.classList.contains('deterministic')).toBe(true);
 		expect(li.querySelector('.part')?.textContent?.trim()).toBe('Ask');
 		expect(li.querySelector('.msg')?.textContent).toContain('Sól is reaching');
 		expect(container.querySelector('.cols')).toBeNull(); // the old two-column layout is gone
 	});
 
-	it('colours each card by source and badges LLM vs deterministic', () => {
+	it('colours each card by owner and badges kind (LLM vs deterministic)', () => {
 		const oracle: DebugEvent = {
 			seq: 4,
-			channel: 'oracle',
-			level: 'info',
+			owner: 'Oracle',
+			kind: 'llm',
 			part: 'Ask',
-			message: 'Human asks'
+			level: 'info',
+			message: 'reads it as: whether it is light'
 		};
 		const skollLlm: DebugEvent = {
 			seq: 6,
-			channel: 'skoll',
-			level: 'info',
-			actor: 'Sköll',
+			owner: 'Sköll',
+			kind: 'llm',
 			part: 'Ask',
+			level: 'info',
 			message: 'Sköll asks…',
 			data: { source: 'gemini' }
 		};
-		const { container } = renderWith([turn, secret, floor, oracle, skollLlm]);
+		const { container } = renderWith([verdict, secret, floor, oracle, skollLlm]);
 		const li = (c: string) => container.querySelector<HTMLElement>(`li.${c}`)!;
-		// Colour = source (turn coloured by its actor).
-		expect(li('human')).toBeTruthy();
+		// Colour = owner.
+		expect(li('engine')).toBeTruthy();
 		expect(li('oracle')).toBeTruthy();
-		expect(li('session')).toBeTruthy();
-		// LLM vs deterministic badge.
-		const isDet = (el: HTMLElement) => el.querySelector('.badge.llm')!.classList.contains('det');
-		expect(isDet(li('oracle'))).toBe(false); // Oracle reads via Gemini → LLM
-		expect(isDet(li('human'))).toBe(true); // engine verdict → deterministic
-		expect(isDet(li('session'))).toBe(true); // the secret → deterministic
-		// Sköll: gemini-sourced → LLM; floor-sourced → deterministic.
-		expect(isDet(container.querySelector<HTMLElement>('li.skoll')!)).toBe(false); // skollLlm renders first among skoll
-		expect(isDet(container.querySelectorAll<HTMLElement>('li.skoll')[1])).toBe(true); // floor
+		expect(li('skoll')).toBeTruthy();
+		// Kind badge.
+		const kind = (el: HTMLElement) => el.querySelector('.kind-badge')!.classList;
+		expect(kind(li('oracle')).contains('llm')).toBe(true); // Oracle reads via Gemini → LLM
+		expect(kind(li('engine')).contains('deterministic')).toBe(true); // engine verdict
+		// Sköll: gemini-sourced → LLM; floor-sourced → deterministic. Newest-first → skollLlm before floor.
+		const skolls = container.querySelectorAll<HTMLElement>('li.skoll');
+		expect(skolls[0].querySelector('.kind-badge')!.classList.contains('llm')).toBe(true);
+		expect(skolls[1].querySelector('.kind-badge')!.classList.contains('deterministic')).toBe(true);
 	});
 
 	it('shows a raw Gemini call as a Sköll card (his move), LLM-badged', () => {
 		const gemini: DebugEvent = {
 			seq: 5,
-			channel: 'gemini',
+			owner: 'Sköll',
+			kind: 'llm',
+			part: 'Cast',
 			level: 'info',
 			sensitive: true,
-			part: 'Cast',
-			message: 'Gemini move call',
+			message: 'raw Gemini move call',
 			data: { response: {} }
 		};
 		const { container } = renderWith([gemini]);
 		const card = container.querySelector('li')!;
 		expect(card.classList.contains('skoll')).toBe(true); // his move call → Sköll colour
 		expect(card.querySelector('.who')?.textContent?.trim()).toBe('Sköll');
-		expect(card.querySelector('.badge.llm')?.classList.contains('det')).toBe(false); // LLM
-		expect(card.querySelector('.msg')?.textContent).toContain('Gemini move call');
+		expect(card.querySelector('.kind-badge')?.classList.contains('llm')).toBe(true); // LLM
+		expect(card.querySelector('.msg')?.textContent).toContain('raw Gemini move call');
 	});
 
-	it('renders a non-turn event as a message + JSON detail, flagging warn', async () => {
+	it('renders an event as a message + JSON detail, flagging warn', async () => {
 		const { container } = renderWith([floor]);
 		await expect
 			.element(container.querySelector<HTMLElement>('li.skoll.warn')!)
 			.toBeInTheDocument();
-		expect(container.querySelector('.msg')?.textContent).toContain('Floor fired');
+		expect(container.querySelector('.msg')?.textContent).toContain('gold rune');
 		expect(container.querySelector('pre')?.textContent).toContain('floor'); // the data block
 	});
 
 	it('badges a sensitive event and renders newest first', async () => {
-		const { container } = renderWith([turn, floor, secret]);
+		const { container } = renderWith([verdict, floor, secret]);
 		await expect
-			.element(container.querySelector<HTMLElement>('li.session .badge')!)
+			.element(container.querySelector<HTMLElement>('li.engine .sensitive-flag')!)
 			.toBeInTheDocument();
 		const seqs = [...container.querySelectorAll('.seq')].map((n) => n.textContent);
 		expect(seqs).toEqual(['#3', '#2', '#1']);
@@ -145,14 +148,21 @@ describe('/debug view', () => {
 		const next = {
 			level: 'verbose' as DebugLevel,
 			events: [
-				{ seq: 9, channel: 'oracle', level: 'info', message: 'Human asks: "fresh"' } as DebugEvent
+				{
+					seq: 9,
+					owner: 'Oracle',
+					kind: 'llm',
+					part: 'Ask',
+					level: 'info',
+					message: 'Human asks: "fresh"'
+				} as DebugEvent
 			]
 		};
 		vi.stubGlobal(
 			'fetch',
 			vi.fn(async () => new Response(JSON.stringify(next)))
 		);
-		const { container } = renderWith([turn]); // first paint: seq 1
+		const { container } = renderWith([verdict]); // first paint: seq 1
 		await expect
 			.poll(() => container.querySelector('.msg')?.textContent, { timeout: 3000 })
 			.toContain('Human asks: "fresh"');
@@ -162,10 +172,12 @@ describe('/debug view', () => {
 		// A realistic verbose gemini event: a long unbroken token (base64-like) + a long prose string.
 		const heavy: DebugEvent = {
 			seq: 9,
-			channel: 'gemini',
+			owner: 'Sköll',
+			kind: 'llm',
+			part: 'Cast',
 			level: 'info',
 			sensitive: true,
-			message: 'Gemini move call',
+			message: 'raw Gemini move call',
 			data: {
 				request: { systemInstruction: 'word '.repeat(900), contents: '{}' },
 				response: { thoughtSignature: 'A'.repeat(2000) }

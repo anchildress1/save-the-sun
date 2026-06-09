@@ -218,9 +218,9 @@ A mood feature that can't degrade to the tier below doesn't ship — so each tie
 
 | Area | Test type | What to test |
 |---|---|---|
-| Engine fact vs LLM inference | Integration | The engine's deterministic verdict is the ONLY thing on a `turn` event; the inference that reached the move — the Oracle's reading, Sköll's reasoning + source — lives on its own channel (`oracle`/`skoll`), never bolted onto the engine. |
-| View encoding | Component | Each card is coloured by source (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine); an LLM-vs-deterministic badge keys off the channel + Sköll's source (gemini = LLM, floor = deterministic); a turn-part chip (Ask / Cast / React / Round) names the phase. |
-| Fallback flag | Integration | Any turn the deterministic floor fired is flagged (`warn` on the `skoll` channel). |
+| Engine fact vs LLM inference | Integration | A verdict is the ENGINE's (`owner: Engine, kind: deterministic`), never the actor's; the inference that reached the move — the Oracle's `llm` reading, Sköll's `llm` move + reasoning + source — is its own owner, never bolted onto the engine. A human Ask splits into her `input`, the Oracle's `llm` reading, and the engine's `deterministic` verdict. |
+| View encoding | Component | Each card's border + name is coloured by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine); a **kind** badge marks `input` vs `llm` vs `deterministic` (Sköll's source drives his: gemini = llm, floor = deterministic); a **part** chip (Ask / Cast / React / Round) names the phase. |
+| Fallback flag | Integration | A floored Sköll move is `kind: deterministic` + `level: warn` (not a message string). |
 | Event-log lifecycle | Unit | Per-session event stream: seq, bounded trim, session isolation; lifecycle-linked to the round — reset on a new round (reseeded with the new secret) and evicted with the session. |
 | Exposure level (`DEBUG_LOG`) | Unit + Integration | verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev, off in prod; filtered server-side (`/api/debug` + page load). |
 | Raw model I/O | Integration + Unit | The Gemini request+response captured (verbose) as a sensitive event, **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe sanitizer so neither `json()` nor the load serializer 500s. |

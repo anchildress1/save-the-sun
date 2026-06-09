@@ -26,10 +26,11 @@ function create(sessionId: string, seed: number): GameEngine {
 	const secret = selectSecret(seed).name;
 	if (dev) console.debug(`[session ${sessionId}] new round — secret: ${secret} (seed ${seed})`);
 	logEvent(sessionId, {
-		channel: 'session',
+		owner: 'Engine',
+		kind: 'deterministic',
+		part: 'Round',
 		level: 'info',
 		sensitive: true,
-		part: 'Round',
 		message: `New round — secret is ${secret}`,
 		data: { secret, seed }
 	});

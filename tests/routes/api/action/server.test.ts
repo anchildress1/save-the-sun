@@ -286,77 +286,94 @@ describe('POST /api/action', () => {
 		});
 	});
 
-	// S8 / R8 debug log — the chronological stream the /debug view reads. Turn rows carry ONLY the
-	// engine's deterministic verdict; the inference that reached the move lives on its own channel
-	// (oracle for the human's reading, skoll for his move + reasoning + source).
-	const turns = () => getEvents(SID).filter((e) => e.channel === 'turn');
-	const lastTurn = () => turns().at(-1)!;
-	const byChannel = (c: string) => getEvents(SID).filter((e) => e.channel === c);
+	// S8 / R8 debug log — the chronological stream the /debug view reads. Three orthogonal facts per
+	// event: owner (who), kind (raw input · LLM inference · deterministic engine), part (turn phase).
+	// A verdict is the ENGINE's deterministic truth, never the actor's; the inference that reached a
+	// move is its own owner (Oracle reads the human's text, Sköll owns his move + reasoning + source).
+	const events = () => getEvents(SID);
+	const byOwner = (owner: string) => events().filter((e) => e.owner === owner);
+	// Engine verdicts — the deterministic truth rows (the round's opening secret is part 'Round').
+	const verdicts = () => byOwner('Engine').filter((e) => e.part !== 'Round');
+	const lastVerdict = () => verdicts().at(-1)!;
+	// Sköll's on-stage move/reaction events, apart from the raw model I/O (sensitive) he also owns.
+	const skollMoves = () => byOwner('Sköll').filter((e) => !e.sensitive);
+	const geminiIO = () => byOwner('Sköll').filter((e) => e.sensitive);
 
 	describe('debug log (S8)', () => {
-		it('opens the round with the secret as a sensitive session event tagged Round', () => {
-			const secretEv = byChannel('session').at(-1)!;
-			expect(secretEv).toMatchObject({ sensitive: true, part: 'Round' });
+		it('opens the round with the secret as a sensitive Engine event tagged Round', () => {
+			const secretEv = byOwner('Engine').find((e) => e.part === 'Round')!;
+			expect(secretEv).toMatchObject({ kind: 'deterministic', sensitive: true, part: 'Round' });
 			expect(secretEv.data).toMatchObject({ secret: SECRET });
 		});
 
-		it('logs the human question on the oracle channel and the verdict on the turn (both Ask)', async () => {
+		it('splits a human Ask into her input, the Oracle’s reading, and the engine’s verdict', async () => {
 			await ask();
-			// The Oracle's reading (LLM-inference) is its own event — not bolted onto the engine's turn.
-			const q = byChannel('oracle').at(-1)!;
-			expect(q).toMatchObject({ actor: 'Human', part: 'Ask' });
-			expect(q.message).toContain('is it light?'); // the raw free-text
-			expect(q.data).toMatchObject({ question: 'is it light?', readAs: 'whether it is light' });
-
-			const turn = lastTurn();
-			expect(turn).toMatchObject({ actor: 'Human', part: 'Ask' });
-			expect(turn.data).toBeUndefined(); // the turn is the engine fact, no inference attached
-			expect(turn.message).toMatch(/^(Yes|No)\. Sól is/); // deterministic-engine verdict
+			// Her raw free-text — hers (input), distinct from the Oracle's reading of it.
+			const human = byOwner('Human').at(-1)!;
+			expect(human).toMatchObject({ kind: 'input', part: 'Ask' });
+			expect(human.message).toContain('is it light?');
+			expect(human.data).toMatchObject({ question: 'is it light?' });
+			// The Oracle's LLM reading — its own event, not bolted onto the engine's verdict.
+			const reading = byOwner('Oracle').at(-1)!;
+			expect(reading).toMatchObject({ kind: 'llm', part: 'Ask' });
+			expect(reading.message).toContain('whether it is light'); // the Oracle's read, in the message
+			expect(reading.data).toMatchObject({ query: { axis: 'fill', value: 'Light' } });
+			// The verdict is the engine fact — deterministic, no inference attached.
+			const v = lastVerdict();
+			expect(v).toMatchObject({ kind: 'deterministic', part: 'Ask' });
+			expect(v.data).toBeUndefined();
+			expect(v.message).toMatch(/^(Yes|No)\. Sól is/);
 		});
 
-		it('logs a human Cast as an engine-fact turn', async () => {
+		it('logs a human Cast as her input plus the engine verdict', async () => {
 			await call({ type: 'Cast', player: 'Human', runeName: WRONG });
-			expect(lastTurn()).toMatchObject({ actor: 'Human' });
-			expect(lastTurn().message).toContain('wrong');
+			const input = byOwner('Human').at(-1)!;
+			expect(input).toMatchObject({ kind: 'input', part: 'Cast' });
+			expect(input.message).toContain(`casts ${WRONG}`);
+			const v = lastVerdict();
+			expect(v).toMatchObject({ kind: 'deterministic', part: 'Cast' });
+			expect(v.message).toContain('wrong');
 		});
 
-		it('puts a Sköll Cast verdict on the turn, his reasoning + source on the skoll event', async () => {
+		it('logs a Sköll Cast as his llm move plus the engine verdict', async () => {
 			await ask(); // hand him the turn
 			await advance(); // he casts (default mock: wrong, payload fallback for reasoning)
-			expect(lastTurn()).toMatchObject({ actor: 'Sköll', part: 'Cast' });
-			expect(lastTurn().message).toContain('wrong'); // engine fact only
-			const move = byChannel('skoll').at(-1)!;
-			expect(move).toMatchObject({ part: 'Cast' });
-			expect(move.message).toContain('Sköll casts');
+			const v = lastVerdict();
+			expect(v).toMatchObject({ kind: 'deterministic', part: 'Cast' });
+			expect(v.message).toContain('wrong'); // engine fact only
+			const move = skollMoves().at(-1)!;
+			expect(move).toMatchObject({ kind: 'llm', part: 'Cast' });
+			expect(move.message).toContain('casts');
 			expect(move.data).toMatchObject({ source: 'gemini' });
 			expect(String(move.data?.reasoning)).toContain('hunch'); // the earned-only fallback
 		});
 
-		it('flags the turn the deterministic floor fired (warn on the skoll channel)', async () => {
+		it('marks a floored Sköll move deterministic and warns', async () => {
 			skollDecides(async () => {
 				throw new Error('timeout');
 			});
 			await ask();
 			await advance(); // Gemini throws → floor plays
-			const move = byChannel('skoll').at(-1)!;
-			expect(move).toMatchObject({ level: 'warn' });
-			expect(move.message).toContain('Floor fired');
+			const move = skollMoves().at(-1)!;
+			expect(move).toMatchObject({ kind: 'deterministic', level: 'warn' });
+			expect(move.data).toMatchObject({ source: 'floor' });
 		});
 
-		it('logs his Ask reasoning on the skoll event, the answer on the turn after the human reacts', async () => {
+		it('parks a Sköll Ask: his move now, the engine verdict only after the human reacts', async () => {
 			skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
 			await ask();
-			await advance(); // his Ask is parked — reasoning logged now, no turn row yet
-			expect(turns().some((e) => e.actor === 'Sköll')).toBe(false);
-			const move = byChannel('skoll').at(-1)!;
+			await advance(); // his Ask is parked — his move event logged, no verdict on it yet
+			expect(verdicts().some((e) => /gold rune/i.test(e.message))).toBe(false);
+			const move = skollMoves().at(-1)!;
+			expect(move).toMatchObject({ kind: 'llm', part: 'Ask' });
 			expect(move.data).toMatchObject({ source: 'gemini' });
 			expect(String(move.data?.reasoning)).toContain('hunch');
 
 			await call({ type: 'React', player: 'Human', reaction: 'Pass' });
-			const turn = lastTurn();
-			expect(turn).toMatchObject({ actor: 'Sköll' });
-			expect(turn.message).toMatch(/Sól is (not )?reaching for a gold rune\./); // engine verdict
-			expect(turn.data).toBeUndefined();
+			const v = lastVerdict();
+			expect(v).toMatchObject({ kind: 'deterministic', part: 'Ask' });
+			expect(v.message).toMatch(/Sól is (not )?reaching for a gold rune\./); // engine verdict
+			expect(v.data).toBeUndefined();
 		});
 
 		it('records the engine’s verdict, not a Hex, on a hexed Sköll Ask', async () => {
@@ -364,15 +381,16 @@ describe('POST /api/action', () => {
 			await ask();
 			await advance();
 			await call({ type: 'React', player: 'Human', reaction: 'Hex' });
-			expect(lastTurn().message).toContain('Hexed');
+			expect(lastVerdict().message).toContain('Hexed');
 		});
 
-		it('logs Sköll reacting to the human’s Ask (React part, gemini source)', async () => {
+		it('logs Sköll reacting to the human’s Ask (React part, gemini source → llm)', async () => {
 			skollReacts(async () => ({ reaction: 'Pass' }));
 			openGate(); // gate open → Gemini decided → source gemini (drives the LLM badge)
 			await ask();
-			const react = byChannel('skoll').find((e) => e.message.includes('reacts to your Ask: Pass'))!;
-			expect(react).toMatchObject({ part: 'React' });
+			const react = skollMoves().find((e) => e.part === 'React')!;
+			expect(react).toMatchObject({ kind: 'llm', part: 'React' });
+			expect(react.message).toContain('reacts to your Ask: Pass');
 			expect(react.data).toMatchObject({ choice: 'Pass', source: 'gemini' });
 		});
 
@@ -386,22 +404,22 @@ describe('POST /api/action', () => {
 			}));
 			await ask(); // hand him the turn (Pass gate closed → he learns nothing first)
 			await advance();
-			const move = byChannel('skoll').at(-1)!;
+			const move = skollMoves().at(-1)!;
 			expect(move.data?.crossedThisMove).toEqual([4, 8]);
 			// Reasoning is the state he reasoned FROM — no facts yet → the opening-hunch line, 0 crossed.
 			expect(String(move.data?.reasoning)).toContain('hunch');
 		});
 
-		it('drains raw Gemini I/O onto the log as a sensitive event (verbose)', async () => {
+		it('drains raw Gemini I/O onto the log as a sensitive Sköll llm event (verbose)', async () => {
 			// The real seam is mocked here, so seed THIS session's sink the way gemini.ts would (inside
-			// the session context), then advance — the route drains it as a sensitive `gemini` event.
+			// the session context), then advance — the route drains it as a sensitive Sköll llm event.
 			await ask(); // hand the wolf his turn
 			runWithSession(SID, () =>
 				captureGemini({ label: 'move', request: { contents: 'board…' }, response: { text: '{}' } })
 			);
 			await advance();
-			const io = byChannel('gemini').at(-1)!;
-			expect(io).toMatchObject({ sensitive: true });
+			const io = geminiIO().at(-1)!;
+			expect(io).toMatchObject({ kind: 'llm', sensitive: true });
 			expect(io.message).toContain('move');
 			expect(io.data).toMatchObject({ response: { text: '{}' } });
 		});

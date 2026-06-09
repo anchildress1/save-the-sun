@@ -19,7 +19,9 @@ import {
 
 const SID = 'log-session';
 const ev = (over: Partial<DebugEvent> = {}): Omit<DebugEvent, 'seq'> => ({
-	channel: 'turn',
+	owner: 'Engine',
+	kind: 'deterministic',
+	part: 'Round',
 	level: 'info',
 	message: 'm',
 	...over
@@ -38,7 +40,7 @@ describe('debug event log', () => {
 
 	it('appends with a monotonic seq', () => {
 		logEvent(SID, ev());
-		logEvent(SID, ev({ channel: 'skoll' }));
+		logEvent(SID, ev({ owner: 'Sköll', kind: 'llm', part: 'React' }));
 		expect(getEvents(SID).map((e) => e.seq)).toEqual([1, 2]);
 	});
 
@@ -80,8 +82,16 @@ describe('debugLevel', () => {
 
 describe('filterForLevel', () => {
 	const events: DebugEvent[] = [
-		{ seq: 1, channel: 'turn', level: 'info', message: 'safe' },
-		{ seq: 2, channel: 'session', level: 'info', sensitive: true, message: 'the secret' }
+		{ seq: 1, owner: 'Human', kind: 'input', part: 'Ask', level: 'info', message: 'safe' },
+		{
+			seq: 2,
+			owner: 'Engine',
+			kind: 'deterministic',
+			part: 'Round',
+			level: 'info',
+			sensitive: true,
+			message: 'the secret'
+		}
 	];
 
 	it('off hides everything', () => {

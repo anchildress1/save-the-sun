@@ -149,13 +149,13 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 10. Debug view (S8)
 
-- [x] [I] Engine fact vs LLM inference cleanly separated: the engine's verdict is the ONLY thing on a `turn` event; the inference (Oracle reading, Sköll reasoning + source) lives on its own `oracle`/`skoll` channel
-- [x] [I] Any turn the deterministic floor fired is flagged (warn on the `skoll` channel)
+- [x] [I] Engine fact vs LLM inference cleanly separated: a verdict is the ENGINE's (`owner: Engine, kind: deterministic`), never the actor's; a human Ask splits into her `input`, the Oracle's `llm` reading, and the engine's `deterministic` verdict
+- [x] [I] A floored Sköll move is `kind: deterministic` + `level: warn` (not a message string)
 - [x] [U] Per-session event stream: seq, bounded trim, session isolation; lifecycle-linked — reset on a new round (reseeded with the new secret) **and** evicted with the session
 - [x] [U][I] `DEBUG_LOG` verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev / off in prod; filtered server-side (`/api/debug` + page load)
 - [x] [I][U] Raw Gemini I/O captured (verbose) as a sensitive event, **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe snapshot so neither the API nor the load 500s
 - [x] [I] Sköll's move event shows the cross-offs made **this** turn (the delta), consistent with the pre-move reasoning
-- [x] [C] Cards coloured by source (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine); an LLM-vs-deterministic badge (Sköll's gemini move = LLM, floor = deterministic); a turn-part chip (Ask / Cast / React / Round)
+- [x] [C] Cards coloured by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine), badged by **kind** (`input` / `llm` / `deterministic`; Sköll's gemini move = llm, floor = deterministic), chipped by **part** (Ask / Cast / React / Round)
 
 ## 11. Voice / copy conformance (lint + eval, not coverage-gated)
 

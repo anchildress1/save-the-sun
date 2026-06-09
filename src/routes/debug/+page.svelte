@@ -30,30 +30,9 @@
 
 	const pretty = (d: unknown) => JSON.stringify(d, null, 2);
 
-	type Source = 'human' | 'oracle' | 'skoll' | 'session';
-	const LABEL: Record<Source, string> = {
-		human: 'Human',
-		oracle: 'Oracle',
-		skoll: 'Sköll',
-		session: 'Engine'
-	};
-
-	// Card colour = WHO the event belongs to. A turn verdict is its actor's; the raw Gemini call IS
-	// Sköll's move/reaction (the model computing his move), so it's his too — kept distinct as a raw-I/O
-	// card, not a separate actor. The Oracle and the secret name themselves.
-	function source(e: DebugEvent): Source {
-		if (e.channel === 'turn') return e.actor === 'Sköll' ? 'skoll' : 'human';
-		if (e.channel === 'gemini') return 'skoll';
-		return e.channel as Source; // 'oracle' | 'skoll' | 'session'
-	}
-
-	// Orthogonal to colour: was this reached by a model call? The Oracle's read and the raw Gemini I/O
-	// always are; a Sköll move/reaction is LLM only when Gemini decided it (the floor is deterministic).
-	function isLlm(e: DebugEvent): boolean {
-		if (e.channel === 'oracle' || e.channel === 'gemini') return true;
-		if (e.channel === 'skoll') return e.data?.source === 'gemini';
-		return false; // turn verdicts + the round's secret are the deterministic engine
-	}
+	// Three explicit fields, no derivation: owner → colour class, kind → badge, part → chip.
+	const ownerClass = (e: DebugEvent) => e.owner.toLowerCase().replace('ö', 'o'); // 'Sköll' → 'skoll'
+	const KIND_LABEL = { input: 'input', llm: 'LLM', deterministic: 'deterministic' } as const;
 </script>
 
 <svelte:head><title>Save the Sun — debug</title></svelte:head>
@@ -67,13 +46,14 @@
 			<code>DEBUG_LOG</code> to <code>verbose</code> / <code>demo</code> / <code>off</code>).
 		</p>
 		<p class="legend">
-			Colour = source:
+			Colour = owner:
 			<span class="tag human">Human</span>
 			<span class="tag oracle">Oracle</span>
-			<span class="tag skoll">Sköll</span> (incl. his raw Gemini move/reaction calls)
-			<span class="tag session">Engine</span>. The <span class="badge llm">LLM</span> badge marks a
-			model-derived event vs <span class="badge llm det">deterministic</span>; the part chip shows
-			the turn phase.
+			<span class="tag skoll">Sköll</span>
+			<span class="tag engine">Engine</span>. Badge = kind:
+			<span class="badge input">input</span>
+			<span class="badge llm">LLM</span>
+			<span class="badge deterministic">deterministic</span>. The part chip names the turn phase.
 		</p>
 	</header>
 
@@ -86,14 +66,12 @@
 	{:else}
 		<ol reversed>
 			{#each ordered as event (event.seq)}
-				<li class="ev {source(event)} {event.level}" class:sensitive={event.sensitive}>
+				<li class="ev {ownerClass(event)} {event.level}" class:sensitive={event.sensitive}>
 					<div class="head">
 						<span class="seq">#{event.seq}</span>
-						{#if event.part}<span class="part">{event.part}</span>{/if}
-						<span class="who">{LABEL[source(event)]}</span>
-						<span class="badge llm" class:det={!isLlm(event)}>
-							{isLlm(event) ? 'LLM' : 'deterministic'}
-						</span>
+						<span class="part">{event.part}</span>
+						<span class="who">{event.owner}</span>
+						<span class="badge kind-badge {event.kind}">{KIND_LABEL[event.kind]}</span>
 						{#if event.sensitive}<span class="badge sensitive-flag">sensitive</span>{/if}
 						{#if event.level !== 'info'}<span class="badge {event.level}">{event.level}</span>{/if}
 					</div>
@@ -114,12 +92,13 @@
 		box-sizing: border-box;
 	}
 	main {
-		/* Source colours — one per actor, defined once. Gemini (raw I/O) is its own, apart from Sköll. */
-		/* Drawn from the game's palette: gold Oracle, cold-steel Sköll, sage witch, stone engine. */
-		--human: #7ba88c;
-		--oracle: #d9a94a;
-		--skoll: #6c93bd;
-		--session: #9a958a;
+		/* Owner colours — the game's own rune-gem jewel tones (runeVisuals.ts), one per owner.
+		   Green witch · gold Oracle · blue wolf · purple engine. Black is the ground; red is held
+		   back for warn/error so a severity badge never reads as an owner. */
+		--human: #5cbf8a;
+		--oracle: #e6c068;
+		--skoll: #6ea0e0;
+		--engine: #8b5cf6;
 		inline-size: 100%;
 		padding: clamp(1rem, 0.5rem + 2vw, 2.5rem) clamp(0.75rem, 0.5rem + 1.5vw, 2rem);
 		min-block-size: 100dvh;
@@ -174,8 +153,8 @@
 	li.skoll {
 		border-inline-start-color: var(--skoll);
 	}
-	li.session {
-		border-inline-start-color: var(--session);
+	li.engine {
+		border-inline-start-color: var(--engine);
 	}
 	.head {
 		display: flex;
@@ -193,8 +172,8 @@
 	.part {
 		padding: 0.05rem 0.4rem;
 		border-radius: 0.25rem;
-		background: #2c2c34;
-		color: #c8c8d0;
+		background: #2a3247;
+		color: #c2cad8;
 		font-size: 0.68rem;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
@@ -213,31 +192,41 @@
 	li.skoll .who {
 		color: var(--skoll);
 	}
-	li.session .who {
-		color: var(--session);
+	li.engine .who {
+		color: var(--engine);
 	}
 	.badge {
 		padding: 0.05rem 0.45rem;
 		border-radius: 1rem;
-		background: #2c2c34;
-		color: #b8b8c0;
+		background: #33384a;
+		color: #c8cdda;
 		font-size: 0.7rem;
 	}
-	/* LLM badge — highlighted; deterministic — muted. */
-	.badge.llm {
+	/* Kind badge sits at the line's end, whichever kind it is. */
+	.kind-badge {
 		margin-inline-start: auto;
+	}
+	/* Three distinct fills: input — quiet gray outline (raw text, lowest signal); LLM — gold (a guess);
+	   deterministic — green (verified engine truth). Green reads as "confirmed", never confused with
+	   the green Human border since these events sit under the purple Engine border. */
+	.badge.input {
+		background: transparent;
+		border: 1px solid #4a5168;
+		color: #b6bccb;
+	}
+	.badge.llm {
 		background: #5a4a00;
 		color: #ffe08a;
 		font-weight: 600;
 	}
-	.badge.llm.det {
-		background: #2c2c34;
-		color: #8a8a95;
-		font-weight: 400;
+	.badge.deterministic {
+		background: #18402e;
+		color: #7fe0a8;
+		font-weight: 600;
 	}
 	.badge.sensitive-flag {
-		background: #4a1f4a;
-		color: #f0b3f0;
+		background: #3a2f4a;
+		color: #c9b3e8;
 	}
 	.badge.warn {
 		background: #5a4300;
@@ -264,8 +253,8 @@
 	.legend .tag.skoll {
 		background: var(--skoll);
 	}
-	.legend .tag.session {
-		background: var(--session);
+	.legend .tag.engine {
+		background: var(--engine);
 	}
 	.legend .badge {
 		font-size: 0.85em;
