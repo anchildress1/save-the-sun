@@ -238,6 +238,7 @@
 		return () => {
 			window.removeEventListener('resize', onReposition);
 			window.removeEventListener('scroll', onReposition, true);
+			clearTimeout(aiNoteHideTimer); // don't let a scheduled hide fire after teardown
 		};
 	});
 
