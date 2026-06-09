@@ -3,6 +3,7 @@
 	import RuneGrid from '$lib/components/RuneGrid.svelte';
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 	import Onboarding from '$lib/components/Onboarding.svelte';
+	import EndScreen from '$lib/components/EndScreen.svelte';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets/ui/app-icon.png';
@@ -86,6 +87,10 @@
 	let humanWon = $derived(roundOver && winner === 'Human');
 	let skollWon = $derived(roundOver && winner === 'Sköll');
 	let outcomeLine = $derived(humanWon ? RITE.sunCrests : RITE.skollTakes);
+	// The end-screen rite takes over the moment the round resolves (S9). It owns the replay surface, so
+	// the header's own controls fold away while it is up — one "Begin another night" on screen, not two.
+	let showEndScreen = $derived(roundOver);
+	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
 	let nightProgress = $derived(
 		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
 	);
@@ -432,6 +437,20 @@
 		}
 	}
 
+	// "Leave the fire." — step back from the closing rite to the threshold. A fresh round is prepared
+	// behind the title (so the resolved one is discarded, not re-entered), then the title screen returns;
+	// the onboarded flag is cleared so the rite opens as a fresh arrival, not a mid-round resume.
+	async function leaveFire() {
+		await newGame();
+		onboardingStart = 'title';
+		showOnboarding = true;
+		try {
+			localStorage.removeItem(ONBOARDED_KEY);
+		} catch {
+			/* storage unavailable — non-fatal */
+		}
+	}
+
 	async function commitCast() {
 		if (selectedRune === null) return;
 		pending = true;
@@ -514,24 +533,26 @@
 			</p>
 		</div>
 
-		<div class="header-controls">
-			<button
-				class="ghost ritual-button ritual-button--ghost"
-				type="button"
-				data-testid="show-instructions"
-				onclick={showInstructions}
-			>
-				How the rite works
-			</button>
-			<button
-				class="ghost new-game ritual-button ritual-button--ghost"
-				type="button"
-				onclick={newGame}
-				disabled={pending}
-			>
-				Begin another night
-			</button>
-		</div>
+		{#if !showEndScreen}
+			<div class="header-controls">
+				<button
+					class="ghost ritual-button ritual-button--ghost"
+					type="button"
+					data-testid="show-instructions"
+					onclick={showInstructions}
+				>
+					How the rite works
+				</button>
+				<button
+					class="ghost new-game ritual-button ritual-button--ghost"
+					type="button"
+					onclick={newGame}
+					disabled={pending}
+				>
+					Begin another night
+				</button>
+			</div>
+		{/if}
 	</header>
 
 	<div class="game-layout">
@@ -685,6 +706,10 @@
 		</aside>
 	</div>
 </main>
+
+{#if showEndScreen}
+	<EndScreen outcome={endOutcome} onReplay={newGame} onLeave={leaveFire} />
+{/if}
 
 {#if showOnboarding}
 	<Onboarding onDone={finishOnboarding} start={onboardingStart} />
