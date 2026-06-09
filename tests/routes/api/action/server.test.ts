@@ -286,10 +286,9 @@ describe('POST /api/action', () => {
 		});
 	});
 
-	// S8 / R8 debug log — the chronological stream the /debug view reads. Three orthogonal facts per
-	// event: owner (who), kind (raw input · LLM inference · deterministic engine), part (turn phase).
-	// A verdict is the ENGINE's deterministic truth, never the actor's; the inference that reached a
-	// move is its own owner (Oracle reads the human's text, Sköll owns his move + reasoning + source).
+	// Debug log — the chronological stream the /debug view reads. Three orthogonal facts per event:
+	// owner (who), kind (input · llm · deterministic), part (turn phase). A verdict is the ENGINE's,
+	// never the actor's; the inference that reached a move is its own owner.
 	const events = () => getEvents(SID);
 	const byOwner = (owner: string) => events().filter((e) => e.owner === owner);
 	// Engine verdicts — the deterministic truth rows (the round's opening secret is part 'Round').

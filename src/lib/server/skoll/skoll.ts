@@ -1,4 +1,4 @@
-// Sköll's turn orchestration (S6) — the seam where the Gemini opponent plays through the
+// Sköll's turn orchestration — the seam where the Gemini opponent plays through the
 // SAME engine interface as the human. Gemini decides; the engine referees. Every tool call is
 // validated here before the engine resolves it; an error, timeout, or illegal/malformed call
 // drops to the deterministic floor (never as a quality filter on a legal move).
@@ -39,7 +39,7 @@ export interface SkollState {
 	rng: () => number;
 }
 
-/** How a move was reached: which seam decided it, and the reasoning to show on stage (S8). */
+/** How a move was reached: which seam decided it, and the reasoning to show on stage. */
 export interface SkollDecision {
 	source: SkollSource;
 	reasoning: string;
@@ -102,8 +102,8 @@ export interface RawSkollDecision {
 	query?: unknown;
 	runeName?: string;
 	crossOff?: unknown;
-	// His thinking trace, when the model returns one (S8). Untrusted display text only — never
-	// validated into a move; absent on MINIMAL thinking, in which case the floor's payload stands in.
+	// His thinking trace, when the model returns one. Untrusted display text only — never validated
+	// into a move; absent on MINIMAL thinking, in which case the floor's payload stands in.
 	reasoning?: string;
 }
 
@@ -279,7 +279,7 @@ export function resolveSkollAsk(
 	return { hexed: false, affirmative: result.answer, shared };
 }
 
-// --- Sköll reacting to the human's Ask (R12 reverse direction) ---
+// --- Sköll reacting to the human's Ask (the reverse direction) ---
 
 /** The earned-only view for a reaction decision: his state + the trait the human just asked. */
 export interface SkollReactionView {

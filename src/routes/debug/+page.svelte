@@ -30,7 +30,6 @@
 
 	const pretty = (d: unknown) => JSON.stringify(d, null, 2);
 
-	// Three explicit fields, no derivation: owner → colour class, kind → badge, part → chip.
 	const ownerClass = (e: DebugEvent) => e.owner.toLowerCase().replace('ö', 'o'); // 'Sköll' → 'skoll'
 	const KIND_LABEL = { input: 'input', llm: 'LLM', deterministic: 'deterministic' } as const;
 </script>
@@ -85,16 +84,14 @@
 </main>
 
 <style>
-	/* Fluid throughout — no fixed widths or breakpoints. border-box so padding never widens a box
-	   past its track, scoped to this view so it can't leak into the game. */
+	/* border-box so padding never widens a box past its track; scoped so it can't leak into the game. */
 	main,
 	main * {
 		box-sizing: border-box;
 	}
 	main {
-		/* Owner colours — the game's own rune-gem jewel tones (runeVisuals.ts), one per owner.
-		   Green witch · gold Oracle · blue wolf · purple engine. Black is the ground; red is held
-		   back for warn/error so a severity badge never reads as an owner. */
+		/* Owner colours — the game's own rune-gem jewel tones (runeVisuals.ts). Red is held back for
+		   warn/error so a severity badge never reads as an owner. */
 		--human: #5cbf8a;
 		--oracle: #e6c068;
 		--skoll: #6ea0e0;
@@ -143,7 +140,6 @@
 		padding: 0.6rem 0.9rem;
 		background: #1d1d22;
 	}
-	/* Border = source. Severity (warn/error) and LLM-vs-deterministic are badges, not the colour. */
 	li.human {
 		border-inline-start-color: var(--human);
 	}
@@ -168,7 +164,6 @@
 	.seq {
 		color: #7a7a85;
 	}
-	/* Turn phase (Ask / Cast / React / Round). */
 	.part {
 		padding: 0.05rem 0.4rem;
 		border-radius: 0.25rem;
@@ -179,7 +174,6 @@
 		letter-spacing: 0.04em;
 		font-weight: 600;
 	}
-	/* The source label, coloured to match its border. */
 	.who {
 		font-weight: 700;
 	}
@@ -202,13 +196,10 @@
 		color: #c8cdda;
 		font-size: 0.7rem;
 	}
-	/* Kind badge sits at the line's end, whichever kind it is. */
 	.kind-badge {
 		margin-inline-start: auto;
 	}
-	/* Three distinct fills: input — quiet gray outline (raw text, lowest signal); LLM — gold (a guess);
-	   deterministic — green (verified engine truth). Green reads as "confirmed", never confused with
-	   the green Human border since these events sit under the purple Engine border. */
+	/* Three distinct fills so the kinds never blur: outline input, gold LLM, green deterministic. */
 	.badge.input {
 		background: transparent;
 		border: 1px solid #4a5168;
@@ -236,7 +227,6 @@
 		background: #5a1f1f;
 		color: #ff9d9d;
 	}
-	/* Legend swatches. */
 	.legend .tag {
 		padding: 0.05rem 0.4rem;
 		border-radius: 0.25rem;
@@ -268,8 +258,7 @@
 		padding: 0.5rem 0.7rem;
 		background: #121215;
 		border-radius: 0.3rem;
-		/* Wrap the raw JSON (long system-instruction / base64 strings) instead of scrolling — keeps
-		   indentation, never pushes the page wide. */
+		/* Wrap long raw JSON (system-instruction / base64) instead of scrolling — never pushes the page wide. */
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 		font-size: 0.8rem;

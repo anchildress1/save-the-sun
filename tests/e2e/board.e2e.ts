@@ -2,9 +2,8 @@ import { expect, test } from '@playwright/test';
 
 const ONBOARDED_KEY = 'save-the-sun:onboarded';
 
-// S7 puts a first-run title overlay over the live board. These tests drive the board itself, so
-// seed the onboarded flag (via an init script that runs before the page's own scripts) to open
-// straight on the grid. The onboarding flow is exercised in its own describe below.
+// A first-run title overlay covers the live board. These tests drive the board itself, so seed the
+// onboarded flag (an init script that runs before the page's own) to open straight on the grid.
 test.describe('the live board (past the title screen)', () => {
 	test.beforeEach(async ({ page }) => {
 		await page.addInitScript((key) => {
@@ -184,9 +183,9 @@ test.describe('the live board (past the title screen)', () => {
 	});
 });
 
-// S7 title screen + coach-mark tour, end to end over the live board (what the component/page suites
-// can't prove: the real overlay against the real grid, and dismissal persisting across a reload).
-test.describe('first-run onboarding (S7)', () => {
+// Title screen + coach-mark tour end to end, what the component/page suites can't prove: the real
+// overlay against the real grid, and dismissal persisting across a reload.
+test.describe('first-run onboarding', () => {
 	test('shows the title over the live board, dismisses, and stays dismissed on reload', async ({
 		page
 	}) => {

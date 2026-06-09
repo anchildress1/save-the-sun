@@ -1,4 +1,4 @@
-// Oracle deterministic core (S2) — voices the engine's truth, per `ux-copy.md` §1.
+// Oracle deterministic core — voices the engine's truth.
 
 import { dev } from '$app/environment';
 import { parseQuery, type PowerOp, type Query } from '$lib/server/engine/queries';
@@ -132,7 +132,7 @@ export function answerAsk(
 			`[oracle] engine answered ${result.answer} for ${JSON.stringify(query)} [deterministic-engine]`
 		);
 
-	// The echo is for the opponent's Ask (S5/S6); your own Ask shows the answer, which restates the trait.
+	// The echo is for the opponent's Ask; your own Ask shows the answer, which restates the trait.
 	return {
 		ok: true,
 		echo: `You ask after ${paraphrase}.`,

@@ -19,9 +19,7 @@
 	// should fail loudly, not silently fall back to a frozen board.
 	let { data }: PageProps = $props();
 
-	// Every in-world line the Rite swaps in at runtime, in one place (ux-copy.md). Static chrome
-	// (title, button labels) stays inline in the template; these are the lines the Oracle panel,
-	// the turn pill, and the cast prompt show as play resolves.
+	// Every in-world line the Rite swaps in at runtime, in one place (canonical copy: ux-copy.md).
 	const RITE = {
 		emptyAsk: 'Speak your question, witch.',
 		wolfMoving: 'The wolf is moving. Hold.',
@@ -31,26 +29,18 @@
 		runeTrue: 'The rune is true.',
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
-		// His turn failed to load (network/Advance error) — in-world stall with a retry affordance.
 		wolfStalled: 'The wolf stalls in the dark. Rouse him to move.',
-		// Reaction outcomes on Sköll's Ask (ux-copy.md §3). A Scry surfaces his answer itself in the
-		// panel, so it needs no separate flavor line.
 		hexHim: "You close the Oracle's lips. His question dies unanswered — his turn with it.",
 		passHim: 'You hold your hand. Let him have his answer.',
-		// Sköll hexing your Ask (ux-copy.md §3). Named in the rite's voice (third person) so the
-		// Oracle frame says who silenced you — without putting Sköll's first-person gloat in its mouth.
+		// Third person so the Oracle frame names who silenced you, not Sköll's first-person gloat.
 		askSilenced: 'Sköll Hexes your question. It dies unanswered.',
-		// Resolution lines (ux-copy.md §4) — voiced in the header when a round ends. A human win
-		// raises the sun under sunCrests; a Sköll win keeps the moon under the defeat line.
 		sunCrests: 'Sól crests the rim of the world.',
 		skollTakesSun: 'Sköll takes the sun. The longest day never breaks. The year falls to dark.',
 		skollTakes: 'Sköll takes the sun.',
-		// Night-progress chrome (ux-copy.md §6), keyed to elapsed turns — cosmetic, no timer.
 		nightHolds: 'The night lies deep and unbroken.',
 		nightThins: 'Gray bleeds into the dark.',
 		nightDawn: 'Dawn gathers at the edge of the world.',
 		chooseTarget: 'Choose a rune from the board.',
-		// Best-on-desktop notice (R10) — shown below the 1280px minimum; the rite does not reflow.
 		desktopOnly:
 			'The rite needs a wider sky. Save the Sun is cast on a desktop — return on a larger screen to take up the runes.',
 		castPrompt: (name: string) => `Cast ${name}?`
@@ -61,46 +51,37 @@
 	let askValue = $state('');
 	let pending = $state(false);
 
-	// First-run title screen + onboarding (S7). Shown once over the live board, then remembered —
-	// a refresh resumes the same round (S2.5), so the title must not nag the returning player.
+	// Shown once over the live board, then remembered — a refresh resumes the same round, so the title
+	// must not nag the returning player.
 	const ONBOARDED_KEY = 'save-the-sun:onboarded';
 	let showOnboarding = $state(false);
-	// First run opens on the title; the persistent "How the rite works" button reopens the tour itself.
 	let onboardingStart = $state<'title' | 'tour'>('title');
 
-	// Sköll's surfaced turn (S6): his voice this turn, his Ask echo, and whether his Ask is open for
-	// the human to react to. A round can resume on his parked Ask, so the prompt + the human's still-
-	// held charges hydrate from the load (the reaction window lives server-side); otherwise they
-	// start fresh. The engine stays authoritative on charges, so the hydrated values can't over-grant.
+	// A round can resume on Sköll's parked Ask, so the prompt + the human's still-held charges hydrate
+	// from the load (the window lives server-side). The engine stays authoritative, so they can't over-grant.
 	let skollEcho = $state(untrack(() => data.pendingReaction?.echo ?? ''));
 	let skollAsking = $state(untrack(() => data.pendingReaction != null));
 	let heldScry = $state(untrack(() => data.pendingReaction?.held.Scry ?? true));
 	let heldHex = $state(untrack(() => data.pendingReaction?.held.Hex ?? true));
-	// His turn stalled (an Advance request failed). It's still his turn server-side, so the controls
-	// stay locked — surface a retry so the human can rouse him rather than being soft-locked.
+	// His turn stalled (an Advance request failed); it's still his turn server-side, so the controls
+	// stay locked — the retry lets the human rouse him rather than being soft-locked.
 	let skollStalled = $state(false);
 
-	// Turn state mirrors the engine, hydrated from the load (not guessed) so a resumed round — incl.
-	// one already won, or one resumed on Sköll's turn — renders true on load, then fed by each action.
+	// Turn state mirrors the engine, hydrated from the load (not guessed) so a resumed round renders
+	// true on load, then fed by each action.
 	let activePlayer = $state<Player>(untrack(() => data.state.activePlayer));
 	let roundStatus = $state<'active' | 'won'>(untrack(() => data.state.status));
 	let turns = $state<number>(untrack(() => data.state.turns));
 	let winner = $state<Player | null>(untrack(() => data.state.winner));
 	let roundOver = $derived(roundStatus === 'won');
-	// Header swaps the moon for a risen sun on a human win; a Sköll win keeps the moon, defeat line.
 	let humanWon = $derived(roundOver && winner === 'Human');
 	let skollWon = $derived(roundOver && winner === 'Sköll');
-	// Header carries the short tag; the Oracle panel carries the full resolution sentence.
 	let outcomeLine = $derived(humanWon ? RITE.sunCrests : RITE.skollTakes);
-	// Night-progress phase by elapsed turns (cosmetic): holds 0–2, thins 3–5, dawn 6+.
 	let nightProgress = $derived(
 		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
 	);
-	// Ask and Cast are turn-gated; cross-off is a private aid and is never gated (RuneGrid owns
-	// it and stays enabled through Sköll's turn — game-spec "private aid").
+	// Cross-off is a private aid, never turn-gated — RuneGrid owns it and stays enabled through Sköll's turn.
 	let canAct = $derived(activePlayer === 'Human' && !roundOver);
-	// Won rounds read as resolved, not as a phantom turn. A human win lights the victory line; a
-	// Sköll win reads the defeat (the Oracle panel carries the fuller resolution line).
 	let turnPill = $derived(
 		humanWon
 			? RITE.runeTrue
@@ -118,9 +99,8 @@
 		winner = state.winner;
 	}
 
-	// His box shows ONLY his templated question (the inference) when he Asks, and is blank otherwise —
-	// no taunt, no cast line. The cast outcome derives from engine truth (winner) in advanceSkoll, so
-	// there's one source of "Sköll won," not two that can drift.
+	// His box shows ONLY his templated question when he Asks, blank otherwise. The cast outcome derives
+	// from engine truth (winner), so there's one source of "Sköll won," not two that can drift.
 	function applySkoll(skoll: SkollTurn | undefined) {
 		if (skoll === undefined) return;
 		if (skoll.asks) {
@@ -132,17 +112,13 @@
 		}
 	}
 
-	// Tracks the loaded seed until a new game overrides it. A changed seed remounts RuneGrid
-	// (via {#key}), discarding its crossings and highlight; the parent's cast arming is
-	// cleared separately by cancelCast().
+	// A changed seed remounts RuneGrid (via {#key}), discarding its crossings; cast arming is cleared
+	// separately by cancelCast().
 	let seedOverride: number | null = $state(null);
 	let boardSeed = $derived(seedOverride ?? data.boardSeed);
 
-	// The Oracle surface — one response at a time. Defaults read as ready, not blank (prd.md
-	// S3); a resumed won round opens on its victory line so the panel and pill agree. Your Ask
-	// shows the answer, which restates the trait. The interpretation echo is reserved for the
-	// rival's Ask (you'd see his question, not his answer) — wired in S5/S6, so it is
-	// deliberately not rendered for your own Ask today.
+	// The Oracle surface — one response at a time. A resumed won round opens on its victory line so the
+	// panel and pill agree.
 	let answer = $state(
 		untrack(() =>
 			data.state.status !== 'won'
@@ -202,10 +178,8 @@
 		}
 	}
 
-	// A round resumes on whichever turn it was left on (one engine per session). Since Sköll's move
-	// is now its own request, a load can land on his turn — drive it so the game never opens stuck on
-	// "Sköll moves." Its own guard makes it a no-op on the human's turn or a parked Ask (prompt shown).
-	// Wrapped so the async return is never mistaken for an onMount cleanup.
+	// A load can land on Sköll's turn — drive it so the game never opens stuck on "Sköll moves" (his
+	// own guard no-ops otherwise). Wrapped so the async return isn't mistaken for an onMount cleanup.
 	onMount(() => {
 		advanceSkoll();
 		// Storage can throw (private mode) — first-run is the safe default, so show it then.
@@ -234,7 +208,7 @@
 	async function submitAsk() {
 		const question = askValue.trim();
 		if (question === '') {
-			// Refusal does not consume a turn (game-spec). Client-side gate, no dispatch.
+			// An empty Ask never consumes a turn — gated client-side, no dispatch.
 			answer = RITE.emptyAsk;
 			return;
 		}
@@ -247,7 +221,6 @@
 			});
 			applyState(state);
 			if (skollVsYou?.reaction === 'Hex') {
-				// Silenced before any answer: no oracle comes back; the frame names Sköll as the cause.
 				answer = RITE.askSilenced;
 				askValue = '';
 			} else if (oracle?.ok) {
@@ -261,7 +234,7 @@
 			} else {
 				answer = RITE.oracleSilent; // no oracle and not a Hex — unexpected; fail to a safe line
 			}
-			await advanceSkoll(); // your answer shows first, then the wolf takes his turn in his own request
+			await advanceSkoll();
 		} catch (err) {
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
@@ -272,7 +245,6 @@
 		}
 	}
 
-	// The human reacts to Sköll's open Ask: Scry (hear it too), Hex (kill it), or let it pass.
 	async function submitReact(choice: ReactionChoice) {
 		pending = true;
 		try {
@@ -291,7 +263,7 @@
 				answer = RITE.hexHim;
 				heldHex = false;
 			} else if (skollReaction?.scried) {
-				answer = skollReaction.scried.answer; // you hear his answer too
+				answer = skollReaction.scried.answer;
 				heldScry = false;
 			} else {
 				answer = RITE.passHim; // a Pass, or a reaction that didn't land
@@ -332,14 +304,13 @@
 			// reset — treat it as a hard failure, not a silent no-op.
 			if (!Number.isFinite(seed)) throw new Error('New game response missing boardSeed');
 			seedOverride = seed; // remounts RuneGrid → crossings + highlight clear
-			answer = ''; // a fresh round opens blank — the Oracle speaks only when it has a response
+			answer = '';
 			askValue = '';
-			// The wolf's surfaced turn + the human's reactions reset with the round.
 			skollEcho = '';
 			skollAsking = false;
 			heldScry = true;
 			heldHex = true;
-			applyState(state); // reset from engine truth, same as every other action
+			applyState(state);
 			cancelCast();
 		} catch (err) {
 			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
@@ -365,7 +336,7 @@
 				console.warn('[ui] Cast rejected by engine:', cast.reason);
 				answer = RITE.castFalters;
 			}
-			await advanceSkoll(); // a wrong cast hands the wolf his turn (his own request); a win ends it
+			await advanceSkoll();
 		} catch (err) {
 			console.error('[ui] Cast dispatch failed:', err);
 			answer = RITE.castFalters;
@@ -475,8 +446,6 @@
 		</section>
 
 		<aside class="oracle-panel">
-			<!-- Turn state sits with the controls it gates: whose move it is is the reason Ask/Cast are
-			     live or dead. Doubles as the resolution indicator, beside the full line in the frame. -->
 			<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
 				{turnPill}
 			</div>
@@ -487,8 +456,7 @@
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
-			<!-- Always present, like the Oracle frame; carries ONLY his templated question (the
-			     inference) when he Asks, and is blank otherwise — no taunt, no cast line. -->
+			<!-- Always present; carries ONLY his templated question when he Asks, blank otherwise. -->
 			<div class="skoll-frame" data-testid="skoll-frame">
 				<h2 class="skoll-title">Sköll</h2>
 				{#if skollEcho}
@@ -654,7 +622,6 @@
 		filter: drop-shadow(0 0 16px rgba(220, 226, 240, 0.4));
 	}
 
-	/* The risen sun replaces the moon on a human win — the saved sun, warm and radiant. */
 	.sun-risen {
 		width: 58px;
 		height: 58px;
@@ -671,7 +638,6 @@
 		white-space: nowrap;
 	}
 
-	/* Same slot, resolution register: gold for the win, the muted default holds for defeat. */
 	.night-progress.won {
 		color: var(--gold-bright);
 		text-shadow: 0 0 12px rgba(217, 169, 74, 0.4);
@@ -684,7 +650,6 @@
 		gap: 0.8rem;
 	}
 
-	/* At the top of the Oracle panel, centered above the controls it gates. */
 	.turn-pill {
 		align-self: center;
 		font-family: var(--font-display);
@@ -698,7 +663,6 @@
 		font-size: 0.85rem;
 	}
 
-	/* Resolved round: the pill stops reading as a turn and lights up as the victory state. */
 	.turn-pill.won {
 		color: var(--bg-deep);
 		background: linear-gradient(180deg, var(--gold-bright), var(--gold));
@@ -706,7 +670,6 @@
 		box-shadow: 0 0 18px rgba(217, 169, 74, 0.4);
 	}
 
-	/* Defeat: the pill goes cold — no gold, no glow. */
 	.turn-pill.lost {
 		color: var(--ink-muted);
 		background: rgba(120, 130, 150, 0.08);
@@ -729,7 +692,6 @@
 		justify-content: center;
 	}
 
-	/* Oracle panel */
 	.oracle-panel {
 		display: flex;
 		flex-direction: column;
@@ -772,7 +734,7 @@
 		color: var(--gold-bright);
 	}
 
-	/* Sköll's own frame — cold steel to the Oracle's gold, so the duel reads as two voices. */
+	/* Cold steel to the Oracle's gold, so the duel reads as two voices. */
 	.skoll-frame {
 		display: flex;
 		flex-direction: column;
@@ -795,8 +757,6 @@
 		color: #c2cad8; /* moon-cold, deliberately not the Oracle's gold */
 	}
 
-	/* His voice — colder than the Oracle's gold; his presence on the panel. */
-	/* His Ask, echoed so the human knows what they're choosing to Scry, Hex, or let pass. */
 	.skoll-echo {
 		margin: 0;
 		font-family: var(--font-display);
@@ -929,9 +889,8 @@
 		display: block;
 	}
 
-	/* Best-on-desktop notice (R10). Below the 1280px minimum the rite does not reflow — it steps
-	   aside for this notice. This is the one deliberate width breakpoint; the desktop layout itself
-	   stays intrinsic (no media queries above the floor). */
+	/* The one deliberate width breakpoint: below the 1280px minimum the rite steps aside for this
+	   notice rather than reflowing. The desktop layout above the floor stays intrinsic. */
 	.desktop-notice {
 		display: none;
 	}

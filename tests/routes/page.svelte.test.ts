@@ -22,8 +22,8 @@ const props = (state: GameState, pendingReaction: PendingReaction = null) => ({
 const pageProps = props(HUMAN_TURN);
 const propsWith = (state: GameState) => props(state);
 
-// These tests drive the in-game board, so the first-run title screen (S7) must be out of the way —
-// mark the player onboarded before each render. The onboarding flow itself is covered below.
+// These tests drive the in-game board, so mark the player onboarded before each render to clear the
+// first-run title screen. The onboarding flow itself is covered below.
 beforeEach(() => {
 	localStorage.setItem(ONBOARDED_KEY, '1');
 });
@@ -48,7 +48,7 @@ const askResult = (oracle: object, state: GameState = HUMAN_TURN) =>
 const castResult = (cast: object, state: GameState = HUMAN_TURN) =>
 	respond({ type: 'Cast', cast, state });
 
-// --- S6: Sköll's surfaced turn + the human's reactions ---
+// --- Sköll's surfaced turn + the human's reactions ---
 
 // Sköll's move arrives on a SEPARATE Advance request now, so the stub routes by action type:
 // the Ask returns the human's answer (turn handed to Sköll), Advance returns the wolf's move, and

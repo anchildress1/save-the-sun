@@ -70,13 +70,13 @@ export interface SkollTurn {
 	asks?: { echo: string };
 }
 
-/** How Sköll's parked Ask resolved after the human reacted (S6). A Hex kills it; a Scry shares it. */
+/** How Sköll's parked Ask resolved after the human reacted. A Hex kills it; a Scry shares it. */
 export interface SkollReaction {
 	hexed: boolean;
 	scried?: { answer: string };
 }
 
-/** How Sköll reacted to the *human's* Ask (S6, R12 reverse): Hex kills it, Scry overhears it. */
+/** How Sköll reacted to the *human's* Ask: Hex kills it, Scry overhears it. */
 export interface SkollVsYou {
 	reaction: 'Scry' | 'Hex' | 'Pass';
 }

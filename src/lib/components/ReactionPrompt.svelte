@@ -2,9 +2,8 @@
 	import type { Reaction } from '$lib/server/engine/engine';
 	import type { ReactionChoice } from '$lib/server/engine/reactions';
 
-	// The human-side interrupt prompt (ux-copy.md §3): shown when Sköll Asks, so the witch can
-	// overhear (Scry) or silence (Hex) the question — or let it pass. A spent reaction is gone for
-	// the round, so only held reactions are offered (no "spent" copy). Lit live when S6's Sköll Asks.
+	// The human-side interrupt prompt: shown when Sköll Asks, so the witch can overhear (Scry) or
+	// silence (Hex) the question — or let it pass. Only held reactions are offered (a spent one vanishes).
 	let {
 		held,
 		onReact

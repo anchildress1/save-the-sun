@@ -85,8 +85,8 @@ describe('session engine registry', () => {
 		expect(getSkoll('wolf-victim').facts).toEqual([]);
 	});
 
-	// The S8 debug log is lifecycle-linked to the round through this registry (reset on a new round,
-	// evicted with the session) — the wiring, not just resetLog in isolation.
+	// The debug log is lifecycle-linked to the round through this registry — the wiring, not just
+	// resetLog in isolation.
 	it('wipes the debug log on a new round, reseeded with the new secret', () => {
 		getEngine('log-reset'); // create → logs the round's secret event
 		logEvent('log-reset', {

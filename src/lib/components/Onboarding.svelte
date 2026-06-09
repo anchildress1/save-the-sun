@@ -1,15 +1,13 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 
-	// Title screen + first-run coach-mark tour (ux-copy.md §5). The title is a centered card; the tour
-	// spotlights the live board region each step describes (the runes, the Ask, the Cast) with a
-	// popover anchored beside it. The how-to lives here in the steps, never as persistent on-board
-	// text. `onDone` fires on every exit — Light the fire, Skip, or Take up the runes. `start` lets the
-	// page reopen straight into the tour from a persistent "How the rite works" button.
+	// Title screen + first-run coach-mark tour: the tour spotlights the live board region each step
+	// describes, so the how-to lives in the steps rather than as persistent on-board text. `onDone`
+	// fires on every exit; `start` lets the page reopen straight into the tour.
 	let { onDone, start = 'title' }: { onDone: () => void; start?: 'title' | 'tour' } = $props();
 
-	// One concept per step (ux-copy.md §5 steps 1–5). `target` is the page's data-coach hook the
-	// spotlight anchors to; a missing target falls back to a centered popover (still readable).
+	// `target` is the page's data-coach hook the spotlight anchors to; a missing one falls back to a
+	// centered popover.
 	const STEPS = [
 		{
 			// Scene-setting, not a pointer — no anchor, so it opens as a centered intro and the board

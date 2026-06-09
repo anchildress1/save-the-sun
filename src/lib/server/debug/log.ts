@@ -1,6 +1,6 @@
-// Debug log (S8/R8) — the on-stage proof that the engine owns truth, plus a full diagnostic stream
-// for development. A per-session chronological event log: human questions, the opponent's action +
-// reasoning each turn, the engine's verdicts, and (verbose only) the secret + raw Gemini I/O.
+// Debug log — the on-stage proof that the engine owns truth, plus a full diagnostic stream. A
+// per-session chronological event log: human questions, the opponent's action + reasoning each turn,
+// the engine's verdicts, and (verbose only) the secret + raw Gemini I/O.
 //
 // Exposure is gated by DEBUG_LOG (verbose | demo | off):
 //   verbose — everything, including `sensitive` events (the secret, raw model request/response)
@@ -17,12 +17,8 @@ import { env } from '$env/dynamic/private';
 
 export type DebugLevel = 'verbose' | 'demo' | 'off';
 
-// Three orthogonal facts, each carried explicitly so the view never has to re-derive them:
-//   owner — who produced the event → the card's colour
-//   kind  — what produced it → the badge (raw player input · LLM inference · deterministic engine)
-//   part  — the turn phase → the chip
-// A turn verdict is the ENGINE's (owner Engine, deterministic), never the actor's; the human's
-// question is HERS (owner Human, input); the Oracle's reading of it is the Oracle's (owner Oracle, llm).
+// Three orthogonal facts set at the source so the view never re-derives them: owner (→ colour), kind
+// (→ badge), part (→ chip). A verdict is the ENGINE's, never the actor's whose turn it was.
 export type Owner = 'Human' | 'Oracle' | 'Sköll' | 'Engine';
 export type Kind = 'input' | 'llm' | 'deterministic';
 export type TurnPart = 'Ask' | 'Cast' | 'React' | 'Round';
@@ -37,8 +33,6 @@ export interface DebugEvent {
 	// Held back unless DEBUG_LOG=verbose: the secret and raw Gemini request/response.
 	sensitive?: boolean;
 	message: string;
-	// Structured detail rendered beneath the line — the interpreted query, the chosen move + source,
-	// the raw model I/O.
 	data?: Record<string, unknown>;
 }
 
@@ -81,10 +75,8 @@ export function filterForLevel(events: DebugEvent[], level: DebugLevel): DebugEv
 }
 
 // --- Raw Gemini I/O sink (verbose only) -------------------------------------------------------
-// gemini.ts has no sessionId, so it tees its raw request/response here and the action route drains
-// it onto the session's log right after the call. The sink is keyed PER SESSION via an
-// AsyncLocalStorage the route opens around the action — so two players running verbose turns
-// concurrently never drain each other's I/O (a process-global sink would).
+// gemini.ts has no sessionId, so it tees its raw I/O here and the route drains it. Keyed PER SESSION
+// via an AsyncLocalStorage so concurrent verbose turns never drain each other's I/O.
 export interface GeminiCall {
 	label: 'move' | 'reaction';
 	request: unknown;
@@ -101,11 +93,9 @@ export function runWithSession<T>(sessionId: string, fn: () => T): T {
 }
 
 /**
- * A JSON-safe snapshot of a value. The SDK response is a class instance (getters, non-POJO) that
- * SvelteKit's load serializer (devalue) rejects — and may carry cycles that crash `json()` too. So
- * walk it into a plain object: own enumerable data only (prototype methods/getters dropped, like
- * JSON), functions/symbols dropped, cycles broken to '[Circular]', Dates to ISO. A throwing getter
- * (or anything else) degrades the whole value to a marker rather than crashing the view.
+ * A JSON-safe snapshot of a value. The SDK response is a non-POJO class instance that SvelteKit's
+ * load serializer (devalue) rejects, and may carry cycles that crash `json()` — so walk it into a
+ * plain object. A throwing getter degrades the whole value to a marker rather than crashing the view.
  */
 function toSerializable(value: unknown): unknown {
 	if (value === undefined) return undefined;

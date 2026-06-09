@@ -1,6 +1,5 @@
-// Sköll's Gemini brain (S6) — the LLM seam that decides his move. Excluded from coverage:
-// skoll.ts re-validates everything it returns and drops to the deterministic floor on any
-// failure. gemini-3.5-flash, MINIMAL thinking, structured JSON out (responseSchema).
+// Sköll's Gemini brain — the LLM seam that decides his move. Not coverage-gated: skoll.ts re-validates
+// everything it returns and drops to the floor on any failure. gemini-3.5-flash, MINIMAL thinking.
 //
 // Prompts are tuned for Gemini 3.5 Flash (directness over verbosity): XML-tagged sections, explicit
 // negative constraints, a few-shot anchor, data-before-task ordering. The challenge here is the
