@@ -177,7 +177,6 @@
 {#if phase === 'title'}
 	<div class="backdrop title-backdrop" data-testid="onboarding">
 		<img class="title-splash" src={introSplash} alt="" aria-hidden="true" decoding="async" />
-		<div class="title-scrim" aria-hidden="true"></div>
 		<div
 			class="title-card"
 			role="dialog"
@@ -266,27 +265,6 @@
 		height: 100%;
 		object-fit: cover;
 		object-position: 50% 40%;
-	}
-
-	.title-scrim {
-		position: absolute;
-		inset: 0;
-		z-index: 1;
-		pointer-events: none;
-		background:
-			radial-gradient(
-				ellipse 58% 44% at 50% 52%,
-				rgba(6, 9, 18, 0.74) 0%,
-				rgba(6, 9, 18, 0.34) 56%,
-				transparent 100%
-			),
-			linear-gradient(
-				180deg,
-				rgba(6, 9, 18, 0.5) 0%,
-				transparent 26%,
-				transparent 60%,
-				rgba(6, 9, 18, 0.82) 100%
-			);
 	}
 
 	.title-card {
