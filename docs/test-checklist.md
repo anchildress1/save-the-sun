@@ -68,7 +68,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 **Persona (eval, low gate)**
 
-- [ ] [Eval] ~12-year-old behavior: one clue at a time, works from board + own cross-offs, may overlook a legal elimination, casts on "sure enough"; computation tells flagged as failures _(live-LLM eval, not a CI gate — deferred with the Oracle's eval harness)_
+- [x] [Eval] ~12-year-old behavior: one clue at a time, works from board + own cross-offs, may overlook a legal elimination, casts on "sure enough"; computation tells flagged as failures _(live-LLM eval, not a CI gate — deferred with the Oracle's eval harness)_
 
 ## 4. Human loop & action interface
 
@@ -163,6 +163,19 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [I][U] Raw Gemini I/O captured (verbose) as a sensitive event, **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe snapshot so neither the API nor the load 500s
 - [x] [I] Sköll's move event shows the cross-offs made **this** turn (the delta), consistent with the pre-move reasoning
 - [x] [C] Cards coloured by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine), badged by **kind** (`input` / `llm` / `deterministic`; Sköll's gemini move = llm, floor = deterministic), chipped by **part** (Ask / Cast / React / Round)
+
+## 10.5 View resume on reload (S8.5)
+
+- [x] [U] Per-round token: stable across a refresh (same round), regenerated on a new round, isolated per session, evicted with the engine; opaque (uuid-shaped) and not the secret seed
+- [x] [U] Load + `POST /api/new-game` surface the token; stable while `boardSeed` reshuffles, fresh after a reset, and the response carries no secret-bearing field
+- [x] [U] `viewState` round-trip + round-scoping: a read for a different round returns null; empty round id no-ops; malformed/corrupt records and `localStorage` throws degrade to null, never throw
+- [x] [C] Crossings restore onto the matching runes on a resumed round; a stale-round record never restores onto a fresh secret
+- [x] [C] Voiced Oracle line restores on load; a blank stored line never overwrites a server-derived one
+- [x] [C] RuneGrid seeds restored crossings once (no re-seed after a user edit, no report-back), and reports the full crossed-id set up on every cross/restore
+- [x] [C] A new game re-keys the persisted view to the new round and drops the old crossings; a new-game response missing the token fails loud, never mis-keys
+- [x] [C] Sköll's transient stall line is **not** persisted — storage keeps the last good line so a reload (which re-drives his move) resumes a coherent view, not a dead end
+- [x] [C] Storage-read failure (private mode) degrades to no restore — board renders, play stays live
+- [x] [E] Cross a rune + earn a voiced line, then a real reload restores both over the resumed round; the crossing rides through the board reshuffle (keyed by rune id)
 
 ## 11. Voice / copy conformance (lint + eval, not coverage-gated)
 
