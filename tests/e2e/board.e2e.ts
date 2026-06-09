@@ -216,9 +216,19 @@ test.describe('first-run onboarding', () => {
 		// The board stays visible behind each coach-mark.
 		await expect(page.locator('.rune-card')).toHaveCount(24);
 
-		for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Next' }).click();
+		await page.mouse.wheel(0, 600);
+		await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+
+		for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Next' }).click();
+		await expect(page.getByTestId('step-count')).toHaveText('4 / 5');
+		await expect(page.getByRole('heading', { name: 'Scry & Hex' })).toBeVisible();
+
+		await page.getByRole('button', { name: 'Next' }).click();
 		await expect(page.getByTestId('step-count')).toHaveText('5 / 5');
-		await page.getByRole('button', { name: 'Take up the runes.' }).click();
+		await expect(page.getByRole('heading', { name: 'Cast' })).toBeVisible();
+		const takeUp = page.getByRole('button', { name: 'Take up the runes.' });
+		await expect(takeUp).toBeInViewport();
+		await takeUp.click();
 		await expect(page.getByTestId('onboarding')).toHaveCount(0);
 	});
 

@@ -55,6 +55,8 @@
 	let selectedTargetId: number | null = $state(null);
 	let askValue = $state('');
 	let pending = $state(false);
+	let aiNoteButton: HTMLButtonElement | null = $state(null);
+	let aiNotePopover: HTMLElement | null = $state(null);
 
 	// Shown once over the live board, then remembered — a refresh resumes the same round, so the title
 	// must not nag the returning player.
@@ -194,7 +196,33 @@
 		} catch {
 			showOnboarding = true;
 		}
+
+		function onReposition() {
+			if (aiNotePopover?.matches(':popover-open')) positionAiNotePopover();
+		}
+		window.addEventListener('resize', onReposition);
+		window.addEventListener('scroll', onReposition, true);
+		return () => {
+			window.removeEventListener('resize', onReposition);
+			window.removeEventListener('scroll', onReposition, true);
+		};
 	});
+
+	function positionAiNotePopover() {
+		if (!aiNoteButton || !aiNotePopover) return;
+		const margin = 16;
+		const gap = 8;
+		const button = aiNoteButton.getBoundingClientRect();
+		const width = Math.min(320, window.innerWidth - margin * 2);
+		const left = Math.max(
+			margin,
+			Math.min(button.left + button.width / 2 - width / 2, window.innerWidth - width - margin)
+		);
+		const top = Math.min(button.bottom + gap, window.innerHeight - margin);
+		aiNotePopover.style.setProperty('--ai-note-left', `${left}px`);
+		aiNotePopover.style.setProperty('--ai-note-top', `${top}px`);
+		aiNotePopover.style.setProperty('--ai-note-width', `${width}px`);
+	}
 
 	function finishOnboarding() {
 		showOnboarding = false;
@@ -449,16 +477,26 @@
 				</div>
 				<span class="ai-note-wrap">
 					<button
-						class="ghost ai-note-btn"
+						class="ai-note-btn"
 						type="button"
 						aria-describedby="ai-note"
+						aria-haspopup="dialog"
 						aria-label="About the AI behind the Oracle and Sköll"
+						popovertarget="ai-note"
+						bind:this={aiNoteButton}
+						onclick={positionAiNotePopover}
 					>
 						i
 					</button>
-					<span id="ai-note" role="tooltip" class="ai-note-pop">
-						The Oracle and Sköll run on a live AI. It misreads and misplays sometimes — the runes
-						and rules are exact, the voices reading them are not. Blame the machine, not the writer.
+					<span
+						id="ai-note"
+						role="tooltip"
+						class="ai-note-pop"
+						popover="auto"
+						bind:this={aiNotePopover}
+					>
+						The Oracle and Sköll are live AI driving answers and rival moves. They can misread,
+						misplay, and make mistakes; the rules and rune data are exact.
 					</span>
 				</span>
 			</div>
@@ -730,10 +768,13 @@
 	}
 
 	.turn-pill-row {
-		align-self: center;
+		align-self: stretch;
 		display: inline-flex;
 		align-items: center;
+		justify-content: center;
 		gap: 0.45rem;
+		position: relative;
+		z-index: 4;
 	}
 	.turn-pill {
 		align-self: center;
@@ -817,6 +858,10 @@
 	.oracle-panel > :not(.skoll-banner) {
 		position: relative;
 		z-index: 2;
+	}
+
+	.oracle-panel > .turn-pill-row {
+		z-index: 4;
 	}
 
 	.oracle-title {
@@ -963,49 +1008,69 @@
 		outline-offset: 2px;
 	}
 
-	/* AI-fallibility note: a meta affordance (not the rite's voice). CSS-only popover, shown on hover
-	   AND keyboard focus so it's reachable without a pointer. */
+	/* AI-fallibility note: a meta affordance (not the rite's voice), opened as a browser popover. */
 	.ai-note-wrap {
 		display: inline-flex;
 	}
-	button.ghost.ai-note-btn {
-		inline-size: 1.5rem;
-		block-size: 1.5rem;
-		font-size: 0.8rem;
+	.ai-note-btn {
+		inline-size: 1.05rem;
+		block-size: 1.05rem;
+		display: inline-grid;
+		place-items: center;
 		padding: 0;
-		border-radius: 50%;
-		font-family: var(--font-display);
-		font-style: italic;
+		border: 1px solid var(--gold-dim);
+		border-radius: 999px;
+		background: rgba(6, 9, 18, 0.45);
+		color: var(--ink-muted);
+		font-family: var(--font-body);
+		font-size: 0.68rem;
+		font-weight: 700;
+		line-height: 1;
 		text-transform: none;
 		letter-spacing: 0;
+		cursor: help;
 	}
-	/* Anchored to the panel (not the icon) so it spans the panel width and never spills past the
-	   .oracle-panel overflow clip. */
+
+	.ai-note-btn:hover,
+	.ai-note-btn:focus-visible {
+		color: var(--gold-bright);
+		border-color: var(--gold-bright);
+		background: rgba(217, 169, 74, 0.08);
+	}
 	.ai-note-pop {
-		position: absolute;
-		inset-block-start: 2.9rem;
-		inset-inline: 0.6rem;
+		position: fixed;
+		inset: unset;
+		top: var(--ai-note-top, 0);
+		left: var(--ai-note-left, 0);
+		width: var(--ai-note-width, 20rem);
+		box-sizing: border-box;
+		margin: 0;
 		padding: 0.7rem 0.9rem;
 		border: 1px solid var(--gold-dim);
 		border-radius: 0.5rem;
 		background: var(--bg-panel);
 		color: var(--ink);
-		font-size: 0.85rem;
-		line-height: 1.5;
+		font-family: var(--font-body);
+		font-size: 0.78rem;
+		font-weight: 500;
+		line-height: 1.35;
 		text-align: start;
 		text-transform: none;
 		letter-spacing: 0;
+		white-space: normal;
 		opacity: 0;
 		visibility: hidden;
-		transition: opacity 0.12s ease;
+		transform: translateY(-0.25rem);
+		transition:
+			opacity 0.12s ease,
+			transform 0.12s ease;
 		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-		z-index: 10;
 	}
-	/* Hover for pointer; focus-visible (keyboard only) so a mouse click never sticks it open. */
-	.ai-note-wrap:hover .ai-note-pop,
-	.ai-note-btn:focus-visible ~ .ai-note-pop {
+
+	.ai-note-pop:popover-open {
 		opacity: 1;
 		visibility: visible;
+		transform: translateY(0);
 	}
 
 	.skoll-banner {

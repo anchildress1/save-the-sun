@@ -14,48 +14,63 @@
 			// stays unhighlighted until "Read & cross."
 			label: 'The stakes',
 			target: null,
-			body: 'Tonight the coven makes one offering to Sól. Name her true rune before Sköll does, and the longest day breaks. Fail, and the wolf swallows the dawn.'
+			body: 'Sól has one hidden rune. Name it before Sköll does, or the wolf takes the dawn.'
 		},
 		{
 			label: 'Ask',
 			target: '[data-coach="ask"]',
-			body: 'Ask the Oracle yes/no questions about the runes — their element, power, light, hue, or one rune by name. She answers the sign she reads. One question a turn.'
+			body: 'Ask yes/no questions about element, power, light, hue, or a rune by name. One question a turn.'
 		},
 		{
 			label: 'Read & cross',
 			target: '[data-coach="board"]',
-			body: 'Twenty-four runes stand in the open. Cross off what each answer rules out. The crossing is yours — the board never does it for you. That reading is the whole game.'
-		},
-		{
-			label: 'Cast',
-			target: '[data-coach="cast"]',
-			body: "When you're sure, cast a rune. Cast true and dawn is yours. Cast wrong and the turn is gone. Sköll is racing you for the same rune."
+			body: 'Use each answer to cross off runes yourself. The board will not mark them for you.'
 		},
 		{
 			label: 'Scry & Hex',
 			target: '[data-coach="reactions"]',
-			body: 'Sköll asks the Oracle too. When he does, you may answer back once — Scry to overhear her reply, or Hex to silence her and kill his question. One Scry and one Hex a night; a Cast is sacred, never interrupted.'
+			body: 'When Sköll asks, spend Scry to hear the answer or Hex to silence the question. Each works once per night.'
+		},
+		{
+			label: 'Cast',
+			target: '[data-coach="cast"]',
+			body: "When you're sure, cast. The right rune wins the dawn; the wrong rune spends your turn."
 		}
 	];
 
 	const PAD = 8; // spotlight breathing room around the target
 	const POP_W = 340; // popover width; positioning clamps it to the viewport
-	const POP_EST_H = 220; // height estimate for above/below placement only
+	const POP_FALLBACK_H = 240; // first paint fallback; the rendered popover height replaces it
 
 	// `start` is read once at mount — the component remounts each time the page opens it.
 	let phase = $state<'title' | 'tour'>(untrack(() => start));
 	let step = $state(0);
 	let rect = $state<DOMRect | null>(null);
+	let popoverEl = $state<HTMLElement | null>(null);
+	let popoverSize = $state({ width: POP_W, height: POP_FALLBACK_H });
 	let isLast = $derived(step === STEPS.length - 1);
 
-	function measure() {
+	function targetElement() {
 		const target = phase === 'tour' ? STEPS[step].target : null;
-		if (!target) {
-			rect = null; // no anchor → centered popover over the dimmed page (the intro step)
+		return target ? document.querySelector<HTMLElement>(target) : null;
+	}
+
+	function measure() {
+		const el = targetElement();
+		if (!el) {
+			rect = null; // no anchor -> centered popover over the dimmed page (the intro step)
 			return;
 		}
-		const el = document.querySelector(target);
-		rect = el ? el.getBoundingClientRect() : null;
+		rect = el.getBoundingClientRect();
+	}
+
+	function measurePopover() {
+		if (!popoverEl) return;
+		const box = popoverEl.getBoundingClientRect();
+		popoverSize = {
+			width: Math.ceil(box.width) || POP_W,
+			height: Math.ceil(box.height) || POP_FALLBACK_H
+		};
 	}
 
 	// Re-measure on every step/phase change — measure() reads both, so the effect tracks them.
@@ -64,14 +79,29 @@
 	// rect (the whole screen dims) with nothing to correct it until the next step. The rAF pass
 	// self-corrects that opening step.
 	$effect(() => {
+		targetElement()?.scrollIntoView({ block: 'center', inline: 'nearest' });
 		measure();
-		const raf = requestAnimationFrame(measure);
+		measurePopover();
+		const raf = requestAnimationFrame(() => {
+			measure();
+			measurePopover();
+		});
 		return () => cancelAnimationFrame(raf);
 	});
 
 	onMount(() => {
+		const bodyOverflow = document.body.style.overflow;
+		const rootOverflow = document.documentElement.style.overflow;
+		document.body.style.overflow = 'hidden';
+		document.documentElement.style.overflow = 'hidden';
 		window.addEventListener('resize', measure);
-		return () => window.removeEventListener('resize', measure);
+		window.addEventListener('scroll', measure, true);
+		return () => {
+			document.body.style.overflow = bodyOverflow;
+			document.documentElement.style.overflow = rootOverflow;
+			window.removeEventListener('resize', measure);
+			window.removeEventListener('scroll', measure, true);
+		};
 	});
 
 	let spotlightStyle = $derived(
@@ -85,15 +115,18 @@
 	let popoverStyle = $derived.by(() => {
 		if (!rect) return '';
 		const margin = 16;
-		const below = window.innerHeight - rect.bottom > POP_EST_H + margin;
-		const top = below
-			? rect.bottom + PAD + margin
-			: Math.max(margin, rect.top - PAD - margin - POP_EST_H);
+		const width = Math.min(POP_W, window.innerWidth - margin * 2);
+		const height = Math.min(popoverSize.height, window.innerHeight - margin * 2);
+		const belowSpace = window.innerHeight - rect.bottom - PAD - margin;
+		const aboveSpace = rect.top - PAD - margin;
+		const placeBelow = belowSpace >= height || belowSpace >= aboveSpace;
+		const targetTop = placeBelow ? rect.bottom + PAD + margin : rect.top - PAD - margin - height;
+		const top = Math.max(margin, Math.min(targetTop, window.innerHeight - height - margin));
 		const left = Math.max(
 			margin,
-			Math.min(rect.left + rect.width / 2 - POP_W / 2, window.innerWidth - POP_W - margin)
+			Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - margin)
 		);
-		return `top:${top}px;left:${left}px;width:${POP_W}px;`;
+		return `top:${top}px;left:${left}px;width:${width}px;max-height:${window.innerHeight - margin * 2}px;`;
 	});
 
 	function beginTour() {
@@ -179,6 +212,7 @@
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby="onboarding-heading"
+		bind:this={popoverEl}
 		use:trapFocus
 	>
 		<p class="step-count" data-testid="step-count">{step + 1} / {STEPS.length}</p>
@@ -262,6 +296,7 @@
 	.popover {
 		position: fixed;
 		z-index: 102;
+		overflow-y: auto;
 	}
 
 	/* No anchor target — center the popover in the viewport. */
