@@ -647,6 +647,17 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
 	});
 
+	it('never lets a blank stored line overwrite a server-derived one — a resumed won round keeps its victory line', async () => {
+		// A won round hydrates its victory line from engine truth; a record with a blank answer (e.g. the
+		// win was never voiced client-side before the reload) must not blank it back out.
+		localStorage.setItem(
+			VIEW_KEY,
+			JSON.stringify({ roundId: 'test-round', crossings: [], answer: '' })
+		);
+		const screen = render(Page, propsWith(HUMAN_WON));
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rune is true.');
+	});
+
 	it('ignores a persisted view from a different round — never restores onto a fresh secret', async () => {
 		// Stored under another round's token: the resumed round must open clean, not wear stale marks.
 		localStorage.setItem(
