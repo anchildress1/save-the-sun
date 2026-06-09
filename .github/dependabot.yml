@@ -1,0 +1,25 @@
+version: 2
+
+updates:
+  # JS dependencies. Dependabot forbids two npm entries on one directory/branch, so production and
+  # development are split into separate grouped PRs here rather than two top-level configs.
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 1
+    labels:
+      - dependencies
+    groups:
+      deps:
+        dependency-type: production
+      dev-deps:
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 1
+    labels:
+      - dependencies
