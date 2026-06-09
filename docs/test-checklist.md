@@ -63,7 +63,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 **Opening hunch (seeded — varies the otherwise-constant first move)**
 
 - [x] [U] Per-round hunch is deterministic per seed and varies across seeds — the opener is not pinned to one trait
-- [x] [U] Hunch is trait-level (colour/element) — never a rune by name (can't echo the secret), never light/dark (the prompt forbids that clean-split opener)
+- [x] [U] Hunch is trait-level (color/element) — never a rune by name (can't echo the secret), never light/dark (the prompt forbids that clean-split opener)
 - [x] [I] Hunch is surfaced to Gemini **only** on the opening move (no facts yet); once a fact exists the hunch value is absent from the prompt entirely (not just the sentence)
 
 **Persona (eval, low gate)**
@@ -162,7 +162,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [U][I] `DEBUG_LOG` verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev / demo on deploy (the public `/debug` view is the demo); filtered server-side (`/api/debug` + page load)
 - [x] [I][U] Raw Gemini I/O captured (verbose) as a sensitive event, **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe snapshot so neither the API nor the load 500s
 - [x] [I] Sköll's move event shows the cross-offs made **this** turn (the delta), consistent with the pre-move reasoning
-- [x] [C] Cards coloured by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine), badged by **kind** (`input` / `llm` / `deterministic`; Sköll's gemini move = llm, floor = deterministic), chipped by **part** (Ask / Cast / React / Round)
+- [x] [C] Cards colored by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine), badged by **kind** (`input` / `llm` / `deterministic`; Sköll's gemini move = llm, floor = deterministic), chipped by **part** (Ask / Cast / React / Round)
 
 ## 10.5 View resume on reload (S8.5)
 

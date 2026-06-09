@@ -170,7 +170,7 @@
 		);
 	}
 
-	/* The rite sits centred over the art; a local halo keeps it legible over the bright dawn — no scrim. */
+	/* The rite sits centered over the art; a local halo keeps it legible over the bright dawn — no scrim. */
 	.rite {
 		position: relative;
 		z-index: 2;

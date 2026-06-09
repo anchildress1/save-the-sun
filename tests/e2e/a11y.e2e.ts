@@ -2,12 +2,12 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 // S10 — R9 accessibility basics, proven against the live build. axe sweeps every surface for
-// names/roles + WCAG 2.1 AA contrast (both rune palettes are on the board at once) + colour
+// names/roles + WCAG 2.1 AA contrast (both rune palettes are on the board at once) + color
 // independence; the keyboard suite plays the whole round without a pointer and checks the focus ring.
 
 const ONBOARDED_KEY = 'save-the-sun:onboarded';
 
-// Only colour-contrast / name-role / colour-meaning rules — the v1 a11y gate. Decorative art over
+// Only color-contrast / name-role / color-meaning rules — the v1 a11y gate. Decorative art over
 // which axe can't compute contrast lands as `incomplete`, not `violations`, so it never false-fails.
 const A11Y_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 

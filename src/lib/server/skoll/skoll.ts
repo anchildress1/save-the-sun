@@ -46,7 +46,7 @@ export interface SkollDecision {
 }
 
 /**
- * A trait-level opening hunch — a colour or element the wolf "feels" this round. Drawn from the
+ * A trait-level opening hunch — a color or element the wolf "feels" this round. Drawn from the
  * seed so it varies per round and stays reproducible; a rune by name is excluded so it can never
  * echo the secret, and light/dark is excluded because the prompt forbids a light/dark opener (it is
  * the clean 50/50 split — exactly the optimal play this nudge exists to steer him away from).

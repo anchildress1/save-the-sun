@@ -20,7 +20,7 @@ import { env } from '$env/dynamic/private';
 
 export type DebugLevel = 'verbose' | 'demo' | 'off';
 
-// Three orthogonal facts set at the source so the view never re-derives them: owner (→ colour), kind
+// Three orthogonal facts set at the source so the view never re-derives them: owner (→ color), kind
 // (→ badge), part (→ chip). A verdict is the ENGINE's, never the actor's whose turn it was.
 export type Owner = 'Human' | 'Oracle' | 'Sköll' | 'Engine';
 export type Kind = 'input' | 'llm' | 'deterministic';

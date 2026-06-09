@@ -6,7 +6,7 @@ import type { GameState } from '$lib/server/engine/actions';
 const ONBOARDED_KEY = 'save-the-sun:onboarded';
 
 // Full page props (data normally comes from +page.server.ts). A fixed seed keeps the
-// board order deterministic across these behavioural tests; the hydrated state opens the
+// board order deterministic across these behavioral tests; the hydrated state opens the
 // page human-first on a live round.
 const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
 const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 };

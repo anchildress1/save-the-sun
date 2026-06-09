@@ -267,7 +267,7 @@
 		object-position: 50% 40%;
 	}
 
-	/* Centred over the art; a local halo keeps the wordmark + CTAs legible over the bright glow — no scrim. */
+	/* Centered over the art; a local halo keeps the wordmark + CTAs legible over the bright glow — no scrim. */
 	.title-card {
 		position: relative;
 		z-index: 2;

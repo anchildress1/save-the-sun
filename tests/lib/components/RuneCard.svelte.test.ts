@@ -192,7 +192,7 @@ describe('RuneCard', () => {
 			.toBeInTheDocument();
 	});
 
-	it('labels the power pips so every trait on the card is labelled (value not written)', async () => {
+	it('labels the power pips so every trait on the card is labeled (value not written)', async () => {
 		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		await expect.element(screen.getByText('power', { exact: true })).toBeInTheDocument();
 	});

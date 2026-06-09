@@ -80,7 +80,7 @@
 			{/if}
 			<span class="element-name">{rune.element}</span>
 		</span>
-		<!-- Colour shown once: a gem dot beside its name (no-colour-alone), top-right. The
+		<!-- Color shown once: a gem dot beside its name (no-color-alone), top-right. The
 		     rune id is not shown — it is an internal index, not player information. -->
 		<span class="color-mark">
 			{#if !colorIconFailed}
@@ -241,7 +241,7 @@
 		align-items: flex-start;
 		gap: 0.4rem;
 		padding: 0.12rem 0.1rem 0;
-		/* element (left) + colour (right) share this small uppercase label style */
+		/* element (left) + color (right) share this small uppercase label style */
 		font-size: 0.66rem;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
@@ -283,7 +283,7 @@
 		filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
 	}
 
-	/* Fallback when an icon image cannot load; the visible colour name still carries the trait. */
+	/* Fallback when an icon image cannot load; the visible color name still carries the trait. */
 	.gem {
 		width: 13px;
 		height: 13px;
@@ -339,7 +339,7 @@
 		font-family: var(--font-story-title);
 		font-size: 1rem;
 		letter-spacing: 0.04em;
-		/* Lighter than the carved glyph — the inky SC face reads heavy, so soften colour + shadow. */
+		/* Lighter than the carved glyph — the inky SC face reads heavy, so soften color + shadow. */
 		color: #fdf6e8;
 		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 		overflow: hidden;
@@ -359,7 +359,7 @@
 		white-space: nowrap;
 	}
 
-	/* Footer holds the power row only — element and colour live in the top corners. */
+	/* Footer holds the power row only — element and color live in the top corners. */
 	.traits {
 		position: relative;
 		z-index: 2;

@@ -101,7 +101,7 @@ On move 1 his payload is byte-identical every round (no facts, fixed board), so 
 | Area | Test type | What to test |
 |---|---|---|
 | Hunch determinism + variety | Unit | The per-round hunch is deterministic per seed and varies across seeds — the opener is not pinned to one trait. |
-| Hunch is safe + sub-optimal | Unit | Trait-level (colour/element) only — never a rune by name (cannot echo the secret), never light/dark (the prompt forbids that clean-split opener). |
+| Hunch is safe + sub-optimal | Unit | Trait-level (color/element) only — never a rune by name (cannot echo the secret), never light/dark (the prompt forbids that clean-split opener). |
 | Opening-move only | Integration | The hunch is surfaced in the prompt only when no facts are known; once a fact exists the hunch value is absent from the prompt entirely (not just the opener sentence). |
 
 ### Persona (acceptance, eval-style — low gate, manual-assisted)
@@ -232,7 +232,7 @@ A mood feature that can't degrade to the tier below doesn't ship — so each tie
 | Area | Test type | What to test |
 |---|---|---|
 | Engine fact vs LLM inference | Integration | A verdict is the ENGINE's (`owner: Engine, kind: deterministic`), never the actor's; the inference that reached the move — the Oracle's `llm` reading, Sköll's `llm` move + reasoning + source — is its own owner, never bolted onto the engine. A human Ask splits into her `input`, the Oracle's `llm` reading, and the engine's `deterministic` verdict. |
-| View encoding | Component | Each card's border + name is coloured by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine); a **kind** badge marks `input` vs `llm` vs `deterministic` (Sköll's source drives his: gemini = llm, floor = deterministic); a **part** chip (Ask / Cast / React / Round) names the phase. |
+| View encoding | Component | Each card's border + name is colored by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine); a **kind** badge marks `input` vs `llm` vs `deterministic` (Sköll's source drives his: gemini = llm, floor = deterministic); a **part** chip (Ask / Cast / React / Round) names the phase. |
 | Fallback flag | Integration | A floored Sköll move is `kind: deterministic` + `level: warn` (not a message string). |
 | Event-log lifecycle | Unit | Per-session event stream: seq, bounded trim, session isolation; lifecycle-linked to the round — reset on a new round (reseeded with the new secret) and evicted with the session. |
 | Exposure level (`DEBUG_LOG`) | Unit + Integration | verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev, demo on deploy (the public `/debug` view is the demo); filtered server-side (`/api/debug` + page load). |

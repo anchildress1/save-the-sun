@@ -36,7 +36,7 @@
 	--stone-bottom: #948f85;
 	--stone-edge: #6c675e;
 	--stone-ink: #2b2722; /* carved glyph + name */
-	--stone-ink-muted: #5c5749; /* meaning, trait labels, element/colour */
+	--stone-ink-muted: #5c5749; /* meaning, trait labels, element/color */
 	--stone-strike: rgba(30, 26, 20, 0.82);
 
 	/* Power pips — universal light/dark fill */
