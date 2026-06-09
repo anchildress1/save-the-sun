@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import dawnSplash from '$lib/assets/banners/dawn-splash.jpg';
 	import defeatSplash from '$lib/assets/banners/defeat-splash.jpg';
-	import appIcon from '$lib/assets/ui/app-icon.png';
 
 	// The round's closing rite (ux-copy.md §4), composed after the POC win/lose splashes: a full-bleed
 	// scene under a small wordmark, the result stated as a descending verse — a heavy lead line, then the
@@ -95,20 +94,6 @@
 	<img class="splash" src={scene.splash} alt="" aria-hidden="true" decoding="async" />
 	<div class="scrim" aria-hidden="true"></div>
 
-	<button
-		class="wordmark"
-		type="button"
-		data-testid="end-wordmark"
-		onclick={onLeave}
-		aria-label="Save the Sun — leave the fire and return to the title"
-	>
-		<img class="wordmark-sigil" src={appIcon} alt="" aria-hidden="true" decoding="async" />
-		<span class="wordmark-text">
-			<span class="wordmark-title">Save the Sun</span>
-			<span class="wordmark-sub">A race to beat Sköll and save the light.</span>
-		</span>
-	</button>
-
 	<div class="rite">
 		<p class="line lead" id="end-screen-lead" style="--i:0">{scene.lead}</p>
 		<hr class="rite-divider" aria-hidden="true" />
@@ -146,7 +131,7 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: center;
 		padding: clamp(1.5rem, 5vh, 3rem) 2rem clamp(2.5rem, 8vh, 5rem);
 		overflow: hidden;
 		isolation: isolate;
@@ -190,71 +175,24 @@
 		);
 	}
 
-	/* Small persistent wordmark across every screen (POC) — also the way back to the title. */
-	.wordmark {
-		position: relative;
-		z-index: 2;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin: 0;
-		padding: 0.3rem 0.4rem;
-		border: 0;
-		border-radius: 6px;
-		background: none;
-		cursor: pointer;
-	}
-
-	.wordmark-text {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-	}
-
-	.wordmark:hover .wordmark-title,
-	.wordmark:focus-visible .wordmark-title {
-		color: #fff3cf;
-	}
-
-	.wordmark:focus-visible {
-		outline: none;
-		box-shadow: var(--focus-ring);
-	}
-
-	.wordmark-sigil {
-		width: 34px;
-		height: 34px;
-		object-fit: contain;
-		filter: drop-shadow(0 0 8px rgba(217, 169, 74, 0.4));
-	}
-
-	.wordmark-title {
-		margin: 0;
-		font-family: var(--font-story-title);
-		font-size: 1.15rem;
-		letter-spacing: 0.04em;
-		color: var(--gold-bright);
-		text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
-	}
-
-	.wordmark-sub {
-		margin: 0;
-		font-family: var(--font-story-body);
-		font-style: italic;
-		font-size: 0.72rem;
-		color: var(--ink-muted);
-		text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
-	}
-
+	/* The rite sits centred over the art; a local halo keeps it legible over the bright dawn — no scrim. */
 	.rite {
 		position: relative;
 		z-index: 2;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 1rem;
+		gap: 1.1rem;
 		max-width: 48rem;
+		padding: 2rem 2.8rem;
+		border-radius: 18px;
 		text-align: center;
+		background: radial-gradient(
+			ellipse 92% 128% at 50% 50%,
+			rgba(6, 9, 18, 0.66) 0%,
+			rgba(6, 9, 18, 0.28) 58%,
+			transparent 82%
+		);
 	}
 
 	.line {
@@ -307,11 +245,12 @@
 	}
 
 	.actions {
+		position: relative;
+		z-index: 2;
 		display: flex;
 		gap: 0.9rem;
 		flex-wrap: wrap;
 		justify-content: center;
-		margin-top: 0.7rem;
 		opacity: 0;
 		animation: rise 0.8s ease forwards;
 		animation-delay: calc(var(--i) * 0.7s);
