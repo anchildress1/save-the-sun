@@ -196,9 +196,6 @@
 		color: #c8cdda;
 		font-size: 0.7rem;
 	}
-	.kind-badge {
-		margin-inline-start: auto;
-	}
 	/* Three distinct fills so the kinds never blur: outline input, gold LLM, green deterministic. */
 	.badge.input {
 		background: transparent;
