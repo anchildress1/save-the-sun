@@ -246,13 +246,15 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *Closes the loop. Depends on: S3 (win/cast), S6 (loss path).*
 
-- [ ] Victory sequence (`ux-copy.md` §4): "The rune is true." → "Sól crests the rim of the world." → Sól's only line → CTAs "Begin another night" / "Leave the fire."
-- [ ] Defeat sequence: Sköll's winning cast → "Sköll takes the sun…" → CTAs "Stand against him again" / "Leave the fire."
+- [x] Victory sequence (`ux-copy.md` §4): "The rune is true." → "Sól crests the rim of the world." → Sól's only line → CTAs "Begin another night" / "Leave the fire."
+- [x] Defeat sequence: Sköll's winning cast → "Sköll takes the sun…" → CTAs "Stand against him again" / "Leave the fire."
 - [x] Replay starts a fresh round (new secret reseed)
 
-**Partial (landed early with the round-end header):** the moon → risen sun swap, the short victory/defeat header tags, the outcome turn pill, and the full resolution line in the Oracle panel are built and tested. **Still open:** Sól's only victory line, the "Leave the fire." / "Stand against him again" CTAs, and the S6 defeat choreography.
+**Landed early with the round-end header:** the moon → risen sun swap, the short victory/defeat header tags, the outcome turn pill, and the full resolution line in the Oracle panel.
 
-**Tests to land:** [C] win/lose copy, replay reseeds.
+**Implementation (S9):** `EndScreen.svelte` is the closing rite — a full-bleed cinematic overlay (`z-index` above the board) that mounts the moment the round resolves (`showEndScreen = roundOver` on `+page.svelte`). It owns the splash per outcome (`dawn-splash` on a human win, `defeat-splash` on a Sköll win), stages the in-world lines one beat at a time (the win's three-line Sól sequence; the loss's single toll), and carries the two CTAs. Motion is decorative — `prefers-reduced-motion` shows the whole rite at once. It is an `aria-modal` dialog **named by its heaviest line** (Sól's blessing / the defeat toll) with a focus trap, since cross-off behind it is never turn-gated. **Replay** ("Begin another night" / "Stand against him again") reuses `newGame` (new secret reseed); **"Leave the fire."** resets the round and returns to the title, clearing the onboarded flag so the resolved round is left behind rather than re-entered. The page folds away its **own** header "Begin another night" while the overlay is up, so the replay surface is single (no duplicate accessible name). The earlier header treatment (sun-swap, outcome pill, panel resolution line) stays — the end screen layers the §4 sequence and CTAs on top.
+
+**Tests landed:** [C] victory/defeat line copy + order, CTA labels + wiring (`onReplay`/`onLeave`), splash-by-outcome, `aria-modal` dialog + label + focus trap (Tab wraps both ends), no-arcade-tone/no-exclamation voice guard (`EndScreen.svelte.test`) · [C/I] outcome-gated render (none while live), single replay surface on a win, end screen raised by a winning cast and on a resumed won/lost round, replay → `new-game` + dismiss, "Leave the fire." → reset + title + flag cleared (`page.svelte.test`).
 
 **Done when:** both endings render their exact in-world lines and replay restarts a fair new round — no "Play again," no arcade tone.
 
