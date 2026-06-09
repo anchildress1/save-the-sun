@@ -4,6 +4,7 @@
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 	import Onboarding from '$lib/components/Onboarding.svelte';
 	import { runes } from '$lib/board';
+	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets/ui/app-icon.png';
 	import moonSplash from '$lib/assets/banners/moon-splash-header.jpg';
 	import skollBanner from '$lib/assets/banners/skoll-banner.jpg';
@@ -125,6 +126,17 @@
 	let seedOverride: number | null = $state(null);
 	let boardSeed = $derived(seedOverride ?? data.boardSeed);
 
+	// View-state resume (S8.5): the engine resumes server-side, but the client's presentation — the
+	// crossings and the voiced Oracle line — is otherwise thrown away on reload. Persist it keyed by a
+	// stable per-round token (boardSeed reshuffles, so it can't be the key) and restore it on mount.
+	let roundIdOverride: string | null = $state(null);
+	let roundId = $derived(roundIdOverride ?? data.roundId);
+	let crossings = $state<number[]>([]);
+	let restoreCrossed = $state<number[]>([]);
+	// Gate persistence until the post-mount restore has run, so the empty pre-restore state can't
+	// overwrite a saved round before it is read back.
+	let restored = $state(false);
+
 	// The Oracle surface — one response at a time. A resumed won round opens on its victory line so the
 	// panel and pill agree.
 	let answer = $state(
@@ -136,6 +148,16 @@
 					: RITE.runeTrue
 		)
 	);
+
+	$effect(() => {
+		// Track the view; write only once restoration is done. `crossings` reassigns on every edit and
+		// `answer` on every voiced line, so this captures both without an explicit call at each site.
+		// Skip while Sköll is stalled: that's a transient error line whose companion `skollStalled`
+		// (and its retry button) isn't persisted, and onMount re-drives his move anyway — so keep the
+		// last good line in storage instead of resuming a dead-end error the engine has moved past.
+		const snapshot = { crossings: [...crossings], answer };
+		if (restored && !skollStalled) writeViewState(roundId, snapshot);
+	});
 
 	let selectedRune = $derived(
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
@@ -190,6 +212,17 @@
 	// own guard no-ops otherwise). Wrapped so the async return isn't mistaken for an onMount cleanup.
 	onMount(() => {
 		advanceSkoll();
+		// Restore the resumed round's view over the server-hydrated engine state — crossings onto the
+		// board, the last voiced line into the panel. Layered on top: the engine stays the source of
+		// truth (turn pill, status, pending reaction), this only restores presentation. A blank stored
+		// line never overwrites a server-derived one (e.g. a resumed won round's victory line).
+		const saved = readViewState(roundId);
+		if (saved) {
+			restoreCrossed = saved.crossings;
+			crossings = saved.crossings;
+			if (saved.answer) answer = saved.answer;
+		}
+		restored = true;
 		// Storage can throw (private mode) — first-run is the safe default, so show it then.
 		try {
 			showOnboarding = localStorage.getItem(ONBOARDED_KEY) === null;
@@ -329,20 +362,38 @@
 		selectedTargetId = id;
 	}
 
+	// RuneGrid owns the crossings; mirror them here so the persistence effect captures each edit.
+	function handleCrossChange(ids: number[]) {
+		crossings = ids;
+	}
+
 	async function newGame() {
 		pending = true;
 		let res: Response | undefined;
 		try {
 			res = await fetch('/api/new-game', { method: 'POST' });
 			if (!res.ok) throw new Error(`New game rejected (${res.status})`);
-			const { boardSeed: seed, state } = (await res.json()) as {
+			const {
+				boardSeed: seed,
+				roundId: nextRoundId,
+				state
+			} = (await res.json()) as {
 				boardSeed: number;
+				roundId: string;
 				state: GameState;
 			};
-			// A 200 with no usable seed would leave the board un-remounted while the server
-			// reset — treat it as a hard failure, not a silent no-op.
+			// A 200 with no usable seed/token would leave the view keyed to the OLD round while the
+			// server reset — treat it as a hard failure, not a silent no-op that mis-keys persistence.
 			if (!Number.isFinite(seed)) throw new Error('New game response missing boardSeed');
-			seedOverride = seed; // remounts RuneGrid → crossings + highlight clear
+			if (!nextRoundId) throw new Error('New game response missing roundId');
+			seedOverride = seed; // remounts RuneGrid → its internal crossedOff clears
+			// Re-key the persisted view to the new round and drop the old crossings: restoreCrossed = []
+			// keeps the remounted grid from re-seeding, the `crossings` mirror resets so the persist
+			// effect overwrites the single record with the fresh round's empty state — stale marks never
+			// resume. (`crossings` here is the parent's mirror, distinct from the grid's own crossedOff.)
+			roundIdOverride = nextRoundId;
+			restoreCrossed = [];
+			crossings = [];
 			answer = '';
 			askValue = '';
 			skollEcho = '';
@@ -464,7 +515,13 @@
 	<div class="game-layout">
 		<section class="board-section" data-coach="board">
 			{#key boardSeed}
-				<RuneGrid {castMode} {boardSeed} onSelectTarget={handleTargetSelect} />
+				<RuneGrid
+					{castMode}
+					{boardSeed}
+					{restoreCrossed}
+					onSelectTarget={handleTargetSelect}
+					onCrossChange={handleCrossChange}
+				/>
 			{/key}
 		</section>
 

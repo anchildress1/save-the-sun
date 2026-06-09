@@ -111,4 +111,53 @@ describe('RuneGrid', () => {
 		const second = screen.container.querySelector('.rune-card[data-rune-id="2"]')!;
 		expect(second.classList.contains('selected')).toBe(false);
 	});
+
+	it('seeds restored crossings onto the matching runes on a resumed round', async () => {
+		const screen = render(RuneGrid, {
+			boardSeed: 0,
+			onSelectTarget: vi.fn(),
+			restoreCrossed: [1, 5]
+		});
+		await vi.waitFor(() => {
+			expect(
+				screen.container
+					.querySelector('.rune-card[data-rune-id="1"]')!
+					.classList.contains('crossed')
+			).toBe(true);
+		});
+		expect(
+			screen.container.querySelector('.rune-card[data-rune-id="5"]')!.classList.contains('crossed')
+		).toBe(true);
+		// A rune that was not restored stays open.
+		expect(
+			screen.container.querySelector('.rune-card[data-rune-id="2"]')!.classList.contains('crossed')
+		).toBe(false);
+	});
+
+	it('reports the full crossed-id set up on every cross and restore', async () => {
+		const onCrossChange = vi.fn();
+		const screen = render(RuneGrid, { boardSeed: 0, onSelectTarget: vi.fn(), onCrossChange });
+		await screen.getByRole('button', { name: /cross off sowilo/i }).click();
+		expect(onCrossChange).toHaveBeenLastCalledWith([1]);
+		// Un-crossing reports the now-empty set, not a stale snapshot.
+		await screen.getByRole('button', { name: /restore sowilo/i }).click();
+		expect(onCrossChange).toHaveBeenLastCalledWith([]);
+	});
+
+	it('does not report restored crossings back up — restoration is not a user edit', async () => {
+		const onCrossChange = vi.fn();
+		render(RuneGrid, {
+			boardSeed: 0,
+			onSelectTarget: vi.fn(),
+			restoreCrossed: [1, 5],
+			onCrossChange
+		});
+		// Give the seeding effect a chance to run, then assert it stayed silent.
+		await vi.waitFor(() =>
+			expect(
+				document.querySelector('.rune-card[data-rune-id="1"]')?.classList.contains('crossed')
+			).toBe(true)
+		);
+		expect(onCrossChange).not.toHaveBeenCalled();
+	});
 });

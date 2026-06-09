@@ -114,6 +114,45 @@ test.describe('the live board (past the title screen)', () => {
 		await expect(page.getByRole('button', { name: 'Ask the Oracle' })).toBeEnabled();
 	});
 
+	test('restores the crossings and voiced line over the resumed round after a reload', async ({
+		page
+	}) => {
+		// The Ask is mocked so the run is deterministic and Gemini-free; the human stays on the clock.
+		await page.route('**/api/action', (route) => {
+			const body = route.request().postDataJSON?.() ?? {};
+			if (body?.type === 'Advance') return route.fulfill({ json: { type: 'Advance', state: {} } });
+			return route.fulfill({
+				json: {
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'No. Sól is not reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: { activePlayer: 'Human', status: 'active', winner: null, turns: 1 }
+				}
+			});
+		});
+		await page.goto('/');
+
+		// Dirty the view: cross a rune and earn a voiced line.
+		await page.getByRole('button', { name: /cross off sowilo/i }).click();
+		await expect(page.getByRole('button', { name: /restore sowilo/i })).toBeVisible();
+		await page.getByLabel(/ask the oracle/i).fill('Is it a fire rune?');
+		await page.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect(page.getByTestId('answer')).toContainText(
+			'No. Sól is not reaching for a fire rune.'
+		);
+
+		// A real reload resumes the same round (same session/token); the view must come back with it —
+		// the crossing survives the board reshuffle because it is keyed by rune id, not position.
+		await page.reload();
+		await expect(page.getByRole('button', { name: /restore sowilo/i })).toBeVisible();
+		await expect(page.getByTestId('answer')).toContainText(
+			'No. Sól is not reaching for a fire rune.'
+		);
+	});
+
 	test('cancels a cast with no commitment', async ({ page }) => {
 		await page.goto('/');
 		await page.getByRole('button', { name: 'Cast the rune' }).click();

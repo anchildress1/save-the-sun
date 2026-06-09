@@ -14,8 +14,12 @@ const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Hu
 const SKOLL_WON: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 5 };
 
 type PendingReaction = { echo: string; held: { Scry: boolean; Hex: boolean } } | null;
-const props = (state: GameState, pendingReaction: PendingReaction = null) => ({
-	data: { boardSeed: 0, state, pendingReaction },
+const props = (
+	state: GameState,
+	pendingReaction: PendingReaction = null,
+	roundId = 'test-round'
+) => ({
+	data: { boardSeed: 0, roundId, state, pendingReaction },
 	params: {},
 	form: null
 });
@@ -233,7 +237,9 @@ describe('Save the Sun page', () => {
 	it('begins another night — resets the panel and pulls a fresh board', async () => {
 		const spy = stubFetch(async (url) => {
 			if (url.includes('/api/new-game'))
-				return new Response(JSON.stringify({ boardSeed: 99, state: HUMAN_TURN }));
+				return new Response(
+					JSON.stringify({ boardSeed: 99, roundId: 'next-round', state: HUMAN_TURN })
+				);
 			return new Response(
 				JSON.stringify({
 					type: 'Ask',
@@ -594,5 +600,160 @@ describe('Save the Sun page — first-run onboarding (S7)', () => {
 		// Straight into the tour (no title screen) on the first concept.
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 5');
 		expect(screen.container.querySelector('[data-testid="onboarding"]')).not.toBeNull();
+	});
+});
+
+// S8.5: a refresh resumes the round server-side, but the client's view (crossings + the voiced
+// Oracle line) is otherwise thrown away. These prove it is restored from storage, scoped to the
+// round, and degrades safely when storage is unavailable.
+describe('Save the Sun page — view resume on reload (S8.5)', () => {
+	const VIEW_KEY = 'save-the-sun:view';
+
+	beforeEach(() => {
+		localStorage.setItem(ONBOARDED_KEY, '1'); // past the title; resume is the subject here
+		respond({}); // onMount fires advanceSkoll — keep it a harmless no-op
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+		localStorage.clear();
+	});
+
+	it('restores the crossings onto the board for the resumed round', async () => {
+		// Sowilo is rune id 1 — seed it crossed under the round the load will report.
+		localStorage.setItem(
+			VIEW_KEY,
+			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: '' })
+		);
+		const screen = render(Page, pageProps);
+		await expect
+			.element(screen.getByRole('button', { name: /restore sowilo/i }))
+			.toBeInTheDocument();
+	});
+
+	it('restores the voiced Oracle line for the resumed round', async () => {
+		localStorage.setItem(
+			VIEW_KEY,
+			JSON.stringify({
+				roundId: 'test-round',
+				crossings: [],
+				answer: 'No. Sól is not reaching for a fire rune.'
+			})
+		);
+		const screen = render(Page, pageProps);
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
+	});
+
+	it('ignores a persisted view from a different round — never restores onto a fresh secret', async () => {
+		// Stored under another round's token: the resumed round must open clean, not wear stale marks.
+		localStorage.setItem(
+			VIEW_KEY,
+			JSON.stringify({ roundId: 'a-stale-round', crossings: [1], answer: 'stale line' })
+		);
+		const screen = render(Page, pageProps);
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('');
+		expect(
+			screen.container.querySelector('[data-rune-id="1"]')?.classList.contains('crossed')
+		).toBe(false);
+	});
+
+	it('persists a cross-off so it would survive a reload', async () => {
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: /cross off sowilo/i }).click();
+		await expect
+			.element(screen.getByRole('button', { name: /restore sowilo/i }))
+			.toBeInTheDocument();
+		await vi.waitFor(() => {
+			const saved = JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}');
+			expect(saved).toMatchObject({ roundId: 'test-round', crossings: [1] });
+		});
+	});
+
+	it('re-keys the persisted view to the new round and drops the old crossings on a new game', async () => {
+		// A stale record from the prior round, plus a new-game response that mints a new token.
+		localStorage.setItem(
+			VIEW_KEY,
+			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: 'old' })
+		);
+		stubFetch(async (url) => {
+			if (url.includes('/api/new-game'))
+				return new Response(
+					JSON.stringify({ boardSeed: 99, roundId: 'next-round', state: HUMAN_TURN })
+				);
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Begin another night' }).click();
+
+		await vi.waitFor(() => {
+			const saved = JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}');
+			// The single record now belongs to the new round, with no crossings carried over.
+			expect(saved.roundId).toBe('next-round');
+			expect(saved.crossings).toEqual([]);
+		});
+		// And the board itself shows no surviving crossing.
+		expect(
+			screen.container.querySelector('[data-rune-id="1"]')?.classList.contains('crossed')
+		).toBe(false);
+	});
+
+	it('keeps the last good line in storage when Sköll stalls — never persists the dead-end error', async () => {
+		const error = expectConsole('error');
+		// The Ask hands the turn to Sköll; his Advance then fails, stalling him.
+		stubFetch(async (_url: string, init?: { body?: string }) => {
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (body.type === 'Advance') return new Response('nope', { status: 500 });
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'No. Sól is not reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: SKOLL_TURN
+				})
+			);
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		// The stall line shows live, with its retry affordance...
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('The wolf stalls in the dark');
+		await expect.element(screen.getByTestId('rouse-wolf')).toBeInTheDocument();
+		// ...but storage holds the last good line, not the transient error — a reload (which re-drives
+		// his move) resumes a coherent view instead of a dead end with no rouse button.
+		await vi.waitFor(() => {
+			const saved = JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}');
+			expect(saved.answer).toBe('No. Sól is not reaching for a fire rune.');
+		});
+		expect(error).toHaveBeenCalled();
+	});
+
+	it('treats a new-game response with no round token as a failure, not a silent mis-key', async () => {
+		const error = expectConsole('error');
+		stubFetch(async () => new Response(JSON.stringify({ boardSeed: 99, state: HUMAN_TURN })));
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Begin another night' }).click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+		expect(error).toHaveBeenCalledWith('[ui] New game failed (status 200):', expect.any(Error));
+	});
+
+	it('degrades to no restore when reading storage throws (private mode) — never breaks play', async () => {
+		// Throw only for the view key; the onboarded read still resolves so the title stays down.
+		vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+			if (key === VIEW_KEY) throw new DOMException('denied');
+			return key === ONBOARDED_KEY ? '1' : null;
+		});
+		const screen = render(Page, pageProps);
+		// The board still renders and play is live — the failed restore is silent, not fatal.
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('');
+		expect(screen.container.querySelectorAll('.rune-card')).toHaveLength(24);
 	});
 });

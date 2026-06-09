@@ -1,4 +1,4 @@
-import { getEngine, getSkoll } from '$lib/server/engine/session';
+import { getEngine, getSkoll, getRoundId } from '$lib/server/engine/session';
 import { gameState, type PendingReaction } from '$lib/server/engine/actions';
 import { skollAskEcho } from '$lib/server/skoll/skoll';
 import type { PageServerLoad } from './$types';
@@ -39,6 +39,9 @@ export const load: PageServerLoad = ({ locals }) => {
 	// mulberry32 consumes via seed >>> 0.
 	return {
 		boardSeed: crypto.getRandomValues(new Uint32Array(1))[0],
+		// Stable per-round token (independent of boardSeed, which reshuffles) — the client keys its
+		// persisted crossings/transcript to it so a refresh restores the view and a new round clears it.
+		roundId: getRoundId(locals.sessionId),
 		// Hydrate the real turn/round state so a resumed round (incl. one already won) renders
 		// truthfully on load instead of guessing "Your move." and flipping on the first action.
 		state: gameState(engine),

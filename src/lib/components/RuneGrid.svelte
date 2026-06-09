@@ -10,11 +10,17 @@
 	let {
 		castMode = false,
 		boardSeed,
-		onSelectTarget
+		onSelectTarget,
+		restoreCrossed = [],
+		onCrossChange
 	}: {
 		castMode?: boolean;
 		boardSeed: number;
 		onSelectTarget: (id: number) => void;
+		// Crossed rune ids to seed on a resumed round (applied once, post-mount); empty on a fresh board.
+		restoreCrossed?: number[];
+		// Fired with the full crossed-id set after every cross/restore so the parent can persist it.
+		onCrossChange?: (ids: number[]) => void;
 	} = $props();
 
 	// Shuffled on-screen order, fixed per seed. Depends only on boardSeed, so cross-off
@@ -26,6 +32,16 @@
 	// The armed cast target — only this card highlights; the rest of the board is untouched.
 	let selectedId: number | null = $state(null);
 	let gridContainer: HTMLElement;
+
+	// Seed the resumed crossings exactly once. The parent supplies them post-mount (after reading
+	// storage), so this fires when restoreCrossed first arrives — never re-seeding after a user edit,
+	// and never reporting back up (the parent already holds these).
+	let seeded = false;
+	$effect(() => {
+		if (seeded || restoreCrossed.length === 0) return;
+		for (const id of restoreCrossed) crossedOff.add(id);
+		seeded = true;
+	});
 
 	// Leaving cast mode (commit or cancel) clears the highlight.
 	$effect(() => {
@@ -70,6 +86,7 @@
 				);
 			}
 		}
+		onCrossChange?.([...crossedOff]);
 	}
 
 	onMount(() => {

@@ -5,11 +5,12 @@ import { selectSecret } from '$lib/server/engine/engine';
 import type { GameState } from '$lib/server/engine/actions';
 
 type PendingReaction = { echo: string; held: { Scry: boolean; Hex: boolean } } | null;
-// load is synchronous and returns { boardSeed, state, pendingReaction }; the PageServerLoad
-// signature widens the return to MaybePromise<…>, so narrow it for the assertions.
+// load is synchronous and returns { boardSeed, roundId, state, pendingReaction }; the
+// PageServerLoad signature widens the return to MaybePromise<…>, so narrow it for the assertions.
 const runLoad = (sessionId: string) =>
 	load({ locals: { sessionId } } as never) as {
 		boardSeed: number;
+		roundId: string;
 		state: GameState;
 		pendingReaction: PendingReaction;
 	};
@@ -27,6 +28,30 @@ describe('+page.server load — board seed', () => {
 	it('reseeds the board ORDER per load so the layout varies', () => {
 		const seeds = new Set(Array.from({ length: 20 }, () => runLoad('order-session').boardSeed));
 		expect(seeds.size).toBeGreaterThan(1);
+	});
+});
+
+describe('+page.server load — round token (view resume)', () => {
+	it('surfaces a stable per-round token, held constant across a refresh', () => {
+		const first = runLoad('token-load').roundId;
+		expect(typeof first).toBe('string');
+		expect(first.length).toBeGreaterThan(0);
+		// A reload resumes the same round, so the token must not move (it keys the persisted view).
+		expect(runLoad('token-load').roundId).toBe(first);
+	});
+
+	it('changes the token after a new round so a stale view never restores', () => {
+		const before = runLoad('token-newround').roundId;
+		resetEngine('token-newround', SEED);
+		expect(runLoad('token-newround').roundId).not.toBe(before);
+	});
+
+	it('keeps the token unrelated to the board seed, which reshuffles independently', () => {
+		const loads = Array.from({ length: 12 }, () => runLoad('token-vs-seed'));
+		// Same round → one stable token across every reload...
+		expect(new Set(loads.map((l) => l.roundId)).size).toBe(1);
+		// ...while the display seed keeps varying, proving the token is not the seed.
+		expect(new Set(loads.map((l) => l.boardSeed)).size).toBeGreaterThan(1);
 	});
 });
 
