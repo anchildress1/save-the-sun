@@ -115,10 +115,11 @@
 	}
 	main {
 		/* Source colours — one per actor, defined once. Gemini (raw I/O) is its own, apart from Sköll. */
-		--human: #d069a8;
+		/* Drawn from the game's palette: gold Oracle, cold-steel Sköll, sage witch, stone engine. */
+		--human: #7ba88c;
 		--oracle: #d9a94a;
-		--skoll: #4a82c2;
-		--session: #8a8a95;
+		--skoll: #6c93bd;
+		--session: #9a958a;
 		inline-size: 100%;
 		padding: clamp(1rem, 0.5rem + 2vw, 2.5rem) clamp(0.75rem, 0.5rem + 1.5vw, 2rem);
 		min-block-size: 100dvh;
