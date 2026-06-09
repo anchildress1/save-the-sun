@@ -1163,13 +1163,13 @@
 		z-index: 0;
 		display: block;
 		width: 100%;
-		height: min(68%, 42rem);
+		height: min(92%, 54rem);
 		object-fit: cover;
-		object-position: 50% 16%;
+		object-position: 50% 0%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
 			contrast(var(--skoll-contrast));
-		mask-image: linear-gradient(180deg, transparent 0%, black 12%, black 100%);
-		-webkit-mask-image: linear-gradient(180deg, transparent 0%, black 12%, black 100%);
+		mask-image: linear-gradient(180deg, transparent 0%, black 7%, black 100%);
+		-webkit-mask-image: linear-gradient(180deg, transparent 0%, black 7%, black 100%);
 		pointer-events: none;
 	}
 
