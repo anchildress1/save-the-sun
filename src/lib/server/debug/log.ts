@@ -6,7 +6,8 @@
 //   verbose — everything, including `sensitive` events (the secret, raw model request/response)
 //   demo    — the screen-shareable subset: sensitive events stripped (no secret, no raw model I/O)
 //   off     — the view is disabled
-// Default: verbose in dev, off in prod (so a forgotten var never leaks the secret on a live build).
+// Default: verbose in dev, demo on deploy (sensitive events stripped — screen-shareable, never the
+// secret — so a forgotten var on a live build still can't leak it).
 //
 // Recorded server-side regardless of level (bounded, no client exposure); the level only decides
 // what the /debug API hands back. Lifecycle-linked to the round through session.ts.
@@ -60,11 +61,11 @@ export function resetLog(sessionId: string): void {
 	geminiSinks.delete(sessionId);
 }
 
-/** The exposure level from DEBUG_LOG, validated; default verbose in dev, off in prod. */
+/** The exposure level from DEBUG_LOG, validated; default verbose in dev, demo on deploy. */
 export function debugLevel(): DebugLevel {
 	const raw = env.DEBUG_LOG;
 	if (raw === 'verbose' || raw === 'demo' || raw === 'off') return raw;
-	return dev ? 'verbose' : 'off';
+	return dev ? 'verbose' : 'demo';
 }
 
 /** What the view may show at a level: nothing when off, sensitive stripped for demo, all for verbose. */
