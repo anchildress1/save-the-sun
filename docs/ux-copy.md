@@ -136,8 +136,11 @@ One-use reactions, **not cards** — no deck, no hand. Both trigger on an **Ask*
 - **You let it pass:** "You hold your hand. Let him have his answer."
 
 ### Sköll uses a reaction (on your Ask)
-- **Sköll Scries** (hears your answer): "I heard what the Oracle told you. Kind of her. Careless of you."
-- **Sköll Hexes** (silences your Ask): the Oracle frame names him in the rite's own voice so you know who silenced you — **"Sköll Hexes your question. It dies unanswered."** (third person; never his first-person gloat in the Oracle's mouth).
+
+His **own box** names the skill he played (third person, templated — never a first-person gloat); the Oracle box just speaks, so you can tell his skill use from the Oracle's answer.
+
+- **Sköll Scries** (hears your answer): his box reads **"Sköll Scries your question — he hears the answer too."** The Oracle still speaks your answer (he overheard it; you still get it).
+- **Sköll Hexes** (silences your Ask): his box reads **"Sköll Hexes your question. It dies unanswered."** The Oracle has nothing to speak — its box stays silent.
 
 ## 4. Win / Lose
 

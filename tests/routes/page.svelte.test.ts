@@ -483,7 +483,7 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('You hold your hand. Let him have his answer.');
 	});
 
-	it('shows the silenced line when Sköll Hexes the human Ask', async () => {
+	it('announces the Hex in Sköll box, leaves the Oracle silent', async () => {
 		gameStub({
 			// No oracle line — the question was silenced before any answer; then his own Advance move.
 			ask: { type: 'Ask', skollVsYou: { reaction: 'Hex' }, state: SKOLL_TURN },
@@ -491,20 +491,21 @@ describe('Save the Sun page', () => {
 		});
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		// The Oracle box names Sköll in the rite's voice — NOT his first-person gloat.
+		// His own box names the skill he played; the Oracle has nothing to speak.
 		await expect
-			.element(screen.getByTestId('answer'))
+			.element(screen.getByTestId('skoll-skill'))
 			.toHaveTextContent('Sköll Hexes your question. It dies unanswered.');
-		expect(screen.getByTestId('answer').element().textContent).not.toContain('My doing');
+		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
 	});
 
-	it('shows the answer when Sköll Scries the human Ask (covert — no extra line)', async () => {
+	it('announces the Scry in Sköll box and still speaks the answer in the Oracle', async () => {
 		gameStub({
 			ask: defaultAsk({ reaction: 'Scry' }),
 			advance: advanceCast()
 		});
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
+		await expect.element(screen.getByTestId('skoll-skill')).toHaveTextContent('Sköll Scries');
 		await expect
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
