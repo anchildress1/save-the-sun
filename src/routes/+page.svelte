@@ -4,6 +4,7 @@
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 	import Onboarding from '$lib/components/Onboarding.svelte';
 	import { runes } from '$lib/board';
+	import appIcon from '$lib/assets/ui/app-icon.png';
 	import moonSplash from '$lib/assets/banners/moon-splash.jpg';
 	import skollBanner from '$lib/assets/banners/skoll-banner.jpg';
 	import type {
@@ -372,7 +373,7 @@
 			decoding="async"
 		/>
 		<div class="title-block">
-			<img class="app-sigil" src="/icon-192.png" alt="" aria-hidden="true" decoding="async" />
+			<img class="app-sigil" src={appIcon} alt="" aria-hidden="true" decoding="async" />
 			<div>
 				<h1>Save the Sun</h1>
 				<p class="tagline">A race to beat Sköll and save the light.</p>
@@ -668,8 +669,8 @@
 	}
 
 	.app-sigil {
-		width: 54px;
-		height: 54px;
+		width: 72px;
+		height: 72px;
 		object-fit: contain;
 		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 10px rgba(217, 169, 74, 0.28));
 	}
