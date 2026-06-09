@@ -29,29 +29,30 @@ describe('Onboarding — title screen + first-run tour (S7)', () => {
 		await screen.getByRole('button', { name: 'How the rite works' }).click();
 
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 5');
-		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('one offering to Sól');
+		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('one hidden rune');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('2 / 5');
-		await expect
-			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('Ask the Oracle yes/no questions');
+		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('Ask yes/no questions');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('3 / 5');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('Cross off what each answer rules out');
+			.toHaveTextContent('cross off runes yourself');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('4 / 5');
-		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('cast a rune');
+		await expect
+			.element(screen.getByTestId('step-body'))
+			.toHaveTextContent('spend Scry to hear the answer or Hex to silence the question');
+		await expect.element(screen.getByTestId('step-body')).not.toHaveTextContent('sacred');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('5 / 5');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('Scry to overhear her reply, or Hex to silence her');
+			.toHaveTextContent('The right rune wins the dawn');
 	});
 
 	it('finishes the tour with "Take up the runes."', async () => {

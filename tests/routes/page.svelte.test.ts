@@ -29,6 +29,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	localStorage.clear();
 });
@@ -47,6 +48,8 @@ const askResult = (oracle: object, state: GameState = HUMAN_TURN) =>
 	respond({ type: 'Ask', oracle, state });
 const castResult = (cast: object, state: GameState = HUMAN_TURN) =>
 	respond({ type: 'Cast', cast, state });
+const expectConsole = (method: 'error' | 'warn') =>
+	vi.spyOn(console, method).mockImplementation(() => {});
 
 // --- Sköll's surfaced turn + the human's reactions ---
 
@@ -170,12 +173,14 @@ describe('Save the Sun page', () => {
 	});
 
 	it('shows a rite-falters line when a cast is rejected by the engine', async () => {
+		const warn = expectConsole('warn');
 		castResult({ ok: false, reason: 'not-your-turn', turnConsumed: false });
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Cast the rune' }).click();
 		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
 		await screen.getByRole('button', { name: 'Name it' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rite falters');
+		expect(warn).toHaveBeenCalledWith('[ui] Cast rejected by engine:', 'not-your-turn');
 	});
 
 	it('arms a cast, selects a target, and resolves a correct cast', async () => {
@@ -205,20 +210,24 @@ describe('Save the Sun page', () => {
 	});
 
 	it('shows an in-world error when an Ask dispatch fails', async () => {
+		const error = expectConsole('error');
 		stubFetch(async () => new Response('nope', { status: 500 }));
 		const screen = render(Page, pageProps);
 		await screen.getByLabelText(/ask the oracle/i).fill('Is it gold?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+		expect(error).toHaveBeenCalledWith('[ui] Ask dispatch failed:', expect.any(Error));
 	});
 
 	it('shows an in-world error when a Cast dispatch fails', async () => {
+		const error = expectConsole('error');
 		stubFetch(async () => new Response('nope', { status: 500 }));
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Cast the rune' }).click();
 		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
 		await screen.getByRole('button', { name: 'Name it' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rite falters');
+		expect(error).toHaveBeenCalledWith('[ui] Cast dispatch failed:', expect.any(Error));
 	});
 
 	it('begins another night — resets the panel and pulls a fresh board', async () => {
@@ -250,17 +259,21 @@ describe('Save the Sun page', () => {
 	});
 
 	it('shows an in-world error when starting a new game fails', async () => {
+		const error = expectConsole('error');
 		stubFetch(async () => new Response('nope', { status: 500 }));
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+		expect(error).toHaveBeenCalledWith('[ui] New game failed (status 500):', expect.any(Error));
 	});
 
 	it('treats a 200 with no board seed as a failure, not a silent no-op', async () => {
+		const error = expectConsole('error');
 		stubFetch(async () => new Response(JSON.stringify({})));
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+		expect(error).toHaveBeenCalledWith('[ui] New game failed (status 200):', expect.any(Error));
 	});
 
 	it('opens on the early-night progress line before any turn is spent', async () => {
@@ -321,19 +334,18 @@ describe('Save the Sun page', () => {
 
 	it('raises the sun and voices the victory line in the header on a human win', async () => {
 		const screen = render(Page, propsWith(HUMAN_WON));
-		// Moon gives way to the risen sun; the resolution line replaces the night-progress phase.
+		expect(screen.container.querySelector('.header-background-image')).not.toBeNull();
 		expect(screen.container.querySelector('.sun-risen')).not.toBeNull();
-		expect(screen.container.querySelector('.moon')).toBeNull();
 		await expect
 			.element(screen.getByTestId('outcome-line'))
 			.toHaveTextContent('Sól crests the rim of the world.');
 	});
 
-	it('keeps the moon on a Sköll win — short tag in the header, full line in the Oracle panel', async () => {
+	it('keeps the moon banner on a Sköll win — short tag in the header, full line in the Oracle panel', async () => {
 		const screen = render(Page, propsWith(SKOLL_WON));
-		// No sunrise for a loss — the moon holds. The header carries only the short tag; the full
+		// No sunrise for a loss — the moonlit background holds. The header carries only the short tag; the full
 		// resolution sentence lives in the Oracle panel, which wraps responsively on its own.
-		expect(screen.container.querySelector('.moon')).not.toBeNull();
+		expect(screen.container.querySelector('.header-background-image')).not.toBeNull();
 		expect(screen.container.querySelector('.sun-risen')).toBeNull();
 		await expect
 			.element(screen.getByTestId('outcome-line'))
@@ -414,6 +426,7 @@ describe('Save the Sun page', () => {
 		// His box persists (title) but carries no question and no taunt/cast text.
 		await expect.element(screen.getByTestId('skoll-frame')).toHaveTextContent('Sköll');
 		expect(screen.container.querySelector('[data-testid="skoll-echo"]')).toBeNull();
+		expect(screen.container.querySelector('.skoll-banner')).not.toBeNull();
 		expect(screen.container.querySelector('[data-testid="skoll-voice"]')).toBeNull();
 	});
 

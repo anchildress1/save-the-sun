@@ -172,6 +172,19 @@ Covers R7. A first-run title overlay and an anchored coach-mark tour over the li
 
 ---
 
+## 6.7 Asset delivery pipeline (v2 future work)
+
+The v1/v1.5 asset pass is allowed to use optimized PNG/JPEG output. v2 owns the stable delivery pipeline: art-direction cleanup first, then format variants and budgets. Do not add more generated variants until the image set has one coherent style.
+
+| Area | Test type | What to test |
+|---|---|---|
+| Style cleanup | Manual + visual | All generated image assets align to one stable stylized art direction before new format variants ship. |
+| Format fallbacks | Component + E2E | AVIF/WebP sources load for large stone, banner, chalk, rune, element, color, and fill assets; PNG/JPEG fallback remains available. |
+| Responsive variants | E2E | The browser requests appropriately sized variants when the same art renders at materially different sizes. |
+| Bundle-size budget | CI | First-load image weight and total client asset budget are measured and fail the build when they exceed the v2 ceiling. |
+
+---
+
 ## 7. Accessibility (R9 — v1 scope; screen reader is v1.5)
 
 The lineage bar is Lighthouse a11y ≈ 1.0; this build inherits it.

@@ -42,6 +42,29 @@ describe('RuneGrid', () => {
 		expect(first.classList.contains('crossed')).toBe(false);
 	});
 
+	it('clears click animation inline styles so CSS hover can keep moving restored cards', async () => {
+		const screen = render(RuneGrid, { boardSeed: 0, onSelectTarget: vi.fn() });
+		const first = screen.container.querySelector<HTMLElement>('.rune-card[data-rune-id="1"]')!;
+		await screen.getByRole('button', { name: /cross off sowilo/i }).click();
+
+		await vi.waitFor(() => {
+			expect(first.style.transform).toBe('');
+			expect(first.style.filter).toBe('');
+			expect(first.style.getPropertyValue('--card-action-scale')).toBe('');
+			expect(first.style.getPropertyValue('--card-action-brightness')).toBe('');
+		});
+
+		first.style.transform = 'translate3d(0px, 0px, 0px)';
+		first.style.filter = 'brightness(1)';
+		first.style.setProperty('--card-action-scale', '0.95');
+		first.style.setProperty('--card-action-brightness', '1.5');
+		await screen.getByRole('button', { name: /restore sowilo/i }).click();
+		expect(first.style.transform).toBe('');
+		expect(first.style.filter).toBe('');
+		expect(first.style.getPropertyValue('--card-action-scale')).toBe('');
+		expect(first.style.getPropertyValue('--card-action-brightness')).toBe('');
+	});
+
 	it('lays the 24 cards out in a 6-column grid (6×4)', async () => {
 		const screen = render(RuneGrid, { boardSeed: 42, onSelectTarget: vi.fn() });
 		const cards = [...screen.container.querySelectorAll<HTMLElement>('.rune-card')];
@@ -60,7 +83,9 @@ describe('RuneGrid', () => {
 		const card = screen.container.querySelector('.rune-card[data-rune-id="1"]')!;
 		await screen.getByRole('button', { name: /cross off sowilo/i }).click();
 		expect(card.classList.contains('crossed')).toBe(true);
-		expect(card.querySelectorAll('.strikeout line')).toHaveLength(2);
+		const strikeout = card.querySelector('.strikeout');
+		expect(strikeout).toBeInstanceOf(HTMLImageElement);
+		expect((strikeout as HTMLImageElement).src).toMatch(/chalk-cross\.png/);
 	});
 
 	it('renders the armed visual state — only the chosen target wears the halo', async () => {

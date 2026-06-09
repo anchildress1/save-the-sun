@@ -32,12 +32,22 @@
 		if (!castMode) selectedId = null;
 	});
 
+	function clearCardAnimation(card: Element) {
+		gsap.killTweensOf(card);
+		gsap.set(card, {
+			clearProps: 'transform,filter,--card-action-scale,--card-action-brightness'
+		});
+	}
+
 	function handleRuneAction(id: number) {
 		if (castMode) {
 			selectedId = id;
 			onSelectTarget(id);
 			return;
 		}
+
+		const card = gridContainer.querySelector(`.rune-card[data-rune-id="${id}"]`);
+		if (card) clearCardAnimation(card);
 
 		// Normal cross-off mode
 		if (crossedOff.has(id)) {
@@ -46,12 +56,17 @@
 			crossedOff.add(id);
 
 			// Cross-off stinger animation
-			const card = gridContainer.querySelector(`.rune-card[data-rune-id="${id}"]`);
 			if (card) {
 				gsap.fromTo(
 					card,
-					{ scale: 0.95, filter: 'brightness(1.5)' },
-					{ scale: 1, filter: 'brightness(1)', duration: 0.3, ease: 'power2.out' }
+					{ '--card-action-scale': 0.95, '--card-action-brightness': 1.5 },
+					{
+						'--card-action-scale': 1,
+						'--card-action-brightness': 1,
+						duration: 0.3,
+						ease: 'power2.out',
+						clearProps: '--card-action-scale,--card-action-brightness'
+					}
 				);
 			}
 		}

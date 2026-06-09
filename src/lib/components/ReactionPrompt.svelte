@@ -17,12 +17,30 @@
 	<p class="prompt" data-testid="reaction-prompt">Sköll asks. Answer it?</p>
 	<div class="choices">
 		{#if held.Scry}
-			<button type="button" onclick={() => onReact('Scry')}>Scry</button>
+			<button
+				class="ritual-button ritual-button--primary"
+				type="button"
+				onclick={() => onReact('Scry')}
+			>
+				Scry
+			</button>
 		{/if}
 		{#if held.Hex}
-			<button type="button" onclick={() => onReact('Hex')}>Hex</button>
+			<button
+				class="ritual-button ritual-button--primary"
+				type="button"
+				onclick={() => onReact('Hex')}
+			>
+				Hex
+			</button>
 		{/if}
-		<button class="ghost" type="button" onclick={() => onReact('Pass')}>Let it pass</button>
+		<button
+			class="ghost ritual-button ritual-button--ghost"
+			type="button"
+			onclick={() => onReact('Pass')}
+		>
+			Let it pass
+		</button>
 	</div>
 </div>
 
@@ -51,22 +69,10 @@
 
 	.choices button {
 		flex: 1;
-		padding: 0.45rem;
-		font-family: var(--font-display);
+		min-height: 2.65rem;
+		padding: 0.6rem 0.75rem;
 		font-size: 0.78rem;
 		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		color: var(--bg-deep);
-		background: linear-gradient(180deg, var(--gold-bright), var(--gold));
-		border: 1px solid var(--gold-bright);
-		border-radius: 5px;
-		cursor: pointer;
-	}
-
-	.choices button.ghost {
-		color: var(--ink-muted);
-		background: transparent;
-		border-color: var(--gold-dim);
 	}
 
 	.choices button:focus-visible {
