@@ -68,7 +68,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 **Persona (eval, low gate)**
 
-- [x] [Eval] ~12-year-old behavior: one clue at a time, works from board + own cross-offs, may overlook a legal elimination, casts on "sure enough"; computation tells flagged as failures _(live-LLM eval, not a CI gate — deferred with the Oracle's eval harness)_
+- [ ] [Eval] ~12-year-old behavior: one clue at a time, works from board + own cross-offs, may overlook a legal elimination, casts on "sure enough"; computation tells flagged as failures _(live-LLM eval, not a CI gate — deferred with the Oracle's eval harness)_
 
 ## 4. Human loop & action interface
 
@@ -176,6 +176,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C] Sköll's transient stall line is **not** persisted — storage keeps the last good line so a reload (which re-drives his move) resumes a coherent view, not a dead end
 - [x] [C] Storage-read failure (private mode) degrades to no restore — board renders, play stays live
 - [x] [E] Cross a rune + earn a voiced line, then a real reload restores both over the resumed round; the crossing rides through the board reshuffle (keyed by rune id)
+- [ ] [I] Automated cross-check that the restored marks + line agree with the **debug log** for the same round _(→ v2: the debug log is env-gated off in prod and runs as a separate unlinked stream; v1 proves view ↔ round agreement, the log ↔ view cross-check is a manual demo observation until then)_
 
 ## 11. Voice / copy conformance (lint + eval, not coverage-gated)
 
