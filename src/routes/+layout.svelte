@@ -5,6 +5,12 @@
 </script>
 
 <svelte:head>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+	<link
+		rel="stylesheet"
+		href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Inter:ital,wght@0,400..700;1,400..700&display=swap"
+	/>
 	<link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
 	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
 	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />

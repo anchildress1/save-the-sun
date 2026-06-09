@@ -5,7 +5,7 @@
 	import Onboarding from '$lib/components/Onboarding.svelte';
 	import { runes } from '$lib/board';
 	import appIcon from '$lib/assets/ui/app-icon.png';
-	import moonSplash from '$lib/assets/banners/moon-splash.jpg';
+	import moonSplash from '$lib/assets/banners/moon-splash-header.jpg';
 	import skollBanner from '$lib/assets/banners/skoll-banner.jpg';
 	import type {
 		GameAction,
@@ -657,7 +657,7 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		object-position: 50% 42%;
+		object-position: 50% 50%;
 		filter: saturate(1.04) brightness(0.92) contrast(1.02);
 		pointer-events: none;
 	}
@@ -687,9 +687,10 @@
 
 	.tagline {
 		margin: 0.1rem 0 0;
+		font-family: var(--font-story-body);
 		color: var(--ink-muted);
 		font-style: italic;
-		font-size: 0.85rem;
+		font-size: 0.95rem;
 	}
 
 	.night-block {
@@ -709,10 +710,9 @@
 
 	.night-progress {
 		margin: 0;
-		font-family: var(--font-display);
+		font-family: var(--font-story-body);
 		font-style: italic;
-		font-size: 0.78rem;
-		letter-spacing: 0.06em;
+		font-size: 0.95rem;
 		color: var(--ink-muted);
 		white-space: nowrap;
 	}
@@ -838,9 +838,9 @@
 
 	.frame-text {
 		margin: 0;
-		font-family: var(--font-display);
-		font-size: 0.92rem;
-		line-height: 1.4;
+		font-family: var(--font-story-body);
+		font-size: 1rem;
+		line-height: 1.5;
 		color: var(--ink);
 	}
 
@@ -871,10 +871,12 @@
 		color: #c2cad8; /* moon-cold, deliberately not the Oracle's gold */
 	}
 
+	/* His Ask, echoed so the human knows what they're choosing to Scry, Hex, or let pass. */
 	.skoll-echo {
 		margin: 0;
-		font-family: var(--font-display);
-		font-size: 0.88rem;
+		font-family: var(--font-story-body);
+		font-size: 1rem;
+		line-height: 1.45;
 		color: var(--ink);
 	}
 
@@ -1056,7 +1058,7 @@
 		.notice-line {
 			margin: 0;
 			max-width: 40ch;
-			font-family: var(--font-display);
+			font-family: var(--font-story-body);
 			font-style: italic;
 			font-size: 1rem;
 			line-height: 1.5;

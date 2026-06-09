@@ -284,7 +284,7 @@
 
 	h2 {
 		margin: 0;
-		font-family: var(--font-display);
+		font-family: var(--font-story-title);
 		font-size: 1.3rem;
 		letter-spacing: 0.06em;
 		color: var(--gold-bright);
@@ -292,8 +292,9 @@
 
 	.tagline {
 		margin: 0;
-		font-family: var(--font-display);
+		font-family: var(--font-story-body);
 		font-style: italic;
+		font-size: 1.05rem;
 		color: var(--ink-muted);
 	}
 
@@ -307,9 +308,9 @@
 
 	.step-body {
 		margin: 0;
-		font-family: var(--font-display);
-		font-size: 0.95rem;
-		line-height: 1.55;
+		font-family: var(--font-story-body);
+		font-size: 1.08rem;
+		line-height: 1.6;
 		color: var(--ink);
 	}
 

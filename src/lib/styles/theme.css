@@ -36,8 +36,11 @@
 	--strike: #c8473f;
 
 	/* Type */
-	--font-display: 'Cinzel', 'Trajan Pro', 'Georgia', 'Times New Roman', serif;
-	--font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--font-title: 'Cinzel', serif;
+	--font-body: 'Inter', system-ui, sans-serif;
+	--font-story-title: 'IM Fell English SC', serif;
+	--font-story-body: 'IM Fell English', Georgia, serif;
+	--font-display: var(--font-title);
 
 	/* Ornate UI assets */
 	--ui-divider: url('../assets/ui/divider.png');
