@@ -193,9 +193,7 @@
 				<button class="rite-cta rite-cta--primary" type="button" onclick={() => onDone()}>
 					Light the fire.
 				</button>
-				<button class="rite-cta rite-cta--ghost" type="button" onclick={beginTour}>
-					How the rite works
-				</button>
+				<button class="rite-cta" type="button" onclick={beginTour}> How the rite works </button>
 			</div>
 		</div>
 	</div>

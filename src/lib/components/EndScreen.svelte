@@ -111,12 +111,7 @@
 			>
 				{scene.replay}
 			</button>
-			<button
-				class="rite-cta rite-cta--ghost"
-				type="button"
-				data-testid="end-leave"
-				onclick={onLeave}
-			>
+			<button class="rite-cta" type="button" data-testid="end-leave" onclick={onLeave}>
 				Leave the fire.
 			</button>
 		</div>
