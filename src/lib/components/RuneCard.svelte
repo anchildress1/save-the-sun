@@ -335,11 +335,13 @@
 
 	.name {
 		max-width: 100%;
-		font-family: var(--font-display);
-		font-size: 0.9rem;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		color: var(--card-text);
+		/* Title face (IM Fell SC) like the POC — its own small caps, so no uppercase transform. */
+		font-family: var(--font-story-title);
+		font-size: 1rem;
+		letter-spacing: 0.04em;
+		/* Lighter than the carved glyph — the inky SC face reads heavy, so soften colour + shadow. */
+		color: #fdf6e8;
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
