@@ -35,7 +35,7 @@
 			</button>
 		{/if}
 		<button
-			class="ghost ritual-button ritual-button--ghost"
+			class="ritual-button ritual-button--ghost"
 			type="button"
 			onclick={() => onReact('Pass')}
 		>
@@ -52,7 +52,7 @@
 		padding: 0.6rem 0.7rem;
 		border: 1px solid var(--gold-dim);
 		border-radius: 6px;
-		background: rgba(0, 0, 0, 0.25);
+		background: var(--surface-inset);
 	}
 
 	.prompt {
@@ -67,16 +67,11 @@
 		gap: 0.6rem;
 	}
 
+	/* Sizing from host-panel tokens so the active prompt matches the inert held-charges row; the
+	   fallbacks keep this renderable on its own. */
 	.choices button {
 		flex: 1;
-		min-height: 2.65rem;
-		padding: 0.6rem 0.75rem;
-		font-size: 0.78rem;
-		letter-spacing: 0.12em;
-	}
-
-	.choices button:focus-visible {
-		outline: 2px solid var(--gold-bright);
-		outline-offset: 2px;
+		min-height: var(--reaction-min-h, 2.65rem);
+		font-size: var(--reaction-font, 0.78rem);
 	}
 </style>

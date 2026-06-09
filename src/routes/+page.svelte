@@ -560,15 +560,14 @@
 
 			<hr class="ornate-divider oracle-divider" aria-hidden="true" />
 
-			<h2 class="speaker-title oracle-title">The Oracle</h2>
-			<div class="speaker-frame oracle-frame">
+			<h2 class="oracle-title">The Oracle</h2>
+			<div class="oracle-frame">
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
-			<!-- Mirrors the Oracle: a centered title over a framed box. The frame carries ONLY his
-			     templated question when he Asks, and is blank otherwise. -->
-			<h2 class="speaker-title skoll-title" data-testid="skoll-title">Sköll</h2>
-			<div class="speaker-frame skoll-frame" data-testid="skoll-frame">
+			<!-- The frame carries ONLY his templated question when he Asks; blank otherwise. -->
+			<h2 class="skoll-title" data-testid="skoll-title">Sköll</h2>
+			<div class="skoll-frame" data-testid="skoll-frame">
 				{#if skollEcho}
 					<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
 				{/if}
@@ -577,21 +576,12 @@
 			{#if skollAsking}
 				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
 			{:else}
+				<!-- Held charges, inert until Sköll Asks; the rules live in the onboarding, not on-board. -->
 				<div class="reactions" data-coach="reactions">
-					<button
-						class="ritual-button ritual-button--ghost"
-						type="button"
-						disabled
-						title="When your rival asks, hear the answer too."
-					>
+					<button class="ritual-button ritual-button--ghost reaction-btn" type="button" disabled>
 						Scry
 					</button>
-					<button
-						class="ritual-button ritual-button--ghost"
-						type="button"
-						disabled
-						title="When your rival asks, silence the Oracle — their question dies."
-					>
+					<button class="ritual-button ritual-button--ghost reaction-btn" type="button" disabled>
 						Hex
 					</button>
 				</div>
@@ -599,7 +589,7 @@
 
 			{#if skollStalled}
 				<button
-					class="ghost rouse-wolf ritual-button ritual-button--ghost"
+					class="rouse-wolf ritual-button ritual-button--ghost"
 					type="button"
 					data-testid="rouse-wolf"
 					onclick={advanceSkoll}
@@ -629,7 +619,7 @@
 					disabled={castMode || pending || !canAct}
 				/>
 				<button
-					class="primary ritual-button ritual-button--primary"
+					class="ritual-button ritual-button--primary"
 					type="submit"
 					disabled={castMode || pending || !canAct}
 				>
@@ -644,24 +634,20 @@
 					</p>
 					<div class="cast-actions">
 						<button
-							class="primary ritual-button ritual-button--primary"
+							class="ritual-button ritual-button--primary"
 							type="button"
 							onclick={commitCast}
 							disabled={!selectedRune || pending}
 						>
 							Name it
 						</button>
-						<button
-							class="ghost ritual-button ritual-button--ghost"
-							type="button"
-							onclick={cancelCast}
-						>
+						<button class="ritual-button ritual-button--ghost" type="button" onclick={cancelCast}>
 							Not yet
 						</button>
 					</div>
 				{:else}
 					<button
-						class="primary cast-arm ritual-button ritual-button--primary"
+						class="cast-arm ritual-button ritual-button--primary"
 						type="button"
 						onclick={armCast}
 						disabled={pending || !canAct}
@@ -878,6 +864,16 @@
 	}
 
 	.oracle-panel {
+		/* Shared values, not shared selectors: each speaker/reaction block reads these so they stay
+		   aligned while remaining independently styleable. */
+		--speaker-title-size: 1.05rem;
+		--speaker-title-tracking: 0.32em;
+		--frame-pad: 0.55rem 0.7rem;
+		--frame-min-h: 2.6rem;
+		--frame-radius: 6px;
+		--reaction-min-h: 2.65rem;
+		--reaction-font: 0.78rem;
+
 		position: relative;
 		display: flex;
 		flex-direction: column;
@@ -923,32 +919,22 @@
 		z-index: 4;
 	}
 
-	/* The Oracle and Sköll render identically — a centered title over a framed box — so the duel
-	   reads as two parallel voices. Only the colour differs (gold vs cold), set per speaker below. */
-	.speaker-title {
+	.oracle-title {
 		margin: 0.2rem 0 0.1rem;
 		text-align: center;
 		font-family: var(--font-display);
-		font-size: 1.05rem;
-		letter-spacing: 0.32em;
+		font-size: var(--speaker-title-size);
+		letter-spacing: var(--speaker-title-tracking);
 		text-transform: uppercase;
-	}
-
-	.speaker-frame {
-		border-radius: 6px;
-		padding: 0.55rem 0.7rem;
-		/* Hold the box's shape even when empty so the two speakers stay aligned before either has
-		   spoken (the Oracle opens blank; Sköll's frame is empty until he Asks). */
-		min-height: 2.6rem;
-	}
-
-	.oracle-title {
 		color: var(--gold-bright);
 	}
 
 	.oracle-frame {
+		min-height: var(--frame-min-h);
+		padding: var(--frame-pad);
 		border: 1px solid var(--gold-faint);
-		background: rgba(0, 0, 0, 0.25);
+		border-radius: var(--frame-radius);
+		background: var(--surface-inset);
 	}
 
 	.frame-text {
@@ -964,18 +950,24 @@
 	}
 
 	.skoll-title {
-		color: #c2cad8; /* moon-cold, deliberately not the Oracle's gold */
+		margin: 0.2rem 0 0.1rem;
+		text-align: center;
+		font-family: var(--font-display);
+		font-size: var(--speaker-title-size);
+		letter-spacing: var(--speaker-title-tracking);
+		text-transform: uppercase;
+		color: var(--steel);
 	}
 
-	/* Cold steel to the Oracle's gold, so the duel reads as two voices. */
 	.skoll-frame {
-		border: 1px solid rgba(139, 147, 166, 0.32);
+		min-height: var(--frame-min-h);
+		padding: var(--frame-pad);
+		border: 1px solid var(--steel-line);
+		border-radius: var(--frame-radius);
 		background:
-			radial-gradient(circle at 50% 0%, rgba(139, 147, 166, 0.08) 0%, transparent 60%),
-			rgba(0, 0, 0, 0.28);
+			radial-gradient(circle at 50% 0%, var(--steel-glow) 0%, transparent 60%), var(--surface-inset);
 	}
 
-	/* His Ask, echoed so the human knows what they're choosing to Scry, Hex, or let pass. */
 	.skoll-echo {
 		margin: 0;
 		font-family: var(--font-story-body);
@@ -989,12 +981,19 @@
 		gap: 0.6rem;
 	}
 
-	.reactions button {
+	.reaction-btn {
 		flex: 1;
-		min-height: 2.35rem;
-		padding: 0.45rem 0.65rem;
-		font-size: 0.72rem;
-		letter-spacing: 0.13em;
+		min-height: var(--reaction-min-h);
+		font-size: var(--reaction-font);
+	}
+
+	/* Held charges read as real, legible chips — not the faded global disabled look, which is too
+	   faint over the panel. They're just not actionable until Sköll Asks. */
+	.reaction-btn:disabled {
+		color: var(--ink);
+		border-color: var(--gold-dim);
+		filter: none;
+		cursor: not-allowed;
 	}
 
 	.ask {
@@ -1017,7 +1016,7 @@
 
 	.ask input {
 		padding: 0.65rem 0.7rem;
-		background: rgba(0, 0, 0, 0.35);
+		background: var(--surface-inset);
 		border: 1px solid var(--gold-dim);
 		border-radius: 5px;
 		color: var(--ink);
@@ -1027,26 +1026,24 @@
 	.ask input:focus-visible {
 		outline: none;
 		border-color: var(--gold-bright);
-		box-shadow: 0 0 0 2px rgba(217, 169, 74, 0.2);
+		box-shadow: var(--focus-ring);
 	}
 
-	/* Chrome paints a light background over an autofilled/history-matched field, breaking the dark
-	   panel. The inset box-shadow overpaints it, the text-fill-color keeps the ink legible, and the
-	   absurd transition delay defeats the autofill colour flash. */
+	/* Override Chrome's autofill repaint: the inset shadow overpaints its light fill, the text-fill
+	   keeps the ink legible, and the long transition defeats the colour flash. */
 	.ask input:-webkit-autofill,
 	.ask input:-webkit-autofill:hover,
 	.ask input:-webkit-autofill:active {
 		-webkit-text-fill-color: var(--ink);
-		-webkit-box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.35) inset;
+		-webkit-box-shadow: 0 0 0 1000px var(--surface-inset) inset;
 		caret-color: var(--ink);
 		transition: background-color 9999s ease-in-out 0s;
 	}
 
 	.ask input:-webkit-autofill:focus {
-		/* Keep the gold focus ring stacked over the dark overpaint. */
 		-webkit-box-shadow:
-			0 0 0 2px rgba(217, 169, 74, 0.2),
-			0 0 0 1000px rgba(0, 0, 0, 0.35) inset;
+			var(--focus-ring),
+			0 0 0 1000px var(--surface-inset) inset;
 	}
 
 	.cast {
@@ -1067,23 +1064,8 @@
 		gap: 0.6rem;
 	}
 
-	/* The cast row splits its width evenly; flex: 1 lives here, not on the .ghost variant. */
-	.cast-actions .primary,
-	.cast-actions .ghost {
+	.cast-actions > button {
 		flex: 1;
-	}
-
-	button.primary {
-		min-height: 3rem;
-	}
-
-	button.ghost {
-		min-height: 3rem;
-	}
-
-	button:focus-visible {
-		outline: 2px solid var(--gold-bright);
-		outline-offset: 2px;
 	}
 
 	/* AI-fallibility note: a meta affordance (not the rite's voice), opened as a browser popover. */
@@ -1114,6 +1096,11 @@
 		color: var(--gold-bright);
 		border-color: var(--gold-bright);
 		background: rgba(217, 169, 74, 0.08);
+	}
+
+	.ai-note-btn:focus-visible {
+		outline: none;
+		box-shadow: var(--focus-ring);
 	}
 	.ai-note-pop {
 		position: fixed;
