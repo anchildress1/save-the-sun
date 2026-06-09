@@ -565,7 +565,6 @@
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
-			<!-- The frame carries ONLY his templated question when he Asks; blank otherwise. -->
 			<h2 class="skoll-title" data-testid="skoll-title">Sköll</h2>
 			<div class="skoll-frame" data-testid="skoll-frame">
 				{#if skollEcho}
@@ -576,7 +575,6 @@
 			{#if skollAsking}
 				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
 			{:else}
-				<!-- Held charges, inert until Sköll Asks; the rules live in the onboarding, not on-board. -->
 				<div class="reactions" data-coach="reactions">
 					<button class="ritual-button ritual-button--ghost reaction-btn" type="button" disabled>
 						Scry
@@ -864,8 +862,6 @@
 	}
 
 	.oracle-panel {
-		/* Shared values, not shared selectors: each speaker/reaction block reads these so they stay
-		   aligned while remaining independently styleable. */
 		--speaker-title-size: 1.05rem;
 		--speaker-title-tracking: 0.32em;
 		--frame-pad: 0.55rem 0.7rem;
@@ -987,8 +983,6 @@
 		font-size: var(--reaction-font);
 	}
 
-	/* Held charges read as real, legible chips — not the faded global disabled look, which is too
-	   faint over the panel. They're just not actionable until Sköll Asks. */
 	.reaction-btn:disabled {
 		color: var(--ink);
 		border-color: var(--gold-dim);
@@ -1029,8 +1023,6 @@
 		box-shadow: var(--focus-ring);
 	}
 
-	/* Override Chrome's autofill repaint: the inset shadow overpaints its light fill, the text-fill
-	   keeps the ink legible, and the long transition defeats the colour flash. */
 	.ask input:-webkit-autofill,
 	.ask input:-webkit-autofill:hover,
 	.ask input:-webkit-autofill:active {

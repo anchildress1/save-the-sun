@@ -46,6 +46,8 @@
 
 <style>
 	.reaction-prompt {
+		position: relative;
+		z-index: 2;
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
@@ -67,8 +69,6 @@
 		gap: 0.6rem;
 	}
 
-	/* Sizing from host-panel tokens so the active prompt matches the inert held-charges row; the
-	   fallbacks keep this renderable on its own. */
 	.choices button {
 		flex: 1;
 		min-height: var(--reaction-min-h, 2.65rem);

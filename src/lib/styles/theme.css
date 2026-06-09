@@ -20,15 +20,15 @@
 	--ink-muted: #a9a392;
 	--ink-faint: #6f6c62;
 
-	/* Steel — Sköll's moon-cold counter to the Oracle's gold */
+	/* Steel (Sköll's cold accent) */
 	--steel: #c2cad8;
 	--steel-line: rgba(139, 147, 166, 0.32);
 	--steel-glow: rgba(139, 147, 166, 0.08);
 
-	/* Inset surface — framed boxes, inputs, and prompts sit a step below the panel ground */
+	/* Inset surface (framed boxes, inputs) */
 	--surface-inset: rgba(0, 0, 0, 0.3);
 
-	/* One focus ring, reused — kept >=3:1 against the dark ground for WCAG 2.2 focus appearance */
+	/* Focus ring */
 	--focus-ring: 0 0 0 2px rgba(233, 200, 119, 0.55);
 
 	/* Stone (rune tablet surface, on the midnight board) */
@@ -107,8 +107,6 @@
 	box-shadow: var(--focus-ring);
 }
 
-/* Mute, don't fade: whole-element opacity makes the opaque fill translucent and the button
-   vanishes over the banner image. */
 .ritual-button:disabled {
 	cursor: not-allowed;
 	color: var(--ink-muted);

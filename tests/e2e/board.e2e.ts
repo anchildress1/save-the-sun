@@ -160,6 +160,51 @@ test.describe('the live board (past the title screen)', () => {
 		await expect(page.getByRole('button', { name: 'Cast the rune' })).toBeVisible();
 	});
 
+	test('reaction prompt sits above the Sköll banner — its buttons are clickable, not occluded', async ({
+		page
+	}) => {
+		// Guards the regression where the prompt rendered behind the banner; a click fails if occluded.
+		await page.route('**/api/action', (route) => {
+			const body = route.request().postDataJSON?.() ?? {};
+			if (body?.type === 'Advance')
+				return route.fulfill({
+					json: {
+						type: 'Advance',
+						skoll: { asks: { echo: 'Sköll asks after a gold rune.' } },
+						state: { activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 }
+					}
+				});
+			if (body?.type === 'React')
+				return route.fulfill({
+					json: {
+						type: 'React',
+						skollReaction: { hexed: false },
+						state: { activePlayer: 'Human', status: 'active', winner: null, turns: 1 }
+					}
+				});
+			return route.fulfill({
+				json: {
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'No. Sól is not reaching for a gold rune.',
+						turnConsumed: true
+					},
+					skollVsYou: { reaction: 'Pass' },
+					state: { activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 }
+				}
+			});
+		});
+		await page.goto('/');
+		await page.getByLabel(/ask the oracle/i).fill('Is it gold?');
+		await page.getByRole('button', { name: 'Ask the Oracle' }).click();
+
+		await expect(page.getByText('Sköll asks. Answer it?')).toBeVisible();
+		await page.getByRole('button', { name: 'Let it pass' }).click({ trial: true });
+		await page.getByRole('button', { name: 'Let it pass' }).click();
+		await expect(page.getByTestId('answer')).toContainText('You hold your hand');
+	});
+
 	test('refuses an empty Ask without dispatching', async ({ page }) => {
 		await page.goto('/');
 		await page.getByRole('button', { name: 'Ask the Oracle' }).click();
