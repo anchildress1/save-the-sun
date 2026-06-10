@@ -43,6 +43,10 @@ export default defineConfig({
 				'src/lib/server/skoll/skoll.ts': { lines: 95, branches: 85 },
 				'src/lib/server/oracle/oracle.ts': { lines: 90, branches: 85 },
 				'src/lib/server/engine/session.ts': { lines: 90, branches: 85 },
+				// The perf win rides on these emitting the right cache header + content-type; pure
+				// logic, so held high. The asset routes themselves lean on the global floor.
+				'src/lib/server/cache.ts': { lines: 100, branches: 90 },
+				'src/lib/pwaAssets.ts': { lines: 100, branches: 100 },
 				'src/routes/api/action/+server.ts': { lines: 90, branches: 85 },
 				'src/routes/api/new-game/+server.ts': { lines: 90, branches: 85 },
 				'src/lib/components/**': { lines: 80, branches: 70 },

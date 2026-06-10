@@ -3,7 +3,7 @@ import type { Handle } from '@sveltejs/kit';
 
 // One sessionId per browser so the page load and /api/action resolve the same engine.
 const COOKIE = 'sts_session';
-const SESSIONLESS_PATHS = new Set([
+export const SESSIONLESS_PATHS = new Set([
 	'/apple-touch-icon.png',
 	'/favicon.ico',
 	'/favicon-16x16.png',
