@@ -29,7 +29,7 @@ e2e:
 	pnpm run test:e2e
 
 perf:
-	npx lhci autorun
+	pnpm exec lhci autorun
 
 secret-scan:
 	npx secretlint
