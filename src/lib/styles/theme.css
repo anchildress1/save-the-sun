@@ -59,53 +59,65 @@
 }
 
 /* The app's two — and only two — buttons. Both read on a bright dawn splash AND a dark panel:
-   `--primary` is dark ink on solid gold (≈12:1 on any backdrop); `--secondary` carries its own
-   near-opaque dark surface, so its gold text/border stay legible over light art too. Cinzel,
-   uppercase, one size. Splash surfaces scale them up via their own container, not a third class. */
+   `--primary` is warm-dark ink on near-flat gold; `--secondary` carries its own near-opaque dark
+   surface, so its gold text/hairline border stay legible over light art too. Cinzel, uppercase, one
+   size. The look is flat with a soft drop shadow (no 90s bevel/glow) and a tactile press. Splash
+   surfaces scale them up via their own container, not a third class. */
 .btn {
-	min-height: 2.9rem;
-	padding: 0.68rem 1.15rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 2.85rem;
+	padding: 0.7rem 1.35rem;
 	font-family: var(--font-display);
-	font-size: 0.82rem;
-	letter-spacing: 0.11em;
+	font-size: 0.8rem;
+	font-weight: 600;
+	letter-spacing: 0.07em;
 	text-transform: uppercase;
 	border: 1px solid transparent;
-	border-radius: 6px;
+	border-radius: 10px;
 	cursor: pointer;
 	transition:
-		background 0.2s ease,
-		border-color 0.2s ease,
-		box-shadow 0.2s ease,
-		color 0.2s ease,
-		transform 0.1s ease;
+		background 0.18s ease,
+		border-color 0.18s ease,
+		box-shadow 0.18s ease,
+		color 0.18s ease,
+		transform 0.12s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .btn--primary {
-	color: var(--bg-deep);
-	background: linear-gradient(180deg, var(--gold-bright), var(--gold));
-	border-color: var(--gold-bright);
-	box-shadow: 0 0 14px rgba(217, 169, 74, 0.18);
+	color: #1d1606;
+	background: linear-gradient(180deg, #e7bd63, #d4a23f);
+	box-shadow:
+		0 1px 2px rgba(0, 0, 0, 0.24),
+		0 8px 20px -10px rgba(214, 163, 66, 0.55);
 }
 
 .btn--secondary {
 	color: var(--gold-bright);
-	background: rgba(6, 9, 18, 0.88);
-	border-color: var(--gold-dim);
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+	background: rgba(9, 13, 26, 0.86);
+	border-color: rgba(233, 200, 119, 0.32);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .btn:hover:not(:disabled) {
 	transform: translateY(-1px);
 }
 
+.btn:active:not(:disabled) {
+	transform: translateY(0) scale(0.985);
+}
+
 .btn--primary:hover:not(:disabled) {
-	background: linear-gradient(180deg, #f3dca0, var(--gold-bright));
-	box-shadow: 0 0 18px rgba(217, 169, 74, 0.32);
+	background: linear-gradient(180deg, #f0cc7a, #dcab49);
+	box-shadow:
+		0 1px 2px rgba(0, 0, 0, 0.24),
+		0 12px 26px -10px rgba(214, 163, 66, 0.72);
 }
 
 .btn--secondary:hover:not(:disabled) {
-	border-color: var(--gold-bright);
-	background: rgba(217, 169, 74, 0.14);
+	border-color: rgba(233, 200, 119, 0.6);
+	background: rgba(233, 200, 119, 0.1);
 }
 
 /* Outline + ring together, so the focus indicator stays visible on bright art and dark panel alike. */
@@ -119,7 +131,7 @@
 	cursor: not-allowed;
 	transform: none;
 	box-shadow: none;
-	filter: saturate(0.5) brightness(0.92);
+	filter: saturate(0.55) brightness(0.94);
 }
 
 .btn--secondary:disabled {
