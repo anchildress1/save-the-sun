@@ -84,7 +84,15 @@
 	aria-labelledby="end-screen-lead"
 	use:trapFocus
 >
-	<img class="splash" src={scene.splash} alt="" aria-hidden="true" decoding="async" />
+	<img
+		class="splash"
+		src={scene.splash}
+		width="1440"
+		height="900"
+		alt=""
+		aria-hidden="true"
+		decoding="async"
+	/>
 	<div class="scrim" aria-hidden="true"></div>
 
 	<div class="rite">

@@ -486,12 +486,23 @@
 		<img
 			class="header-background-image"
 			src={moonSplash}
+			width="1600"
+			height="187"
 			alt=""
 			aria-hidden="true"
 			decoding="async"
+			fetchpriority="high"
 		/>
 		<div class="title-block">
-			<img class="app-sigil" src={appIcon} alt="" aria-hidden="true" decoding="async" />
+			<img
+				class="app-sigil"
+				src={appIcon}
+				width="96"
+				height="96"
+				alt=""
+				aria-hidden="true"
+				decoding="async"
+			/>
 			<div>
 				<h1>
 					<button
@@ -576,7 +587,15 @@
 		</section>
 
 		<aside class="oracle-panel">
-			<img class="skoll-banner" src={skollBanner} alt="" aria-hidden="true" decoding="async" />
+			<img
+				class="skoll-banner"
+				src={skollBanner}
+				width="480"
+				height="700"
+				alt=""
+				aria-hidden="true"
+				decoding="async"
+			/>
 
 			<div class="turn-pill-row">
 				<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">

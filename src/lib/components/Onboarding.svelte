@@ -176,7 +176,15 @@
 
 {#if phase === 'title'}
 	<div class="backdrop title-backdrop" data-testid="onboarding">
-		<img class="title-splash" src={introSplash} alt="" aria-hidden="true" decoding="async" />
+		<img
+			class="title-splash"
+			src={introSplash}
+			width="1440"
+			height="900"
+			alt=""
+			aria-hidden="true"
+			decoding="async"
+		/>
 		<div
 			class="title-card"
 			role="dialog"

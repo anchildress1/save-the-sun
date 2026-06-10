@@ -58,6 +58,8 @@
 	<img
 		class="card-background-image"
 		src={CARD_BACKGROUND_ASSET}
+		width="224"
+		height="280"
 		alt=""
 		aria-hidden="true"
 		decoding="async"
@@ -70,6 +72,8 @@
 				<img
 					class="element-icon-image"
 					src={elementIconImage}
+					width="48"
+					height="48"
 					alt=""
 					aria-hidden="true"
 					decoding="async"
@@ -87,6 +91,8 @@
 				<img
 					class="color-icon-image"
 					src={colorIcon}
+					width="80"
+					height="80"
 					alt=""
 					aria-hidden="true"
 					decoding="async"
@@ -105,6 +111,8 @@
 				<img
 					class="rune-symbol-image"
 					src={symbol}
+					width="96"
+					height="96"
 					alt=""
 					aria-hidden="true"
 					decoding="async"
@@ -129,6 +137,8 @@
 						<img
 							class="pip-image"
 							src={fillIcon}
+							width="24"
+							height="24"
 							alt=""
 							aria-hidden="true"
 							decoding="async"
@@ -148,6 +158,8 @@
 			<img
 				class="strikeout"
 				src={CHALK_CROSS_ASSET}
+				width="224"
+				height="224"
 				alt=""
 				aria-hidden="true"
 				decoding="async"
