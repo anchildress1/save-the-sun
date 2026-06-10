@@ -305,11 +305,11 @@ test.describe('first-run onboarding', () => {
 
 		for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Next' }).click();
 		await expect(page.getByTestId('step-count')).toHaveText('4 / 5');
-		await expect(page.getByRole('heading', { name: 'Scry & Hex' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Cast' })).toBeVisible();
 
 		await page.getByRole('button', { name: 'Next' }).click();
 		await expect(page.getByTestId('step-count')).toHaveText('5 / 5');
-		await expect(page.getByRole('heading', { name: 'Cast' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Scry & Hex' })).toBeVisible();
 		const takeUp = page.getByRole('button', { name: 'Take up the runes.' });
 		await expect(takeUp).toBeInViewport();
 		await takeUp.click();
