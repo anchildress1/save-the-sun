@@ -216,8 +216,8 @@
 		bind:this={popoverEl}
 		use:trapFocus
 	>
-		<p class="step-count" data-testid="step-count">{step + 1} / {STEPS.length}</p>
 		<h2 id="onboarding-heading">{STEPS[step].label}</h2>
+		<hr class="step-divider" aria-hidden="true" />
 		<p class="step-body" data-testid="step-body">{STEPS[step].body}</p>
 		<div class="actions">
 			{#if !isLast}
@@ -227,6 +227,7 @@
 				{isLast ? 'Take up the runes.' : 'Next'}
 			</button>
 		</div>
+		<p class="step-count" data-testid="step-count">{step + 1} / {STEPS.length}</p>
 	</div>
 {/if}
 
@@ -392,8 +393,19 @@
 		text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
 	}
 
+	/* Ornate rule under the step title, matching the title card's divider — snug to the heading. */
+	.step-divider {
+		width: min(15rem, 80%);
+		height: 1.05rem;
+		margin: -0.35rem auto -0.15rem;
+		border: 0;
+		background: var(--ui-divider) center / 100% 100% no-repeat;
+		opacity: 0.85;
+	}
+
+	/* Step counter sits at the foot of the popover now, a quiet footer under the controls. */
 	.step-count {
-		margin: 0;
+		margin: 0.1rem 0 0;
 		font-family: var(--font-display);
 		font-size: 0.72rem;
 		letter-spacing: 0.2em;
