@@ -115,7 +115,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [x] Each card shows: glyph, color swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken together in the accessible name as "{n} light/dark power", never as visible text; light/dark still a queryable Oracle axis)
 - [x] Nothing conveyed by color alone — color name and element name always accompany their icons
 - [x] Card dims in place when crossed; restore affordance present and works
-- [x] Header: title "Save the Sun", tagline "A rite for the longest day," night-progress indicator, turn pill ("Your move." / "Sköll moves.")
+- [x] Header: title "Save the Sun", tagline "A rite for the longest day.", night-progress indicator, turn pill ("Your move." / "Sköll moves.")
 - [x] Right column order: Rite transcript → Reactions panel (Scry · Hex) → Ask input → "Cast the rune" (no suggestion chips — pre-filled questions would do the player's deduction)
 - [x] Native focusable DOM elements carry the controls so rendering never blocks keyboard play
 
