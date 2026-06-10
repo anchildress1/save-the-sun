@@ -4,3 +4,4 @@
 - [ ] Optimize image download and caching on the server to load faster
 - [ ] Ensure DEV is allowed for embed to CloudRun
 - [ ] Add in OG and SEO
+- [ ] Auto-pass turn if scry/hex are both used for the night
