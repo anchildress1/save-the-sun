@@ -3,8 +3,19 @@ import type { Handle } from '@sveltejs/kit';
 
 // One sessionId per browser so the page load and /api/action resolve the same engine.
 const COOKIE = 'sts_session';
+const SESSIONLESS_PATHS = new Set([
+	'/apple-touch-icon.png',
+	'/favicon.ico',
+	'/favicon-16x16.png',
+	'/favicon-32x32.png',
+	'/icon-192.png',
+	'/icon-512.png',
+	'/site.webmanifest'
+]);
 
 export const handle: Handle = async ({ event, resolve }) => {
+	if (SESSIONLESS_PATHS.has(event.url.pathname)) return resolve(event);
+
 	// `!sessionId` not `=== undefined`: an empty-string cookie is junk, regenerate it.
 	let sessionId = event.cookies.get(COOKIE);
 	if (!sessionId) {
