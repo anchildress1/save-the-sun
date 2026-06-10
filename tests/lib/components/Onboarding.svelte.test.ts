@@ -6,9 +6,7 @@ describe('Onboarding — title screen + first-run tour (S7)', () => {
 	it('opens on the title screen with both CTAs', async () => {
 		const screen = render(Onboarding, { onDone: vi.fn() });
 		await expect.element(screen.getByRole('heading', { name: 'Save the Sun' })).toBeInTheDocument();
-		await expect
-			.element(screen.getByText('A race to beat Sköll and save the light.'))
-			.toBeInTheDocument();
+		await expect.element(screen.getByText('A rite for the longest day.')).toBeInTheDocument();
 		await expect
 			.element(screen.getByRole('button', { name: 'Light the fire.' }))
 			.toBeInTheDocument();
@@ -29,30 +27,33 @@ describe('Onboarding — title screen + first-run tour (S7)', () => {
 		await screen.getByRole('button', { name: 'How the rite works' }).click();
 
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 5');
-		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('one hidden rune');
+		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('one offering to Sól');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('2 / 5');
-		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('Ask yes/no questions');
+		await expect
+			.element(screen.getByTestId('step-body'))
+			.toHaveTextContent('Ask the Oracle yes/no questions');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('3 / 5');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('cross off runes yourself');
+			.toHaveTextContent('Cross off what each answer rules out');
 
+		// Cast precedes Scry & Hex (ux-copy.md §5 order).
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('4 / 5');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('spend Scry to hear the answer or Hex to silence the question');
-		await expect.element(screen.getByTestId('step-body')).not.toHaveTextContent('sacred');
+			.toHaveTextContent('Cast true and dawn is yours');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('5 / 5');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('The right rune wins the dawn');
+			.toHaveTextContent('Scry to overhear her reply, or Hex to silence her');
+		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('a Cast is sacred');
 	});
 
 	it('finishes the tour with "Take up the runes."', async () => {

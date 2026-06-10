@@ -21,10 +21,24 @@
 >
 	<div class="choices">
 		{#if held.Scry}
-			<button class="btn btn--primary" type="button" onclick={() => onReact('Scry')}> Scry </button>
+			<button
+				class="btn btn--primary"
+				type="button"
+				title="When your rival asks, hear the answer too."
+				onclick={() => onReact('Scry')}
+			>
+				Scry
+			</button>
 		{/if}
 		{#if held.Hex}
-			<button class="btn btn--primary" type="button" onclick={() => onReact('Hex')}> Hex </button>
+			<button
+				class="btn btn--primary"
+				type="button"
+				title="When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted."
+				onclick={() => onReact('Hex')}
+			>
+				Hex
+			</button>
 		{/if}
 		<button class="btn btn--secondary" type="button" onclick={() => onReact('Pass')}>
 			Let it pass

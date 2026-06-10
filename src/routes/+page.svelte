@@ -28,18 +28,19 @@
 	const RITE = {
 		emptyAsk: 'Speak your question, witch.',
 		wolfMoving: 'The wolf is moving. Hold.',
-		oracleSilent: 'The Oracle falls silent. Draw breath and try again.',
+		oracleSilent: "The Oracle falls silent — the rite can't reach Sól. Draw breath, and ask again.",
 		castFalters: 'The rite falters. The rune slips away.',
 		wrongCast: 'The rune is not the one. The night holds.',
 		runeTrue: 'The rune is true.',
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
 		wolfStalled: 'The wolf stalls in the dark. Rouse him to move.',
+		scryHim: 'You lean into the dark and listen. His answer is yours too.',
 		hexHim: "You close the Oracle's lips. His question dies unanswered — his turn with it.",
 		passHim: 'You hold your hand. Let him have his answer.',
 		// Sköll's skill plays, voiced in the Oracle's text (rite voice, third person — never his gloat).
 		// Hex replaces the answer (the question died); the Scry note trails the answer he overheard.
-		skollHexes: "Sköll closes the Oracle's lips. Your question dies unanswered.",
+		skollHexes: "Sköll closes the Oracle's lips. Your question dies in the dark.",
 		skollScried: 'Sköll listened at the threshold — the answer is his too.',
 		sunCrests: 'Sól crests the rim of the world.',
 		skollTakesSun: 'Sköll takes the sun. The longest day never breaks. The year falls to dark.',
@@ -48,8 +49,7 @@
 		nightThins: 'Gray bleeds into the dark.',
 		nightDawn: 'Dawn gathers at the edge of the world.',
 		chooseTarget: 'Choose a rune from the board.',
-		desktopOnly:
-			'The rite needs a wider sky. Save the Sun is cast on a desktop — return on a larger screen to take up the runes.',
+		desktopOnly: 'The rite needs a wider sky. Return on a desktop to take up the runes.',
 		castPrompt: (name: string) => `Cast ${name}?`
 	};
 
@@ -370,7 +370,8 @@
 				answer = RITE.hexHim;
 				heldHex = false;
 			} else if (skollReaction?.scried) {
-				answer = skollReaction.scried.answer;
+				// §3: the Scry framing leads, then the answer he was owed — now yours too.
+				answer = `${RITE.scryHim} ${skollReaction.scried.answer}`;
 				heldScry = false;
 			} else {
 				answer = RITE.passHim; // a Pass, or a reaction that didn't land
@@ -502,7 +503,7 @@
 						Save the Sun
 					</button>
 				</h1>
-				<p class="tagline">A race to beat Sköll and save the light.</p>
+				<p class="tagline">A rite for the longest day.</p>
 			</div>
 		</div>
 
@@ -631,8 +632,22 @@
 				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
 			{:else}
 				<div class="reactions" data-coach="reactions">
-					<button class="btn btn--secondary reaction-btn" type="button" disabled> Scry </button>
-					<button class="btn btn--secondary reaction-btn" type="button" disabled> Hex </button>
+					<button
+						class="btn btn--secondary reaction-btn"
+						type="button"
+						title="When your rival asks, hear the answer too."
+						disabled
+					>
+						Scry
+					</button>
+					<button
+						class="btn btn--secondary reaction-btn"
+						type="button"
+						title="When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted."
+						disabled
+					>
+						Hex
+					</button>
 				</div>
 			{/if}
 

@@ -15,27 +15,27 @@
 			// stays unhighlighted until "Read & cross."
 			label: 'The stakes',
 			target: null,
-			body: 'Sól has one hidden rune. Name it before Sköll does, or the wolf takes the dawn.'
+			body: 'Tonight the coven makes one offering to Sól. Name her true rune before Sköll does, and the longest day breaks. Fail, and the wolf swallows the dawn.'
 		},
 		{
 			label: 'Ask',
 			target: '[data-coach="ask"]',
-			body: 'Ask yes/no questions about element, power, light, hue, or a rune by name. One question a turn.'
+			body: 'Ask the Oracle yes/no questions about the runes — their element, power, light, hue, or one rune by name. She answers the sign she reads. One question a turn.'
 		},
 		{
 			label: 'Read & cross',
 			target: '[data-coach="board"]',
-			body: 'Use each answer to cross off runes yourself. The board will not mark them for you.'
-		},
-		{
-			label: 'Scry & Hex',
-			target: '[data-coach="reactions"]',
-			body: 'When Sköll asks, spend Scry to hear the answer or Hex to silence the question. Each works once per night.'
+			body: 'Twenty-four runes stand in the open. Cross off what each answer rules out. The crossing is yours — the board never does it for you. That reading is the whole game.'
 		},
 		{
 			label: 'Cast',
 			target: '[data-coach="cast"]',
-			body: "When you're sure, cast. The right rune wins the dawn; the wrong rune spends your turn."
+			body: "When you're sure, cast a rune. Cast true and dawn is yours. Cast wrong and the turn is gone. Sköll is racing you for the same rune."
+		},
+		{
+			label: 'Scry & Hex',
+			target: '[data-coach="reactions"]',
+			body: 'Sköll asks the Oracle too. When he does, you may answer back once — Scry to overhear her reply, or Hex to silence her and kill his question. One Scry and one Hex a night; a Cast is sacred, never interrupted.'
 		}
 	];
 
@@ -187,7 +187,7 @@
 			<div class="title-top">
 				<h1 id="onboarding-heading">Save the Sun</h1>
 				<hr class="title-divider" aria-hidden="true" />
-				<p class="tagline">A race to beat Sköll and save the light.</p>
+				<p class="tagline">A rite for the longest day.</p>
 			</div>
 			<div class="title-actions">
 				<button class="btn btn--primary" type="button" onclick={() => onDone()}>

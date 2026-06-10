@@ -186,6 +186,8 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [ ] [Eval] Sampled Oracle vs Sköll lines attributable to correct speaker
 - [x] [C] Sköll's box shows only his templated Ask (no taunts, no cast lines); blank when he isn't asking
 
+> S11 (2026-06-09): the built copy was brought into conformance with `ux-copy.md` (tagline, mixed-type refusal, connection-error, Sköll-Hex line, the §3 Scry framing line, onboarding §5 copy + order, reaction tooltips) and the per-surface copy assertions updated to match. The boxes above stay unchecked: they track the **consolidated automated lint + speaker eval**, which are deferred to S12 — conformance is currently proven piecemeal by the surface copy tests, not by one diegetic-string lint.
+
 ---
 
 ## Enforced coverage gates (CI — PR fails below floor)

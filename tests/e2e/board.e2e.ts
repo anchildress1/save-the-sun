@@ -19,7 +19,7 @@ test.describe('the live board (past the title screen)', () => {
 		await page.goto('/');
 		await expect(page.locator('h1', { hasText: 'Save the Sun' })).toBeVisible();
 		await expect(
-			page.locator('p.tagline', { hasText: 'A race to beat Sköll and save the light.' })
+			page.locator('p.tagline', { hasText: 'A rite for the longest day.' })
 		).toBeVisible();
 	});
 
