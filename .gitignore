@@ -31,6 +31,9 @@ test-results
 # Coverage
 coverage
 
+# Lighthouse CI run artifacts
+.lighthouseci/
+
 # Ad-hoc screenshots / design refs dropped at the repo root
 /*.png
 .playwright-mcp/
