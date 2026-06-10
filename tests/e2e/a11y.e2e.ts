@@ -7,8 +7,9 @@ import { expect, test, type Page } from '@playwright/test';
 
 const ONBOARDED_KEY = 'save-the-sun:onboarded';
 
-// Only color-contrast / name-role / color-meaning rules — the v1 a11y gate. Decorative art over
-// which axe can't compute contrast lands as `incomplete`, not `violations`, so it never false-fails.
+// The full WCAG 2.0 + 2.1 Level A/AA rule set — which subsumes the S10 concerns (name/role,
+// color-contrast, color-independence) along with the rest of the A/AA bar. Decorative art over which
+// axe can't compute contrast lands as `incomplete`, not `violations`, so it never false-fails.
 const A11Y_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
 const seedOnboarded = (page: Page) =>
