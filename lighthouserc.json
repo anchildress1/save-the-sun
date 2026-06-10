@@ -1,0 +1,20 @@
+{
+	"ci": {
+		"collect": {
+			"startServerCommand": "pnpm run build && pnpm exec vite preview --port 4321",
+			"startServerReadyPattern": "Local:",
+			"startServerReadyTimeout": 120000,
+			"url": ["http://localhost:4321/"],
+			"numberOfRuns": 1
+		},
+		"assert": {
+			"assertions": {
+				"categories:accessibility": ["error", { "minScore": 0.95 }]
+			}
+		},
+		"upload": {
+			"target": "filesystem",
+			"outputDir": ".lighthouseci"
+		}
+	}
+}

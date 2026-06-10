@@ -115,7 +115,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [x] Each card shows: glyph, color swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken together in the accessible name as "{n} light/dark power", never as visible text; light/dark still a queryable Oracle axis)
 - [x] Nothing conveyed by color alone — color name and element name always accompany their icons
 - [x] Card dims in place when crossed; restore affordance present and works
-- [x] Header: title "Save the Sun", tagline "A race to beat Sköll and save the light," night-progress indicator, turn pill ("Your move." / "Sköll moves.")
+- [x] Header: title "Save the Sun", tagline "A rite for the longest day.", night-progress indicator, turn pill ("Your move." / "Sköll moves.")
 - [x] Right column order: Rite transcript → Reactions panel (Scry · Hex) → Ask input → "Cast the rune" (no suggestion chips — pre-filled questions would do the player's deduction)
 - [x] Native focusable DOM elements carry the controls so rendering never blocks keyboard play
 
@@ -289,11 +289,13 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
 - [ ] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
 - [ ] Sköll vs Oracle lines attributable to the correct speaker _(Sköll's taunts were cut from the UI — his only on-board line is his templated Ask; no taunt pool to de-dup)_
-- [ ] Connection/engine error shown in-world ("The Oracle falls silent…") **without** losing crossings or turn state
+- [ ] Connection/engine error shown in-world ("The Oracle falls silent…") **without** losing crossings or turn state _(strings now conform and the error path swaps only the voiced line — crossings live in `RuneGrid`, turn state is engine-hydrated — but the dedicated preservation [I] test is not yet written)_
 
-**Tests to land:** [A] string + terminology lint · [Eval] speaker-distinctness · [I] error-state preserves crossings/turn.
+**Implementation (S11):** a conformance pass over every diegetic string, bringing the built copy into line with the refreshed `ux-copy.md` voice (the "first implementation" had drifted). Fixed: the tagline (`A rite for the longest day.` in `Onboarding.svelte` + `+page.svelte`), the mixed-type refusal (`element`, not `fire`, in `oracle.ts`), the connection-error line (`Draw breath, and ask again.` in both `oracle.ts` and the page's `RITE`), Sköll's Hex line (`Your question dies in the dark.`), and the over-long best-on-desktop notice (trimmed to spec). Added the **missing §3 Scry framing** — the human-Scry result now leads with `You lean into the dark and listen. His answer is yours too.` before the overheard answer, instead of surfacing the bare answer with no voice. Restored the onboarding tour to the fuller, more mythic `ux-copy.md` §5 copy and reordered it to **Cast before Scry & Hex** (matching §5 and the S7 note). Wired the §3 reaction **tooltips** (`title`) onto the Scry/Hex affordances. Every per-surface copy assertion (`oracle.test`, `Onboarding.svelte.test`, `page.svelte.test`, `board.e2e`) was updated to the corrected strings.
 
-**Done when:** the voice/terminology lint reports zero diegetic violations in CI.
+**Tests to land:** [A] string + terminology lint · [Eval] speaker-distinctness · [I] error-state preserves crossings/turn. _(Deferred to the S12 gate — this pass brought the strings into conformance and updated the existing per-surface copy assertions, but the consolidated automated voice/terminology **lint**, the live-LLM speaker-distinctness **eval**, and a dedicated error-state preservation [I] test were intentionally not built here.)_
+
+**Done when:** the voice/terminology lint reports zero diegetic violations in CI. _(Open — the strings now conform, but the automated CI lint that proves it stays the S12 deliverable.)_
 
 ---
 

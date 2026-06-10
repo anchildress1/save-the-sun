@@ -19,7 +19,7 @@ test.describe('the live board (past the title screen)', () => {
 		await page.goto('/');
 		await expect(page.locator('h1', { hasText: 'Save the Sun' })).toBeVisible();
 		await expect(
-			page.locator('p.tagline', { hasText: 'A race to beat Sköll and save the light.' })
+			page.locator('p.tagline', { hasText: 'A rite for the longest day.' })
 		).toBeVisible();
 	});
 
@@ -305,11 +305,11 @@ test.describe('first-run onboarding', () => {
 
 		for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Next' }).click();
 		await expect(page.getByTestId('step-count')).toHaveText('4 / 5');
-		await expect(page.getByRole('heading', { name: 'Scry & Hex' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Cast' })).toBeVisible();
 
 		await page.getByRole('button', { name: 'Next' }).click();
 		await expect(page.getByTestId('step-count')).toHaveText('5 / 5');
-		await expect(page.getByRole('heading', { name: 'Cast' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Scry & Hex' })).toBeVisible();
 		const takeUp = page.getByRole('button', { name: 'Take up the runes.' });
 		await expect(takeUp).toBeInViewport();
 		await takeUp.click();

@@ -178,7 +178,7 @@ describe('Save the Sun page', () => {
 			ok: false,
 			reason: 'refusal',
 			refusal: 'mixed-type',
-			line: 'I read one sign at a time. Ask of fire, or power, or light, or hue — not two at once.',
+			line: 'I read one sign at a time. Ask of element, or power, or light, or hue — not two at once.',
 			turnConsumed: false
 		});
 		const screen = render(Page, pageProps);
@@ -500,10 +500,12 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
 		await screen.getByRole('button', { name: 'Scry' }).click();
-		// The scried answer is the payoff — it surfaces in the panel itself, no extra flavor line.
+		// §3: the Scry framing line leads, then the overheard answer he was owed.
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('Yes. Sól is reaching for a gold rune.');
+			.toHaveTextContent(
+				'You lean into the dark and listen. His answer is yours too. Yes. Sól is reaching for a gold rune.'
+			);
 	});
 
 	it('kills the question when the human Hexes Sköll Ask', async () => {
@@ -541,7 +543,7 @@ describe('Save the Sun page', () => {
 		// The Oracle text names Sköll in the rite's voice — NOT his first-person gloat.
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent("Sköll closes the Oracle's lips. Your question dies unanswered.");
+			.toHaveTextContent("Sköll closes the Oracle's lips. Your question dies in the dark.");
 		expect(screen.getByTestId('answer').element().textContent).not.toContain('My doing');
 	});
 

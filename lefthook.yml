@@ -26,5 +26,6 @@ pre-push:
     test:
       # Coverage run so the CI floors (vite.config thresholds) are enforced on push.
       run: pnpm run test:coverage
-    e2e:
-      run: pnpm run test:e2e
+    e2e-perf:
+      # e2e then Lighthouse, chained so the two vite builds never race into build/ under parallel.
+      run: pnpm run test:e2e && make perf
