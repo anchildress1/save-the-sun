@@ -85,7 +85,7 @@ describe('+page.server load — engine lifetime', () => {
 
 		const { pendingReaction } = runLoad('parked-session');
 		expect(pendingReaction).toEqual({
-			echo: 'Sköll asks after a gold rune.',
+			echo: 'A gold rune. Mine.',
 			held: { Scry: true, Hex: true }
 		});
 	});

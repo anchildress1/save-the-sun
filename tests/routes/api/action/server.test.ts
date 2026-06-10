@@ -134,7 +134,7 @@ describe('POST /api/action', () => {
 		skollDecides(async () => ({ kind: 'ask', query: { axis: 'color', value: 'Gold' } }));
 		await ask();
 		const data = await json(await advance());
-		expect(data.skoll.asks.echo).toContain('Sköll asks after');
+		expect(data.skoll.asks.echo).toBe('A gold rune. Mine.');
 		expect(data.state.activePlayer).toBe('Sköll'); // unanswered — still his turn, window open
 	});
 

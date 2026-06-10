@@ -112,10 +112,21 @@ Templated. **Both verdicts restate the trait**—`Yes. Sól is reaching for {val
 
 ## 2. Sköll
 
-Sköll's on-board surface carries **only his templated question**—the inference the human Scries, Hexes, or lets pass. No taunts, no cast lines: his box shows his Ask when he Asks and is blank otherwise. His casts read from the engine (the turn pill flips, the Oracle panel voices the resolution); the wolf's pressure is felt in how he plays, not in chatter.
+Sköll's on-board surface carries **only his Ask**—the inference the human Scries, Hexes, or lets pass. No taunts, no cast lines: his box shows his Ask when he Asks and is blank otherwise. His casts read from the engine (the turn pill flips, the Oracle panel voices the resolution); the wolf's pressure is felt in how he plays, not in chatter.
 
 ### His Ask (the only Sköll line shown)
-- "Sköll asks after {value-phrase}."—the `{value-phrase}` grammar of §1, so the human knows what they're choosing to Scry, Hex, or let pass.
+He asks in **his own voice**—first-person, predatory, sardonic (the Cast Voice Charter, Part I)—**not** the Oracle's third-person paraphrase. The line still names the sign he hunts, so the human knows what they're choosing to Scry, Hex, or let pass.
+
+| Axis | Line |
+|---|---|
+| Element | "I scent a fire rune on her." |
+| Hue | "A gold rune. Mine." |
+| Light / dark | "Light or dark — I taste a dark one." |
+| Single rune | "Sowilo. I name it in the dark." |
+| Power exact | "Three power. I can smell it." |
+| Power range | "Fewer than three power. I can smell it." / "Three power or more. I can smell it." |
+
+Power is spoken as a word (1–6), not the Oracle's digit grammar—the registers are deliberately distinct so the speaker is unmistakable.
 
 _Cut from the v1 UI (flavor, not inference): the idle/turn taunts, the escalation tier (was P2), and the public cast lines ("I name it. {Rune}." / "The hunt ends. {Rune}.")._
 

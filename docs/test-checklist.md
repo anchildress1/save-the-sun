@@ -28,7 +28,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## 2. Oracle pipeline (Gemini, Role 1)
 
 - [x] [I] Free-text maps to exactly one query type; multi-type intent rejected, not split _(the free-text→query mapping is eval-gated — see the `[Eval]` row; structural mixed-type rejection is CI-proven in `queries`)_
-- [x] [C] Echo matches the resolved query, shown **before** the answer; interpreted query stands (no do-over) _(the rival's-Ask echo surface lit up in S6 — Sköll's Ask renders `skoll-echo` before its post-reaction answer; the human's own Ask shows no echo by design)_
+- [x] [C] Echo matches the resolved query, shown **before** the answer; interpreted query stands (no do-over) _(the rival's-Ask echo surface lit up in S6 — Sköll's Ask renders `skoll-echo` (his own first-person voice, S11) before its post-reaction answer; the human's own Ask shows no echo by design)_
 - [x] [C] Both verdicts restate the trait (Yes "is reaching for", No "is not reaching for"); `{value-phrase}` fills per axis
 - [x] [C] Mixed-type refusal returns `ux-copy.md` line; turn not consumed
 - [x] [Sec] Secret-seeking Ask refused; secret never leaks
@@ -192,10 +192,12 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [ ] [A] No emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line — the old winning-cast exclamation allowlist — was cut)
 - [ ] [A] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
 - [ ] [A] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
-- [ ] [Eval] Sampled Oracle vs Sköll lines attributable to correct speaker
-- [x] [C] Sköll's box shows only his templated Ask (no taunts, no cast lines); blank when he isn't asking
+- [ ] [Eval] Sampled Oracle vs Sköll lines attributable to correct speaker _(the live-LLM scored eval stays deferred to S12; his deterministic Ask echo is now structurally speaker-distinct — first-person, no Oracle "asks after" — and unit-guarded, see below)_
+- [x] [C] Sköll's box shows only his Ask, in his own first-person voice (no taunts, no cast lines); blank when he isn't asking _([U] `skollAskEcho` per-axis voice + power ops + no-"asks after" guard, `skoll.test`)_
 
 > S11 (2026-06-09): the built copy was brought into conformance with `ux-copy.md` (tagline, mixed-type refusal, connection-error, Sköll-Hex line, the §3 Scry framing line, onboarding §5 copy + order, reaction tooltips) and the per-surface copy assertions updated to match. The boxes above stay unchecked: they track the **consolidated automated lint + speaker eval**, which are deferred to S12 — conformance is currently proven piecemeal by the surface copy tests, not by one diegetic-string lint.
+
+> S11 follow-up (2026-06-10): Sköll's on-board Ask was voiced in the Oracle's register (`Sköll asks after {value-phrase}.` — third-person, wrapping `oracle.ts`'s own `valuePhrase`). `skollAskEcho` is now self-contained first-person predatory voice (`ux-copy.md` §2): "I scent a fire rune on her." / "A gold rune. Mine." / "Three power. I can smell it." Power 1–6 reads as a word (not the Oracle's digit grammar) so the speakers never collide. [U] per-axis + all five power ops + no-exclamation/no-"asks after" guards (`skoll.test`); real-output echo assertions (`page.server.test`, `api/action/server.test`) and the component/e2e fixtures retracked.
 
 ---
 
