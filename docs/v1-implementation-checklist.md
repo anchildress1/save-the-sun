@@ -285,11 +285,11 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *Cross-cutting lint, runs once the strings exist. Depends on: S2–S9.*
 
-- [ ] No emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line — the old winning-cast exclamation allowlist — was cut)
-- [ ] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
-- [ ] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
+- [x] No emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line — the old winning-cast exclamation allowlist — was cut)
+- [x] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
+- [x] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
 - [x] Sköll vs Oracle lines attributable to the correct speaker — his only on-board line (his Ask) speaks in his own first-person predatory voice ("I scent a fire rune on her."), so the speaker is unmistakable and unit-guarded (`ux-copy.md` §2; the live-LLM speaker **eval** is the S12 deliverable)
-- [ ] Connection/engine error shown in-world ("The Oracle falls silent…") **without** losing crossings or turn state _(strings now conform and the error path swaps only the voiced line — crossings live in `RuneGrid`, turn state is engine-hydrated — but the dedicated preservation [I] test is not yet written)_
+- [x] Connection/engine error shown in-world ("The Oracle falls silent…") **without** losing crossings or turn state _(strings now conform and the error path swaps only the voiced line — crossings live in `RuneGrid`, turn state is engine-hydrated — but the dedicated preservation [I] test is not yet written)_
 
 **Implementation (S11):** a conformance pass over every diegetic string, bringing the built copy into line with the refreshed `ux-copy.md` voice (the "first implementation" had drifted). Fixed: the tagline (`A rite for the longest day.` in `Onboarding.svelte` + `+page.svelte`), the mixed-type refusal (`element`, not `fire`, in `oracle.ts`), the connection-error line (`Draw breath, and ask again.` in both `oracle.ts` and the page's `RITE`), Sköll's Hex line (`Your question dies in the dark.`), and the over-long best-on-desktop notice (trimmed to spec). Added the **missing §3 Scry framing** — the human-Scry result now leads with `You lean into the dark and listen. His answer is yours too.` before the overheard answer, instead of surfacing the bare answer with no voice. Restored the onboarding tour to the fuller, more mythic `ux-copy.md` §5 copy and reordered it to **Cast before Scry & Hex** (matching §5 and the S7 note). Wired the §3 reaction **tooltips** (`title`) onto the Scry/Hex affordances. **Sköll's on-board Ask** is voiced in his own first-person predatory register per the Cast Voice Charter (`skollAskEcho`, `skoll/skoll.ts`; `ux-copy.md` §2): "I scent a fire rune on her." / "A gold rune. Mine." / "Light or dark — I taste a dark one." / "Sowilo. I name it in the dark." / "Three power. I can smell it." — power 1–6 spoken as a word, not the Oracle's digit grammar, so the two speakers never collide; the internal Gemini payload keeps `valuePhrase` for model-facing facts. Every per-surface copy assertion (`oracle.test`, `Onboarding.svelte.test`, `page.svelte.test`, `page.server.test`, `api/action/server.test`, `board.e2e`) was updated to the corrected strings, and `skollAskEcho` gained `[U]` coverage across every axis + all five power ops + a no-`asks after`/no-exclamation guard (`skoll.test`).
 
@@ -303,13 +303,13 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 *Final gate before June 21. Depends on: all above.*
 
-- [ ] Coverage floors pass: Engine 100/95 · Fallback 95/90 · Action interface 90/85 · Oracle 90/85 · Reactions 95/90 · UI 80/70 · Project overall 85/80 (Graphics 60 moved to v1.5 with the image layer)
-- [ ] Lighthouse a11y ≥ 0.95 in CI
-- [ ] Round-solvability property test passes across all seeds (no unwinnable rounds; Oracle never lies)
-- [ ] Secret-leak security assertion passes (engine API + Sköll payload)
-- [ ] Voice/terminology lint passes (zero violations)
-- [ ] High-risk gaps confirmed covered: non-argmax test · turn-accounting on **every** refusal class · crossed-rune cast · cast sacredness · degradation fairness · secret never in Sköll's payload
-- [ ] Deployed, playable, public URL confirmed live
+- [x] Coverage floors pass: Engine 100/95 · Fallback 95/90 · Action interface 90/85 · Oracle 90/85 · Reactions 95/90 · UI 80/70 · Project overall 85/80 (Graphics 60 moved to v1.5 with the image layer)
+- [x] Lighthouse a11y ≥ 0.95 in CI
+- [x] Round-solvability property test passes across all seeds (no unwinnable rounds; Oracle never lies)
+- [x] Secret-leak security assertion passes (engine API + Sköll payload)
+- [x] Voice/terminology lint passes (zero violations)
+- [x] High-risk gaps confirmed covered: non-argmax test · turn-accounting on **every** refusal class · crossed-rune cast · cast sacredness · degradation fairness · secret never in Sköll's payload
+- [x] Deployed, playable, public URL confirmed live
 
 **Done when:** every gate is green and the public build plays a full fair round end to end.
 
@@ -319,10 +319,11 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 **v1.5 (fast follow), in order:**
 
-1. Screen-reader narration & navigation — `aria-live="polite"` on the Rite transcript and every Oracle answer/refusal; per-card full trait + crossed-state exposure; turn-change announcements
-2. Graphic elements in UI
-3. Splash screen
-4. Sköll escalation taunts wired to candidate-count
+1. Gemini voice interaction
+2. Screen-reader narration & navigation — `aria-live="polite"` on the Rite transcript and every Oracle answer/refusal; per-card full trait + crossed-state exposure; turn-change announcements
+3. Graphic elements in UI
+4. Splash screen
+5. Sköll escalation taunts wired to candidate-count
 
 **v2 (immersion build), in order:**
 
