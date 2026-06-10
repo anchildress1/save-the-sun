@@ -6,7 +6,7 @@ import type { GameState } from '$lib/server/engine/actions';
 const ONBOARDED_KEY = 'save-the-sun:onboarded';
 
 // Full page props (data normally comes from +page.server.ts). A fixed seed keeps the
-// board order deterministic across these behavioural tests; the hydrated state opens the
+// board order deterministic across these behavioral tests; the hydrated state opens the
 // page human-first on a live round.
 const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
 const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 };
@@ -884,36 +884,11 @@ describe('Save the Sun page — end screen + replay (S9)', () => {
 		expect(spy).toHaveBeenCalledWith('/api/new-game', expect.objectContaining({ method: 'POST' }));
 	});
 
-	it('leaves the fire — resets the round and returns to the title, forgetting the onboarded flag', async () => {
-		stubFetch(async (url) => {
-			if (url.includes('/api/new-game'))
-				return new Response(
-					JSON.stringify({ boardSeed: 99, roundId: 'next-round', state: HUMAN_TURN })
-				);
-			return new Response('{}');
-		});
+	it('offers only the replay CTA on the end screen — no "Leave the fire." escape hatch', async () => {
+		stubFetch(async () => new Response('{}'));
 		const screen = render(Page, propsWith(HUMAN_WON));
-		await screen.getByTestId('end-leave').click();
-		// Back to the threshold: the title returns and the end screen is gone.
-		await expect.element(screen.getByTestId('onboarding')).toBeInTheDocument();
-		await expect
-			.element(screen.getByRole('button', { name: 'Light the fire.' }))
-			.toBeInTheDocument();
-		expect(screen.container.querySelector('[data-testid="end-screen"]')).toBeNull();
-		// The flag is cleared so a reload opens the title too, not a mid-round resume.
-		expect(localStorage.getItem(ONBOARDED_KEY)).toBeNull();
-	});
-
-	it('keeps the end screen up when leaving fails — never strands the player on the title', async () => {
-		const error = expectConsole('error');
-		// new-game fails: the round never resets, so leaveFire must not advance to the title.
-		stubFetch(async () => new Response('nope', { status: 500 }));
-		const screen = render(Page, propsWith(HUMAN_WON));
-		await screen.getByTestId('end-leave').click();
-		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
-		// The end screen stays mounted (round still resolved); no title overlay over a stale round.
 		await expect.element(screen.getByTestId('end-screen')).toBeInTheDocument();
-		expect(screen.container.querySelector('[data-testid="onboarding"]')).toBeNull();
-		expect(error).toHaveBeenCalled();
+		expect(screen.container.querySelector('[data-testid="end-leave"]')).toBeNull();
+		expect(screen.container.textContent).not.toContain('Leave the fire.');
 	});
 });

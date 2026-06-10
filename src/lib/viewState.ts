@@ -5,7 +5,7 @@
 // One record under one key. The round id is stored inside it, so a read for a different round
 // (a new secret) finds a stale record and returns null — stale crossings/transcript can never
 // land on a fresh secret. Every access is guarded: storage throws in private mode, and a
-// failure degrades to the prior reset-on-reload behaviour, never to broken play.
+// failure degrades to the prior reset-on-reload behavior, never to broken play.
 
 const KEY = 'save-the-sun:view';
 

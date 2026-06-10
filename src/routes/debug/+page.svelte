@@ -75,7 +75,7 @@
 		box-sizing: border-box;
 	}
 	main {
-		/* Owner colours — the game's own rune-gem jewel tones (runeVisuals.ts). Red is held back for
+		/* Owner colors — the game's own rune-gem jewel tones (runeVisuals.ts). Red is held back for
 		   warn/error so a severity badge never reads as an owner. */
 		--human: #5cbf8a;
 		--oracle: #e6c068;

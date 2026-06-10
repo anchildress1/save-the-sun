@@ -3,15 +3,10 @@
 	import dawnSplash from '$lib/assets/banners/dawn-splash.jpg';
 	import defeatSplash from '$lib/assets/banners/defeat-splash.jpg';
 
-	// The round's closing rite (ux-copy.md §4), composed after the POC win/lose splashes: a full-bleed
-	// scene under a small wordmark, the result stated as a descending verse — a heavy lead line, then the
-	// quieter consequence — closed by the two CTAs. `onReplay` starts a fresh round; `onLeave` returns to
-	// the title. Lines stage in one beat at a time (instant under reduced motion).
-	let {
-		outcome,
-		onReplay,
-		onLeave
-	}: { outcome: 'win' | 'lose'; onReplay: () => void; onLeave: () => void } = $props();
+	// The round's closing rite (ux-copy.md §4): a full-bleed scene with the result stated as a descending
+	// verse — a heavy lead line, then the quieter consequence — closed by a single CTA. `onReplay` starts
+	// a fresh round. Lines stage in one beat at a time (instant under reduced motion).
+	let { outcome, onReplay }: { outcome: 'win' | 'lose'; onReplay: () => void } = $props();
 
 	// Each outcome owns its art, the canonical §4 copy split into a lead + the lines beneath (a `verse`
 	// only the victory carries), and the exact replay label. The lead is the dialog's accessible name.
@@ -51,13 +46,11 @@
 	});
 
 	// Focus trap: the resolved board behind stays interactive (cross-off is never turn-gated), so keep
-	// Tab cycling inside the terminal dialog. Focus lands on the primary CTA. No Escape exit — the round
-	// is over and the only ways on are the two CTAs.
+	// Tab cycling inside the terminal dialog. Focus lands on the replay CTA. No Escape exit — the round
+	// is over and the only way on is replay.
 	function trapFocus(node: HTMLElement) {
 		const focusable = () =>
 			Array.from(node.querySelectorAll<HTMLElement>('button:not([disabled])'));
-		// Open focus on the primary action, not the wordmark (which is first in DOM order); the wordmark
-		// stays in the Tab cycle as the way back to the title.
 		(node.querySelector<HTMLElement>('[data-testid="end-replay"]') ?? focusable()[0])?.focus();
 
 		function onKeydown(e: KeyboardEvent) {
@@ -103,16 +96,8 @@
 		<p class="line coda" style="--i:{delays.coda}">{scene.coda}</p>
 
 		<div class="actions" style="--i:{delays.actions}">
-			<button
-				class="rite-cta rite-cta--primary"
-				type="button"
-				data-testid="end-replay"
-				onclick={onReplay}
-			>
+			<button class="btn btn--primary" type="button" data-testid="end-replay" onclick={onReplay}>
 				{scene.replay}
-			</button>
-			<button class="rite-cta" type="button" data-testid="end-leave" onclick={onLeave}>
-				Leave the fire.
 			</button>
 		</div>
 	</div>
@@ -170,7 +155,7 @@
 		);
 	}
 
-	/* The rite sits centred over the art; a local halo keeps it legible over the bright dawn — no scrim. */
+	/* The rite sits centered over the art; a local halo keeps it legible over the bright dawn — no scrim. */
 	.rite {
 		position: relative;
 		z-index: 2;
@@ -249,6 +234,13 @@
 		opacity: 0;
 		animation: rise 0.8s ease forwards;
 		animation-delay: calc(var(--i) * 0.7s);
+	}
+
+	/* The closing rite scales its single CTA up — a container concern, not a button-class change. */
+	.actions .btn {
+		min-width: 15rem;
+		padding: 0.9rem 1.8rem;
+		font-size: 0.92rem;
 	}
 
 	@keyframes rise {

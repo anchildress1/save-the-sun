@@ -148,11 +148,11 @@ Voiced in the **Oracle text**, in the rite's own voice (third person — never h
 1. On the cast landing: **"The rune is true."**
 2. As the glyph carves: **"Sól crests the rim of the world."**
 3. Sól (her only appearance): **"The offering is made. The longest day breaks — and the light is yours to keep."**
-4. CTA: primary **"Begin another night"** · secondary **"Leave the fire."**
+4. CTA: **"Begin another night"** _(the only closing action — the secondary "Leave the fire." was cut)_
 
 ### Defeat — Sköll casts first
 1. The loss resolves: **"Sköll takes the sun. The longest day never breaks. The year falls to dark."** _(Sköll's cast carries no line of its own — the resolution is the Oracle panel's; see §2.)_
-2. CTA: primary **"Stand against him again"** · secondary **"Leave the fire."**
+2. CTA: **"Stand against him again"** _(the only closing action — the secondary "Leave the fire." was cut)_
 
 Sól speaks only at victory — the goddess's rarity is the power.
 

@@ -53,7 +53,7 @@ describe('/debug view', () => {
 	it('renders an engine verdict as a deterministic Engine card, with its part', () => {
 		const { container } = renderWith([verdict]);
 		const li = container.querySelector('li')!;
-		expect(li.classList.contains('engine')).toBe(true); // owner Engine → Engine colour
+		expect(li.classList.contains('engine')).toBe(true); // owner Engine → Engine color
 		expect(li.querySelector('.who')?.textContent?.trim()).toBe('Engine');
 		expect(li.querySelector('.kind-badge')?.classList.contains('deterministic')).toBe(true);
 		expect(li.querySelector('.part')?.textContent?.trim()).toBe('Ask');
@@ -61,7 +61,7 @@ describe('/debug view', () => {
 		expect(container.querySelector('.cols')).toBeNull(); // the old two-column layout is gone
 	});
 
-	it('colours each card by owner and badges kind (LLM vs deterministic)', () => {
+	it('colors each card by owner and badges kind (LLM vs deterministic)', () => {
 		const oracle: DebugEvent = {
 			seq: 4,
 			owner: 'Oracle',
@@ -81,7 +81,7 @@ describe('/debug view', () => {
 		};
 		const { container } = renderWith([verdict, secret, floor, oracle, skollLlm]);
 		const li = (c: string) => container.querySelector<HTMLElement>(`li.${c}`)!;
-		// Colour = owner.
+		// Color = owner.
 		expect(li('engine')).toBeTruthy();
 		expect(li('oracle')).toBeTruthy();
 		expect(li('skoll')).toBeTruthy();
@@ -108,7 +108,7 @@ describe('/debug view', () => {
 		};
 		const { container } = renderWith([gemini]);
 		const card = container.querySelector('li')!;
-		expect(card.classList.contains('skoll')).toBe(true); // his move call → Sköll colour
+		expect(card.classList.contains('skoll')).toBe(true); // his move call → Sköll color
 		expect(card.querySelector('.who')?.textContent?.trim()).toBe('Sköll');
 		expect(card.querySelector('.kind-badge')?.classList.contains('llm')).toBe(true); // LLM
 		expect(card.querySelector('.msg')?.textContent).toContain('raw Gemini move call');

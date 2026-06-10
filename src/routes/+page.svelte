@@ -402,7 +402,7 @@
 		crossings = ids;
 	}
 
-	// Returns whether the reset landed, so callers (leaveFire) don't advance the view on a failed reset.
+	// Returns whether the reset landed, so a caller can avoid advancing the view on a failed reset.
 	async function newGame(): Promise<boolean> {
 		pending = true;
 		let res: Response | undefined;
@@ -445,22 +445,6 @@
 			return false;
 		} finally {
 			pending = false;
-		}
-	}
-
-	// "Leave the fire." — step back from the closing rite to the threshold. A fresh round is prepared
-	// behind the title (so the resolved one is discarded, not re-entered), then the title screen returns;
-	// the onboarded flag is cleared so the rite opens as a fresh arrival, not a mid-round resume.
-	// Guarded on the reset: a failed newGame() leaves the end screen up with its in-world error line,
-	// rather than stranding the player on the title over a round the server never reset.
-	async function leaveFire() {
-		if (!(await newGame())) return;
-		onboardingStart = 'title';
-		showOnboarding = true;
-		try {
-			localStorage.removeItem(ONBOARDED_KEY);
-		} catch {
-			/* storage unavailable — non-fatal */
 		}
 	}
 
@@ -558,7 +542,7 @@
 		{#if !showEndScreen}
 			<div class="header-controls">
 				<button
-					class="ghost ritual-button ritual-button--ghost"
+					class="btn btn--secondary"
 					type="button"
 					data-testid="show-instructions"
 					onclick={showInstructions}
@@ -566,7 +550,7 @@
 					How the rite works
 				</button>
 				<button
-					class="ghost new-game ritual-button ritual-button--ghost"
+					class="btn btn--secondary new-game"
 					type="button"
 					onclick={newGame}
 					disabled={pending}
@@ -647,18 +631,14 @@
 				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
 			{:else}
 				<div class="reactions" data-coach="reactions">
-					<button class="ritual-button ritual-button--ghost reaction-btn" type="button" disabled>
-						Scry
-					</button>
-					<button class="ritual-button ritual-button--ghost reaction-btn" type="button" disabled>
-						Hex
-					</button>
+					<button class="btn btn--secondary reaction-btn" type="button" disabled> Scry </button>
+					<button class="btn btn--secondary reaction-btn" type="button" disabled> Hex </button>
 				</div>
 			{/if}
 
 			{#if skollStalled}
 				<button
-					class="rouse-wolf ritual-button ritual-button--ghost"
+					class="btn btn--secondary rouse-wolf"
 					type="button"
 					data-testid="rouse-wolf"
 					onclick={advanceSkoll}
@@ -687,11 +667,7 @@
 					bind:value={askValue}
 					disabled={castMode || pending || !canAct}
 				/>
-				<button
-					class="ritual-button ritual-button--primary"
-					type="submit"
-					disabled={castMode || pending || !canAct}
-				>
+				<button class="btn btn--primary" type="submit" disabled={castMode || pending || !canAct}>
 					Ask the Oracle
 				</button>
 			</form>
@@ -703,20 +679,18 @@
 					</p>
 					<div class="cast-actions">
 						<button
-							class="ritual-button ritual-button--primary"
+							class="btn btn--primary"
 							type="button"
 							onclick={commitCast}
 							disabled={!selectedRune || pending}
 						>
 							Name it
 						</button>
-						<button class="ritual-button ritual-button--ghost" type="button" onclick={cancelCast}>
-							Not yet
-						</button>
+						<button class="btn btn--secondary" type="button" onclick={cancelCast}> Not yet </button>
 					</div>
 				{:else}
 					<button
-						class="cast-arm ritual-button ritual-button--primary"
+						class="btn btn--primary cast-arm"
 						type="button"
 						onclick={armCast}
 						disabled={pending || !canAct}
@@ -730,7 +704,7 @@
 </main>
 
 {#if showEndScreen}
-	<EndScreen outcome={endOutcome} onReplay={newGame} onLeave={leaveFire} />
+	<EndScreen outcome={endOutcome} onReplay={newGame} />
 {/if}
 
 {#if showOnboarding}

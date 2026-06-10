@@ -127,5 +127,5 @@ These probe the edges. Expected classification noted; if Gemini drifts, that's t
 - [x] "Is it fire or water?" → refusal `mixed-type` _(two values on one axis isn't one representable query — one sign at a time)_
 - [x] "Power seven?" → `power eq 7` _(structurally legal; the engine answers a truthful No — out-of-range is not a refusal)_
 - [x] "Is it a strong rune?" → refusal `unparseable` _(no concrete threshold — "strong" is not a sign the Oracle can read)_
-- [x] "Is it warm-coloured?" → refusal `unparseable` _("warm" is not one of the six hues)_
+- [x] "Is it warm-colored?" → refusal `unparseable` _("warm" is not one of the six hues)_
 - [x] "Tell me about the runes." → refusal `unparseable` _(not a yes/no sign query)_

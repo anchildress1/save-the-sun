@@ -15,7 +15,7 @@ The runes are the complete Elder Futhark, all 24, in plain spellings.
 
 Power (the count) and fill (light/dark) are each askable on their own turn. Glyph mapping: hollow ○ = Light, solid ● = Dark. Element symbols (☼ Sun, 🜂 Fire, 🜁 Air, ✧ Spirit, 🜄 Water, 🜃 Earth) are the in-app icons from `runeVisuals.ts` — decorative only; the element name always accompanies them. Engine/data field names: element, power, fill, color. Player-facing axis names: element, power, light, hue.
 
-Fill is balanced 2/2 within every element, power, and color value — a light/dark answer never just echoes a trait you've already pinned. Every rune is a unique combination of all four traits, so the axes always narrow to exactly one. (The other axes do correlate — colour clusters by power, for instance — by design; fill is the evenly-split one.)
+Fill is balanced 2/2 within every element, power, and color value — a light/dark answer never just echoes a trait you've already pinned. Every rune is a unique combination of all four traits, so the axes always narrow to exactly one. (The other axes do correlate — color clusters by power, for instance — by design; fill is the evenly-split one.)
 
 ## The 24 Runes
 

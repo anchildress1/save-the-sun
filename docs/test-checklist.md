@@ -63,7 +63,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 **Opening hunch (seeded — varies the otherwise-constant first move)**
 
 - [x] [U] Per-round hunch is deterministic per seed and varies across seeds — the opener is not pinned to one trait
-- [x] [U] Hunch is trait-level (colour/element) — never a rune by name (can't echo the secret), never light/dark (the prompt forbids that clean-split opener)
+- [x] [U] Hunch is trait-level (color/element) — never a rune by name (can't echo the secret), never light/dark (the prompt forbids that clean-split opener)
 - [x] [I] Hunch is surfaced to Gemini **only** on the opening move (no facts yet); once a fact exists the hunch value is absent from the prompt entirely (not just the sentence)
 
 **Persona (eval, low gate)**
@@ -79,7 +79,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C][E] "Name it" commits; "Not yet" cancels with **no turn spent**
 - [x] [C] Two scoped card behaviors (cross-off vs select-target) never collide
 - [x] [E] Wrong cast costs turn only; crossings + round state preserved
-- [ ] [E][A] Full keyboard cast path: arm → arrow → select → "Name it" _(S10 a11y)_
+- [x] [E][A] Full keyboard cast path: arm → select → "Name it" _(the cards are native buttons navigated by Tab/activated by Enter/Space — no arrow roving; `a11y.e2e`)_
 - [x] [C] Oracle panel opens **blank** — voices a response only (answer/refusal/resolution), no idle filler
 
 ## 4.5 Round lifecycle & session isolation (S2.5)
@@ -130,19 +130,19 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 7. Accessibility (v1; screen reader = v1.5)
 
-- [ ] [E][manual] Whole round operable by keyboard with visible focus indicator
-- [ ] [A] Controls have accessible names/roles (axe)
-- [ ] [A][manual] WCAG 2.1 AA contrast across light **and** dark palettes
+- [x] [E][A] Whole round operable by keyboard (ask, cross, arm, select, cast, react) with a visible focus indicator; Tab is never trapped on the grid _(`a11y.e2e`)_
+- [x] [A] Controls have accessible names/roles (axe-clean on every surface: board, crossed/armed, title, tour, reaction prompt, both end screens) _(`a11y.e2e`)_
+- [x] [A] WCAG 2.1 AA contrast across light **and** dark palettes (axe `wcag21aa` color-contrast — both rune palettes are on the board at once) _(`a11y.e2e`)_
 - [x] [A][manual] No information by color alone
-- [ ] [C][manual] `prefers-reduced-motion` → motion instant, audio muted, still reflects live state
+- [x] [C][E] `prefers-reduced-motion` → motion instant (entrance + end-screen rise cut), no audio to unmute (v1 ships none), still reflects live state _(`reducedMotion.svelte.test`, `degradation.e2e`)_
 - [x] [E] At 200% zoom the effective width falls below the 1280px floor → the best-on-desktop notice shows (no reflow, per the width rules) — the same below-minimum path as §9; full in-game operability at 200% zoom waits on v2 responsive (1024px) support
-- [ ] [A][CI] Lighthouse a11y ≥ 0.95 (target ≈ 1.0) — build fails below
+- [ ] [A][CI] Lighthouse a11y ≥ 0.95 (target ≈ 1.0) _(not added — the global no-lhci-in-GHA rule stands; the in-CI a11y gate is the axe sweep above, run in the existing e2e step and failing the build on any violation. `lhci autorun` stays local via `make perf`.)_
 - [ ] _(v1.5, not gated)_ Screen-reader: `aria-live="polite"`, per-card traits, turn-change announcements
 
 ## 8. Degradation tiers
 
 - [x] [E] Plain (v1): full round winnable on static grid
-- [ ] [E] Reduced: reduced-motion OR WebGL/audio unavailable → instant changes, muted, static, game unaffected + fair
+- [x] [E] Reduced: reduced-motion → instant changes, muted (no audio in v1), static, game unaffected + fair (a full round is winnable with motion cut) _(`degradation.e2e`; WebGL is not a v1 layer — GSAP DOM motion is the only mood, so reduced-motion is the reduced tier)_
 - [ ] [E] Full (v2, when built): tide + stingers + audio (muted by default); mood off mid-round leaves game fully playable
 - [x] [S] Fairness invariant: with all mood off/failed, every round winnable through legal Asks alone
 
@@ -162,7 +162,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [U][I] `DEBUG_LOG` verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev / demo on deploy (the public `/debug` view is the demo); filtered server-side (`/api/debug` + page load)
 - [x] [I][U] Raw Gemini I/O captured (verbose) as a sensitive event, **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe snapshot so neither the API nor the load 500s
 - [x] [I] Sköll's move event shows the cross-offs made **this** turn (the delta), consistent with the pre-move reasoning
-- [x] [C] Cards coloured by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine), badged by **kind** (`input` / `llm` / `deterministic`; Sköll's gemini move = llm, floor = deterministic), chipped by **part** (Ask / Cast / React / Round)
+- [x] [C] Cards colored by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine), badged by **kind** (`input` / `llm` / `deterministic`; Sköll's gemini move = llm, floor = deterministic), chipped by **part** (Ask / Cast / React / Round)
 
 ## 10.5 View resume on reload (S8.5)
 
@@ -201,7 +201,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## Enforced non-coverage gates (CI)
 
-- [ ] Lighthouse accessibility ≥ 0.95 (target ≈ 1.0)
+- [ ] Lighthouse accessibility ≥ 0.95 (target ≈ 1.0) _(not gated in GHA — no lhci per the global rule; the axe e2e sweep is the in-CI a11y gate. lhci stays local via `make perf`.)_
 - [x] Round-solvability property test passes across all seeds
 - [x] Secret-leak security assertion (engine API + Sköll payload)
 - [ ] Voice/terminology lint — zero diegetic violations
@@ -223,4 +223,4 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] Reactions suite lands with reactions
 - [x] Opponent (Gemini + floor) suite lands with opponent
 - [x] Integration + E2E follow once action interface is stable
-- [ ] a11y + degradation E2E gate the v1 jam build (June 21)
+- [x] a11y + degradation E2E gate the v1 jam build (June 21) _(axe sweep + keyboard round + reduced-motion/degradation run in the CI e2e step; `a11y.e2e`, `degradation.e2e`)_

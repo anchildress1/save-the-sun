@@ -190,10 +190,12 @@
 				<p class="tagline">A race to beat Sköll and save the light.</p>
 			</div>
 			<div class="title-actions">
-				<button class="rite-cta rite-cta--primary" type="button" onclick={() => onDone()}>
+				<button class="btn btn--primary" type="button" onclick={() => onDone()}>
 					Light the fire.
 				</button>
-				<button class="rite-cta" type="button" onclick={beginTour}> How the rite works </button>
+				<button class="btn btn--secondary" type="button" onclick={beginTour}>
+					How the rite works
+				</button>
 			</div>
 		</div>
 	</div>
@@ -214,23 +216,18 @@
 		bind:this={popoverEl}
 		use:trapFocus
 	>
-		<p class="step-count" data-testid="step-count">{step + 1} / {STEPS.length}</p>
 		<h2 id="onboarding-heading">{STEPS[step].label}</h2>
+		<hr class="step-divider" aria-hidden="true" />
 		<p class="step-body" data-testid="step-body">{STEPS[step].body}</p>
 		<div class="actions">
 			{#if !isLast}
-				<button
-					class="ghost ritual-button ritual-button--ghost"
-					type="button"
-					onclick={() => onDone()}
-				>
-					Skip
-				</button>
+				<button class="btn btn--secondary" type="button" onclick={() => onDone()}> Skip </button>
 			{/if}
-			<button class="primary ritual-button ritual-button--primary" type="button" onclick={next}>
+			<button class="btn btn--primary" type="button" onclick={next}>
 				{isLast ? 'Take up the runes.' : 'Next'}
 			</button>
 		</div>
+		<p class="step-count" data-testid="step-count">{step + 1} / {STEPS.length}</p>
 	</div>
 {/if}
 
@@ -267,7 +264,7 @@
 		object-position: 50% 40%;
 	}
 
-	/* Centred over the art; a local halo keeps the wordmark + CTAs legible over the bright glow — no scrim. */
+	/* Centered over the art; a local halo keeps the wordmark + CTAs legible over the bright glow — no scrim. */
 	.title-card {
 		position: relative;
 		z-index: 2;
@@ -396,8 +393,19 @@
 		text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
 	}
 
+	/* Ornate rule under the step title, matching the title card's divider — snug to the heading. */
+	.step-divider {
+		width: min(15rem, 80%);
+		height: 1.05rem;
+		margin: -0.35rem auto -0.15rem;
+		border: 0;
+		background: var(--ui-divider) center / 100% 100% no-repeat;
+		opacity: 0.85;
+	}
+
+	/* Step counter sits at the foot of the popover now, a quiet footer under the controls. */
 	.step-count {
-		margin: 0;
+		margin: 0.1rem 0 0;
 		font-family: var(--font-display);
 		font-size: 0.72rem;
 		letter-spacing: 0.2em;
@@ -419,15 +427,16 @@
 		margin-top: 0.4rem;
 	}
 
-	button.primary,
-	button.ghost {
-		min-height: 3rem;
-		padding: 0.72rem 1.05rem;
-		font-size: 0.8rem;
+	/* The title splash scales its two buttons up for the opening beat; the tour nav keeps them compact —
+	   both container concerns, not new button classes. Focus styling is the shared `.btn` rule (theme.css). */
+	.title-actions .btn {
+		min-width: 12rem;
+		padding: 0.85rem 1.5rem;
+		font-size: 0.9rem;
 	}
 
-	button:focus-visible {
-		outline: 2px solid var(--gold-bright);
-		outline-offset: 2px;
+	.actions .btn {
+		min-height: 3rem;
+		padding: 0.72rem 1.05rem;
 	}
 </style>
