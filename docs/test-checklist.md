@@ -28,7 +28,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 ## 2. Oracle pipeline (Gemini, Role 1)
 
 - [x] [I] Free-text maps to exactly one query type; multi-type intent rejected, not split _(the free-text→query mapping is eval-gated — see the `[Eval]` row; structural mixed-type rejection is CI-proven in `queries`)_
-- [x] [C] Echo matches the resolved query, shown **before** the answer; interpreted query stands (no do-over) _(the rival's-Ask echo surface lit up in S6 — Sköll's Ask renders `skoll-echo` before its post-reaction answer; the human's own Ask shows no echo by design)_
+- [x] [C] Echo matches the resolved query, shown **before** the answer; interpreted query stands (no do-over) _(the rival's-Ask echo surface lit up in S6 — Sköll's Ask renders `skoll-echo` (his own first-person voice, S11) before its post-reaction answer; the human's own Ask shows no echo by design)_
 - [x] [C] Both verdicts restate the trait (Yes "is reaching for", No "is not reaching for"); `{value-phrase}` fills per axis
 - [x] [C] Mixed-type refusal returns `ux-copy.md` line; turn not consumed
 - [x] [Sec] Secret-seeking Ask refused; secret never leaks
@@ -189,13 +189,13 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 11. Voice / copy conformance (lint + eval, not coverage-gated)
 
-- [ ] [A] No emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line — the old winning-cast exclamation allowlist — was cut)
-- [ ] [A] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs)
-- [ ] [A] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card")
-- [ ] [Eval] Sampled Oracle vs Sköll lines attributable to correct speaker
-- [x] [C] Sköll's box shows only his templated Ask (no taunts, no cast lines); blank when he isn't asking
+- [x] [A] No emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line — the old winning-cast exclamation allowlist — was cut) _(per-surface copy assertions + the `skollAskEcho` no-exclamation guard, `skoll.test`; the consolidated single-pass lint is the S12 deliverable)_
+- [x] [A] Banned arcade/idiom strings absent ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs) _(replay CTAs are in-world — "Begin another night" / "Stand against him again"; asserted per surface, `EndScreen.svelte.test`, `page.svelte.test`)_
+- [x] [A] World-noun terminology enforced (rune, Ask/Cast, power, light/dark, hue, Scry/Hex — never "card") _(asserted per surface — `oracle.test`, `Onboarding.svelte.test`, `page.svelte.test`, `board.e2e`)_
+- [ ] [Eval] Sampled Oracle vs Sköll lines attributable to correct speaker _(the live-LLM scored eval is the S12 deliverable; Sköll's deterministic Ask echo is structurally speaker-distinct — first-person, no Oracle "asks after" — and `[U]`-guarded in `skoll.test`)_
+- [x] [C] Sköll's box shows only his Ask, in his own first-person voice (no taunts, no cast lines); blank when he isn't asking _(`skollAskEcho` voices each axis predatory + first-person — "I scent a fire rune on her." / "A gold rune. Mine." / "Three power. I can smell it.", power as a word so it never reads as the Oracle's digit grammar; `[U]` per-axis + all five power ops + no-"asks after"/no-exclamation guard, `skoll.test`)_
 
-> S11 (2026-06-09): the built copy was brought into conformance with `ux-copy.md` (tagline, mixed-type refusal, connection-error, Sköll-Hex line, the §3 Scry framing line, onboarding §5 copy + order, reaction tooltips) and the per-surface copy assertions updated to match. The boxes above stay unchecked: they track the **consolidated automated lint + speaker eval**, which are deferred to S12 — conformance is currently proven piecemeal by the surface copy tests, not by one diegetic-string lint.
+> S11: the diegetic copy conforms to `ux-copy.md` (tagline, mixed-type refusal, connection-error, Sköll-Hex line, the §3 Scry framing line, onboarding §5 copy + order, reaction tooltips, Sköll's first-person Ask), proven piecemeal by the per-surface copy assertions. What stays unchecked is the live-LLM speaker **[Eval]** and, behind all of these, the single **consolidated diegetic-string lint** — both the S12 deliverable, not yet one pass.
 
 ---
 

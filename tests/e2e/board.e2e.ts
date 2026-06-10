@@ -170,7 +170,7 @@ test.describe('the live board (past the title screen)', () => {
 				return route.fulfill({
 					json: {
 						type: 'Advance',
-						skoll: { asks: { echo: 'Sköll asks after a gold rune.' } },
+						skoll: { asks: { echo: 'A gold rune. Mine.' } },
 						state: { activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 }
 					}
 				});

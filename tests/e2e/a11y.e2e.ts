@@ -70,7 +70,7 @@ test.describe('a11y — axe has no violations on any surface', () => {
 				return route.fulfill({
 					json: {
 						type: 'Advance',
-						skoll: { asks: { echo: 'Sköll asks after a gold rune.' } },
+						skoll: { asks: { echo: 'A gold rune. Mine.' } },
 						state: { activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 }
 					}
 				});
@@ -193,7 +193,7 @@ test.describe('a11y — the whole round is keyboard-operable with a visible focu
 				return route.fulfill({
 					json: {
 						type: 'Advance',
-						skoll: { asks: { echo: 'Sköll asks after a gold rune.' } },
+						skoll: { asks: { echo: 'A gold rune. Mine.' } },
 						state: { activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 }
 					}
 				});

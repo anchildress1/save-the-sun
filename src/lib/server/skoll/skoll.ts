@@ -10,7 +10,7 @@
 import { dev } from '$app/environment';
 import { runes } from '$lib/board';
 import { mulberry32 } from '$lib/prng';
-import { parseQuery, type Query } from '$lib/server/engine/queries';
+import { parseQuery, type PowerOp, type Query } from '$lib/server/engine/queries';
 import { valuePhrase } from '$lib/server/oracle/oracle';
 import type { GameEngine, CastResult } from '$lib/server/engine/engine';
 import {
@@ -179,10 +179,45 @@ function validateMove(raw: RawSkollDecision): SkollMove | null {
 	return null;
 }
 
-/** Sköll's Ask echo, shown to the human so they can judge whether to Scry or Hex it. Exported so
- *  a page load can rehydrate the interrupt prompt when a round resumes on his parked Ask. */
+// Power 1–6 spoken as a word so the line reads as a sentence, not a stat. Deliberately NOT the
+// Oracle's digit grammar — Sköll owns his own voice (ux-copy.md §2 Cast Voice Charter).
+const POWER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
+const numberWord = (n: number) => POWER_WORDS[n] ?? String(n);
+const article = (word: string): 'a' | 'an' => (/^[aeiou]/i.test(word) ? 'an' : 'a');
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function skollPowerLine(op: PowerOp, n: number): string {
+	const word = numberWord(n);
+	switch (op) {
+		case 'eq':
+			return `${cap(word)} power. I can smell it.`;
+		case 'lt':
+			return `Fewer than ${word} power. I can smell it.`;
+		case 'lte':
+			return `${cap(word)} power or fewer. I can smell it.`;
+		case 'gt':
+			return `More than ${word} power. I can smell it.`;
+		case 'gte':
+			return `${cap(word)} power or more. I can smell it.`;
+	}
+}
+
+/** Sköll's Ask in his own voice — first-person, predatory, naming the sign the human judges for
+ *  Scry/Hex (ux-copy.md §2). NOT the Oracle's third-person paraphrase. Exported so a page load can
+ *  rehydrate the interrupt prompt when a round resumes on his parked Ask. */
 export function skollAskEcho(query: Query): string {
-	return `Sköll asks after ${valuePhrase(query)}.`;
+	switch (query.axis) {
+		case 'element':
+			return `I scent ${article(query.value)} ${query.value.toLowerCase()} rune on her.`;
+		case 'color':
+			return `${cap(article(query.value))} ${query.value.toLowerCase()} rune. Mine.`;
+		case 'fill':
+			return `Light or dark — I taste a ${query.value.toLowerCase()} one.`;
+		case 'rune':
+			return `${query.value}. I name it in the dark.`;
+		case 'power':
+			return skollPowerLine(query.op, query.value);
+	}
 }
 
 /**

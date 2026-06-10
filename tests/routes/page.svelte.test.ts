@@ -81,7 +81,7 @@ const defaultAsk = (skollVsYou: object = { reaction: 'Pass' }) => ({
 });
 // A Cast carries no flavor line — his box stays blank; the outcome rides the turn state.
 const advanceCast = (state: GameState = HUMAN_TURN) => ({ type: 'Advance', skoll: {}, state });
-const advanceAsk = (echo = 'Sköll asks after a gold rune.') => ({
+const advanceAsk = (echo = 'A gold rune. Mine.') => ({
 	type: 'Advance',
 	skoll: { asks: { echo } },
 	state: SKOLL_TURN
@@ -439,10 +439,10 @@ describe('Save the Sun page', () => {
 		const spy = gameStub({ react: reactResult({ hexed: true }) });
 		const screen = render(
 			Page,
-			props(SKOLL_TURN, { echo: 'Sköll asks after a gold rune.', held: { Scry: true, Hex: true } })
+			props(SKOLL_TURN, { echo: 'A gold rune. Mine.', held: { Scry: true, Hex: true } })
 		);
 		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
-		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('a gold rune');
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('A gold rune. Mine.');
 		// A parked Ask must NOT fire an Advance on mount — the human owes a reaction first.
 		expect(spy).not.toHaveBeenCalled();
 		// And reacting still resolves it.
@@ -470,9 +470,7 @@ describe('Save the Sun page', () => {
 		gameStub({ advance: advanceAsk() });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		await expect
-			.element(screen.getByTestId('skoll-echo'))
-			.toHaveTextContent('Sköll asks after a gold rune.');
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('A gold rune. Mine.');
 		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
 		await expect.element(screen.getByRole('button', { name: 'Let it pass' })).toBeInTheDocument();
 	});

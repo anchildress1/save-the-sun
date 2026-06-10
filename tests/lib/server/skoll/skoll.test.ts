@@ -4,6 +4,7 @@ import {
 	freshSkollState,
 	reactToHumanAsk,
 	resolveSkollAsk,
+	skollAskEcho,
 	summarizePayload,
 	takeSkollTurn,
 	type RawSkollDecision,
@@ -84,6 +85,64 @@ describe('freshSkollState — seeded opening hunch', () => {
 		for (let seed = 1; seed <= 30; seed++) {
 			expect(['a light rune', 'a dark rune']).not.toContain(freshSkollState(seed).hunch);
 		}
+	});
+});
+
+describe('skollAskEcho — his Ask in his own first-person voice (ux-copy.md §2)', () => {
+	it('voices each axis as the wolf, not the Oracle — no third-person "asks after"', () => {
+		const lines = [
+			skollAskEcho({ axis: 'element', value: 'Fire' }),
+			skollAskEcho({ axis: 'color', value: 'Gold' }),
+			skollAskEcho({ axis: 'fill', value: 'Dark' }),
+			skollAskEcho({ axis: 'rune', value: 'Sowilo' }),
+			skollAskEcho({ axis: 'power', op: 'eq', value: 3 })
+		];
+		for (const line of lines) {
+			expect(line).not.toContain('asks after');
+			// First-person hunger somewhere in the line — "I …" or "Mine".
+			expect(/\bI\b|Mine/.test(line)).toBe(true);
+		}
+	});
+
+	it('names the sign the human judges for Scry/Hex, per axis', () => {
+		expect(skollAskEcho({ axis: 'element', value: 'Fire' })).toBe('I scent a fire rune on her.');
+		expect(skollAskEcho({ axis: 'color', value: 'Gold' })).toBe('A gold rune. Mine.');
+		expect(skollAskEcho({ axis: 'fill', value: 'Light' })).toBe(
+			'Light or dark — I taste a light one.'
+		);
+		expect(skollAskEcho({ axis: 'rune', value: 'Sowilo' })).toBe('Sowilo. I name it in the dark.');
+	});
+
+	it('speaks power 1–6 as a word across every comparison op', () => {
+		expect(skollAskEcho({ axis: 'power', op: 'eq', value: 3 })).toBe(
+			'Three power. I can smell it.'
+		);
+		expect(skollAskEcho({ axis: 'power', op: 'lt', value: 3 })).toBe(
+			'Fewer than three power. I can smell it.'
+		);
+		expect(skollAskEcho({ axis: 'power', op: 'lte', value: 3 })).toBe(
+			'Three power or fewer. I can smell it.'
+		);
+		expect(skollAskEcho({ axis: 'power', op: 'gt', value: 3 })).toBe(
+			'More than three power. I can smell it.'
+		);
+		expect(skollAskEcho({ axis: 'power', op: 'gte', value: 3 })).toBe(
+			'Three power or more. I can smell it.'
+		);
+	});
+
+	it('carries no exclamation — the wolf earns one rarely, not on a routine Ask', () => {
+		const ops = ['eq', 'lt', 'lte', 'gt', 'gte'] as const;
+		const lines = [
+			skollAskEcho({ axis: 'element', value: 'Air' }), // vowel → "an air rune"
+			skollAskEcho({ axis: 'color', value: 'Red' }),
+			skollAskEcho({ axis: 'fill', value: 'Dark' }),
+			skollAskEcho({ axis: 'rune', value: 'Sowilo' }),
+			...ops.map((op) => skollAskEcho({ axis: 'power', op, value: 2 }))
+		];
+		for (const line of lines) expect(line).not.toContain('!');
+		// The vowel article branch ("an", not "a").
+		expect(skollAskEcho({ axis: 'element', value: 'Air' })).toBe('I scent an air rune on her.');
 	});
 });
 
