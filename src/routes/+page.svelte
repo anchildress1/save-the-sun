@@ -402,7 +402,7 @@
 		crossings = ids;
 	}
 
-	// Returns whether the reset landed, so callers (leaveFire) don't advance the view on a failed reset.
+	// Returns whether the reset landed, so a caller can avoid advancing the view on a failed reset.
 	async function newGame(): Promise<boolean> {
 		pending = true;
 		let res: Response | undefined;
@@ -445,22 +445,6 @@
 			return false;
 		} finally {
 			pending = false;
-		}
-	}
-
-	// "Leave the fire." — step back from the closing rite to the threshold. A fresh round is prepared
-	// behind the title (so the resolved one is discarded, not re-entered), then the title screen returns;
-	// the onboarded flag is cleared so the rite opens as a fresh arrival, not a mid-round resume.
-	// Guarded on the reset: a failed newGame() leaves the end screen up with its in-world error line,
-	// rather than stranding the player on the title over a round the server never reset.
-	async function leaveFire() {
-		if (!(await newGame())) return;
-		onboardingStart = 'title';
-		showOnboarding = true;
-		try {
-			localStorage.removeItem(ONBOARDED_KEY);
-		} catch {
-			/* storage unavailable — non-fatal */
 		}
 	}
 
@@ -720,7 +704,7 @@
 </main>
 
 {#if showEndScreen}
-	<EndScreen outcome={endOutcome} onReplay={newGame} onLeave={leaveFire} />
+	<EndScreen outcome={endOutcome} onReplay={newGame} />
 {/if}
 
 {#if showOnboarding}

@@ -9,7 +9,7 @@ import RuneGrid from '$lib/components/RuneGrid.svelte';
 
 describe('reduced motion — the rite is present at once, never mid-animation', () => {
 	it('shows every EndScreen line at full opacity immediately (no rise-in to wait on)', async () => {
-		const screen = render(EndScreen, { outcome: 'win', onReplay: vi.fn(), onLeave: vi.fn() });
+		const screen = render(EndScreen, { outcome: 'win', onReplay: vi.fn() });
 		const lines = [...screen.container.querySelectorAll<HTMLElement>('.line, .actions')];
 		expect(lines.length).toBeGreaterThan(0);
 		// The CSS staggers these in from opacity:0; under reduced motion the media query forces them to
