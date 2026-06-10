@@ -85,7 +85,7 @@ describe('RuneGrid', () => {
 		expect(card.classList.contains('crossed')).toBe(true);
 		const strikeout = card.querySelector('.strikeout');
 		expect(strikeout).toBeInstanceOf(HTMLImageElement);
-		expect((strikeout as HTMLImageElement).src).toMatch(/chalk-cross\.png/);
+		expect((strikeout as HTMLImageElement).src).toMatch(/chalk-cross\.webp/);
 	});
 
 	it('renders the armed visual state — only the chosen target wears the halo', async () => {

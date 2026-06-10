@@ -54,8 +54,8 @@
 	--font-display: var(--font-title);
 
 	/* Ornate UI assets */
-	--ui-divider: url('../assets/ui/divider.png');
-	--modal-bg: url('../assets/banners/modal-background.jpg');
+	--ui-divider: url('../assets-webp/ui/divider.webp?no-inline');
+	--modal-bg: url('../assets-webp/banners/modal-background.webp?no-inline');
 }
 
 /* The app's two — and only two — buttons. Both read on a bright dawn splash AND a dark panel:

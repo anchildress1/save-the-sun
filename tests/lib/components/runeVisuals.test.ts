@@ -18,6 +18,8 @@ import {
 } from '$lib/components/runeVisuals';
 
 describe('rune visual maps', () => {
+	const webpAsset = /\.webp(?:\?no-inline)?$/;
+
 	it('maps every rune color to a defined gem color', () => {
 		for (const rune of runes) {
 			expect(() => gemColor(rune.color)).not.toThrow();
@@ -35,37 +37,37 @@ describe('rune visual maps', () => {
 	it('maps every rune name to a bundled symbol asset', () => {
 		for (const rune of runes) {
 			expect(() => runeSymbolAsset(rune.name)).not.toThrow();
-			expect(runeSymbolAsset(rune.name)).toMatch(/\.png$/);
+			expect(runeSymbolAsset(rune.name)).toMatch(webpAsset);
 		}
 	});
 
 	it('maps every rune color to a bundled icon asset', () => {
 		for (const rune of runes) {
 			expect(() => colorIconAsset(rune.color)).not.toThrow();
-			expect(colorIconAsset(rune.color)).toMatch(/\.png$/);
+			expect(colorIconAsset(rune.color)).toMatch(webpAsset);
 		}
 	});
 
 	it('maps every rune element to a bundled icon asset', () => {
 		for (const rune of runes) {
 			expect(() => elementIconAsset(rune.element)).not.toThrow();
-			expect(elementIconAsset(rune.element)).toMatch(/\.png$/);
+			expect(elementIconAsset(rune.element)).toMatch(webpAsset);
 		}
 	});
 
 	it('maps every rune fill to a bundled icon asset', () => {
 		for (const rune of runes) {
 			expect(() => fillIconAsset(rune.fill)).not.toThrow();
-			expect(fillIconAsset(rune.fill)).toMatch(/\.png$/);
+			expect(fillIconAsset(rune.fill)).toMatch(webpAsset);
 		}
 	});
 
 	it('exposes a bundled stone card background asset', () => {
-		expect(CARD_BACKGROUND_ASSET).toMatch(/\.png$/);
+		expect(CARD_BACKGROUND_ASSET).toMatch(webpAsset);
 	});
 
 	it('exposes a bundled chalk cross asset', () => {
-		expect(CHALK_CROSS_ASSET).toMatch(/\.png$/);
+		expect(CHALK_CROSS_ASSET).toMatch(webpAsset);
 	});
 
 	it('covers all six colors and six elements with no extras', () => {

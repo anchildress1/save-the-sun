@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import introSplash from '$lib/assets/banners/intro-splash.jpg';
+	import introSplash from '$lib/assets-webp/banners/intro-splash.webp?url&no-inline';
 
 	// Title screen + first-run coach-mark tour: the tour spotlights the live board region each step
 	// describes, so the how-to lives in the steps rather than as persistent on-board text. `onDone`
@@ -340,9 +340,9 @@
 		gap: 0.9rem;
 		padding: 1.6rem 1.8rem;
 		text-align: center;
-		/* Faint sunrise under a warm-dark wash — visible but soft, never harsh, never blue. */
+		/* Moon art stays visible without competing with the tour copy. */
 		background:
-			linear-gradient(180deg, rgba(18, 14, 10, 0.88) 0%, rgba(28, 18, 8, 0.85) 100%),
+			linear-gradient(180deg, rgba(4, 8, 16, 0.78) 0%, rgba(6, 9, 18, 0.9) 100%),
 			var(--modal-bg) center / cover no-repeat;
 		border: 1px solid var(--gold-dim);
 		border-radius: 12px;

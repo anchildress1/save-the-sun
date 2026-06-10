@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import dawnSplash from '$lib/assets/banners/dawn-splash.jpg';
-	import defeatSplash from '$lib/assets/banners/defeat-splash.jpg';
+	import dawnSplash from '$lib/assets-webp/banners/dawn-splash.webp?url&no-inline';
+	import defeatSplash from '$lib/assets-webp/banners/defeat-splash.webp?url&no-inline';
 
 	// The round's closing rite (ux-copy.md §4): a full-bleed scene with the result stated as a descending
 	// verse — a heavy lead line, then the quieter consequence — closed by a single CTA. `onReplay` starts
