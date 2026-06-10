@@ -636,6 +636,7 @@
 						class="btn btn--secondary reaction-btn"
 						type="button"
 						title="When your rival asks, hear the answer too."
+						aria-describedby="scry-hint"
 						disabled
 					>
 						Scry
@@ -644,10 +645,17 @@
 						class="btn btn--secondary reaction-btn"
 						type="button"
 						title="When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted."
+						aria-describedby="hex-hint"
 						disabled
 					>
 						Hex
 					</button>
+					<!-- title alone is unreliable for AT and disabled buttons aren't focusable; expose the
+					     same guidance to assistive tech through described-by text. -->
+					<span id="scry-hint" class="sr-only">When your rival asks, hear the answer too.</span>
+					<span id="hex-hint" class="sr-only"
+						>When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted.</span
+					>
 				</div>
 			{/if}
 
