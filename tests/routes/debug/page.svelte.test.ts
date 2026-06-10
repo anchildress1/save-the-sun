@@ -33,7 +33,7 @@ const floor: DebugEvent = {
 	kind: 'deterministic',
 	part: 'Ask',
 	level: 'warn',
-	message: 'Sköll asks after a gold rune.',
+	message: 'A gold rune. Mine.',
 	data: { source: 'floor', reasoning: 'No facts yet; opening hunch: a gold rune.' }
 };
 const secret: DebugEvent = {
