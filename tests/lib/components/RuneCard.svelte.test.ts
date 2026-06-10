@@ -43,19 +43,19 @@ describe('RuneCard', () => {
 		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		const image = screen.container.querySelector('.rune-symbol-image');
 		expect(image).toBeInstanceOf(HTMLImageElement);
-		expect((image as HTMLImageElement).src).toMatch(/uruz\.png/);
+		expect((image as HTMLImageElement).src).toMatch(/uruz\.webp/);
 		const elementIcon = screen.container.querySelector('.element-icon-image');
 		expect(elementIcon).toBeInstanceOf(HTMLImageElement);
-		expect((elementIcon as HTMLImageElement).src).toMatch(/fire\.png/);
+		expect((elementIcon as HTMLImageElement).src).toMatch(/fire\.webp/);
 		const colorIcon = screen.container.querySelector('.color-icon-image');
 		expect(colorIcon).toBeInstanceOf(HTMLImageElement);
-		expect((colorIcon as HTMLImageElement).src).toMatch(/purple\.png/);
+		expect((colorIcon as HTMLImageElement).src).toMatch(/purple\.webp/);
 		const fillIcons = screen.container.querySelectorAll('.pip-image');
 		expect(fillIcons).toHaveLength(4);
-		expect((fillIcons[0] as HTMLImageElement).src).toMatch(/light\.png/);
+		expect((fillIcons[0] as HTMLImageElement).src).toMatch(/light\.webp/);
 		const cardBackground = screen.container.querySelector('.card-background-image');
 		expect(cardBackground).toBeInstanceOf(HTMLImageElement);
-		expect((cardBackground as HTMLImageElement).src).toMatch(/stone\.png/);
+		expect((cardBackground as HTMLImageElement).src).toMatch(/stone\.webp/);
 		await expect.element(screen.getByText('Uruz')).toBeInTheDocument();
 		await expect.element(screen.getByText('Fire')).toBeInTheDocument();
 		await expect.element(screen.getByText('Purple')).toBeInTheDocument();
@@ -201,20 +201,20 @@ describe('RuneCard', () => {
 		const light = render(RuneCard, { rune: uruz, onAction: vi.fn() });
 		expect(light.container.querySelectorAll('.pip-image')).toHaveLength(4);
 		expect((light.container.querySelector('.pip-image') as HTMLImageElement).src).toMatch(
-			/light\.png/
+			/light\.webp/
 		);
 
 		const darkOne = render(RuneCard, { rune: perthro, onAction: vi.fn() });
 		expect(darkOne.container.querySelectorAll('.pip-image')).toHaveLength(1);
 		expect((darkOne.container.querySelector('.pip-image') as HTMLImageElement).src).toMatch(
-			/dark\.png/
+			/dark\.webp/
 		);
 
 		// Max power, Dark: all six pips carry the dark icon (not just the first).
 		const darkSix = render(RuneCard, { rune: othala, onAction: vi.fn() });
 		expect(darkSix.container.querySelectorAll('.pip-image')).toHaveLength(6);
 		for (const pip of darkSix.container.querySelectorAll('.pip-image')) {
-			expect((pip as HTMLImageElement).src).toMatch(/dark\.png/);
+			expect((pip as HTMLImageElement).src).toMatch(/dark\.webp/);
 		}
 		await expect
 			.element(darkSix.getByRole('button', { name: /cross off othala, 6 dark power/i }))
@@ -236,7 +236,7 @@ describe('RuneCard', () => {
 			.toBeInTheDocument();
 		const strikeout = screen.container.querySelector('.strikeout');
 		expect(strikeout).toBeInstanceOf(HTMLImageElement);
-		expect((strikeout as HTMLImageElement).src).toMatch(/chalk-cross\.png/);
+		expect((strikeout as HTMLImageElement).src).toMatch(/chalk-cross\.webp/);
 	});
 
 	it('exposes a cast-target label (with power + fill) when armed', async () => {
@@ -255,7 +255,7 @@ describe('RuneCard', () => {
 			.toBeInTheDocument();
 		const strikeout = screen.container.querySelector('.strikeout');
 		expect(strikeout).toBeInstanceOf(HTMLImageElement);
-		expect((strikeout as HTMLImageElement).src).toMatch(/chalk-cross\.png/);
+		expect((strikeout as HTMLImageElement).src).toMatch(/chalk-cross\.webp/);
 	});
 
 	it('marks only the selected target with the gold halo class', async () => {

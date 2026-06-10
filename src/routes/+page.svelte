@@ -6,9 +6,9 @@
 	import EndScreen from '$lib/components/EndScreen.svelte';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
-	import appIcon from '$lib/assets/ui/app-icon.png';
-	import moonSplash from '$lib/assets/banners/moon-splash-header.jpg';
-	import skollBanner from '$lib/assets/banners/skoll-banner.jpg';
+	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
+	import moonSplash from '$lib/assets-webp/banners/moon-splash-header.webp?url&no-inline';
+	import skollBanner from '$lib/assets-webp/banners/skoll-banner.webp?url&no-inline';
 	import type {
 		GameAction,
 		ActionResponse,
@@ -486,12 +486,23 @@
 		<img
 			class="header-background-image"
 			src={moonSplash}
+			width="1600"
+			height="187"
 			alt=""
 			aria-hidden="true"
 			decoding="async"
+			fetchpriority="high"
 		/>
 		<div class="title-block">
-			<img class="app-sigil" src={appIcon} alt="" aria-hidden="true" decoding="async" />
+			<img
+				class="app-sigil"
+				src={appIcon}
+				width="96"
+				height="96"
+				alt=""
+				aria-hidden="true"
+				decoding="async"
+			/>
 			<div>
 				<h1>
 					<button
@@ -504,6 +515,14 @@
 					</button>
 				</h1>
 				<p class="tagline">A rite for the longest day.</p>
+				<p
+					class="night-progress"
+					class:won={humanWon}
+					class:lost={skollWon}
+					data-testid={roundOver ? 'outcome-line' : 'night-progress'}
+				>
+					{roundOver ? outcomeLine : nightProgress}
+				</p>
 			</div>
 		</div>
 
@@ -530,14 +549,6 @@
 					<circle cx="32" cy="32" r="14" fill="url(#sunFace)" />
 				</svg>
 			{/if}
-			<p
-				class="night-progress"
-				class:won={humanWon}
-				class:lost={skollWon}
-				data-testid={roundOver ? 'outcome-line' : 'night-progress'}
-			>
-				{roundOver ? outcomeLine : nightProgress}
-			</p>
 		</div>
 
 		{#if !showEndScreen}
@@ -576,7 +587,15 @@
 		</section>
 
 		<aside class="oracle-panel">
-			<img class="skoll-banner" src={skollBanner} alt="" aria-hidden="true" decoding="async" />
+			<img
+				class="skoll-banner"
+				src={skollBanner}
+				width="480"
+				height="700"
+				alt=""
+				aria-hidden="true"
+				decoding="async"
+			/>
 
 			<div class="turn-pill-row">
 				<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
@@ -876,7 +895,6 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.3rem;
 	}
 
 	/* The risen sun replaces the moon on a human win — the saved sun, warm and radiant. */
@@ -887,10 +905,10 @@
 	}
 
 	.night-progress {
-		margin: 0;
+		margin: 0.35rem 0 0;
 		font-family: var(--font-story-body);
 		font-style: italic;
-		font-size: 0.95rem;
+		font-size: 0.88rem;
 		color: var(--ink-muted);
 		white-space: nowrap;
 	}
@@ -898,6 +916,10 @@
 	.night-progress.won {
 		color: var(--gold-bright);
 		text-shadow: 0 0 12px rgba(217, 169, 74, 0.4);
+	}
+
+	.night-progress.lost {
+		color: var(--steel);
 	}
 
 	.header-controls {
@@ -1202,7 +1224,7 @@
 		padding: 0.7rem 0.9rem;
 		border: 1px solid var(--gold-dim);
 		border-radius: 0.5rem;
-		background: var(--bg-panel);
+		background: linear-gradient(180deg, rgba(6, 9, 18, 0.98), rgba(3, 5, 10, 0.98));
 		color: var(--ink);
 		font-family: var(--font-body);
 		font-size: 0.78rem;
@@ -1233,13 +1255,14 @@
 		z-index: 0;
 		display: block;
 		width: 100%;
-		height: min(92%, 54rem);
+		height: min(44%, 27rem);
 		object-fit: cover;
 		object-position: 50% 0%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
 			contrast(var(--skoll-contrast));
-		mask-image: linear-gradient(180deg, transparent 0%, black 7%, black 100%);
-		-webkit-mask-image: linear-gradient(180deg, transparent 0%, black 7%, black 100%);
+		transform: scaleX(-1);
+		mask-image: linear-gradient(180deg, transparent 0%, black 18%, black 100%);
+		-webkit-mask-image: linear-gradient(180deg, transparent 0%, black 18%, black 100%);
 		pointer-events: none;
 	}
 

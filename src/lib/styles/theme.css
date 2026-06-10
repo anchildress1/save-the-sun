@@ -48,14 +48,14 @@
 
 	/* Type */
 	--font-title: 'Cinzel', serif;
-	--font-body: 'Inter', system-ui, sans-serif;
+	--font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 	--font-story-title: 'IM Fell English SC', serif;
 	--font-story-body: 'IM Fell English', Georgia, serif;
 	--font-display: var(--font-title);
 
 	/* Ornate UI assets */
-	--ui-divider: url('../assets/ui/divider.png');
-	--modal-bg: url('../assets/banners/modal-background.jpg');
+	--ui-divider: url('../assets-webp/ui/divider.webp?no-inline');
+	--modal-bg: url('../assets-webp/banners/modal-background.webp?no-inline');
 }
 
 /* The app's two — and only two — buttons. Both read on a bright dawn splash AND a dark panel:

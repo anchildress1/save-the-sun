@@ -128,6 +128,15 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [ ] [E] Responsive image variants are requested when the same art renders at materially different sizes
 - [ ] [CI] Bundle-size budget fails when first-load image weight or total client assets exceed the v2 budget
 
+## 6.8 PWA asset routes & immutable caching (perf/image-lhci-95)
+
+- [x] [U] `cachedAsset` stamps `public, max-age=31536000, immutable` + the given content-type, body/status preserved
+- [x] [U] A failed read (non-OK or bodyless) is **never** relabeled as an image nor cached — returns 502, logged (an immutable-cached error body is unrecoverable client-side)
+- [x] [U] `versionedPwaAsset` appends `?v={PWA_ASSET_VERSION}` — the cache-bust contract the `<link>`s + manifest depend on
+- [x] [U] Each icon route serves its asset with the correct content-type (`.ico` → `image/x-icon`, the rest → `image/png`) + immutable caching
+- [x] [U] `/site.webmanifest` is `application/manifest+json` with version-busted icon `src` (192/512, correct sizes/types)
+- [x] [U] **Every** `SESSIONLESS_PATHS` entry (all 7, parameterized) bypasses session-cookie creation — a typo would silently re-cookie an asset and kill its cacheability
+
 ## 7. Accessibility (v1; screen reader = v1.5)
 
 - [x] [E][A] Whole round operable by keyboard (ask, cross, arm, select, cast, react) with a visible focus indicator; Tab is never trapped on the grid _(`a11y.e2e`)_
@@ -198,6 +207,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] **Oracle pipeline** — line **90%** / branch **85%**
 - [x] **Reactions** — line **95%** / branch **90%**
 - [x] **UI / interaction** — line **80%** / branch **70%**
+- [x] **PWA caching** (`cache.ts` 100/90 · `pwaAssets.ts` 100/100) — the perf win rides on the cache header + cache-bust contract
 - [ ] **Graphics render layer** — line **60%** _(→ v1.5: graphics is a separate layer; not a v1 gate. Functional render is covered under the components gate at 80/70)_
 - [x] **Project overall** — line **85%** / branch **80%**
 
