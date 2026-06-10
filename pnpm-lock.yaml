@@ -34,7 +34,7 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.4.1(jiti@2.6.1))
       '@lhci/cli':
-        specifier: ^0.15.1
+        specifier: 0.15.1
         version: 0.15.1
       '@playwright/test':
         specifier: ^1.60.0

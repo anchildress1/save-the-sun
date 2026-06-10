@@ -23,7 +23,7 @@
 		"@commitlint/cli": "^21.0.2",
 		"@commitlint/config-conventional": "^21.0.2",
 		"@eslint/js": "^10.0.1",
-		"@lhci/cli": "^0.15.1",
+		"@lhci/cli": "0.15.1",
 		"@playwright/test": "^1.60.0",
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.2",
 		"@sveltejs/adapter-node": "^5.5.4",
