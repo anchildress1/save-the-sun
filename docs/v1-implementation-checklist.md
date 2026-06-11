@@ -359,7 +359,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 - [ ] Module's own test suite lands **with** the module (`test-plan.md` build-order rule)
 - [x] Module meets or exceeds its CI coverage floor
-- [x] Player-facing strings pass the voice/terminology lint
+- [ ] Player-facing strings pass the voice/terminology lint
 - [x] Engine remains the single source of truth — no truth logic leaks into UI or Gemini
 - [x] Degrades cleanly to the tier below, or it doesn't ship
 
