@@ -13,11 +13,11 @@
   <br/>
   <img alt="Sonar Quality Gate" src="https://img.shields.io/sonar/quality_gate/anchildress1_save-the-sun?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge" />
   <img alt="Sonar Coverage" src="https://img.shields.io/sonar/coverage/anchildress1_save-the-sun?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&color=limegreen" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-658%20passing-limegreen?style=for-the-badge&logo=vitest&logoColor=white" />
 </p>
 
-<!-- Interim art: swap for the real social banner when it exists. -->
 <p align="center">
-  <img src="src/lib/assets-webp/banners/intro-splash.webp" alt="A rune stone blazing with golden light at sunrise while Sköll, the great wolf, watches from a dark ridge." />
+  <img src="https://raw.githubusercontent.com/anchildress1/save-the-sun/main/docs/assets/social-banner.webp" alt="A rune stone blazing with golden light at sunrise while Sköll, the great wolf, watches from a dark ridge." />
 </p>
 
 ## Table of Contents
@@ -71,7 +71,7 @@ Design intent: [`docs/prd.md`](docs/prd.md) · mechanics: [`docs/game-spec.md`](
 
 ## Tech Stack
 
-- **App:** [SvelteKit 2](https://svelte.dev/docs/kit) / Svelte 5 (runes), TypeScript, Node.js ≥ 24, ESM
+- **App:** [SvelteKit 2](https://svelte.dev/docs/kit) / Svelte 5 (runes), TypeScript, Node.js ≥ 26, ESM
 - **AI:** [Gemini API](https://ai.google.dev/) (`@google/genai`) — interprets Asks for the Oracle and plays Sköll
 - **Tests:** Vitest (unit + browser-mode component), Playwright e2e, `@axe-core/playwright`, Lighthouse CI (pre-push)
 - **Quality:** ESLint, Prettier, svelte-check, commitlint (conventional + RAI), secretlint, Lefthook hooks

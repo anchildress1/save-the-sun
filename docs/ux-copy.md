@@ -112,7 +112,7 @@ Templated. **Both verdicts restate the trait**—`Yes. Sól is reaching for {val
 
 ## 2. Sköll
 
-Sköll's on-board surface carries **only his Ask**—the inference the human Scries, Hexes, or lets pass. No taunts, no cast lines: his box shows his Ask when he Asks and is blank otherwise. His casts read from the engine (the turn pill flips, the Oracle panel voices the resolution); the wolf's pressure is felt in how he plays, not in chatter.
+Sköll's on-board surface carries **only his Ask**—the inference the human Scries, Hexes, or lets pass. No taunts, no cast lines: his box shows his Ask when he Asks and is blank otherwise. His casts read from the engine (the turn pill flips; a winning cast raises the end screen, which owns the defeat text — the Oracle panel keeps its last voiced line, the WHY of the loss); the wolf's pressure is felt in how he plays, not in chatter.
 
 ### His Ask (the only Sköll line shown)
 He asks in **his own voice**—first-person, predatory, sardonic (the Cast Voice Charter, Part I)—**not** the Oracle's third-person paraphrase. The line still names the sign he hunts, so the human knows what they're choosing to Scry, Hex, or let pass.
@@ -165,7 +165,7 @@ Voiced in the **Oracle text**, in the rite's own voice (third person—never his
 4. CTA: **"Begin another night"** _(the only closing action—the secondary "Leave the fire." was cut)_
 
 ### Defeat—Sköll casts first
-1. The loss resolves: **"Sköll takes the sun. The longest day never breaks. The year falls to dark."** _(Sköll's cast carries no line of its own—the resolution is the Oracle panel's; see §2.)_
+1. The loss resolves on the end screen: lead **"Sköll takes the sun."**, coda **"The longest day never breaks. The year falls to dark."** _(Sköll's cast carries no line of its own; the Oracle panel deliberately keeps its last voiced answer—and his Scry note when he overheard it—so the WHY of the loss stays readable. Never doubled into the panel; see §2.)_
 2. CTA: **"Stand against him again"** _(the only closing action—the secondary "Leave the fire." was cut)_
 
 Sól speaks only at victory—the goddess's rarity is the power.
