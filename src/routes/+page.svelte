@@ -99,8 +99,8 @@
 	let nightProgress = $derived(
 		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
 	);
-	// Asymptotic: every turn visibly moves the sky, but the moon only sets if the dawn is won.
-	let nightT = $derived(humanWon ? 1 : 1 - Math.pow(0.85, turns));
+	// Asymptotic, capped: the moon fully sets only on a win (uncapped, toFixed(3) hits 1.000 ~turn 47).
+	let nightT = $derived(humanWon ? 1 : Math.min(0.95, 1 - Math.pow(0.85, turns)));
 	// Cross-off is a private aid, never turn-gated — RuneGrid owns it and stays enabled through Sköll's turn.
 	let canAct = $derived(activePlayer === 'Human' && !roundOver);
 	let turnPill = $derived(

@@ -133,8 +133,7 @@ function normalize(raw: RawResponse): RawSkollDecision {
 
 let client: GoogleGenAI | null = null;
 function ai(): GoogleGenAI {
-	// 3 attempts with the SDK's exponential backoff (408/429/5xx): a single rate-limit blip
-	// otherwise floors the wolf for the turn. Capped below the SDK's 5 — the player is waiting.
+	// 3 backoff attempts (408/429/5xx) — a rate-limit blip shouldn't floor the wolf for the turn.
 	client ??= new GoogleGenAI({
 		apiKey: env.GEMINI_API_KEY,
 		httpOptions: { retryOptions: { attempts: 3 } }

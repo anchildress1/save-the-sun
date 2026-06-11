@@ -115,8 +115,7 @@ function normalize(raw: RawResponse): Interpretation {
 
 let client: GoogleGenAI | null = null;
 function ai(): GoogleGenAI {
-	// 3 attempts with the SDK's exponential backoff (408/429/5xx): a single rate-limit blip
-	// otherwise silences the Oracle mid-rite. Capped below the SDK's 5 — the player is waiting.
+	// 3 backoff attempts (408/429/5xx) — a rate-limit blip shouldn't silence the Oracle mid-rite.
 	client ??= new GoogleGenAI({
 		apiKey: env.GEMINI_API_KEY,
 		httpOptions: { retryOptions: { attempts: 3 } }
