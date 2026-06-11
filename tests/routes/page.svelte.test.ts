@@ -254,6 +254,29 @@ describe('Save the Sun page', () => {
 		expect(error).toHaveBeenCalledWith('[ui] Ask dispatch failed:', expect.any(Error));
 	});
 
+	// S11: the error path swaps only the voiced line — a failed dispatch must never cost
+	// the player their board state. Crossings and the turn survive the Oracle falling silent.
+	it('preserves crossings and turn state when the Ask dispatch fails', async () => {
+		const error = expectConsole('error');
+		stubFetch(async () => new Response('nope', { status: 500 }));
+		const screen = render(Page, pageProps);
+
+		await screen.getByRole('button', { name: /cross off sowilo/i }).click();
+		await expect
+			.element(screen.getByRole('button', { name: /restore sowilo/i }))
+			.toBeInTheDocument();
+
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it gold?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+
+		await expect
+			.element(screen.getByRole('button', { name: /restore sowilo/i }))
+			.toBeInTheDocument();
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
+		expect(error).toHaveBeenCalledWith('[ui] Ask dispatch failed:', expect.any(Error));
+	});
+
 	it('shows an in-world error when a Cast dispatch fails', async () => {
 		const error = expectConsole('error');
 		stubFetch(async () => new Response('nope', { status: 500 }));
