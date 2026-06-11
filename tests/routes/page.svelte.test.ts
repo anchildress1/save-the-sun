@@ -511,14 +511,14 @@ describe('Save the Sun page', () => {
 		await humanAsks(screen);
 		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('A gold rune. Mine.');
 		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
-		await expect.element(screen.getByRole('button', { name: 'Let it pass' })).toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Pass' })).toBeInTheDocument();
 	});
 
 	it('lets the human let Sköll Ask pass', async () => {
 		gameStub({ advance: advanceAsk(), react: reactResult({ hexed: false }) });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		await screen.getByRole('button', { name: 'Let it pass' }).click();
+		await screen.getByRole('button', { name: 'Pass' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('You hold your hand. Let him have his answer.');
@@ -543,6 +543,33 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent(
 				'You lean into the dark and listen. His answer is yours too. Yes. Sól is reaching for a gold rune.'
 			);
+	});
+
+	it('shows spent Scry disabled on the next Sköll Ask instead of hiding it', async () => {
+		gameStub({
+			advance: advanceAsk(),
+			react: reactResult({
+				hexed: false,
+				scried: { answer: 'Yes. Sól is reaching for a gold rune.' }
+			})
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Scry' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('His answer is yours too.');
+
+		await humanAsks(screen);
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
+		const scry = screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement;
+		const hex = screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement;
+		const pass = screen.getByRole('button', { name: 'Pass' }).element() as HTMLButtonElement;
+
+		expect(scry.disabled).toBe(true);
+		expect(scry.classList).toContain('reaction-choice--spent');
+		expect(hex.disabled).toBe(false);
+		expect(pass.disabled).toBe(false);
 	});
 
 	it('kills the question when the human Hexes Sköll Ask', async () => {

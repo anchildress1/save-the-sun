@@ -63,7 +63,7 @@ One charge of each per player per game. **Both reactions trigger on an Ask; a Ca
    - **Hex** (formerly Hang-Up) — cancels the Ask before its answer: no answer is returned and the active player's turn is wasted. Triggers only on an Ask.
 4. The engine resolves: an Ask returns its yes/no answer (private to the active player, plus a Scry-er) — unless Hexed, in which case no answer is returned; a Cast runs its win check, always uninterrupted.
 
-Both reactions fight over the same Ask: Scry steals the information, Hex denies it. Only one may be used per interrupt window. If Hex is used, no answer exists for anyone to Scry. Neither can be used on a Cast. A spent reaction is gone for the rest of the game.
+Both reactions fight over the same Ask: Scry steals the information, Hex denies it. Only one may be used per interrupt window. If Hex is used, no answer exists for anyone to Scry. Neither can be used on a Cast. A spent reaction is unavailable for the rest of the game and stays visible but disabled in the UI.
 
 ## Visibility
 

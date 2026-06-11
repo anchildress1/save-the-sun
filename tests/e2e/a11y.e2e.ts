@@ -90,7 +90,7 @@ test.describe('a11y — axe has no violations on any surface', () => {
 		await page.goto('/');
 		await page.getByLabel(/ask the oracle/i).fill('Is it gold?');
 		await page.getByRole('button', { name: 'Ask the Oracle' }).click();
-		await expect(page.getByRole('button', { name: 'Let it pass' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Pass' })).toBeVisible();
 		const results = await sweep(page);
 		expect(results.violations).toEqual([]);
 	});

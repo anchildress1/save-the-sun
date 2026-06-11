@@ -132,7 +132,7 @@ _Cut from the v1 UI (flavor, not inference): the idle/turn taunts, the escalatio
 
 ## 3. Reactions—Scry & Hex
 
-One-use reactions, **not cards**—no deck, no hand. Both trigger on an **Ask**; a Cast is sacred and cannot be interrupted. A spent reaction is gone for the game—no "spent" copy.
+One-use reactions, **not cards**—no deck, no hand. Both trigger on an **Ask**; a Cast is sacred and cannot be interrupted. A spent reaction stays visible but disabled for the game—no visible "spent" copy.
 
 ### Tooltips
 | Reaction | Tooltip |
@@ -141,10 +141,10 @@ One-use reactions, **not cards**—no deck, no hand. Both trigger on an **Ask**;
 | **Hex** | "When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted." |
 
 ### You use a reaction (on Sköll's Ask)
-**Interrupt prompt:** buttons **"Scry"** · **"Hex"** · **"Let it pass"**. The **"Sköll asks. Answer it?"** heading is **not displayed** in v1—it survives only as the buttons' accessibility group label (`aria-label`); the visible reaction-prompt copy is deferred to a v2 reaction-UI redesign.
+**Interrupt prompt:** buttons **"Scry"** · **"Hex"** · **"Pass"**. The **"Sköll asks. Answer it?"** heading is **not displayed** in v1—it survives only as the buttons' accessibility group label (`aria-label`); the visible reaction-prompt copy is deferred to a v2 reaction-UI redesign.
 - **You Scry:** "You lean into the dark and listen. His answer is yours too."
 - **You Hex:** "You close the Oracle's lips. His question dies unanswered — his turn with it."
-- **You let it pass:** "You hold your hand. Let him have his answer."
+- **You pass:** "You hold your hand. Let him have his answer."
 
 ### Sköll uses a reaction (on your Ask)
 
@@ -228,7 +228,7 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 - **Frame:** the longest day (headline) won through the one short night (nuance).
 - **Traits:** count = "power"; fill = "light/dark" (○ light, ● dark); axes = element, power, light, hue.
 - **Address:** Sköll says "witch" = gender-neutral coven role; Oracle addresses no one.
-- **Reactions:** Scry + Hex are one-use reactions (not cards) that trigger on an Ask; Cast is sacred. Spent reactions vanish (no copy).
+- **Reactions:** Scry + Hex are one-use reactions (not cards) that trigger on an Ask; Cast is sacred. Spent reactions remain visible but disabled (no visible spent copy).
 - **Casting a crossed-off rune is legal**—crossing is the player's private aid, never validated.
 - **Sól** speaks only at victory. Replay CTAs in-world ("Begin another night" / "Stand against him again"), never "Play again."
 - No alternates, no neutral/system filler—single in-world choices throughout.

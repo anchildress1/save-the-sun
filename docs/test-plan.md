@@ -131,12 +131,12 @@ Covers R3, R4, and the casting flow. One shared action interface serves both the
 
 | Area | Test type | What to test |
 |---|---|---|
-| One use each per round | Integration | Each reaction usable once per player per round; spent reaction is unavailable for the rest of the game (no "spent" copy shown). |
+| One use each per round | Integration + component | Each reaction usable once per player per round; spent reactions remain visible but disabled for the rest of the game, with no visible "spent" copy shown. |
 | Trigger on Ask only | Integration | Scry/Hex offered on an Ask's interpretation echo; **never** offered on a Cast. |
 | Interrupt window | Integration | At most one reaction per window; if Hex is used there is no answer left for Scry. |
 | Scry effect | Integration | Rival also receives the private answer. |
 | Hex effect | Integration | Question dies, no answer to anyone, active player's turn spent. |
-| Human-side prompt | Component | On Sköll's Ask: Scry / Hex / Let it pass behave per `ux-copy.md`. The "Sköll asks. Answer it?" heading is SR-only (the buttons' `aria-label`); the visible copy is deferred to a v2 reaction-UI redesign. |
+| Human-side prompt | Component | On Sköll's Ask: Scry / Hex / Pass behave per `ux-copy.md`; spent Scry/Hex stay disabled and Pass stays a manual choice. The "Sköll asks. Answer it?" heading is SR-only (the buttons' `aria-label`); the visible copy is deferred to a v2 reaction-UI redesign. |
 | Sköll-side reaction | Integration | Sköll's reaction is a refereed Gemini response with deterministic-floor fallback (per R5). |
 
 ---
