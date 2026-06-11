@@ -137,6 +137,11 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [U] `/site.webmanifest` is `application/manifest+json` with version-busted icon `src` (192/512, correct sizes/types)
 - [x] [U] **Every** `SESSIONLESS_PATHS` entry (all 7, parameterized) bypasses session-cookie creation — a typo would silently re-cookie an asset and kill its cacheability
 
+## 6.9 Social embed metadata & author footer
+
+- [x] [E] SSR HTML carries canonical, description, OG, and Twitter card tags with absolute URLs; `og:image` resolves from the served build _(`meta.e2e`)_
+- [x] [E] Author footer exposes the copyright and public profile links _(`meta.e2e`)_
+
 ## 7. Accessibility (v1; screen reader = v1.5)
 
 - [x] [E][A] Whole round operable by keyboard (ask, cross, arm, select, cast, react) with a visible focus indicator; Tab is never trapped on the grid _(`a11y.e2e`)_

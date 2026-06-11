@@ -309,6 +309,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [x] Secret-leak security assertion passes (engine API + Sköll payload)
 - [ ] Voice/terminology lint passes (zero violations) _(open — the per-surface copy assertions hold across the suite, but the consolidated automated lint is not built; matches the S11 "Done when")_
 - [x] High-risk gaps confirmed covered: non-argmax test · turn-accounting on **every** refusal class · crossed-rune cast · cast sacredness · degradation fairness · secret never in Sköll's payload
+- [x] Public social cards and author footer ship in SSR HTML, with the card image resolving from the served build _(`meta.e2e`)_
 - [x] Deployed, playable, public URL confirmed live
 
 **Done when:** every gate is green and the public build plays a full fair round end to end.
