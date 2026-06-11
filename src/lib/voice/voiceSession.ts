@@ -130,7 +130,7 @@ export function createVoiceSession(): VoiceSession {
 			body: JSON.stringify({ level, message })
 		})
 			.then((response) => {
-				if (!response.ok) console.warn(`[voice] debug tee rejected (${response.status}):`, message);
+				if (!response.ok) console.warn('[voice] debug tee rejected:', response.status, message);
 			})
 			.catch(() => console.warn('[voice] debug tee unreachable:', message));
 	}
@@ -280,8 +280,14 @@ export function createVoiceSession(): VoiceSession {
 		}
 		if (generation !== myGeneration) return;
 
-		speaker = createSpeaker();
-		speaker.onDrained(onDrained);
+		try {
+			speaker = createSpeaker();
+			speaker.onDrained(onDrained);
+		} catch (err) {
+			if (generation !== myGeneration) return;
+			fail('audio', err instanceof Error ? err.message : String(err));
+			return;
+		}
 
 		let connected: Session;
 		try {

@@ -597,10 +597,35 @@ describe('voiceSession failures', () => {
 		await awaken();
 		await vi.advanceTimersByTimeAsync(0);
 		expect(consoleWarn).toHaveBeenCalledWith(
-			'[voice] debug tee rejected (400):',
+			'[voice] debug tee rejected:',
+			400,
 			'voice session awake'
 		);
 		consoleWarn.mockRestore();
+	});
+
+	it('a speaker setup failure releases the mic, reports audio failure, and allows retry', async () => {
+		audio.createSpeaker.mockImplementationOnce(() => {
+			throw new Error('no output device');
+		});
+
+		await vs.wake();
+
+		expect(events).toEqual([
+			{
+				type: 'error',
+				reason: 'audio',
+				notice: 'No voice reaches the fire. The rite continues by hand.'
+			}
+		]);
+		expect(micStop).toHaveBeenCalledTimes(1);
+		expect(vs.state).toBe('asleep');
+
+		events = [];
+		await awaken();
+
+		expect(vs.state).toBe('listening');
+		expect(eventTypes()).toEqual(['listening']);
 	});
 
 	it('a failing debug tee never disturbs the session', async () => {

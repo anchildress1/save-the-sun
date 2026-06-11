@@ -20,7 +20,7 @@ Add endpoint to existing Cloud Run server: mint Live API ephemeral token using G
 
 Client module owning the Live API WebSocket lifecycle: connect with ephemeral token, stream mic PCM (16-bit/16kHz) in, play audio (24kHz) out.
 
-- [x] `voiceSession.wake()` / `voiceSession.sleep()` API consumed by UI
+- [ ] `voiceSession.wake()` / `voiceSession.sleep()` API consumed by UI
 - [x] Barge-in: player speech interrupts Oracle playback immediately
 - [x] Emits events: `listening`, `hearing`, `thinking`, `speaking`, `asleep`, `error`, `transcript(in|out)`
 - [x] On socket drop/error: emit `error`, revert to asleep, non-blocking notice; game continues on buttons
