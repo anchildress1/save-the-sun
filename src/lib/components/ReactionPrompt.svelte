@@ -40,7 +40,7 @@
 		>
 			Hex
 		</button>
-		<button class="btn btn--secondary" type="button" onclick={() => onReact('Pass')}> Pass </button>
+		<button class="btn btn--secondary" type="button" onclick={() => onReact('Pass')}>Pass</button>
 	</div>
 </div>
 

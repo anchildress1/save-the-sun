@@ -763,7 +763,7 @@
 						>
 							Name it
 						</button>
-						<button class="btn btn--secondary" type="button" onclick={cancelCast}> Not yet </button>
+						<button class="btn btn--secondary" type="button" onclick={cancelCast}>Not yet</button>
 					</div>
 				{:else}
 					<button
