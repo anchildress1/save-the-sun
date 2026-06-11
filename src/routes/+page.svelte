@@ -11,6 +11,8 @@
 	import skollBanner from '$lib/assets-webp/banners/skoll-banner.webp?url&no-inline';
 	import introSplash from '$lib/assets-webp/banners/intro-splash.webp?url&no-inline';
 	import uiDivider from '$lib/assets-webp/ui/divider.webp?url&no-inline';
+	import dawnSplash from '$lib/assets-webp/banners/dawn-splash.webp?url&no-inline';
+	import defeatSplash from '$lib/assets-webp/banners/defeat-splash.webp?url&no-inline';
 	import type {
 		GameAction,
 		ActionResponse,
@@ -219,6 +221,14 @@
 	// own guard no-ops otherwise). Wrapped so the async return isn't mistaken for an onMount cleanup.
 	onMount(() => {
 		advanceSkoll();
+		// Warm the end-screen splashes at idle — EndScreen mounts only when the round resolves,
+		// and a cold fetch there pops the closing rite in late. Idle (or a generous timeout where
+		// requestIdleCallback is missing) keeps them out of the first-paint contest.
+		const warmEndSplashes = () => {
+			for (const src of [dawnSplash, defeatSplash]) new Image().src = src;
+		};
+		if ('requestIdleCallback' in window) requestIdleCallback(warmEndSplashes);
+		else setTimeout(warmEndSplashes, 1500);
 		// Restore the resumed round's view over the server-hydrated engine state — crossings onto the
 		// board, the last voiced line into the panel. Layered on top: the engine stays the source of
 		// truth (turn pill, status, pending reaction), this only restores presentation. A blank stored
