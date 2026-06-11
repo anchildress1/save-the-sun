@@ -146,7 +146,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C][E] `prefers-reduced-motion` → motion instant (entrance + end-screen rise cut), no audio to unmute (v1 ships none), still reflects live state _(`reducedMotion.svelte.test`, `degradation.e2e`)_
 - [x] [E] At 200% zoom the effective width falls below the 1280px floor → the best-on-desktop notice shows (no reflow, per the width rules) — the same below-minimum path as §9; full in-game operability at 200% zoom waits on v2 responsive (1024px) support
 - [ ] [A][CI] Lighthouse a11y ≥ 0.95 (target ≈ 1.0) _(not added — the global no-lhci-in-GHA rule stands; the in-CI a11y gate is the axe sweep above, run in the existing e2e step and failing the build on any violation. `lhci autorun` stays local via `make perf`.)_
-- [ ] _(v1.5, not gated)_ Screen-reader: `aria-live="polite"`, per-card traits, turn-change announcements
+- [x] [C] _(v1.5)_ Screen-reader: turn pill, Oracle frame, and Sköll frame are polite status regions (turn-change, answer/refusal, and Ask announcements); per-card full traits + crossed state in the accessible name _(`page.svelte.test`, `RuneCard.svelte.test`)_
 
 ## 8. Degradation tiers
 
