@@ -148,9 +148,11 @@
 		/* minmax(0, 1fr), not 1fr: each card's nowrap trait row has a wide min-content,
 		   and plain 1fr lets columns blow out past their share (cards overflow into the
 		   Oracle panel and come out uneven). minmax(0,…) caps them to equal cells. */
-		grid-template-columns: repeat(6, minmax(0, 1fr));
-		gap: 0.7rem;
+		grid-template-columns: repeat(var(--rune-grid-columns, 6), minmax(0, 1fr));
+		gap: var(--rune-grid-gap, 0.7rem);
 		width: 100%;
+		max-width: var(--rune-grid-max-inline-size, none);
+		margin-inline: auto;
 		/* start (not stretch): let each card's aspect-ratio set its height so every
 		   card is identical, instead of rows stretching to their tallest card. */
 		align-items: start;
@@ -159,11 +161,9 @@
 	}
 
 	.rune-card-wrapper {
-		/* Stable positioning wrapper for the staggered entrance. Centering keeps capped
-		   embed cards from clinging to one side of an oversized grid cell. */
-		display: flex;
-		justify-content: center;
-		width: 100%;
+		/* Stable positioning wrapper for the staggered entrance. Visible by default so a
+		   failed/absent GSAP run never leaves the board blank. */
+		display: block;
 	}
 
 	.sr-only {

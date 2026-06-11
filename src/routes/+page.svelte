@@ -1424,39 +1424,21 @@
 		}
 
 		.board-section :global(.rune-grid) {
-			grid-template-columns: repeat(4, minmax(0, 1fr));
-		}
-
-		.board-section :global(.rune-card) {
-			max-width: 13.25rem;
+			--rune-grid-columns: 4;
+			--rune-grid-max-inline-size: 55.1rem;
+			--rune-card-padding: 0.62rem 0.64rem 0.82rem;
+			--rune-card-middle-gap: 0.34rem;
+			--rune-card-name-size: 0.92rem;
+			--rune-card-name-line-height: 1.05;
+			--rune-card-meaning-size: 0.68rem;
+			--rune-power-gap: 0.04rem;
+			--rune-power-label-size: 0.62rem;
 			--pip-icon-size: 14px;
 			--symbol-box-height: 2.8rem;
 			--symbol-image-width: auto;
 			--symbol-image-height: 2.8rem;
 			--symbol-image-max-width: 58%;
 			--symbol-image-max-height: 100%;
-			padding: 0.62rem 0.64rem 0.82rem;
-		}
-
-		.board-section :global(.middle) {
-			gap: 0.34rem;
-		}
-
-		.board-section :global(.name) {
-			font-size: 0.92rem;
-			line-height: 1.05;
-		}
-
-		.board-section :global(.meaning) {
-			font-size: 0.68rem;
-		}
-
-		.board-section :global(.trait.power) {
-			gap: 0.04rem;
-		}
-
-		.board-section :global(.power-label) {
-			font-size: 0.62rem;
 		}
 
 		.oracle-panel {
