@@ -130,11 +130,26 @@ describe('voiceSession wake', () => {
 		});
 	});
 
+	it('announces waking synchronously at the tap — the UI never reads asleep while the mic opens', async () => {
+		const woke = vs.wake();
+		expect(vs.state).toBe('waking');
+		expect(eventTypes()).toEqual(['waking']);
+		await vi.advanceTimersByTimeAsync(0);
+		callbacks!.onmessage({ setupComplete: {} });
+		await woke;
+		expect(vs.state).toBe('listening');
+	});
+
 	it('emits listening once setup completes and tees the awake event', async () => {
 		await awaken();
 		expect(vs.state).toBe('listening');
-		expect(eventTypes()).toEqual(['listening']);
+		expect(eventTypes()).toEqual(['waking', 'listening']);
 		expect(teeBodies().join(' ')).toContain('voice session awake');
+	});
+
+	it('mints the token under an abort timeout so a hung endpoint fails the wake', async () => {
+		await awaken();
+		expect((tokenCalls()[0][1] as { signal?: unknown }).signal).toBeInstanceOf(AbortSignal);
 	});
 
 	it('ignores a second wake while already awake', async () => {
@@ -331,14 +346,15 @@ describe('voiceSession sleep', () => {
 		expect(events).toEqual([]);
 	});
 
-	it('sleep mid-wake aborts silently and releases the mic', async () => {
+	it('a cancel tap mid-wake reverts to asleep, releases the mic, and tees the cancel', async () => {
 		const woke = vs.wake();
 		await vi.advanceTimersByTimeAsync(0);
 		vs.sleep();
 		await woke;
 		expect(micStop).toHaveBeenCalledTimes(1);
-		expect(events).toEqual([]);
+		expect(eventTypes()).toEqual(['waking', 'asleep']);
 		expect(vs.state).toBe('asleep');
+		expect(teeBodies().join(' ')).toContain('voice wake canceled');
 	});
 
 	it('sleep racing the mic grant releases the mic the moment it lands', async () => {
@@ -354,7 +370,7 @@ describe('voiceSession sleep', () => {
 		grantMic({ ok: true, mic: { stop: micStop } });
 		await woke;
 		expect(micStop).toHaveBeenCalledTimes(1);
-		expect(events).toEqual([]);
+		expect(eventTypes()).toEqual(['waking', 'asleep']);
 		expect(tokenCalls()).toHaveLength(0);
 	});
 
@@ -364,7 +380,7 @@ describe('voiceSession sleep', () => {
 		unsubscribe();
 		await awaken();
 		expect(gone).not.toHaveBeenCalled();
-		expect(events).toEqual([{ type: 'listening' }]);
+		expect(events).toEqual([{ type: 'waking' }, { type: 'listening' }]);
 	});
 
 	it('a stale socket close after sleep stays silent', async () => {
@@ -392,7 +408,11 @@ describe('voiceSession failures', () => {
 	] as const)('mic failure %s emits its notice and never mints a token', async (reason, notice) => {
 		audio.openMic.mockResolvedValueOnce({ ok: false, reason, detail: 'NotAllowedError: denied' });
 		await vs.wake();
-		expect(events).toEqual([{ type: 'error', reason, notice }]);
+		expect(events).toEqual([
+			{ type: 'waking' },
+			{ type: 'error', reason, notice },
+			{ type: 'asleep' }
+		]);
 		expect(tokenCalls()).toHaveLength(0);
 		expect(vs.state).toBe('asleep');
 		expect(teeBodies().join(' ')).toContain('NotAllowedError: denied');
@@ -414,11 +434,13 @@ describe('voiceSession failures', () => {
 		});
 		await vs.wake();
 		expect(events).toEqual([
+			{ type: 'waking' },
 			{
 				type: 'error',
 				reason: 'token',
 				notice: 'The fire does not carry your voice tonight. The rite continues by hand.'
-			}
+			},
+			{ type: 'asleep' }
 		]);
 		expect(micStop).toHaveBeenCalledTimes(1);
 		expect(sdk.connect).not.toHaveBeenCalled();
@@ -477,10 +499,40 @@ describe('voiceSession failures', () => {
 		await vi.advanceTimersByTimeAsync(0);
 		await vi.advanceTimersByTimeAsync(10_000);
 		await woke;
-		expect(eventTypes()).toEqual(['error']);
-		expect(events[0]).toMatchObject({ reason: 'socket' });
+		expect(eventTypes()).toEqual(['waking', 'error', 'asleep']);
+		expect(events[1]).toMatchObject({ reason: 'socket' });
 		expect(vs.state).toBe('asleep');
 		expect(micStop).toHaveBeenCalledTimes(1);
+	});
+
+	it('a hung connect times out into error socket instead of stranding the wake', async () => {
+		sdk.connect.mockImplementationOnce(() => new Promise(() => {}));
+		const woke = vs.wake();
+		await vi.advanceTimersByTimeAsync(0);
+		await vi.advanceTimersByTimeAsync(10_000);
+		await woke;
+		expect(eventTypes()).toEqual(['waking', 'error', 'asleep']);
+		expect(events[1]).toMatchObject({ reason: 'socket' });
+		expect(micStop).toHaveBeenCalledTimes(1);
+		expect(teeBodies().join(' ')).toContain('live connect timed out');
+	});
+
+	it('a connect resolving after its timeout closes the late socket instead of leaking it', async () => {
+		let finishConnect!: () => void;
+		sdk.connect.mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					finishConnect = () => resolve(liveSession);
+				})
+		);
+		const woke = vs.wake();
+		await vi.advanceTimersByTimeAsync(0);
+		await vi.advanceTimersByTimeAsync(10_000);
+		await woke;
+		expect(vs.state).toBe('asleep');
+		finishConnect();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(liveSession.close).toHaveBeenCalledTimes(1);
 	});
 
 	it('a socket that closes during setup fails the wake exactly once', async () => {
@@ -488,7 +540,7 @@ describe('voiceSession failures', () => {
 		await vi.advanceTimersByTimeAsync(0);
 		callbacks!.onclose({ code: 1011 });
 		await woke;
-		expect(eventTypes()).toEqual(['error']);
+		expect(eventTypes()).toEqual(['waking', 'error', 'asleep']);
 		expect(vs.state).toBe('asleep');
 	});
 
@@ -530,7 +582,7 @@ describe('voiceSession failures', () => {
 		finishConnect(liveSession);
 		await woke;
 		expect(liveSession.close).toHaveBeenCalledTimes(1);
-		expect(events).toEqual([]);
+		expect(eventTypes()).toEqual(['waking', 'asleep']);
 		expect(vs.state).toBe('asleep');
 	});
 
@@ -542,7 +594,7 @@ describe('voiceSession failures', () => {
 		await Promise.all([first, second]);
 		expect(audio.openMic).toHaveBeenCalledTimes(1);
 		expect(tokenCalls()).toHaveLength(1);
-		expect(eventTypes()).toEqual(['listening']);
+		expect(eventTypes()).toEqual(['waking', 'listening']);
 	});
 
 	it('can wake cleanly after a failed wake', async () => {
@@ -551,7 +603,7 @@ describe('voiceSession failures', () => {
 		events = [];
 		await awaken();
 		expect(vs.state).toBe('listening');
-		expect(eventTypes()).toEqual(['listening']);
+		expect(eventTypes()).toEqual(['waking', 'listening']);
 	});
 
 	it('a socket close during setup carries its close code into the tee', async () => {
@@ -641,11 +693,13 @@ describe('voiceSession failures', () => {
 		await vs.wake();
 
 		expect(events).toEqual([
+			{ type: 'waking' },
 			{
 				type: 'error',
 				reason: 'audio',
 				notice: 'No voice reaches the fire. The rite continues by hand.'
-			}
+			},
+			{ type: 'asleep' }
 		]);
 		expect(micStop).toHaveBeenCalledTimes(1);
 		expect(vs.state).toBe('asleep');
@@ -654,7 +708,7 @@ describe('voiceSession failures', () => {
 		await awaken();
 
 		expect(vs.state).toBe('listening');
-		expect(eventTypes()).toEqual(['listening']);
+		expect(eventTypes()).toEqual(['waking', 'listening']);
 	});
 
 	it('a failing debug tee never disturbs the session', async () => {

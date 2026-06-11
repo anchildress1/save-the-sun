@@ -207,6 +207,16 @@
 		opacity: 1;
 	}
 
+	/* Waking: the shadow half-lifts and the corona kindles — static (no animation), so the
+	   permission-prompt stretch reads as pending without needing a reduced-motion variant. */
+	.medallion[data-voice-state='waking'] .shadow-bite {
+		opacity: 0.45;
+	}
+
+	.medallion[data-voice-state='waking'] .corona {
+		opacity: 0.18;
+	}
+
 	/* Listening: disc unveiled, corona breathing slow. */
 	.medallion[data-voice-state='listening'] .corona {
 		animation: corona-breathe 4.2s ease-in-out infinite;

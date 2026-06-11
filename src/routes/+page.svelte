@@ -197,6 +197,7 @@
 				voiceState = 'listening';
 				voiceNotice = ''; // a successful wake clears the last failure
 				break;
+			case 'waking':
 			case 'thinking':
 			case 'speaking':
 				voiceState = event.type;
@@ -211,20 +212,11 @@
 		}
 	}
 
-	// The session reports 'asleep' for the whole mic-permission + token + connect stretch, so the
-	// page tracks the in-flight wake itself: a second tap there must cancel (sleep() aborts a
-	// pending wake), never be silently dropped into the wake() re-entry guard.
-	let wakePending = false;
-
+	// Waking counts as awake: a tap during the permission+token+connect stretch reaches sleep(),
+	// which cancels the pending wake — it is never silently dropped.
 	function toggleVoice() {
-		if (!wakePending && voiceSession.state === 'asleep') {
-			wakePending = true;
-			void voiceSession.wake().finally(() => {
-				wakePending = false;
-			});
-		} else {
-			voiceSession.sleep();
-		}
+		if (voiceSession.state === 'asleep') void voiceSession.wake();
+		else voiceSession.sleep();
 	}
 
 	// Return type is derived from the action's `type`, so a caller can't request a

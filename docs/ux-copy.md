@@ -292,6 +292,7 @@ The medallion is a labeled button: its accessible name carries the state plus wh
 | State | Button label | Announced |
 |---|---|---|
 | Asleep | **"The voice sleeps. Wake the Oracle."** | "The voice sleeps." |
+| Waking (tap → listening: permission, token, connect) | **"The Oracle stirs. Silence the voice."** | "The Oracle stirs." |
 | Listening | **"The Oracle listens. Silence the voice."** | "The Oracle listens." |
 | Hearing speech | **"The Oracle hears you. Silence the voice."** | — |
 | Thinking | **"The Oracle considers. Silence the voice."** | — |

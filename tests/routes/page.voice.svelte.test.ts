@@ -89,6 +89,7 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 	// Every awake state promises "Silence the voice" (MEDALLION_LABEL) — the tap must honor it
 	// from all of them, not just listening. A hot mic that ignores the tap is a privacy failure.
 	it.each([
+		{ state: 'waking' },
 		{ state: 'listening' },
 		{ state: 'hearing' },
 		{ state: 'thinking' },
@@ -102,19 +103,26 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 	});
 
 	it('cancels an in-flight wake on a second tap — never silently drops it', async () => {
-		// The session reports 'asleep' for the whole permission+token+connect stretch; a player
-		// who taps again to back out must reach sleep() (which aborts a pending wake), not a
-		// re-entry no-op while the mic is about to go live.
-		voiceMock.wake.mockImplementation(() => new Promise(() => {})); // wake that never settles
+		// The session reports 'waking' for the whole permission+token+connect stretch; a player
+		// who taps again to back out must reach sleep() (which aborts the pending wake), not a
+		// wake() re-entry no-op while the mic is about to go live.
+		voiceMock.wake.mockImplementation(() => {
+			voiceMock.state = 'waking';
+			emit({ type: 'waking' });
+			return new Promise(() => {}); // a wake that never settles
+		});
 		const screen = render(Page, pageProps);
 		await screen.getByTestId('eclipse-medallion').click();
 		expect(voiceMock.wake).toHaveBeenCalledOnce();
+		await expect
+			.element(screen.getByTestId('eclipse-medallion'))
+			.toHaveAttribute('data-voice-state', 'waking');
 		await screen.getByTestId('eclipse-medallion').click();
 		expect(voiceMock.sleep).toHaveBeenCalledOnce();
 		expect(voiceMock.wake).toHaveBeenCalledOnce(); // the second tap must not re-enter wake
 	});
 
-	it('allows a fresh wake after a failed one — the pending flag must not stick', async () => {
+	it('allows a fresh wake after a failed one — a failure must not jam the toggle', async () => {
 		voiceMock.wake.mockImplementation(async () => {
 			emit({
 				type: 'error',
@@ -132,6 +140,7 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 	});
 
 	it.each([
+		{ event: { type: 'waking' } as VoiceEvent, state: 'waking' },
 		{ event: { type: 'listening' } as VoiceEvent, state: 'listening' },
 		{ event: { type: 'thinking' } as VoiceEvent, state: 'thinking' },
 		{ event: { type: 'speaking' } as VoiceEvent, state: 'speaking' },

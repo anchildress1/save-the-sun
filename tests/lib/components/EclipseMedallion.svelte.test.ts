@@ -67,6 +67,13 @@ describe('EclipseMedallion — state visuals', () => {
 		expect(getComputedStyle(layer(button, '.wolf-eyes')).opacity).toBe('0');
 	});
 
+	it('half-lifts the shadow and kindles the corona while waking — pending, not asleep', () => {
+		const { button } = renderMedallion('waking');
+		expect(getComputedStyle(layer(button, '.shadow-bite')).opacity).toBe('0.45');
+		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('0');
+		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.08);
+	});
+
 	it('unveils the disc on listening — no bite, no mic glyph, corona lit', () => {
 		const { button } = renderMedallion('listening');
 		expect(getComputedStyle(layer(button, '.shadow-bite')).opacity).toBe('0');

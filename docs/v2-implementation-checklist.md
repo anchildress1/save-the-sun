@@ -25,6 +25,7 @@ Client module owning the Live API WebSocket lifecycle: connect with ephemeral to
 - [x] Emits events: `listening`, `hearing`, `thinking`, `speaking`, `asleep`, `error`, `transcript(in|out)`
 - [x] On socket drop/error: emit `error`, revert to asleep, non-blocking notice; game continues on buttons
 - [x] System instruction: Oracle persona (measured, ritual cadence, knows the answer before you ask)
+- [x] Wake hardening (landed with S3): `waking` state/event covers the tap→listening stretch (tap cancels), token mint + Live connect carry 10s timeouts so a hung endpoint fails the wake instead of stranding it
 - Depends: S1
 
 ### S3 — Eclipse medallion component (R6)

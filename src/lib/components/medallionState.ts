@@ -10,6 +10,7 @@ export type MedallionState = VoiceState | 'skoll-speaking';
 // Canonical copy: docs/ux-copy.md §6 (eclipse medallion). State first, then what a tap does.
 export const MEDALLION_LABEL: Record<MedallionState, string> = {
 	asleep: 'The voice sleeps. Wake the Oracle.',
+	waking: 'The Oracle stirs. Silence the voice.',
 	listening: 'The Oracle listens. Silence the voice.',
 	hearing: 'The Oracle hears you. Silence the voice.',
 	thinking: 'The Oracle considers. Silence the voice.',
@@ -22,6 +23,7 @@ export const MEDALLION_LABEL: Record<MedallionState, string> = {
 // and announcing every utterance would drown the screen reader in chatter).
 export const MEDALLION_ANNOUNCEMENT: Record<MedallionState, string | null> = {
 	asleep: 'The voice sleeps.',
+	waking: 'The Oracle stirs.',
 	listening: 'The Oracle listens.',
 	hearing: null,
 	thinking: null,

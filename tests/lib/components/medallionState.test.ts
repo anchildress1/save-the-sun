@@ -10,6 +10,7 @@ import { RUNE_SYMBOL_ASSET } from '$lib/components/runeVisuals';
 
 const ALL_STATES: MedallionState[] = [
 	'asleep',
+	'waking',
 	'listening',
 	'hearing',
 	'thinking',
@@ -43,6 +44,7 @@ describe('MEDALLION_ANNOUNCEMENT', () => {
 		expect(Object.keys(MEDALLION_ANNOUNCEMENT).sort()).toEqual([...ALL_STATES].sort());
 		// Mic on/off and who speaks must announce; hearing/thinking are still "listening".
 		expect(MEDALLION_ANNOUNCEMENT.asleep).toBeTruthy();
+		expect(MEDALLION_ANNOUNCEMENT.waking).toBeTruthy(); // the mic is being opened — never silent
 		expect(MEDALLION_ANNOUNCEMENT.listening).toBeTruthy();
 		expect(MEDALLION_ANNOUNCEMENT.speaking).toBeTruthy();
 		expect(MEDALLION_ANNOUNCEMENT['skoll-speaking']).toBeTruthy();
