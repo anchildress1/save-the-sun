@@ -610,7 +610,14 @@
 			/>
 
 			<div class="turn-pill-row">
-				<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
+				<!-- role=status: turn changes are narrated politely without stealing focus (v1.5 SR pass). -->
+				<div
+					class="turn-pill"
+					class:won={humanWon}
+					class:lost={skollWon}
+					data-testid="turn-pill"
+					role="status"
+				>
 					{turnPill}
 				</div>
 				<span class="ai-note-wrap">
@@ -648,12 +655,15 @@
 			<hr class="ornate-divider oracle-divider" aria-hidden="true" />
 
 			<h2 class="oracle-title">The Oracle</h2>
-			<div class="oracle-frame">
+			<!-- role=status: every Oracle answer and refusal is narrated as it is voiced. -->
+			<div class="oracle-frame" role="status">
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
 			<h2 class="skoll-title" data-testid="skoll-title">Sköll</h2>
-			<div class="skoll-frame" data-testid="skoll-frame">
+			<!-- role=status: Sköll's Ask is narrated when it lands — it opens the reaction window,
+			     so a screen-reader player must hear it without hunting for the frame. -->
+			<div class="skoll-frame" data-testid="skoll-frame" role="status">
 				{#if skollEcho}
 					<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
 				{/if}

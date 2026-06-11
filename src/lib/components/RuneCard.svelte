@@ -50,10 +50,10 @@
 	onclick={() => onAction(rune.id)}
 	style={cardStyle}
 	aria-label={armed
-		? `Select ${rune.name} as cast target, ${rune.power} ${fillWord} power`
+		? `Select ${rune.name} as cast target, ${rune.power} ${fillWord} power, ${rune.element}, ${rune.color}`
 		: crossed
-			? `Restore ${rune.name}, ${rune.power} ${fillWord} power`
-			: `Cross off ${rune.name}, ${rune.power} ${fillWord} power`}
+			? `Restore ${rune.name}, ${rune.power} ${fillWord} power, ${rune.element}, ${rune.color}, crossed off`
+			: `Cross off ${rune.name}, ${rune.power} ${fillWord} power, ${rune.element}, ${rune.color}`}
 >
 	<img
 		class="card-background-image"
