@@ -1,7 +1,12 @@
 <script lang="ts">
 	import '$lib/styles/theme.css';
 	import { versionedPwaAsset } from '$lib/pwaAssets';
+	import cinzelFont from '$lib/assets/fonts/cinzel-latin.woff2?url&no-inline';
+	import imFellEnglishFont from '$lib/assets/fonts/im-fell-english-latin.woff2?url&no-inline';
+	import imFellEnglishItalicFont from '$lib/assets/fonts/im-fell-english-italic-latin.woff2?url&no-inline';
+	import imFellEnglishScFont from '$lib/assets/fonts/im-fell-english-sc-latin.woff2?url&no-inline';
 	import ogImage from '$lib/assets-webp/banners/intro-splash.webp?url&no-inline';
+	import buttonBorder from '$lib/assets-webp/ui/button-border.webp?url&no-inline';
 
 	let { children } = $props();
 
@@ -17,12 +22,29 @@
 </script>
 
 <svelte:head>
-	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+	<link rel="preload" href={cinzelFont} as="font" type="font/woff2" crossorigin="anonymous" />
 	<link
-		rel="stylesheet"
-		href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&display=swap"
+		rel="preload"
+		href={imFellEnglishFont}
+		as="font"
+		type="font/woff2"
+		crossorigin="anonymous"
 	/>
+	<link
+		rel="preload"
+		href={imFellEnglishItalicFont}
+		as="font"
+		type="font/woff2"
+		crossorigin="anonymous"
+	/>
+	<link
+		rel="preload"
+		href={imFellEnglishScFont}
+		as="font"
+		type="font/woff2"
+		crossorigin="anonymous"
+	/>
+	<link rel="preload" href={buttonBorder} as="image" type="image/webp" fetchpriority="high" />
 	<link rel="icon" type="image/x-icon" href={versionedPwaAsset('/favicon.ico')} sizes="any" />
 	<link rel="icon" type="image/png" sizes="32x32" href={versionedPwaAsset('/favicon-32x32.png')} />
 	<link rel="icon" type="image/png" sizes="16x16" href={versionedPwaAsset('/favicon-16x16.png')} />

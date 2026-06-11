@@ -310,6 +310,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [ ] Voice/terminology lint passes (zero violations) _(open — the per-surface copy assertions hold across the suite, but the consolidated automated lint is not built; matches the S11 "Done when")_
 - [x] High-risk gaps confirmed covered: non-argmax test · turn-accounting on **every** refusal class · crossed-rune cast · cast sacredness · degradation fairness · secret never in Sköll's payload
 - [x] Public social cards and author footer ship in SSR HTML, with the card image resolving from the served build _(`meta.e2e`)_
+- [x] Local WOFF2 fonts and the optimized button-border WebP preload as immutable assets; the shared `.btn` frame uses the hashed border and no Google Fonts stylesheet _(`meta.e2e`)_
 - [x] Deployed, playable, public URL confirmed live
 
 **Done when:** every gate is green and the public build plays a full fair round end to end.

@@ -63,3 +63,40 @@ test.describe('author footer', () => {
 		}
 	});
 });
+
+test.describe('asset preloads', () => {
+	test('fonts and button border load from immutable local assets', async ({ page }) => {
+		await page.goto('/');
+
+		await expect(page.locator('link[href*="fonts.googleapis.com"]')).toHaveCount(0);
+
+		const fontPreloads = await page.locator('link[rel="preload"][as="font"]').evaluateAll((links) =>
+			links.map((link) => ({
+				href: link.getAttribute('href'),
+				type: link.getAttribute('type'),
+				crossorigin: link.getAttribute('crossorigin')
+			}))
+		);
+		expect(fontPreloads).toHaveLength(4);
+		for (const preload of fontPreloads) {
+			expect(preload.href).toMatch(/^\/_app\/immutable\/assets\/.+\.woff2$/);
+			expect(preload.type).toBe('font/woff2');
+			expect(preload.crossorigin).toBe('anonymous');
+		}
+
+		const buttonBorderPreload = page.locator(
+			'link[rel="preload"][as="image"][type="image/webp"][href*="button-border"]'
+		);
+		await expect(buttonBorderPreload).toHaveAttribute('fetchpriority', 'high');
+		await expect(buttonBorderPreload).toHaveAttribute(
+			'href',
+			/^\/_app\/immutable\/assets\/button-border\..+\.webp$/
+		);
+
+		const borderSource = await page
+			.locator('.btn')
+			.first()
+			.evaluate((button) => getComputedStyle(button, '::before').borderImageSource);
+		expect(borderSource).toContain('button-border');
+	});
+});

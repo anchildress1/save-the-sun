@@ -136,6 +136,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [U] Each icon route serves its asset with the correct content-type (`.ico` → `image/x-icon`, the rest → `image/png`) + immutable caching
 - [x] [U] `/site.webmanifest` is `application/manifest+json` with version-busted icon `src` (192/512, correct sizes/types)
 - [x] [U] **Every** `SESSIONLESS_PATHS` entry (all 7, parameterized) bypasses session-cookie creation — a typo would silently re-cookie an asset and kill its cacheability
+- [x] [E] Font files and the button-border WebP preload from immutable local assets; Google Fonts is not requested; the shared `.btn` frame resolves the optimized border _(`meta.e2e`)_
 
 ## 6.9 Social embed metadata & author footer
 
