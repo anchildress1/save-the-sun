@@ -25,7 +25,8 @@ function randomSeed(): number {
 	return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
-// Open the round's log with the secret (a `sensitive` event — verbose only).
+// Open the round's log. The secret (and its seed, which derives it) never enters the log stream at
+// any level — the dev console line is the only place it is spoken, and that never leaves the server.
 function create(sessionId: string, seed: number): GameEngine {
 	const secret = selectSecret(seed).name;
 	if (dev) console.debug(`[session ${sessionId}] new round — secret: ${secret} (seed ${seed})`);
@@ -34,9 +35,7 @@ function create(sessionId: string, seed: number): GameEngine {
 		kind: 'deterministic',
 		part: 'Round',
 		level: 'info',
-		sensitive: true,
-		message: `New round — secret is ${secret}`,
-		data: { secret, seed }
+		message: 'New round — the secret is chosen and sealed'
 	});
 	return new GameEngine(seed);
 }

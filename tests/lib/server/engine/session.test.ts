@@ -88,8 +88,8 @@ describe('session engine registry', () => {
 
 	// The debug log is lifecycle-linked to the round through this registry — the wiring, not just
 	// resetLog in isolation.
-	it('wipes the debug log on a new round, reseeded with the new secret', () => {
-		getEngine('log-reset'); // create → logs the round's secret event
+	it('wipes the debug log on a new round, reopened without the secret', () => {
+		getEngine('log-reset'); // create → logs the round-opened event
 		logEvent('log-reset', {
 			owner: 'Human',
 			kind: 'input',
@@ -98,10 +98,20 @@ describe('session engine registry', () => {
 			message: 'mid-round'
 		});
 		expect(getEvents('log-reset').length).toBeGreaterThan(1);
-		resetEngine('log-reset', SEED); // resetLog clears, then create reseeds the secret
+		resetEngine('log-reset', SEED); // resetLog clears, then create reopens the round
 		const events = getEvents('log-reset');
-		expect(events).toHaveLength(1); // only the new round's secret event remains
-		expect(events[0]).toMatchObject({ owner: 'Engine', part: 'Round', sensitive: true });
+		expect(events).toHaveLength(1); // only the new round's opening event remains
+		expect(events[0]).toMatchObject({ owner: 'Engine', part: 'Round' });
+	});
+
+	// The invariant the public /debug view rests on: the round event can never name or derive the
+	// secret — no rune name, no seed — at any DEBUG_LOG level.
+	it('keeps the secret and its seed out of the round log event', () => {
+		resetEngine('log-secret', SEED);
+		const [event] = getEvents('log-secret');
+		expect(event.message).not.toContain(selectSecret(SEED).name);
+		// No data payload at all — the old event carried { secret, seed }, either of which names it.
+		expect(event.data).toBeUndefined();
 	});
 
 	it('evicts the debug log with its engine', () => {
