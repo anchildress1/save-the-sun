@@ -41,7 +41,10 @@ export const POST: RequestHandler = async ({ locals }) => {
 				uses: 1,
 				expireTime: new Date(now + SESSION_TTL_MS).toISOString(),
 				newSessionExpireTime: new Date(now + CONNECT_WINDOW_MS).toISOString(),
-				liveConnectConstraints: { model: LIVE_MODEL }
+				liveConnectConstraints: { model: LIVE_MODEL },
+				// Omitting this locks the WHOLE LiveConnectConfig (not just the model) and every
+				// session dies with close 1011; the empty array means "lock only what's set above".
+				lockAdditionalFields: []
 			}
 		});
 		// The SDK types name as optional; a mint without one is unusable, so fail loudly.
