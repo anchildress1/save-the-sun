@@ -136,16 +136,18 @@
 		overflow: hidden;
 	}
 
-	/* Placeholder art until the generated medallion lands: aged-gold rim on a deep night face. */
+	/* Placeholder art until the generated medallion lands: aged-gold rim on a moonlit face.
+	   The face must sit clearly brighter than the panel, or the eclipse bite has nothing
+	   visible to bite and reads as a smudged shadow. */
 	.disc {
 		position: absolute;
 		inset: 0;
 		border-radius: 50%;
-		background: radial-gradient(circle at 38% 32%, #1b2138 0%, #0c1124 58%, #060912 100%);
+		background: radial-gradient(circle at 38% 30%, #38426a 0%, #1c2444 52%, #0d1228 100%);
 		box-shadow:
-			inset 0 0 0 3px rgba(217, 169, 74, 0.6),
-			inset 0 0 0 5px rgba(120, 86, 30, 0.45),
-			inset 0 0 22px rgba(0, 0, 0, 0.8);
+			inset 0 0 0 3px rgba(233, 200, 119, 0.9),
+			inset 0 0 0 5px rgba(158, 113, 42, 0.65),
+			inset 0 0 26px rgba(0, 0, 0, 0.65);
 	}
 
 	.rune-ring {
@@ -162,15 +164,16 @@
 		margin: -0.5rem;
 		transform: rotate(calc(var(--i) * 45deg)) translateY(calc(var(--ring-r) * -1));
 		/* The card glyphs are carved-stone dark; re-tint them aged gold for the rim. */
-		--rune-tint: invert(0.78) sepia(0.55) saturate(4) hue-rotate(-18deg);
+		--rune-tint: invert(0.78) sepia(0.55) saturate(4) hue-rotate(-18deg) brightness(1.15);
 		filter: var(--rune-tint);
-		opacity: 0.2;
+		opacity: 0.34;
 		transition:
 			opacity 0.25s ease,
 			filter 0.25s ease;
 	}
 
-	/* Asleep: Sköll's shadow bites into the disc — the partial eclipse. */
+	/* Asleep: Sköll's shadow bites into the disc — the partial eclipse. The edge must stay
+	   near-crisp: a soft falloff smears across the face and reads as a blurry shadow. */
 	.shadow-bite {
 		position: absolute;
 		top: -34%;
@@ -178,13 +181,18 @@
 		width: 92%;
 		height: 92%;
 		border-radius: 50%;
-		background: radial-gradient(circle, rgba(4, 6, 12, 0.96) 62%, rgba(4, 6, 12, 0) 74%);
+		background: radial-gradient(circle, rgba(5, 7, 14, 0.97) 67%, rgba(5, 7, 14, 0) 70.5%);
 		opacity: 0;
 		transition: opacity 0.25s ease;
 	}
 
 	.medallion[data-voice-state='asleep'] .shadow-bite {
 		opacity: 1;
+	}
+
+	/* Even asleep the gold must read at a glance — the medallion is the voice's front door. */
+	.medallion[data-voice-state='asleep'] .corona {
+		opacity: 0.14;
 	}
 
 	/* Asleep: the etched mic glyph is the discoverability cue. */
@@ -195,7 +203,7 @@
 		width: 1.6rem;
 		height: 1.6rem;
 		transform: translate(-50%, -50%);
-		stroke: rgba(217, 169, 74, 0.55);
+		stroke: rgba(233, 200, 119, 0.85);
 		fill: none;
 		stroke-width: 1.6;
 		stroke-linecap: round;

@@ -71,7 +71,8 @@ describe('EclipseMedallion — state visuals', () => {
 		const { button } = renderMedallion('waking');
 		expect(getComputedStyle(layer(button, '.shadow-bite')).opacity).toBe('0.45');
 		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('0');
-		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.08);
+		// Brighter than the asleep corona (0.14), or waking is indistinguishable from asleep.
+		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.14);
 	});
 
 	it('unveils the disc on listening — no bite, no mic glyph, corona lit', () => {
