@@ -1,12 +1,11 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import type { DebugEvent, DebugLevel } from '$lib/server/debug/log';
+	import type { DebugEvent } from '$lib/server/debug/log';
 	import type { PageProps } from './$types';
 
 	// SSR gives the first paint; the page then polls so the log stays live while screen-shared.
 	let { data }: PageProps = $props();
 	let events = $state<DebugEvent[]>(untrack(() => data.events));
-	let level = $state<DebugLevel>(untrack(() => data.level));
 
 	// Newest first so the latest move is on top during the demo (no scrolling to follow along).
 	const ordered = $derived([...events].reverse());
@@ -15,9 +14,8 @@
 		try {
 			const res = await fetch('/api/debug');
 			if (!res.ok) return;
-			const next = (await res.json()) as { level: DebugLevel; events: DebugEvent[] };
+			const next = (await res.json()) as { events: DebugEvent[] };
 			events = next.events;
-			level = next.level;
 		} catch {
 			// A dropped poll is harmless — the next tick retries; never break the view over it.
 		}
@@ -41,22 +39,17 @@
 		<h1>Debug log 🐞</h1>
 	</header>
 
-	{#if level === 'off'}
-		<p class="empty">
-			The debug log is off. Set <code>DEBUG_LOG=verbose</code> (or <code>demo</code>) to see it.
-		</p>
-	{:else if ordered.length === 0}
+	{#if ordered.length === 0}
 		<p class="empty">No events yet. Play a turn and they appear here.</p>
 	{:else}
 		<ol reversed>
 			{#each ordered as event (event.seq)}
-				<li class="ev {ownerClass(event)} {event.level}" class:sensitive={event.sensitive}>
+				<li class="ev {ownerClass(event)} {event.level}">
 					<div class="head">
 						<span class="seq">#{event.seq}</span>
 						<span class="part">{event.part}</span>
 						<span class="who">{event.owner}</span>
 						<span class="badge kind-badge {event.kind}">{KIND_LABEL[event.kind]}</span>
-						{#if event.sensitive}<span class="badge sensitive-flag">sensitive</span>{/if}
 						{#if event.level !== 'info'}<span class="badge {event.level}">{event.level}</span>{/if}
 					</div>
 
@@ -90,12 +83,6 @@
 	}
 	h1 {
 		margin: 0 0 clamp(1rem, 0.5rem + 1.5vw, 1.75rem);
-	}
-	code {
-		background: #2c2c34;
-		padding: 0.05em 0.35em;
-		border-radius: 0.25em;
-		font-size: 0.85em;
 	}
 	.empty {
 		color: #b8b8c0;
@@ -187,10 +174,6 @@
 		background: #18402e;
 		color: #7fe0a8;
 		font-weight: 600;
-	}
-	.badge.sensitive-flag {
-		background: #3a2f4a;
-		color: #c9b3e8;
 	}
 	.badge.warn {
 		background: #5a4300;

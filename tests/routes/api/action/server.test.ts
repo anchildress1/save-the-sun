@@ -316,16 +316,17 @@ describe('POST /api/action', () => {
 	// Engine verdicts — the deterministic truth rows (the round's opening secret is part 'Round').
 	const verdicts = () => byOwner('Engine').filter((e) => e.part !== 'Round');
 	const lastVerdict = () => verdicts().at(-1)!;
-	// Sköll's on-stage move/reaction events, apart from the raw model I/O (sensitive) he also owns.
-	const skollMoves = () => byOwner('Sköll').filter((e) => !e.sensitive);
-	const geminiIO = () => byOwner('Sköll').filter((e) => e.sensitive);
+	// Sköll's on-stage move/reaction events, apart from the raw model I/O he also owns.
+	const isRawIO = (e: { message: string }) => e.message.startsWith('raw Gemini');
+	const skollMoves = () => byOwner('Sköll').filter((e) => !isRawIO(e));
+	const geminiIO = () => byOwner('Sköll').filter(isRawIO);
 
 	describe('debug log (S8)', () => {
-		it('opens the round without exposing the secret or its seed', () => {
+		it('opens the round naming the secret and its seed — the on-stage record is a spoiler by design', () => {
 			const secretEv = byOwner('Engine').find((e) => e.part === 'Round')!;
 			expect(secretEv).toMatchObject({ kind: 'deterministic', part: 'Round' });
-			expect(secretEv.message).not.toContain(SECRET);
-			expect(secretEv.data).toBeUndefined();
+			expect(secretEv.message).toContain(SECRET);
+			expect(secretEv.data).toMatchObject({ secret: SECRET, seed: SEED });
 		});
 
 		it('splits a human Ask into her input, the Oracle’s reading, and the engine’s verdict', async () => {
@@ -432,18 +433,30 @@ describe('POST /api/action', () => {
 			expect(String(move.data?.reasoning)).toContain('hunch');
 		});
 
-		it('drains raw Gemini I/O onto the log as a sensitive Sköll llm event (verbose)', async () => {
+		it('drains raw Gemini I/O onto the log as a Sköll llm event', async () => {
 			// The real seam is mocked here, so seed THIS session's sink the way gemini.ts would (inside
-			// the session context), then advance — the route drains it as a sensitive Sköll llm event.
+			// the session context), then advance — the route drains it as a Sköll llm event.
 			await ask(); // hand the wolf his turn
 			runWithSession(SID, () =>
 				captureGemini({ label: 'move', request: { contents: 'board…' }, response: { text: '{}' } })
 			);
 			await advance();
 			const io = geminiIO().at(-1)!;
-			expect(io).toMatchObject({ kind: 'llm', sensitive: true });
+			expect(io).toMatchObject({ kind: 'llm', owner: 'Sköll' });
 			expect(io.message).toContain('move');
 			expect(io.data).toMatchObject({ response: { text: '{}' } });
+		});
+
+		it('drains a raw oracle call as the Oracle’s own llm event on the Ask', async () => {
+			// The interpret seam is mocked, so tee the oracle call the way oracle/gemini.ts would; the
+			// next Ask drains it attributed to the Oracle (owner), not Sköll.
+			runWithSession(SID, () =>
+				captureGemini({ label: 'oracle', request: { contents: 'is it light?' }, response: {} })
+			);
+			await ask();
+			const io = byOwner('Oracle').find(isRawIO)!;
+			expect(io).toMatchObject({ kind: 'llm', part: 'Ask' });
+			expect(io.message).toContain('oracle');
 		});
 	});
 

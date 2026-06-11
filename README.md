@@ -143,10 +143,9 @@ make dev                     # vite dev server
 
 ## Configuration
 
-| Variable         | Required | What it does                                                                                                                                                                    |
-| ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GEMINI_API_KEY` | Yes      | Server-side only — powers the Oracle and Sköll. Get one at [AI Studio](https://aistudio.google.com/apikey).                                                                     |
-| `DEBUG_LOG`      | No       | `/debug` event-stream exposure — player inputs, engine verdicts, and the raw Gemini request/response I/O. The secret is never in the stream at any level. Set `off` to disable. |
+| Variable         | Required | What it does                                                                                                |
+| ---------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY` | Yes      | Server-side only — powers the Oracle and Sköll. Get one at [AI Studio](https://aistudio.google.com/apikey). |
 
 Local secrets live in `.env` (gitignored). Deployed, the key rides Google Secret Manager via [`deploy.sh`](deploy.sh).
 
@@ -154,8 +153,8 @@ Local secrets live in `.env` (gitignored). Deployed, the key rides Google Secret
 
 ## Security
 
-- The secret rune never leaves the server — it isn't in any response, client bundle, public board seed, or the `/debug` log at any level, and tests assert it. Gemini prompts are secret-free by construction: the model interprets language and plays the wolf; the engine alone holds and judges the answer.
-- `GEMINI_API_KEY` is server-side only: `.env` locally, Secret Manager on Cloud Run.
+- The secret rune never enters gameplay responses, the client bundle, or the public board seed — the engine alone holds and judges the answer, and Gemini prompts are secret-free by construction (the model interprets language and plays the wolf). The always-on `/debug` stream is the one deliberate exception: it names the secret because following the engine's truth live is its whole point — a spoiler surface by design.
+- `GEMINI_API_KEY` is server-side only: `.env` locally, Secret Manager on Cloud Run. It can never enter the `/debug` stream — every logged string is masked at the sink, and tests assert it.
 - Sessions are an `httpOnly`, `secure`, `sameSite=lax` cookie holding an opaque UUID — no user data, no accounts, nothing durable.
 - `secretlint` runs in the pre-commit hook; CodeQL runs in CI.
 

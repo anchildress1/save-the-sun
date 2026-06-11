@@ -4,6 +4,7 @@
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
 import { runes } from '$lib/board';
+import { captureGemini } from '$lib/server/debug/log';
 import type { PowerOp, Query } from '$lib/server/engine/queries';
 import type { Interpretation, Interpret, RefusalClass } from './types';
 
@@ -120,6 +121,7 @@ function ai(): GoogleGenAI {
 
 export const interpret: Interpret = async (question) => {
 	let raw: RawResponse;
+	const request = { systemInstruction: SYSTEM_INSTRUCTION, contents: question };
 	try {
 		const response = await ai().models.generateContent({
 			model: MODEL,
@@ -132,8 +134,11 @@ export const interpret: Interpret = async (question) => {
 				temperature: 0
 			}
 		});
+		// Tee the raw I/O for the debug view — the actual thing the model received and returned.
+		captureGemini({ label: 'oracle', request, response });
 		raw = JSON.parse(response.text ?? '{}') as RawResponse;
 	} catch (err) {
+		captureGemini({ label: 'oracle', request, error: String(err) });
 		// Only transport/parse failures degrade to an in-world engine-error so a live round
 		// never hard-fails; the turn is preserved. normalize() is pure and stays OUTSIDE the
 		// catch, so a mapping bug surfaces loudly instead of masquerading as a network outage.
