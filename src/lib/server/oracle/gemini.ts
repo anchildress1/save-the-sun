@@ -115,7 +115,12 @@ function normalize(raw: RawResponse): Interpretation {
 
 let client: GoogleGenAI | null = null;
 function ai(): GoogleGenAI {
-	client ??= new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+	// 3 attempts with the SDK's exponential backoff (408/429/5xx): a single rate-limit blip
+	// otherwise silences the Oracle mid-rite. Capped below the SDK's 5 — the player is waiting.
+	client ??= new GoogleGenAI({
+		apiKey: env.GEMINI_API_KEY,
+		httpOptions: { retryOptions: { attempts: 3 } }
+	});
 	return client;
 }
 
