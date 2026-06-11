@@ -1,4 +1,4 @@
-.PHONY: install dev format format-check lint typecheck test build e2e perf secret-scan deploy clean ai-checks
+.PHONY: install dev format format-check lint typecheck test build preview e2e perf secret-scan deploy clean ai-checks
 
 install:
 	pnpm install
@@ -24,6 +24,11 @@ test:
 
 build:
 	pnpm run build
+
+# Serve the real production build (hashed assets, preload headers) — the error
+# class `make dev` can never surface, because vite dev skips the asset pipeline.
+preview: build
+	pnpm run preview
 
 e2e:
 	pnpm run test:e2e

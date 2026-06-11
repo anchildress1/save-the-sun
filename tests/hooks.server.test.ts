@@ -65,6 +65,27 @@ describe('session hook', () => {
 		expect(await res.text()).toBe('ok');
 	});
 
+	// Stale HTML outliving its hashed assets is the failure mode here: a deploy swaps the
+	// Cloud Run image, the old /_app/immutable files vanish, and any cached document 404s
+	// on its own CSS. no-cache forces revalidation so the page always matches its assets.
+	it('marks HTML responses no-cache so stale documents never reference dead assets', async () => {
+		const html = vi.fn(
+			async () => new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } })
+		);
+		const { event } = fakeEvent('any');
+		const res = await handle({ event, resolve: html } as never);
+		expect(res.headers.get('cache-control')).toBe('no-cache');
+	});
+
+	it('leaves cache-control untouched on non-HTML responses', async () => {
+		const json = vi.fn(
+			async () => new Response('{}', { headers: { 'content-type': 'application/json' } })
+		);
+		const { event } = fakeEvent('any');
+		const res = await handle({ event, resolve: json } as never);
+		expect(res.headers.get('cache-control')).toBeNull();
+	});
+
 	// Every sessionless path, not just one — a typo in any entry would silently route that asset
 	// through cookie creation, defeating its cacheability, with nothing to catch the omission.
 	it.each([...SESSIONLESS_PATHS])('does not create a session for %s', async (pathname) => {
