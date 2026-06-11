@@ -1298,13 +1298,139 @@
 		pointer-events: none;
 	}
 
-	/* The one deliberate width breakpoint: below the 1280px minimum the rite steps aside for this
-	   notice rather than reflowing. The desktop layout above the floor stays intrinsic. */
+	/* The one deliberate floor: below 750px the rite steps aside; 750px+ gets a compact
+	   embedded layout so the playable board works in narrow embeds. */
 	.desktop-notice {
 		display: none;
 	}
 
-	@media (max-width: 1279.98px) {
+	@media (min-width: 750px) and (max-width: 1279.98px) {
+		main {
+			max-width: 100%;
+			min-height: 100svh;
+			padding: 0.75rem;
+			gap: 0.5rem;
+		}
+
+		.rite-header {
+			grid-template-columns: minmax(0, 1fr) auto;
+			grid-template-areas:
+				'title night'
+				'controls controls';
+			gap: 0.65rem;
+			min-height: auto;
+			padding: 0.7rem;
+		}
+
+		.title-block {
+			grid-area: title;
+			min-width: 0;
+			gap: 0.6rem;
+		}
+
+		.app-sigil {
+			width: 56px;
+			height: 56px;
+		}
+
+		h1 {
+			font-size: 1.55rem;
+		}
+
+		.tagline {
+			font-size: 0.85rem;
+		}
+
+		.night-block {
+			grid-area: night;
+		}
+
+		.night-progress {
+			font-size: 0.78rem;
+		}
+
+		.header-controls {
+			grid-area: controls;
+			justify-self: stretch;
+			justify-content: flex-end;
+			flex-wrap: wrap;
+			gap: 0.55rem;
+		}
+
+		.header-controls .btn {
+			min-height: 2.45rem;
+			padding: 0.58rem 0.9rem;
+			font-size: 0.72rem;
+		}
+
+		.game-layout {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 0.75rem;
+		}
+
+		.board-section {
+			justify-content: flex-start;
+		}
+
+		.board-section :global(.rune-grid) {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+
+		.board-section :global(.rune-card) {
+			--pip-icon-size: 14px;
+			--symbol-box-height: 2.8rem;
+			--symbol-image-width: auto;
+			--symbol-image-height: 2.8rem;
+			--symbol-image-max-width: 58%;
+			--symbol-image-max-height: 100%;
+			padding: 0.62rem 0.64rem 0.82rem;
+		}
+
+		.board-section :global(.middle) {
+			gap: 0.34rem;
+		}
+
+		.board-section :global(.name) {
+			font-size: 0.92rem;
+			line-height: 1.05;
+		}
+
+		.board-section :global(.meaning) {
+			font-size: 0.68rem;
+		}
+
+		.board-section :global(.trait.power) {
+			gap: 0.04rem;
+		}
+
+		.board-section :global(.power-label) {
+			font-size: 0.62rem;
+		}
+
+		.oracle-panel {
+			--speaker-title-size: 0.92rem;
+			--speaker-title-tracking: 0.24em;
+			--frame-pad: 0.48rem 0.6rem;
+			--frame-min-h: 2.35rem;
+			--reaction-min-h: 2.45rem;
+			--reaction-font: 0.72rem;
+
+			gap: 0.6rem;
+			padding: 0.85rem 0.9rem 0;
+		}
+
+		.frame-text,
+		.skoll-echo {
+			font-size: 0.92rem;
+			line-height: 1.4;
+		}
+
+		.skoll-banner {
+			height: min(36%, 16rem);
+		}
+	}
+
+	@media (max-width: 749.98px) {
 		main {
 			display: none;
 		}
