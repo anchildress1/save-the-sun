@@ -35,6 +35,7 @@ e2e:
 
 perf:
 	pnpm exec lhci autorun
+	node scripts/lighthouse-scores.mjs
 
 secret-scan:
 	npx secretlint
