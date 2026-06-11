@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { resetEngine, getRoundId } from '$lib/server/engine/session';
+import { resetEngine, getRoundId, getBoardSeed } from '$lib/server/engine/session';
 import { gameState } from '$lib/server/engine/actions';
 import type { RequestHandler } from './$types';
 
@@ -10,7 +10,8 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = ({ locals }) => {
 	const engine = resetEngine(locals.sessionId);
 	return json({
-		boardSeed: crypto.getRandomValues(new Uint32Array(1))[0],
+		// The reset dropped the held seed, so this mints the fresh round's layout.
+		boardSeed: getBoardSeed(locals.sessionId),
 		roundId: getRoundId(locals.sessionId),
 		state: gameState(engine)
 	});

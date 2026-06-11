@@ -1,7 +1,9 @@
 # Things to Do
 
-- [x] Fix bug that page order refreshes on reload, even though game state remains _(S8.5: crossings + the voiced Oracle line persist across a reload, keyed by rune id; the visible board-order reshuffle that rides along is display-only and intended — `boardseed-display-only-dont-persist`)_
+- [x] Fix bug that page order refreshes on reload, even though game state remains _(S8.5: crossings + the voiced Oracle line persist across a reload, keyed by rune id; the board order itself now also holds — `boardSeed` is minted per round and stable across refreshes)_
 - [x] Optimize image download and caching on the server to load faster
-- [ ] Ensure DEV is allowed for embed to CloudRun
+- [x] Ensure DEV is allowed for embed to CloudRun
 - [x] Add in OG and SEO
-- [ ] Auto-pass turn if scry/hex are both used for the night
+- [x] Keep spent Scry/Hex visible but disabled; Pass remains manual
+- [x] Prevent board from shuffle on reload when session doesn't change _(`boardSeed` is held per round in `session.ts` — stable across a refresh, reminted with the round; e2e asserts order stability on reload)_
+- [ ] Fine-tune Sköll prompt to allow for wins between 7.5-9 turns with randomizer. Keep metrics output as corpus.

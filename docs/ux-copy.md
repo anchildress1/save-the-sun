@@ -112,7 +112,7 @@ Templated. **Both verdicts restate the trait**—`Yes. Sól is reaching for {val
 
 ## 2. Sköll
 
-Sköll's on-board surface carries **only his Ask**—the inference the human Scries, Hexes, or lets pass. No taunts, no cast lines: his box shows his Ask when he Asks and is blank otherwise. His casts read from the engine (the turn pill flips, the Oracle panel voices the resolution); the wolf's pressure is felt in how he plays, not in chatter.
+Sköll's on-board surface carries **only his Ask**—the inference the human Scries, Hexes, or lets pass. No taunts, no cast lines: his box shows his Ask when he Asks and is blank otherwise. His casts read from the engine (the turn pill flips; a winning cast raises the end screen, which owns the defeat text — the Oracle panel keeps its last voiced line, the WHY of the loss); the wolf's pressure is felt in how he plays, not in chatter.
 
 ### His Ask (the only Sköll line shown)
 He asks in **his own voice**—first-person, predatory, sardonic (the Cast Voice Charter, Part I)—**not** the Oracle's third-person paraphrase. The line still names the sign he hunts, so the human knows what they're choosing to Scry, Hex, or let pass.
@@ -132,7 +132,7 @@ _Cut from the v1 UI (flavor, not inference): the idle/turn taunts, the escalatio
 
 ## 3. Reactions—Scry & Hex
 
-One-use reactions, **not cards**—no deck, no hand. Both trigger on an **Ask**; a Cast is sacred and cannot be interrupted. A spent reaction is gone for the game—no "spent" copy.
+One-use reactions, **not cards**—no deck, no hand. Both trigger on an **Ask**; a Cast is sacred and cannot be interrupted. A spent reaction stays visible but disabled for the game—no visible "spent" copy.
 
 ### Tooltips
 | Reaction | Tooltip |
@@ -141,10 +141,10 @@ One-use reactions, **not cards**—no deck, no hand. Both trigger on an **Ask**;
 | **Hex** | "When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted." |
 
 ### You use a reaction (on Sköll's Ask)
-**Interrupt prompt:** buttons **"Scry"** · **"Hex"** · **"Let it pass"**. The **"Sköll asks. Answer it?"** heading is **not displayed** in v1—it survives only as the buttons' accessibility group label (`aria-label`); the visible reaction-prompt copy is deferred to a v2 reaction-UI redesign.
+**Interrupt prompt:** buttons **"Scry"** · **"Hex"** · **"Pass"**. The **"Sköll asks. Answer it?"** heading is **not displayed** in v1—it survives only as the buttons' accessibility group label (`aria-label`); the visible reaction-prompt copy is deferred to a v2 reaction-UI redesign.
 - **You Scry:** "You lean into the dark and listen. His answer is yours too."
 - **You Hex:** "You close the Oracle's lips. His question dies unanswered — his turn with it."
-- **You let it pass:** "You hold your hand. Let him have his answer."
+- **You pass:** "You hold your hand. Let him have his answer."
 
 ### Sköll uses a reaction (on your Ask)
 
@@ -155,6 +155,9 @@ Voiced in the **Oracle text**, in the rite's own voice (third person—never his
 
 ## 4. Win / Lose
 
+### Wrong Cast
+**"{Rune} is not the one. The night holds."** _(repeat the named rune; no generic "the rune" fallback.)_
+
 ### Victory—your correct Cast (glyph carves into stone)
 1. On the cast landing: **"The rune is true."**
 2. As the glyph carves: **"Sól crests the rim of the world."**
@@ -162,7 +165,7 @@ Voiced in the **Oracle text**, in the rite's own voice (third person—never his
 4. CTA: **"Begin another night"** _(the only closing action—the secondary "Leave the fire." was cut)_
 
 ### Defeat—Sköll casts first
-1. The loss resolves: **"Sköll takes the sun. The longest day never breaks. The year falls to dark."** _(Sköll's cast carries no line of its own—the resolution is the Oracle panel's; see §2.)_
+1. The loss resolves on the end screen in three falling beats: lead **"Sköll takes the sun."**, verse **"The longest day never breaks. The night is everlasting."**, coda **"Sól waits in the dark — only the true rune can win her back."** _(She does not return on her own — the replay is the rescue. Sköll's cast carries no line of its own; the Oracle panel deliberately keeps its last voiced answer—and his Scry note when he overheard it—so the WHY of the loss stays readable. Never doubled into the panel; see §2.)_
 2. CTA: **"Stand against him again"** _(the only closing action—the secondary "Leave the fire." was cut)_
 
 Sól speaks only at victory—the goddess's rarity is the power.
@@ -228,7 +231,7 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 - **Frame:** the longest day (headline) won through the one short night (nuance).
 - **Traits:** count = "power"; fill = "light/dark" (○ light, ● dark); axes = element, power, light, hue.
 - **Address:** Sköll says "witch" = gender-neutral coven role; Oracle addresses no one.
-- **Reactions:** Scry + Hex are one-use reactions (not cards) that trigger on an Ask; Cast is sacred. Spent reactions vanish (no copy).
+- **Reactions:** Scry + Hex are one-use reactions (not cards) that trigger on an Ask; Cast is sacred. Spent reactions remain visible but disabled (no visible spent copy).
 - **Casting a crossed-off rune is legal**—crossing is the player's private aid, never validated.
 - **Sól** speaks only at victory. Replay CTAs in-world ("Begin another night" / "Stand against him again"), never "Play again."
 - No alternates, no neutral/system filler—single in-world choices throughout.

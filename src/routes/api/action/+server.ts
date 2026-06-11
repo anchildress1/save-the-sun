@@ -88,20 +88,25 @@ function humanAsks(sessionId: string, question: string): void {
 	});
 }
 
-// The raw Gemini I/O is Sköll's own move/reaction call (owner Sköll, llm), drained sensitive.
+// The raw Gemini I/O, drained onto the log: the Oracle's interpret call is hers; the move and
+// reaction calls are Sköll's own.
 function geminiEvents(sessionId: string, movePart: TurnPart): void {
-	for (const call of drainGemini(sessionId))
+	for (const call of drainGemini(sessionId)) {
+		const oracle = call.label === 'oracle';
+		let part: TurnPart = movePart;
+		if (oracle) part = 'Ask';
+		else if (call.label === 'reaction') part = 'React';
 		logEvent(sessionId, {
-			owner: 'Sköll',
+			owner: oracle ? 'Oracle' : 'Sköll',
 			kind: 'llm',
-			part: call.label === 'reaction' ? 'React' : movePart,
+			part,
 			level: call.error ? 'error' : 'info',
-			sensitive: true,
 			message: `raw Gemini ${call.label} call${call.error ? ' failed' : ''}`,
 			data: call.error
 				? { request: call.request, error: call.error }
 				: { request: call.request, response: call.response }
 		});
+	}
 }
 
 // His templated Ask is surfaced for the human to react to; a Cast carries no flavor line.
@@ -195,6 +200,8 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 	}
 
 	const result = await handleAction(action, { engine, interpret });
+	// The fallback Ask path (stale turn, resolved round) still ran interpret — drain its raw I/O.
+	if (result.type === 'Ask') geminiEvents(sessionId, 'Ask');
 	if (result.type === 'Cast' && result.cast.ok) {
 		const runeName = (action as { runeName: string }).runeName;
 		logEvent(sessionId, {
@@ -217,6 +224,8 @@ async function askWithSkollReaction(
 ) {
 	const prepared = await prepareAsk(question, interpret);
 	humanAsks(sessionId, question);
+	// Drain her interpret call now so its raw I/O lands between her Ask and the Oracle's reading.
+	geminiEvents(sessionId, 'Ask');
 	// A refusal never opens a window, spends a turn, or rouses Sköll.
 	if (!prepared.ok) {
 		logEvent(sessionId, {

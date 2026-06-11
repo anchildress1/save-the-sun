@@ -26,6 +26,12 @@ describe('POST /api/new-game', () => {
 		expect(body.state).toEqual({ activePlayer: 'Human', status: 'active', winner: null, turns: 0 });
 	});
 
+	it('deals a fresh layout each new round — the held seed dies with the old round', async () => {
+		const before = await (await call('seed-reshuffle')).json();
+		const after = await (await call('seed-reshuffle')).json();
+		expect(after.boardSeed).not.toBe(before.boardSeed);
+	});
+
 	it('hands back a fresh round token so the client re-keys its persisted view', async () => {
 		const before = getRoundId('token-newgame');
 		const { roundId } = await (await call('token-newgame')).json();

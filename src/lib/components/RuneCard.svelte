@@ -176,14 +176,13 @@
 		position: relative;
 		display: flex;
 		flex-direction: column;
-		gap: 0;
 		/* width:100% + min-width:0 — a <button> defaults to fit-content, and its nowrap
 		   trait row sets a wide min-content; min-width:0 lets the card shrink to its grid
 		   cell (overflow is clipped) so all 24 cards are identical. */
 		width: 100%;
 		min-width: 0;
 		aspect-ratio: 4 / 5;
-		padding: 0.72rem 0.74rem 0.96rem;
+		padding: var(--rune-card-padding, 0.72rem 0.74rem 0.96rem);
 		text-align: left;
 		cursor: pointer;
 		overflow: hidden;
@@ -199,14 +198,14 @@
 		--card-label: #f3e8cf;
 		--card-muted: #d9ccb0;
 		/* One size for both corner icons — the art fills its canvas edge-to-edge in both
-		   sets, so equal boxes is what makes them read as equal on the card. */
-		--trait-icon-size: 36px;
-		--pip-icon-size: 18px;
-		--symbol-box-height: clamp(3.2rem, 5.7vw, 4.9rem);
-		--symbol-image-width: min(68%, 4.35rem);
-		--symbol-image-height: 100%;
-		--symbol-image-max-width: none;
-		--symbol-image-max-height: none;
+		   sets, so equal boxes is what makes them read as equal on the card. cqi (the
+		   wrapper is the container) so the icons shrink with the card below ~180px. Every
+		   cqi value in this file is the element's share of the reference card (~183px wide,
+		   the 1600px desktop layout), so the full-width look is unchanged. */
+		--trait-icon-size: clamp(24px, 20cqi, 36px);
+		/* Resolved once here: the grid-level --pip-icon-size override (embed layout) wins via
+		   inheritance; otherwise the cqi clamp scales the pips with the card. */
+		--pip-size: var(--pip-icon-size, clamp(12px, 10cqi, 18px));
 		--stone-brightness: 1;
 		--stone-contrast: 1;
 		--card-glow-opacity: 0.14;
@@ -280,16 +279,11 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 0.16rem;
-		overflow: hidden;
-		text-overflow: ellipsis;
 	}
 
+	/* Size, casing, and color cascade from .card-top. */
 	.element-name,
 	.color-name {
-		font-size: 0.66rem;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--card-label);
 		line-height: 1;
 	}
 
@@ -320,23 +314,34 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 0.2rem;
+		gap: var(--rune-card-middle-gap, 0.2rem);
 		text-align: center;
 	}
 
+	/* flex:1 + min-height:0, not a fixed height: the symbol absorbs whatever space the
+	   card has left after the header, name row, and power footer, so the carved art
+	   shrinks with the card instead of pushing the pips out the clipped bottom. The
+	   var caps it so large cards don't blow the symbol up past the design size. */
 	.symbol {
+		position: relative;
 		display: grid;
 		place-items: center;
 		width: 100%;
-		height: var(--symbol-box-height);
+		flex: 1 1 0;
+		min-height: 0;
+		max-height: var(--symbol-box-height, 4.9rem);
 	}
 
+	/* Absolute, because an in-flow image's percentage height acts as auto during sizing
+	   and its intrinsic height would force the flexed box back open over the name row. */
 	.rune-symbol-image {
-		display: block;
-		width: var(--symbol-image-width);
-		height: var(--symbol-image-height);
-		max-width: var(--symbol-image-max-width);
-		max-height: var(--symbol-image-max-height);
+		position: absolute;
+		inset: 0;
+		margin: auto;
+		width: var(--symbol-image-width, min(68%, 4.35rem));
+		height: var(--symbol-image-height, 100%);
+		max-width: var(--symbol-image-max-width, none);
+		max-height: var(--symbol-image-max-height, 100%);
 		object-fit: contain;
 		filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
 	}
@@ -345,7 +350,7 @@
 	   instead of the headline act. */
 	.glyph {
 		font-family: var(--font-display);
-		font-size: clamp(2.4rem, 3.8vw, 3.6rem);
+		font-size: clamp(1.6rem, 31cqi, 3.6rem);
 		line-height: 1;
 		color: var(--card-text);
 		text-shadow:
@@ -357,7 +362,8 @@
 		max-width: 100%;
 		/* Title face (IM Fell SC) like the POC — its own small caps, so no uppercase transform. */
 		font-family: var(--font-story-title);
-		font-size: 1rem;
+		font-size: var(--rune-card-name-size, clamp(0.78rem, 8.8cqi, 1rem));
+		line-height: var(--rune-card-name-line-height, normal);
 		letter-spacing: 0.04em;
 		/* Lighter than the carved glyph — the inky SC face reads heavy, so soften color + shadow. */
 		color: #fdf6e8;
@@ -370,7 +376,7 @@
 	/* Smaller, quieter line under the name. */
 	.meaning {
 		max-width: 100%;
-		font-size: 0.74rem;
+		font-size: var(--rune-card-meaning-size, clamp(0.6rem, 6.5cqi, 0.74rem));
 		font-style: italic;
 		color: var(--card-muted);
 		line-height: 1.2;
@@ -406,7 +412,7 @@
 	}
 
 	.trait.power {
-		gap: 0.1rem;
+		gap: var(--rune-power-gap, 0.1rem);
 		max-width: 100%;
 	}
 	.element-icon-image {
@@ -427,19 +433,23 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0;
-		height: var(--pip-icon-size);
+		min-width: 0;
+		height: var(--pip-size);
 	}
 
 	.power-label {
-		font-size: 0.68rem;
+		font-size: var(--rune-power-label-size, clamp(0.58rem, 6cqi, 0.68rem));
 		letter-spacing: 0.03em;
 	}
 
+	/* flex 0 1 + min-width 0: a six-pip row on a small card compresses the pips (contain
+	   keeps them round) instead of pushing the "power" label out of the clipped footer. */
 	.pip-image {
 		display: block;
-		width: var(--pip-icon-size);
-		height: var(--pip-icon-size);
-		flex: 0 0 var(--pip-icon-size);
+		width: var(--pip-size);
+		height: var(--pip-size);
+		flex: 0 1 var(--pip-size);
+		min-width: 0;
 		object-fit: contain;
 		filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
 	}
@@ -491,7 +501,7 @@
 		place-items: center;
 		color: rgba(255, 255, 255, 0.72);
 		font-family: var(--font-display);
-		font-size: 9rem;
+		font-size: clamp(4.5rem, 80cqi, 9rem);
 		line-height: 1;
 		pointer-events: none;
 	}

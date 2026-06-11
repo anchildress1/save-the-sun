@@ -64,16 +64,17 @@ describe('EndScreen — defeat sequence', () => {
 	const renderLose = (over: { onReplay?: () => void } = {}) =>
 		render(EndScreen, { outcome: 'lose', onReplay: vi.fn(), ...over });
 
-	it('tolls the defeat in a lead line and its quieter consequence — no victory verse', async () => {
+	it('tolls the defeat in three falling beats — the replay is the rescue', async () => {
 		const screen = renderLose();
 		const root = screen.getByTestId('end-screen').element();
 		expect(root.querySelector('.lead')?.textContent?.trim()).toBe('Sköll takes the sun.');
-		expect(root.querySelector('.coda')?.textContent?.trim()).toBe(
-			'The longest day never breaks. The year falls to dark.'
+		expect(root.querySelector('.verse')?.textContent?.trim()).toBe(
+			'The longest day never breaks. The night is everlasting.'
 		);
-		// The full canonical sentence is preserved across the two lines, in order.
-		expect(root.querySelector('.verse')).toBeNull();
-		expect(screen.container.querySelectorAll('.line')).toHaveLength(2);
+		expect(root.querySelector('.coda')?.textContent?.trim()).toBe(
+			'Sól waits in the dark — only the true rune can win her back.'
+		);
+		expect(screen.container.querySelectorAll('.line')).toHaveLength(3);
 	});
 
 	it('offers the defeat CTAs — "Stand against him again" replaces the victory replay', async () => {
@@ -94,6 +95,12 @@ describe('EndScreen — defeat sequence', () => {
 		expect(root.getAttribute('data-outcome')).toBe('lose');
 		const img = root.querySelector('img.splash') as HTMLImageElement;
 		expect(img.getAttribute('src')).toMatch(/defeat-splash/);
+	});
+
+	it('darkens the defeat rite surface so the modal reads intentionally over the dark splash', () => {
+		const screen = renderLose();
+		const rite = screen.container.querySelector('.rite') as HTMLElement;
+		expect(getComputedStyle(rite).backgroundImage).toContain('rgba(6, 9, 18, 0.78)');
 	});
 });
 

@@ -92,12 +92,12 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 ## 5. Reactions — Scry & Hex
 
-- [x] [I] Each reaction once per player per round; spent reaction unavailable after (no "spent" copy)
+- [x] [I][C] Each reaction once per player per round; spent reactions remain visible but disabled after use, with no visible "spent" copy
 - [x] [I] Offered on an Ask's window; **never** on a Cast _(cast-sacredness structural — a Cast leaves no window; the rival's-Ask echo surface lights up in S6)_
 - [x] [I] At most one reaction per interrupt window; Hex leaves no answer for Scry
 - [x] [I] Scry → rival also receives private answer
 - [x] [I] Hex → question dies, no answer to anyone _(kill + no-answer tested in S5; the asker's turn-spend on a hexed Ask lands with S6's hexed-Ask orchestration — the window now precedes the answer, so the Ask is never resolved on a Hex)_
-- [ ] [C] Human prompt "Sköll asks. Answer it?" → Scry / Hex / Let it pass _(→ v2: the visible prompt heading is cut pending a reaction-UI redesign; v1 shows only the buttons under an SR-only group label)_
+- [x] [C] Human prompt "Sköll asks. Answer it?" → Scry / Hex / Pass; spent Scry/Hex stay visibly disabled and Pass stays manual _(→ v2: the visible prompt heading is cut pending a reaction-UI redesign; v1 shows only the buttons under an SR-only group label)_
 - [x] [I] Sköll's reaction is refereed Gemini response with deterministic-floor fallback _(both directions live: the human reacts to his Ask, and Sköll (Gemini, floor = Pass) reacts to hers — Hex before any answer, Scry as his earned fact)_
 
 ## 6. UI / graphics presentation
@@ -106,7 +106,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C] Each card shows glyph, swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken in the accessible name as "{n} light/dark power", never as visible text)
 - [x] [A] Color name + element name accompany icons — nothing by color alone
 - [x] [C] Card dims in place when crossed; restore affordance works
-- [x] [C] Header: title, tagline, night-progress; turn pill ("Your move." / "Sköll moves.") sits at the top of the Oracle panel, beside the controls it gates _(moved off the header in S7)_
+- [x] [C][E] Header: title, tagline, night-progress; the painted moon sinks as turns pass and the page dawn wash rises with it; the moon fully sets on a human win; turn pill ("Your move." / "Sköll moves.") sits at the top of the Oracle panel, beside the controls it gates _(moved off the header in S7)_
 - [x] [C] Round resolved: header swaps the moon → risen sun on a human win, holds the moon on a Sköll win, with the short resolution tag; the outcome pill flips and the Oracle panel carries the full resolution line
 - [ ] [V] Visual regression snapshots for grid + crossed/armed states _(→ v1.5 with the separate graphics layer; v1 captures state screenshots as e2e artifacts only — no pixel-diff baselines)_
 
@@ -174,8 +174,8 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [I] Engine fact vs LLM inference cleanly separated: a verdict is the ENGINE's (`owner: Engine, kind: deterministic`), never the actor's; a human Ask splits into her `input`, the Oracle's `llm` reading, and the engine's `deterministic` verdict
 - [x] [I] A floored Sköll move is `kind: deterministic` + `level: warn` (not a message string)
 - [x] [U] Per-session event stream: seq, bounded trim, session isolation; lifecycle-linked — reset on a new round (reseeded with the new secret) **and** evicted with the session
-- [x] [U][I] `DEBUG_LOG` verbose / demo / off — demo strips `sensitive` (the secret + raw model I/O), off disables; default verbose in dev / demo on deploy (the public `/debug` view is the demo); filtered server-side (`/api/debug` + page load)
-- [x] [I][U] Raw Gemini I/O captured (verbose) as a sensitive event, **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe snapshot so neither the API nor the load 500s
+- [x] [U][I] Always-on stream — no exposure gate; the round event names the secret + seed (a spoiler surface by design), and the `GEMINI_API_KEY` is masked at the sink so it can never enter the stream (`/api/debug` + page load hand back the whole record)
+- [x] [I][U] Raw Gemini I/O captured (Oracle interpret + Sköll move/reaction), **per session** (AsyncLocalStorage — no cross-session bleed), via a cycle-safe snapshot so neither the API nor the load 500s
 - [x] [I] Sköll's move event shows the cross-offs made **this** turn (the delta), consistent with the pre-move reasoning
 - [x] [C] Cards colored by **owner** (Human / Oracle / Sköll — incl. his raw Gemini calls — / Engine), badged by **kind** (`input` / `llm` / `deterministic`; Sköll's gemini move = llm, floor = deterministic), chipped by **part** (Ask / Cast / React / Round)
 

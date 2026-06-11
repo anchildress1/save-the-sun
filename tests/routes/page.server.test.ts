@@ -25,9 +25,15 @@ describe('+page.server load — board seed', () => {
 		expect(boardSeed).toBeLessThan(2 ** 32);
 	});
 
-	it('reseeds the board ORDER per load so the layout varies', () => {
+	it('holds the board order steady across reloads of the same round', () => {
 		const seeds = new Set(Array.from({ length: 20 }, () => runLoad('order-session').boardSeed));
-		expect(seeds.size).toBeGreaterThan(1);
+		expect(seeds.size).toBe(1);
+	});
+
+	it('reshuffles the board only when the round changes', () => {
+		const before = runLoad('order-newround').boardSeed;
+		resetEngine('order-newround', SEED);
+		expect(runLoad('order-newround').boardSeed).not.toBe(before);
 	});
 });
 
@@ -46,12 +52,11 @@ describe('+page.server load — round token (view resume)', () => {
 		expect(runLoad('token-newround').roundId).not.toBe(before);
 	});
 
-	it('keeps the token unrelated to the board seed, which reshuffles independently', () => {
+	it('keeps the token and the board seed stable together across the same round', () => {
 		const loads = Array.from({ length: 12 }, () => runLoad('token-vs-seed'));
-		// Same round → one stable token across every reload...
+		// Same round → one stable token AND one held layout across every reload.
 		expect(new Set(loads.map((l) => l.roundId)).size).toBe(1);
-		// ...while the display seed keeps varying, proving the token is not the seed.
-		expect(new Set(loads.map((l) => l.boardSeed)).size).toBeGreaterThan(1);
+		expect(new Set(loads.map((l) => l.boardSeed)).size).toBe(1);
 	});
 });
 

@@ -7,7 +7,9 @@
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
-	import moonSplash from '$lib/assets-webp/banners/moon-splash-header.webp?url&no-inline';
+	// ?inline (against the repo's no-inline convention) on purpose: this 10KB sky is the LCP
+	// element, and shipping it inside the HTML removes the fetch entirely — it paints at first render.
+	import moonSplash from '$lib/assets-webp/banners/moon-splash-header.webp?inline';
 	import skollBanner from '$lib/assets-webp/banners/skoll-banner.webp?url&no-inline';
 	import introSplash from '$lib/assets-webp/banners/intro-splash.webp?url&no-inline';
 	import uiDivider from '$lib/assets-webp/ui/divider.webp?url&no-inline';
@@ -34,7 +36,7 @@
 		wolfMoving: 'The wolf is moving. Hold.',
 		oracleSilent: "The Oracle falls silent — the rite can't reach Sól. Draw breath, and ask again.",
 		castFalters: 'The rite falters. The rune slips away.',
-		wrongCast: 'The rune is not the one. The night holds.',
+		wrongCast: (name: string) => `${name} is not the one. The night holds.`,
 		runeTrue: 'The rune is true.',
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
@@ -47,7 +49,6 @@
 		skollHexes: "Sköll closes the Oracle's lips. Your question dies in the dark.",
 		skollScried: 'Sköll listened at the threshold — the answer is his too.',
 		sunCrests: 'Sól crests the rim of the world.',
-		skollTakesSun: 'Sköll takes the sun. The longest day never breaks. The year falls to dark.',
 		skollTakes: 'Sköll takes the sun.',
 		nightHolds: 'The night lies deep and unbroken.',
 		nightThins: 'Gray bleeds into the dark.',
@@ -98,6 +99,8 @@
 	let nightProgress = $derived(
 		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
 	);
+	// Asymptotic, capped: the moon fully sets only on a win (uncapped, toFixed(3) hits 1.000 ~turn 47).
+	let nightT = $derived(humanWon ? 1 : Math.min(0.95, 1 - Math.pow(0.85, turns)));
 	// Cross-off is a private aid, never turn-gated — RuneGrid owns it and stays enabled through Sköll's turn.
 	let canAct = $derived(activePlayer === 'Human' && !roundOver);
 	let turnPill = $derived(
@@ -137,7 +140,7 @@
 
 	// View-state resume (S8.5): the engine resumes server-side, but the client's presentation — the
 	// crossings and the voiced Oracle line — is otherwise thrown away on reload. Persist it keyed by a
-	// stable per-round token (boardSeed reshuffles, so it can't be the key) and restore it on mount.
+	// stable per-round token (opaque, minted with the round) and restore it on mount.
 	let roundIdOverride: string | null = $state(null);
 	let roundId = $derived(roundIdOverride ?? data.roundId);
 	let crossings = $state<number[]>([]);
@@ -146,15 +149,12 @@
 	// overwrite a saved round before it is read back.
 	let restored = $state(false);
 
-	// The Oracle surface — one response at a time. A resumed won round opens on its victory line so the
-	// panel and pill agree.
+	// The Oracle surface — one response at a time. A resumed human win opens on its victory line so
+	// the panel and pill agree; a Sköll win leaves the last voiced line alone (restored from the
+	// saved view) — the end screen owns the defeat text, and the panel must not repeat it.
 	let answer = $state(
-		untrack(() =>
-			data.state.status !== 'won'
-				? '' // blank until the Oracle has a response to voice
-				: data.state.winner === 'Sköll'
-					? RITE.skollTakesSun
-					: RITE.runeTrue
+		untrack(
+			() => (data.state.status === 'won' && data.state.winner === 'Human' ? RITE.runeTrue : '') // blank until the Oracle has a response to voice (or the saved view restores one)
 		)
 	);
 
@@ -205,8 +205,9 @@
 			const { skoll, state } = (await res.json()) as AdvanceResponse;
 			applyState(state);
 			applySkoll(skoll);
-			// Defeat line is sourced from engine truth (winner), not the cast DTO — one source, no drift.
-			if (winner === 'Sköll') answer = RITE.skollTakesSun;
+			// A Sköll win deliberately leaves the Oracle's last voiced line in place (the answer, and
+			// his Scry note when he overheard it) — that line is the WHY of the loss, and the end
+			// screen already owns the "Sköll takes the sun" text. Never double it into the panel.
 			skollStalled = false;
 		} catch (err) {
 			// A failed Advance leaves the turn with Sköll, so the controls stay locked. Surface an
@@ -472,7 +473,7 @@
 			});
 			applyState(state);
 			if (cast.ok) {
-				answer = cast.won ? RITE.runeTrue : RITE.wrongCast;
+				answer = cast.won ? RITE.runeTrue : RITE.wrongCast(selectedRune.name);
 			} else {
 				console.warn('[ui] Cast rejected by engine:', cast.reason);
 				answer = RITE.castFalters;
@@ -492,7 +493,7 @@
 	<!-- Assets the preload scanner can't see: the title splash mounts only after hydration
 	     (Onboarding) and the divider hides behind a CSS var — both paint on first load, so
 	     fetch them with the document instead of after it. -->
-	<link rel="preload" as="image" type="image/webp" href={introSplash} fetchpriority="high" />
+	<link rel="preload" as="image" type="image/webp" href={introSplash} />
 	<link rel="preload" as="image" type="image/webp" href={uiDivider} />
 </svelte:head>
 
@@ -501,8 +502,10 @@
 	<p class="notice-line">{RITE.desktopOnly}</p>
 </div>
 
-<main>
-	<header class="rite-header">
+<main style="--night-t: {nightT.toFixed(3)}">
+	<header class="rite-header" style="--night-t: {nightT.toFixed(3)}">
+		<!-- decoding=sync: the sky is inlined (no fetch), so async decode would only push the
+		     LCP paint past first render for nothing. -->
 		<img
 			class="header-background-image"
 			src={moonSplash}
@@ -510,7 +513,7 @@
 			height="187"
 			alt=""
 			aria-hidden="true"
-			decoding="async"
+			decoding="sync"
 			fetchpriority="high"
 		/>
 		<div class="title-block">
@@ -760,7 +763,7 @@
 						>
 							Name it
 						</button>
-						<button class="btn btn--secondary" type="button" onclick={cancelCast}> Not yet </button>
+						<button class="btn btn--secondary" type="button" onclick={cancelCast}>Not yet</button>
 					</div>
 				{:else}
 					<button
@@ -790,7 +793,7 @@
 		position: relative;
 		max-width: 1600px;
 		margin: 0 auto;
-		min-height: 100vh;
+		min-height: 100svh;
 		padding: 1.25rem 2rem 2rem;
 		display: flex;
 		flex-direction: column;
@@ -799,6 +802,29 @@
 		--skoll-saturation: 1.04;
 		--skoll-brightness: 1.06;
 		--skoll-contrast: 1.04;
+	}
+
+	main::before {
+		content: '';
+		position: fixed;
+		inset: 0;
+		z-index: -1;
+		background:
+			linear-gradient(
+				160deg,
+				rgba(220, 171, 73, 0.2) 0%,
+				rgba(56, 79, 130, 0.18) 42%,
+				rgba(6, 9, 18, 0) 72%
+			),
+			linear-gradient(
+				180deg,
+				rgba(16, 23, 43, 0.4) 0%,
+				rgba(6, 9, 18, 0) 54%,
+				rgba(220, 171, 73, 0.12) 100%
+			);
+		opacity: var(--night-t, 0);
+		pointer-events: none;
+		transition: opacity 1.2s ease;
 	}
 
 	.rite-header {
@@ -831,6 +857,25 @@
 		pointer-events: none;
 	}
 
+	/* Dawn seeps up the header as turns pass — the sky warms instead of the board darkening. */
+	.rite-header::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		background:
+			linear-gradient(
+				160deg,
+				rgba(220, 171, 73, 0.2) 0%,
+				rgba(56, 79, 130, 0.18) 42%,
+				rgba(6, 9, 18, 0) 72%
+			),
+			linear-gradient(180deg, rgba(6, 9, 18, 0) 0%, rgba(220, 171, 73, 0.14) 100%);
+		opacity: var(--night-t, 0);
+		pointer-events: none;
+		transition: opacity 1.2s ease;
+	}
+
 	.ornate-divider {
 		position: relative;
 		z-index: 2;
@@ -854,16 +899,19 @@
 		z-index: 2;
 	}
 
+	/* 44px of sky hangs hidden above the header; sliding it down sets the painted moon as turns pass. */
 	.header-background-image {
 		position: absolute;
-		inset: 0;
+		inset: -44px 0 0;
 		z-index: 0;
 		width: 100%;
-		height: 100%;
+		height: calc(100% + 44px);
 		object-fit: cover;
 		object-position: 50% 50%;
+		translate: 0 calc(var(--night-t, 0) * 44px);
 		filter: saturate(1.04) brightness(0.92) contrast(1.02);
 		pointer-events: none;
+		transition: translate 1.2s ease;
 	}
 
 	.title-block {
@@ -1159,10 +1207,16 @@
 		border: 0;
 	}
 
+	.ask {
+		/* Near-opaque, not the translucent inset: the field must read as a field over the
+		   bottom-anchored wolf art, especially in the short embed panel. */
+		--ask-field-bg: rgba(9, 13, 26, 0.88);
+	}
+
 	.ask input {
 		padding: 0.65rem 0.7rem;
-		background: var(--surface-inset);
-		border: 1px solid var(--gold-dim);
+		background: var(--ask-field-bg);
+		border: 1px solid rgba(233, 200, 119, 0.4);
 		border-radius: 5px;
 		color: var(--ink);
 		font-size: 0.92rem;
@@ -1178,7 +1232,7 @@
 	.ask input:-webkit-autofill:hover,
 	.ask input:-webkit-autofill:active {
 		-webkit-text-fill-color: var(--ink);
-		-webkit-box-shadow: 0 0 0 1000px var(--surface-inset) inset;
+		-webkit-box-shadow: 0 0 0 1000px var(--ask-field-bg) inset;
 		caret-color: var(--ink);
 		transition: background-color 9999s ease-in-out 0s;
 	}
@@ -1186,7 +1240,7 @@
 	.ask input:-webkit-autofill:focus {
 		-webkit-box-shadow:
 			var(--focus-ring),
-			0 0 0 1000px var(--surface-inset) inset;
+			0 0 0 1000px var(--ask-field-bg) inset;
 	}
 
 	.cast {
@@ -1373,38 +1427,21 @@
 		}
 
 		.board-section :global(.rune-grid) {
-			grid-template-columns: repeat(4, minmax(0, 1fr));
-		}
-
-		.board-section :global(.rune-card) {
+			--rune-grid-columns: 4;
+			--rune-grid-max-inline-size: 55.1rem;
+			--rune-card-padding: 0.62rem 0.64rem 0.82rem;
+			--rune-card-middle-gap: 0.34rem;
+			--rune-card-name-size: 0.92rem;
+			--rune-card-name-line-height: 1.05;
+			--rune-card-meaning-size: 0.68rem;
+			--rune-power-gap: 0.04rem;
+			--rune-power-label-size: 0.62rem;
 			--pip-icon-size: 14px;
 			--symbol-box-height: 2.8rem;
 			--symbol-image-width: auto;
 			--symbol-image-height: 2.8rem;
 			--symbol-image-max-width: 58%;
 			--symbol-image-max-height: 100%;
-			padding: 0.62rem 0.64rem 0.82rem;
-		}
-
-		.board-section :global(.middle) {
-			gap: 0.34rem;
-		}
-
-		.board-section :global(.name) {
-			font-size: 0.92rem;
-			line-height: 1.05;
-		}
-
-		.board-section :global(.meaning) {
-			font-size: 0.68rem;
-		}
-
-		.board-section :global(.trait.power) {
-			gap: 0.04rem;
-		}
-
-		.board-section :global(.power-label) {
-			font-size: 0.62rem;
 		}
 
 		.oracle-panel {
@@ -1415,6 +1452,8 @@
 			--reaction-min-h: 2.45rem;
 			--reaction-font: 0.72rem;
 
+			/* The rite's controls lead in the single-column embed; the board follows. */
+			order: -1;
 			gap: 0.6rem;
 			padding: 0.85rem 0.9rem 0;
 		}
@@ -1441,7 +1480,9 @@
 			align-items: center;
 			justify-content: center;
 			gap: 1rem;
-			min-height: 100vh;
+			/* svh, not vh: this is the mobile surface, where a vh floor hides the tagline
+			   behind the collapsed address bar. */
+			min-height: 100svh;
 			padding: 2rem;
 			text-align: center;
 		}

@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 // Social embeds (dev.to, LinkedIn, X, Slack…) read these tags from the SSR HTML —
 // no JS runs in those crawlers, so everything asserted here must arrive with the document.
 
-const SITE_URL = 'https://save-the-sun-b5cortkwia-ue.a.run.app';
+const SITE_URL = 'https://savethesun.anchildress1.dev';
 
 const meta = (page: Page, selector: string) =>
 	page.locator(`meta[${selector}]`).getAttribute('content');
@@ -46,7 +46,7 @@ test.describe('social embed metadata', () => {
 });
 
 test.describe('author footer', () => {
-	test('copyright and profile links are present', async ({ page }) => {
+	test('copyright and icon profile links are present', async ({ page }) => {
 		await page.goto('/');
 
 		const footer = page.locator('footer.site-footer');
@@ -59,7 +59,11 @@ test.describe('author footer', () => {
 			'anchildress1.dev': 'https://anchildress1.dev'
 		};
 		for (const [name, href] of Object.entries(links)) {
-			await expect(footer.getByRole('link', { name, exact: true })).toHaveAttribute('href', href);
+			const link = footer.getByRole('link', { name, exact: true });
+			await expect(link).toHaveAttribute('href', href);
+			// Icon-only links: the name rides aria-label, the hover helper rides title.
+			await expect(link).toHaveAttribute('title', name);
+			await expect(link.locator('svg')).toBeVisible();
 		}
 	});
 });

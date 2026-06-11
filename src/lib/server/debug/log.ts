@@ -1,24 +1,17 @@
 // Debug log — the on-stage proof that the engine owns truth, plus a full diagnostic stream. A
 // per-session chronological event log: human questions, the opponent's action + reasoning each turn,
-// the engine's verdicts, and (verbose only) the secret + raw Gemini I/O.
+// the engine's verdicts, the round's secret, and the raw Gemini I/O (request text and JSON responses).
 //
-// Exposure is gated by DEBUG_LOG (verbose | demo | off):
-//   verbose — everything, including `sensitive` events (the secret, raw model request/response)
-//   demo    — the screen-shareable subset: sensitive events stripped (no secret, no raw model I/O)
-//   off     — the view is disabled
-// Default: verbose in dev, demo on deploy. The public /debug view IS the demo — its whole point is to
-// show the engine-vs-LLM stream live and unauthenticated. demo strips `sensitive` (the secret + raw
-// model I/O), so the answer never leaks; what's public (player inputs, engine events, reasoning
-// summaries) is exactly what the demo means to show. Set DEBUG_LOG=off to disable it on a deploy.
+// One secrecy rule: the GEMINI API KEY never enters this log. The round's secret rune is part of
+// the on-stage record (following the engine's truth live is the whole point — the view is a spoiler
+// by design); the key is the only thing that must not leak, and it is masked at the sink so no
+// caller can tee it by accident.
 //
-// Recorded server-side regardless of level (bounded, no client exposure); the level only decides
-// what the /debug API hands back. Lifecycle-linked to the round through session.ts.
+// Always on — the public /debug view IS the demo, live and unauthenticated; there is no exposure
+// gate. Recorded server-side (bounded) and lifecycle-linked to the round through session.ts.
 
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
-
-export type DebugLevel = 'verbose' | 'demo' | 'off';
 
 // Three orthogonal facts set at the source so the view never re-derives them: owner (→ color), kind
 // (→ badge), part (→ chip). A verdict is the ENGINE's, never the actor's whose turn it was.
@@ -33,8 +26,6 @@ export interface DebugEvent {
 	kind: Kind;
 	part: TurnPart;
 	level: 'info' | 'warn' | 'error';
-	// Held back unless DEBUG_LOG=verbose: the secret and raw Gemini request/response.
-	sensitive?: boolean;
 	message: string;
 	data?: Record<string, unknown>;
 }
@@ -47,7 +38,14 @@ const logs = new Map<string, DebugEvent[]>();
 export function logEvent(sessionId: string, event: Omit<DebugEvent, 'seq'>): void {
 	const log = logs.get(sessionId) ?? [];
 	const seq = (log.at(-1)?.seq ?? 0) + 1;
-	log.push({ ...event, seq });
+	// Masked + snapshotted here too, not just in captureGemini — every sink enforces the key rule,
+	// so a future caller logging a raw SDK error string can't reopen the leak.
+	log.push({
+		...event,
+		seq,
+		message: maskApiKey(event.message),
+		...(event.data !== undefined && { data: toSerializable(event.data) as DebugEvent['data'] })
+	});
 	if (log.length > MAX_EVENTS) log.shift();
 	logs.set(sessionId, log);
 }
@@ -63,25 +61,11 @@ export function resetLog(sessionId: string): void {
 	geminiSinks.delete(sessionId);
 }
 
-/** The exposure level from DEBUG_LOG, validated; default verbose in dev, demo on deploy. */
-export function debugLevel(): DebugLevel {
-	const raw = env.DEBUG_LOG;
-	if (raw === 'verbose' || raw === 'demo' || raw === 'off') return raw;
-	return dev ? 'verbose' : 'demo';
-}
-
-/** What the view may show at a level: nothing when off, sensitive stripped for demo, all for verbose. */
-export function filterForLevel(events: DebugEvent[], level: DebugLevel): DebugEvent[] {
-	if (level === 'off') return [];
-	if (level === 'verbose') return events;
-	return events.filter((e) => !e.sensitive);
-}
-
-// --- Raw Gemini I/O sink (verbose only) -------------------------------------------------------
+// --- Raw Gemini I/O sink ------------------------------------------------------------------------
 // gemini.ts has no sessionId, so it tees its raw I/O here and the route drains it. Keyed PER SESSION
-// via an AsyncLocalStorage so concurrent verbose turns never drain each other's I/O.
+// via an AsyncLocalStorage so concurrent turns never drain each other's I/O.
 export interface GeminiCall {
-	label: 'move' | 'reaction';
+	label: 'move' | 'reaction' | 'oracle';
 	request: unknown;
 	response?: unknown;
 	error?: string;
@@ -109,9 +93,18 @@ function toSerializable(value: unknown): unknown {
 	}
 }
 
+// The one hard secrecy rule of this log: the Gemini API key never enters it. SDK error strings can
+// embed the request URL (and with it the key), so every string is scrubbed at both sinks
+// (logEvent and captureGemini) before it is stored.
+function maskApiKey(value: string): string {
+	const key = env.GEMINI_API_KEY;
+	return key ? value.split(key).join('[gemini-api-key]') : value;
+}
+
 function sanitize(value: unknown, seen: WeakSet<object>): unknown {
 	if (value === null) return null;
 	const type = typeof value;
+	if (type === 'string') return maskApiKey(value as string);
 	if (type === 'bigint') return (value as bigint).toString();
 	if (type !== 'object') return type === 'function' || type === 'symbol' ? undefined : value;
 	if (value instanceof Date) return value.toISOString();
@@ -126,7 +119,7 @@ function sanitize(value: unknown, seen: WeakSet<object>): unknown {
 	return out;
 }
 
-/** gemini.ts tees one raw call here (verbose only); the route drains it onto the session log. */
+/** gemini.ts tees one raw call here; the route drains it onto the session log. */
 export function captureGemini(call: GeminiCall): void {
 	const sessionId = sessionStore.getStore();
 	if (sessionId === undefined) return; // no session context → nothing to attribute it to
@@ -134,7 +127,8 @@ export function captureGemini(call: GeminiCall): void {
 	sink.push({
 		...call,
 		request: toSerializable(call.request),
-		response: toSerializable(call.response)
+		response: toSerializable(call.response),
+		...(call.error !== undefined && { error: maskApiKey(call.error) })
 	});
 	if (sink.length > 20) sink.shift(); // bounded if a session is never drained
 	geminiSinks.set(sessionId, sink);

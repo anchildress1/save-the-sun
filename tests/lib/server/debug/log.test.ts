@@ -1,16 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// debugLevel reads $env/dynamic/private + $app/environment; mock both to control the level.
+// The key mask reads $env/dynamic/private; mock it to control GEMINI_API_KEY.
 const mock = vi.hoisted(() => ({ env: {} as Record<string, string | undefined> }));
 vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
-vi.mock('$app/environment', () => ({ dev: true }));
 
 import {
 	logEvent,
 	getEvents,
 	resetLog,
-	debugLevel,
-	filterForLevel,
 	captureGemini,
 	drainGemini,
 	runWithSession,
@@ -29,7 +26,6 @@ const ev = (over: Partial<DebugEvent> = {}): Omit<DebugEvent, 'seq'> => ({
 
 beforeEach(() => {
 	resetLog(SID);
-	mock.env.DEBUG_LOG = undefined;
 	drainGemini(SID);
 });
 
@@ -64,46 +60,18 @@ describe('debug event log', () => {
 		resetLog(SID);
 		expect(getEvents(SID)).toEqual([]);
 	});
-});
 
-describe('debugLevel', () => {
-	it.each(['verbose', 'demo', 'off'] as const)('reads %s from DEBUG_LOG', (v) => {
-		mock.env.DEBUG_LOG = v;
-		expect(debugLevel()).toBe(v);
-	});
-
-	it('defaults to verbose in dev when unset or invalid', () => {
-		mock.env.DEBUG_LOG = undefined;
-		expect(debugLevel()).toBe('verbose');
-		mock.env.DEBUG_LOG = 'loud';
-		expect(debugLevel()).toBe('verbose');
-	});
-});
-
-describe('filterForLevel', () => {
-	const events: DebugEvent[] = [
-		{ seq: 1, owner: 'Human', kind: 'input', part: 'Ask', level: 'info', message: 'safe' },
-		{
-			seq: 2,
-			owner: 'Engine',
-			kind: 'deterministic',
-			part: 'Round',
-			level: 'info',
-			sensitive: true,
-			message: 'the secret'
-		}
-	];
-
-	it('off hides everything', () => {
-		expect(filterForLevel(events, 'off')).toEqual([]);
-	});
-
-	it('demo strips sensitive events', () => {
-		expect(filterForLevel(events, 'demo')).toEqual([events[0]]);
-	});
-
-	it('verbose keeps everything', () => {
-		expect(filterForLevel(events, 'verbose')).toEqual(events);
+	it('masks the Gemini API key at this sink too — message and data alike', () => {
+		mock.env.GEMINI_API_KEY = 'AIzaSecretKey123';
+		logEvent(
+			SID,
+			ev({ message: 'failed: ?key=AIzaSecretKey123', data: { e: 'AIzaSecretKey123' } })
+		);
+		const [event] = getEvents(SID);
+		expect(JSON.stringify(event)).not.toContain('AIzaSecretKey123');
+		expect(event.message).toBe('failed: ?key=[gemini-api-key]');
+		expect(event.data).toEqual({ e: '[gemini-api-key]' });
+		delete mock.env.GEMINI_API_KEY;
 	});
 });
 
@@ -192,14 +160,27 @@ describe('raw Gemini sink (per session)', () => {
 		runWithSession(SID, () => captureGemini({ label: 'move', request: {}, response: bad }));
 		expect(drainGemini(SID)[0].response).toEqual({ note: 'value omitted — not serializable' });
 	});
-});
 
-describe('debugLevel in prod', () => {
-	it('defaults to demo on deploy — the public view is the demo; demo strips the secret + raw I/O', async () => {
-		vi.resetModules();
-		vi.doMock('$app/environment', () => ({ dev: false }));
-		vi.doMock('$env/dynamic/private', () => ({ env: {} }));
-		const mod = await import('$lib/server/debug/log');
-		expect(mod.debugLevel()).toBe('demo');
+	it('masks the Gemini API key in every logged string — error and response alike', () => {
+		mock.env.GEMINI_API_KEY = 'AIzaSecretKey123';
+		runWithSession(SID, () => {
+			captureGemini({
+				label: 'move',
+				request: {},
+				error: 'fetch failed: https://example.com/v1?key=AIzaSecretKey123'
+			});
+			captureGemini({
+				label: 'reaction',
+				request: { url: 'call with AIzaSecretKey123 embedded' },
+				response: { note: 'echoes AIzaSecretKey123 twice: AIzaSecretKey123' }
+			});
+		});
+		const drained = drainGemini(SID);
+		expect(JSON.stringify(drained)).not.toContain('AIzaSecretKey123');
+		expect(drained[0].error).toBe('fetch failed: https://example.com/v1?key=[gemini-api-key]');
+		expect(drained[1].response).toEqual({
+			note: 'echoes [gemini-api-key] twice: [gemini-api-key]'
+		});
+		delete mock.env.GEMINI_API_KEY;
 	});
 });

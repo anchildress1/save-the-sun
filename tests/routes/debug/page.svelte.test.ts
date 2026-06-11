@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Page from '$routes/debug/+page.svelte';
-import type { DebugEvent, DebugLevel } from '$lib/server/debug/log';
+import type { DebugEvent } from '$lib/server/debug/log';
 
 // The page polls /api/debug on a setInterval. Fake timers keep that interval from ever firing, so
 // no request escapes to the (hook-less) test dev server — a late real tick was the source of the
@@ -42,12 +42,11 @@ const secret: DebugEvent = {
 	kind: 'deterministic',
 	part: 'Round',
 	level: 'info',
-	sensitive: true,
 	message: 'New round — secret is Sowilo'
 };
 
-const renderWith = (events: DebugEvent[], level: DebugLevel = 'verbose') =>
-	render(Page, { data: { events, level }, params: {}, form: null });
+const renderWith = (events: DebugEvent[]) =>
+	render(Page, { data: { events }, params: {}, form: null });
 
 describe('/debug view', () => {
 	it('renders an engine verdict as a deterministic Engine card, with its part', () => {
@@ -102,7 +101,6 @@ describe('/debug view', () => {
 			kind: 'llm',
 			part: 'Cast',
 			level: 'info',
-			sensitive: true,
 			message: 'raw Gemini move call',
 			data: { response: {} }
 		};
@@ -114,6 +112,31 @@ describe('/debug view', () => {
 		expect(card.querySelector('.msg')?.textContent).toContain('raw Gemini move call');
 	});
 
+	it('collapses raw Gemini I/O by default and toggles open/closed on click', async () => {
+		const gemini: DebugEvent = {
+			seq: 7,
+			owner: 'Sköll',
+			kind: 'llm',
+			part: 'Cast',
+			level: 'info',
+			message: 'raw Gemini move call',
+			data: { request: { contents: 'board…' }, response: { text: '{}' } }
+		};
+		const screen = renderWith([gemini, floor]);
+		const { container } = screen;
+		// The parsed turn info (head + message) stays visible; only the raw I/O hides.
+		expect(container.textContent).toContain('raw Gemini move call');
+		const details = container.querySelector<HTMLDetailsElement>('details.io')!;
+		expect(details.open).toBe(false);
+		// Gemini calls only: the floor event's data block stays inline, no expander.
+		expect(container.querySelectorAll('details.io')).toHaveLength(1);
+		expect(container.querySelectorAll('pre').length).toBeGreaterThanOrEqual(2);
+		await screen.getByText('full request / response').click();
+		expect(details.open).toBe(true);
+		await screen.getByText('full request / response').click();
+		expect(details.open).toBe(false);
+	});
+
 	it('renders an event as a message + JSON detail, flagging warn', async () => {
 		const { container } = renderWith([floor]);
 		await expect
@@ -123,13 +146,12 @@ describe('/debug view', () => {
 		expect(container.querySelector('pre')?.textContent).toContain('floor'); // the data block
 	});
 
-	it('badges a sensitive event and renders newest first', async () => {
+	it('renders newest first and shows the round secret in the open', async () => {
 		const { container } = renderWith([verdict, floor, secret]);
-		await expect
-			.element(container.querySelector<HTMLElement>('li.engine .sensitive-flag')!)
-			.toBeInTheDocument();
+		await expect.element(container.querySelector<HTMLElement>('li.engine')!).toBeInTheDocument();
 		const seqs = [...container.querySelectorAll('.seq')].map((n) => n.textContent);
 		expect(seqs).toEqual(['#3', '#2', '#1']);
+		expect(container.textContent).toContain('secret is Sowilo');
 	});
 
 	it('shows the empty state when there are no events', async () => {
@@ -137,16 +159,10 @@ describe('/debug view', () => {
 		await expect.element(screen.getByText(/No events yet/)).toBeInTheDocument();
 	});
 
-	it('shows the disabled hint when the level is off', async () => {
-		const screen = renderWith([], 'off');
-		await expect.element(screen.getByText(/debug log is off/)).toBeInTheDocument();
-	});
-
 	it('polls /api/debug and replaces the stream on each tick', async () => {
 		// Real timers for this one so the onMount interval actually fires; a resolving fetch feeds it.
 		vi.useRealTimers();
 		const next = {
-			level: 'verbose' as DebugLevel,
 			events: [
 				{
 					seq: 9,
@@ -169,14 +185,13 @@ describe('/debug view', () => {
 	});
 
 	it('wraps long raw I/O instead of overflowing the page horizontally', async () => {
-		// A realistic verbose gemini event: a long unbroken token (base64-like) + a long prose string.
+		// A realistic raw gemini event: a long unbroken token (base64-like) + a long prose string.
 		const heavy: DebugEvent = {
 			seq: 9,
 			owner: 'Sköll',
 			kind: 'llm',
 			part: 'Cast',
 			level: 'info',
-			sensitive: true,
 			message: 'raw Gemini move call',
 			data: {
 				request: { systemInstruction: 'word '.repeat(900), contents: '{}' },
@@ -184,6 +199,8 @@ describe('/debug view', () => {
 			}
 		};
 		const { container } = renderWith([heavy]);
+		// Raw I/O ships collapsed; open it — the wrap contract applies to the expanded view.
+		container.querySelector<HTMLDetailsElement>('details.io')!.open = true;
 		const pre = container.querySelector<HTMLElement>('pre')!;
 		await expect.element(pre).toBeInTheDocument();
 		// The long pre must not be wider than its card, and the page must not scroll sideways.

@@ -8,8 +8,8 @@
 	// a fresh round. Lines stage in one beat at a time (instant under reduced motion).
 	let { outcome, onReplay }: { outcome: 'win' | 'lose'; onReplay: () => void } = $props();
 
-	// Each outcome owns its art, the canonical §4 copy split into a lead + the lines beneath (a `verse`
-	// only the victory carries), and the exact replay label. The lead is the dialog's accessible name.
+	// Each outcome owns its art, the canonical §4 copy split into lead / verse / coda, and the exact
+	// replay label. The lead is the dialog's accessible name.
 	const SCENE = {
 		win: {
 			splash: dawnSplash,
@@ -21,17 +21,14 @@
 		lose: {
 			splash: defeatSplash,
 			lead: 'Sköll takes the sun.',
-			verse: null,
-			coda: 'The longest day never breaks. The year falls to dark.',
+			verse: 'The longest day never breaks. The night is everlasting.',
+			coda: 'Sól waits in the dark — only the true rune can win her back.',
 			replay: 'Stand against him again'
 		}
 	} as const;
 
 	let scene = $derived(SCENE[outcome]);
-	// Stagger index per element, skipping the absent verse so the coda never waits on an empty beat.
-	let delays = $derived(
-		scene.verse ? { verse: 1, coda: 2, actions: 3 } : { verse: 0, coda: 1, actions: 2 }
-	);
+	const delays = { verse: 1, coda: 2, actions: 3 };
 
 	onMount(() => {
 		// Lock scroll behind the full-bleed overlay (mirrors Onboarding).
@@ -98,9 +95,7 @@
 	<div class="rite">
 		<p class="line lead" id="end-screen-lead" style="--i:0">{scene.lead}</p>
 		<hr class="rite-divider" aria-hidden="true" />
-		{#if scene.verse}
-			<p class="line verse" style="--i:{delays.verse}">{scene.verse}</p>
-		{/if}
+		<p class="line verse" style="--i:{delays.verse}">{scene.verse}</p>
 		<p class="line coda" style="--i:{delays.coda}">{scene.coda}</p>
 
 		<div class="actions" style="--i:{delays.actions}">
@@ -180,6 +175,15 @@
 			rgba(6, 9, 18, 0.66) 0%,
 			rgba(6, 9, 18, 0.28) 58%,
 			transparent 82%
+		);
+	}
+
+	.lose .rite {
+		background: radial-gradient(
+			ellipse 92% 128% at 50% 50%,
+			rgba(6, 9, 18, 0.78) 0%,
+			rgba(6, 9, 18, 0.42) 58%,
+			transparent 84%
 		);
 	}
 

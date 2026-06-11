@@ -11,7 +11,7 @@
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
 import { runes } from '$lib/board';
-import { captureGemini, debugLevel } from '$lib/server/debug/log';
+import { captureGemini } from '$lib/server/debug/log';
 import type { PowerOp, Query } from '$lib/server/engine/queries';
 import type {
 	RawSkollDecision,
@@ -133,7 +133,11 @@ function normalize(raw: RawResponse): RawSkollDecision {
 
 let client: GoogleGenAI | null = null;
 function ai(): GoogleGenAI {
-	client ??= new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+	// 3 backoff attempts (408/429/5xx) — a rate-limit blip shouldn't floor the wolf for the turn.
+	client ??= new GoogleGenAI({
+		apiKey: env.GEMINI_API_KEY,
+		httpOptions: { retryOptions: { attempts: 3 } }
+	});
 	return client;
 }
 
@@ -163,17 +167,17 @@ export const decideSkollMove: SkollDecide = async (payload: SkollPayload) => {
 				temperature: 1
 			}
 		});
-		// Tee the raw I/O for the verbose debug view — the actual thing the model received and returned.
-		if (debugLevel() === 'verbose') captureGemini({ label: 'move', request, response });
+		// Tee the raw I/O for the debug view — the actual thing the model received and returned.
+		captureGemini({ label: 'move', request, response });
 		return normalize(JSON.parse(response.text ?? '{}') as RawResponse);
 	} catch (error) {
-		if (debugLevel() === 'verbose') captureGemini({ label: 'move', request, error: String(error) });
+		captureGemini({ label: 'move', request, error: String(error) });
 		throw error; // skoll.ts catches it and plays the deterministic floor
 	}
 };
 
 const REACTION_INSTRUCTION = `<role>
-You are Sköll, the wolf, racing a witch for one secret rune. She just asked the Oracle a question; you may interrupt it — Scry, Hex, or let it pass.
+You are Sköll, the wolf, racing a witch for one secret rune. She just asked the Oracle a question; you may interrupt it — Scry, Hex, or pass.
 </role>
 
 <choices>
@@ -211,11 +215,10 @@ export const decideSkollReaction: SkollReactionDecide = async (view: SkollReacti
 				temperature: 1
 			}
 		});
-		if (debugLevel() === 'verbose') captureGemini({ label: 'reaction', request, response });
+		captureGemini({ label: 'reaction', request, response });
 		return JSON.parse(response.text ?? '{}') as { reaction?: string };
 	} catch (error) {
-		if (debugLevel() === 'verbose')
-			captureGemini({ label: 'reaction', request, error: String(error) });
+		captureGemini({ label: 'reaction', request, error: String(error) });
 		throw error; // skoll.ts catches it and passes
 	}
 };

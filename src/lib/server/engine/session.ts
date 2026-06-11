@@ -17,12 +17,17 @@ const skolls = new Map<string, SkollState>();
 // derived from the seed (which would let the client brute-force the secret), so exposing it
 // can never leak the answer.
 const roundIds = new Map<string, string>();
+// The public display seed for the on-screen board order, held for the round's lifetime so a
+// reload does not reshuffle. Independent of the secret seed — exposing it can't leak the answer.
+const boardSeeds = new Map<string, number>();
 
 function randomSeed(): number {
 	return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
-// Open the round's log with the secret (a `sensitive` event — verbose only).
+// Open the round's log with the secret — the on-stage record names it (and its seed) so a
+// screen-share can follow the engine's truth. The view is a spoiler by design; the only thing the
+// log must never carry is the Gemini API key (masked at the sink in log.ts).
 function create(sessionId: string, seed: number): GameEngine {
 	const secret = selectSecret(seed).name;
 	if (dev) console.debug(`[session ${sessionId}] new round — secret: ${secret} (seed ${seed})`);
@@ -31,7 +36,6 @@ function create(sessionId: string, seed: number): GameEngine {
 		kind: 'deterministic',
 		part: 'Round',
 		level: 'info',
-		sensitive: true,
 		message: `New round — secret is ${secret}`,
 		data: { secret, seed }
 	});
@@ -53,6 +57,7 @@ function remember(sessionId: string, engine: GameEngine): GameEngine {
 		engines.delete(lru);
 		skolls.delete(lru); // his memory dies with the round it belonged to
 		roundIds.delete(lru); // and the view-state token keyed to that round
+		boardSeeds.delete(lru); // and the round's board order
 		resetLog(lru); // and the demo log, lifecycle-linked to the same round
 		// Rare, but the resulting fresh-secret-on-next-access desync is otherwise invisible.
 		console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
@@ -72,6 +77,7 @@ export function resetEngine(sessionId: string, seed?: number): GameEngine {
 	requireId(sessionId);
 	skolls.delete(sessionId); // a new round wipes the wolf's memory; recreated lazily on his turn
 	roundIds.delete(sessionId); // and the view-state token — the next read mints a fresh round id
+	boardSeeds.delete(sessionId); // and the board order — a fresh round deals a fresh layout
 	resetLog(sessionId); // and the demo log — a fresh round starts the on-stage record over
 	return remember(sessionId, create(sessionId, seed ?? randomSeed()));
 }
@@ -90,6 +96,21 @@ export function getRoundId(sessionId: string): string {
 		roundIds.set(sessionId, id);
 	}
 	return id;
+}
+
+/**
+ * The session's per-round display seed for the on-screen board order. Stable across a refresh
+ * (same round, same layout), reminted with the round so a fresh secret deals a fresh board.
+ */
+export function getBoardSeed(sessionId: string): number {
+	requireId(sessionId);
+	getEngine(sessionId); // ensure the round exists (and re-marks it most-recently-used)
+	let seed = boardSeeds.get(sessionId);
+	if (seed === undefined) {
+		seed = randomSeed();
+		boardSeeds.set(sessionId, seed);
+	}
+	return seed;
 }
 
 /** The session's Sköll memory, lazily created on his first move and reset with the round. */

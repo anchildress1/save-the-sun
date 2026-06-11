@@ -244,7 +244,9 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Cast the rune' }).click();
 		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
 		await screen.getByRole('button', { name: 'Name it' }).click();
-		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rune is not the one');
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Sowilo is not the one. The night holds.');
 	});
 
 	it('cancels a cast with no turn spent', async () => {
@@ -367,6 +369,17 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('Dawn gathers at the edge of the world.');
 	});
 
+	it('hydrates the page dawn gradient from the loaded turn count', () => {
+		const screen = render(Page, propsWith({ ...HUMAN_TURN, turns: 6 }));
+		const pageShell = screen.container.querySelector('main') as HTMLElement;
+		const header = screen.container.querySelector('.rite-header') as HTMLElement;
+		expect(pageShell.style.getPropertyValue('--night-t')).toMatch(/^0\.\d{3}$/);
+		expect(getComputedStyle(pageShell, '::before').backgroundImage).toContain('rgba(220, 171, 73');
+		expect(Number(getComputedStyle(pageShell, '::before').opacity)).toBeGreaterThan(0);
+		expect(getComputedStyle(header, '::after').backgroundImage).toContain('rgba(220, 171, 73');
+		expect(Number(getComputedStyle(header, '::after').opacity)).toBeGreaterThan(0);
+	});
+
 	it('advances the night-progress as turns are spent on an Ask', async () => {
 		askResult(
 			{ ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
@@ -411,21 +424,24 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('Sól crests the rim of the world.');
 	});
 
-	it('keeps the moon banner on a Sköll win — short tag in the header, full line in the Oracle panel', async () => {
+	it('keeps the moon banner on a Sköll win — short tag in the header, no defeat copy in the panel', async () => {
 		const screen = render(Page, propsWith(SKOLL_WON));
-		// No sunrise for a loss — the moonlit background holds. The header carries only the short tag; the full
-		// resolution sentence lives in the Oracle panel, which wraps responsively on its own.
+		// No sunrise for a loss — the moonlit background holds. The header carries only the short tag;
+		// the defeat sentence belongs to the end screen alone, never doubled into the Oracle panel.
 		expect(screen.container.querySelector('.header-background-image')).not.toBeNull();
 		expect(screen.container.querySelector('.sun-risen')).toBeNull();
+		// The loss freezes the night mid-sink — nightT snaps to 1 only when the dawn is won.
+		expect(
+			screen.container
+				.querySelector<HTMLElement>('.rite-header')
+				?.style.getPropertyValue('--night-t')
+		).toMatch(/^0\.\d+$/);
 		await expect
 			.element(screen.getByTestId('outcome-line'))
 			.toHaveTextContent('Sköll takes the sun.');
 		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll takes the sun.');
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent(
-				'Sköll takes the sun. The longest day never breaks. The year falls to dark.'
-			);
+		// The panel holds whatever the Oracle last voiced (restored from the saved view) — here, nothing.
+		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
 	});
 
 	it('hands the turn to Sköll — pill flips and Ask + Cast disable', async () => {
@@ -505,14 +521,14 @@ describe('Save the Sun page', () => {
 		await humanAsks(screen);
 		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('A gold rune. Mine.');
 		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
-		await expect.element(screen.getByRole('button', { name: 'Let it pass' })).toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Pass' })).toBeInTheDocument();
 	});
 
 	it('lets the human let Sköll Ask pass', async () => {
 		gameStub({ advance: advanceAsk(), react: reactResult({ hexed: false }) });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		await screen.getByRole('button', { name: 'Let it pass' }).click();
+		await screen.getByRole('button', { name: 'Pass' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('You hold your hand. Let him have his answer.');
@@ -537,6 +553,33 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent(
 				'You lean into the dark and listen. His answer is yours too. Yes. Sól is reaching for a gold rune.'
 			);
+	});
+
+	it('shows spent Scry disabled on the next Sköll Ask instead of hiding it', async () => {
+		gameStub({
+			advance: advanceAsk(),
+			react: reactResult({
+				hexed: false,
+				scried: { answer: 'Yes. Sól is reaching for a gold rune.' }
+			})
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Scry' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('His answer is yours too.');
+
+		await humanAsks(screen);
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
+		const scry = screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement;
+		const hex = screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement;
+		const pass = screen.getByRole('button', { name: 'Pass' }).element() as HTMLButtonElement;
+
+		expect(scry.disabled).toBe(true);
+		expect(scry.classList).toContain('reaction-choice--spent');
+		expect(hex.disabled).toBe(false);
+		expect(pass.disabled).toBe(false);
 	});
 
 	it('kills the question when the human Hexes Sköll Ask', async () => {
@@ -591,14 +634,32 @@ describe('Save the Sun page', () => {
 		expect(text()).toContain('No. Sól is not reaching for a fire rune.');
 	});
 
+	it('keeps the Scry note in the panel when his very next cast wins — the WHY of the loss survives', async () => {
+		// The scried-name kill: he overhears her answer, then casts it on his Advance and takes the
+		// round. The panel must hold the answer + his Scry, not the end screen's defeat copy.
+		gameStub({
+			ask: defaultAsk({ reaction: 'Scry' }),
+			advance: advanceCast(SKOLL_WON)
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		const text = () => screen.getByTestId('answer').element().textContent ?? '';
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('Sköll listened');
+		expect(text()).toContain('No. Sól is not reaching for a fire rune.');
+		expect(text()).not.toContain('takes the sun');
+		await expect.element(screen.getByTestId('end-screen')).toBeInTheDocument();
+	});
+
 	it('falls to defeat when Sköll casts true on his Advance turn', async () => {
 		gameStub({ advance: advanceCast(SKOLL_WON) });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		// The defeat is the engine outcome in the panel + pill — no Sköll flavor line.
+		// The Oracle panel keeps her last answer — the WHY of the loss — while the pill flips and the
+		// end screen alone carries the defeat text. Nothing is doubled into the panel.
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('Sköll takes the sun. The longest day never breaks.');
+			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain('takes the sun');
 		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll takes the sun.');
 	});
 
@@ -877,10 +938,10 @@ describe('Save the Sun page — end screen + replay (S9)', () => {
 		const screen = render(Page, propsWith(SKOLL_WON));
 		const end = screen.getByTestId('end-screen').element();
 		expect(end.getAttribute('data-outcome')).toBe('lose');
-		// The toll also sits in the answer panel behind — scope to the end screen's own lead + coda.
+		// Scope to the end screen's own lead + coda — the panel behind holds its own last line.
 		expect(end.querySelector('.lead')?.textContent?.trim()).toBe('Sköll takes the sun.');
 		expect(end.querySelector('.coda')?.textContent?.trim()).toBe(
-			'The longest day never breaks. The year falls to dark.'
+			'Sól waits in the dark — only the true rune can win her back.'
 		);
 		expect(screen.getByTestId('end-replay').element().textContent?.trim()).toBe(
 			'Stand against him again'

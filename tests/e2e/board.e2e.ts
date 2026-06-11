@@ -73,6 +73,28 @@ test.describe('the live board (past the title screen)', () => {
 		expect(symbolNameOverlaps).toEqual([]);
 	});
 
+	test('keeps embed-mode rune cards capped at their natural 4:5 ratio', async ({ page }) => {
+		await page.setViewportSize({ width: 1024, height: 768 });
+		await page.goto('/');
+		const cards = await page.locator('.rune-card').evaluateAll((els) =>
+			els.slice(0, 4).map((el) => {
+				const card = el.getBoundingClientRect();
+				const wrapper = el.parentElement!.getBoundingClientRect();
+				return {
+					width: card.width,
+					height: card.height,
+					centerDelta: Math.abs(card.left + card.width / 2 - (wrapper.left + wrapper.width / 2))
+				};
+			})
+		);
+		expect(cards).toHaveLength(4);
+		for (const card of cards) {
+			expect(card.width).toBeLessThanOrEqual(213);
+			expect(card.width / card.height).toBeCloseTo(4 / 5, 1);
+			expect(card.centerDelta).toBeLessThan(1);
+		}
+	});
+
 	test('shows the rite, not the notice, at desktop width', async ({ page }) => {
 		await page.setViewportSize({ width: 1440, height: 900 });
 		await page.goto('/');
@@ -140,9 +162,7 @@ test.describe('the live board (past the title screen)', () => {
 		await page.getByRole('button', { name: 'Cast the rune' }).click();
 		await page.getByRole('button', { name: /select sowilo as cast target/i }).click();
 		await page.getByRole('button', { name: 'Name it' }).click();
-		await expect(page.getByTestId('answer')).toHaveText(
-			'The rune is not the one. The night holds.'
-		);
+		await expect(page.getByTestId('answer')).toHaveText('Sowilo is not the one. The night holds.');
 
 		// Round continues: the crossing is intact and the human can ask again.
 		await expect(page.getByRole('button', { name: /restore sowilo/i })).toBeVisible();
@@ -170,6 +190,12 @@ test.describe('the live board (past the title screen)', () => {
 		});
 		await page.goto('/');
 
+		const boardOrder = () =>
+			page
+				.locator('.rune-card')
+				.evaluateAll((cards) => cards.map((card) => card.getAttribute('data-rune-name')));
+		const orderBefore = await boardOrder();
+
 		// Dirty the view: cross a rune and earn a voiced line.
 		await page.getByRole('button', { name: /cross off sowilo/i }).click();
 		await expect(page.getByRole('button', { name: /restore sowilo/i })).toBeVisible();
@@ -179,13 +205,14 @@ test.describe('the live board (past the title screen)', () => {
 			'No. Sól is not reaching for a fire rune.'
 		);
 
-		// A real reload resumes the same round (same session/token); the view must come back with it —
-		// the crossing survives the board reshuffle because it is keyed by rune id, not position.
+		// A real reload resumes the same round (same session/token); the view must come back with it,
+		// and the same round holds its seed — the board order must not reshuffle under the player.
 		await page.reload();
 		await expect(page.getByRole('button', { name: /restore sowilo/i })).toBeVisible();
 		await expect(page.getByTestId('answer')).toContainText(
 			'No. Sól is not reaching for a fire rune.'
 		);
+		expect(await boardOrder()).toEqual(orderBefore);
 	});
 
 	test('cancels a cast with no commitment', async ({ page }) => {
@@ -234,9 +261,9 @@ test.describe('the live board (past the title screen)', () => {
 		await page.getByLabel(/ask the oracle/i).fill('Is it gold?');
 		await page.getByRole('button', { name: 'Ask the Oracle' }).click();
 
-		await expect(page.getByRole('button', { name: 'Let it pass' })).toBeVisible();
-		await page.getByRole('button', { name: 'Let it pass' }).click({ trial: true });
-		await page.getByRole('button', { name: 'Let it pass' }).click();
+		await expect(page.getByRole('button', { name: 'Pass' })).toBeVisible();
+		await page.getByRole('button', { name: 'Pass' }).click({ trial: true });
+		await page.getByRole('button', { name: 'Pass' }).click();
 		await expect(page.getByTestId('answer')).toContainText('You hold your hand');
 	});
 
@@ -365,5 +392,82 @@ test.describe('first-run onboarding', () => {
 		// Straight into the tour (no title), spotlighting the live board.
 		await expect(page.getByTestId('step-count')).toHaveText('1 / 5');
 		await expect(page.locator('.rune-card')).toHaveCount(24);
+	});
+});
+
+test.describe('the night advances', () => {
+	test.beforeEach(async ({ page }) => {
+		await page.addInitScript((key) => {
+			try {
+				localStorage.setItem(key, '1');
+			} catch {
+				/* storage blocked */
+			}
+		}, ONBOARDED_KEY);
+	});
+
+	test('the painted moon sinks as turns pass', async ({ page }) => {
+		const midGame = { activePlayer: 'Human', status: 'active', winner: null, turns: 3 };
+		await page.route('**/api/action', (route) => {
+			const body = route.request().postDataJSON?.() ?? {};
+			if (body?.type === 'Advance')
+				return route.fulfill({ json: { type: 'Advance', state: midGame } });
+			return route.fulfill({
+				json: {
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'No. Sól is not reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: midGame
+				}
+			});
+		});
+		await page.goto('/');
+
+		// Computed translate is "0px" while y is zero; the y component appears once the sky moves.
+		const skyY = () =>
+			page
+				.locator('.header-background-image')
+				.evaluate((el) => parseFloat(getComputedStyle(el).translate.split(' ')[1] ?? '0'));
+		const pageDawnOpacity = () =>
+			page.locator('main').evaluate((el) => Number(getComputedStyle(el, '::before').opacity));
+		expect(await skyY()).toBe(0);
+		expect(await pageDawnOpacity()).toBe(0);
+
+		await page.getByLabel(/ask the oracle/i).fill('Is it a fire rune?');
+		await page.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect(page.getByTestId('answer')).toContainText('fire rune');
+
+		// Sinks, but never the full 44px band mid-game — only a won dawn completes the descent.
+		await expect.poll(skyY).toBeGreaterThan(0);
+		expect(await skyY()).toBeLessThan(44);
+		await expect.poll(pageDawnOpacity).toBeGreaterThan(0);
+	});
+
+	test('the night completes on a win — moon fully set, sun risen', async ({ page }) => {
+		await page.route('**/api/action', (route) =>
+			route.fulfill({
+				json: {
+					type: 'Cast',
+					cast: { ok: true, won: true, rune: { name: 'Sowilo' }, turnConsumed: true },
+					state: { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 4 }
+				}
+			})
+		);
+		await page.goto('/');
+
+		await page.getByRole('button', { name: 'Cast the rune' }).click();
+		await page.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await page.getByRole('button', { name: 'Name it' }).click();
+
+		await expect(page.locator('.sun-risen')).toBeVisible();
+		// nightT snaps to 1 on a human win: the sky finishes its full 44px descent.
+		await expect
+			.poll(() =>
+				page.locator('.header-background-image').evaluate((el) => getComputedStyle(el).translate)
+			)
+			.toBe('0px 44px');
 	});
 });
