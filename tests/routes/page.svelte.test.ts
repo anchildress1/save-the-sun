@@ -424,10 +424,10 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('Sól crests the rim of the world.');
 	});
 
-	it('keeps the moon banner on a Sköll win — short tag in the header, full line in the Oracle panel', async () => {
+	it('keeps the moon banner on a Sköll win — short tag in the header, no defeat copy in the panel', async () => {
 		const screen = render(Page, propsWith(SKOLL_WON));
-		// No sunrise for a loss — the moonlit background holds. The header carries only the short tag; the full
-		// resolution sentence lives in the Oracle panel, which wraps responsively on its own.
+		// No sunrise for a loss — the moonlit background holds. The header carries only the short tag;
+		// the defeat sentence belongs to the end screen alone, never doubled into the Oracle panel.
 		expect(screen.container.querySelector('.header-background-image')).not.toBeNull();
 		expect(screen.container.querySelector('.sun-risen')).toBeNull();
 		// The loss freezes the night mid-sink — nightT snaps to 1 only when the dawn is won.
@@ -440,11 +440,8 @@ describe('Save the Sun page', () => {
 			.element(screen.getByTestId('outcome-line'))
 			.toHaveTextContent('Sköll takes the sun.');
 		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll takes the sun.');
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent(
-				'Sköll takes the sun. The longest day never breaks. The year falls to dark.'
-			);
+		// The panel holds whatever the Oracle last voiced (restored from the saved view) — here, nothing.
+		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
 	});
 
 	it('hands the turn to Sköll — pill flips and Ask + Cast disable', async () => {
@@ -637,14 +634,32 @@ describe('Save the Sun page', () => {
 		expect(text()).toContain('No. Sól is not reaching for a fire rune.');
 	});
 
+	it('keeps the Scry note in the panel when his very next cast wins — the WHY of the loss survives', async () => {
+		// The scried-name kill: he overhears her answer, then casts it on his Advance and takes the
+		// round. The panel must hold the answer + his Scry, not the end screen's defeat copy.
+		gameStub({
+			ask: defaultAsk({ reaction: 'Scry' }),
+			advance: advanceCast(SKOLL_WON)
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		const text = () => screen.getByTestId('answer').element().textContent ?? '';
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('Sköll listened');
+		expect(text()).toContain('No. Sól is not reaching for a fire rune.');
+		expect(text()).not.toContain('takes the sun');
+		await expect.element(screen.getByTestId('end-screen')).toBeInTheDocument();
+	});
+
 	it('falls to defeat when Sköll casts true on his Advance turn', async () => {
 		gameStub({ advance: advanceCast(SKOLL_WON) });
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		// The defeat is the engine outcome in the panel + pill — no Sköll flavor line.
+		// The Oracle panel keeps her last answer — the WHY of the loss — while the pill flips and the
+		// end screen alone carries the defeat text. Nothing is doubled into the panel.
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('Sköll takes the sun. The longest day never breaks.');
+			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain('takes the sun');
 		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll takes the sun.');
 	});
 

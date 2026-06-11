@@ -49,7 +49,6 @@
 		skollHexes: "Sköll closes the Oracle's lips. Your question dies in the dark.",
 		skollScried: 'Sköll listened at the threshold — the answer is his too.',
 		sunCrests: 'Sól crests the rim of the world.',
-		skollTakesSun: 'Sköll takes the sun. The longest day never breaks. The year falls to dark.',
 		skollTakes: 'Sköll takes the sun.',
 		nightHolds: 'The night lies deep and unbroken.',
 		nightThins: 'Gray bleeds into the dark.',
@@ -150,15 +149,12 @@
 	// overwrite a saved round before it is read back.
 	let restored = $state(false);
 
-	// The Oracle surface — one response at a time. A resumed won round opens on its victory line so the
-	// panel and pill agree.
+	// The Oracle surface — one response at a time. A resumed human win opens on its victory line so
+	// the panel and pill agree; a Sköll win leaves the last voiced line alone (restored from the
+	// saved view) — the end screen owns the defeat text, and the panel must not repeat it.
 	let answer = $state(
-		untrack(() =>
-			data.state.status !== 'won'
-				? '' // blank until the Oracle has a response to voice
-				: data.state.winner === 'Sköll'
-					? RITE.skollTakesSun
-					: RITE.runeTrue
+		untrack(
+			() => (data.state.status === 'won' && data.state.winner === 'Human' ? RITE.runeTrue : '') // blank until the Oracle has a response to voice (or the saved view restores one)
 		)
 	);
 
@@ -209,8 +205,9 @@
 			const { skoll, state } = (await res.json()) as AdvanceResponse;
 			applyState(state);
 			applySkoll(skoll);
-			// Defeat line is sourced from engine truth (winner), not the cast DTO — one source, no drift.
-			if (winner === 'Sköll') answer = RITE.skollTakesSun;
+			// A Sköll win deliberately leaves the Oracle's last voiced line in place (the answer, and
+			// his Scry note when he overheard it) — that line is the WHY of the loss, and the end
+			// screen already owns the "Sköll takes the sun" text. Never double it into the panel.
 			skollStalled = false;
 		} catch (err) {
 			// A failed Advance leaves the turn with Sköll, so the controls stay locked. Surface an
@@ -796,7 +793,7 @@
 		position: relative;
 		max-width: 1600px;
 		margin: 0 auto;
-		min-height: 100vh;
+		min-height: 100svh;
 		padding: 1.25rem 2rem 2rem;
 		display: flex;
 		flex-direction: column;
@@ -1475,7 +1472,9 @@
 			align-items: center;
 			justify-content: center;
 			gap: 1rem;
-			min-height: 100vh;
+			/* svh, not vh: this is the mobile surface, where a vh floor hides the tagline
+			   behind the collapsed address bar. */
+			min-height: 100svh;
 			padding: 2rem;
 			text-align: center;
 		}
