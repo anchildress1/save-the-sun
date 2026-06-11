@@ -49,7 +49,7 @@ Design intent: [`docs/prd.md`](docs/prd.md) · mechanics: [`docs/game-spec.md`](
 
 ## Play
 
-- **Live:** [save-the-sun on Cloud Run](https://save-the-sun-b5cortkwia-ue.a.run.app/)
+- **Live:** [savethesun.anchildress1.dev](https://savethesun.anchildress1.dev/)
 - Desktop-first; the embedded board plays down to 750px wide. Below that, the rite asks for a wider sky.
 
 ---

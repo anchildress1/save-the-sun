@@ -10,8 +10,9 @@
 
 	let { children } = $props();
 
-	// Hardcoded: crawlers need absolute URLs and the Cloud Run proxy hides the real origin.
-	const SITE_URL = 'https://save-the-sun-b5cortkwia-ue.a.run.app';
+	// Hardcoded: crawlers need absolute URLs, and behind the Cloud Run proxy the server can't
+	// trust url.origin to be the visitor-facing domain — so the canonical host is pinned here.
+	const SITE_URL = 'https://savethesun.anchildress1.dev';
 	const TITLE = 'Save the Sun';
 	const DESCRIPTION =
 		'A free browser deduction game for the longest day. Question the Oracle, read the signs, and name the true rune before Sköll the wolf swallows the sun.';

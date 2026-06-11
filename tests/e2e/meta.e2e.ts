@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 // Social embeds (dev.to, LinkedIn, X, Slack…) read these tags from the SSR HTML —
 // no JS runs in those crawlers, so everything asserted here must arrive with the document.
 
-const SITE_URL = 'https://save-the-sun-b5cortkwia-ue.a.run.app';
+const SITE_URL = 'https://savethesun.anchildress1.dev';
 
 const meta = (page: Page, selector: string) =>
 	page.locator(`meta[${selector}]`).getAttribute('content');
