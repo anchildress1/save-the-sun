@@ -165,7 +165,7 @@ Voiced in the **Oracle text**, in the rite's own voice (third person—never his
 4. CTA: **"Begin another night"** _(the only closing action—the secondary "Leave the fire." was cut)_
 
 ### Defeat—Sköll casts first
-1. The loss resolves on the end screen: lead **"Sköll takes the sun."**, coda **"The longest day never breaks. The year falls to dark."** _(Sköll's cast carries no line of its own; the Oracle panel deliberately keeps its last voiced answer—and his Scry note when he overheard it—so the WHY of the loss stays readable. Never doubled into the panel; see §2.)_
+1. The loss resolves on the end screen in three falling beats: lead **"Sköll takes the sun."**, verse **"The longest day never breaks. The night is everlasting."**, coda **"Sól waits in the dark — only the true rune can win her back."** _(She does not return on her own — the replay is the rescue. Sköll's cast carries no line of its own; the Oracle panel deliberately keeps its last voiced answer—and his Scry note when he overheard it—so the WHY of the loss stays readable. Never doubled into the panel; see §2.)_
 2. CTA: **"Stand against him again"** _(the only closing action—the secondary "Leave the fire." was cut)_
 
 Sól speaks only at victory—the goddess's rarity is the power.
