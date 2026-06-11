@@ -380,9 +380,11 @@ test.describe('the night advances', () => {
 	});
 
 	test('the painted moon sinks as turns pass', async ({ page }) => {
+		const midGame = { activePlayer: 'Human', status: 'active', winner: null, turns: 3 };
 		await page.route('**/api/action', (route) => {
 			const body = route.request().postDataJSON?.() ?? {};
-			if (body?.type === 'Advance') return route.fulfill({ json: { type: 'Advance', state: {} } });
+			if (body?.type === 'Advance')
+				return route.fulfill({ json: { type: 'Advance', state: midGame } });
 			return route.fulfill({
 				json: {
 					type: 'Ask',
@@ -391,21 +393,26 @@ test.describe('the night advances', () => {
 						answer: 'No. Sól is not reaching for a fire rune.',
 						turnConsumed: true
 					},
-					state: { activePlayer: 'Human', status: 'active', winner: null, turns: 3 }
+					state: midGame
 				}
 			});
 		});
 		await page.goto('/');
 
-		const sky = page.locator('.header-background-image');
-		const at = () => sky.evaluate((el) => getComputedStyle(el).translate);
-		const start = await at();
+		// Computed translate is "0px" while y is zero; the y component appears once the sky moves.
+		const skyY = () =>
+			page
+				.locator('.header-background-image')
+				.evaluate((el) => parseFloat(getComputedStyle(el).translate.split(' ')[1] ?? '0'));
+		expect(await skyY()).toBe(0);
 
 		await page.getByLabel(/ask the oracle/i).fill('Is it a fire rune?');
 		await page.getByRole('button', { name: 'Ask the Oracle' }).click();
 		await expect(page.getByTestId('answer')).toContainText('fire rune');
 
-		await expect.poll(at).not.toBe(start);
+		// Sinks, but never the full 44px band mid-game — only a won dawn completes the descent.
+		await expect.poll(skyY).toBeGreaterThan(0);
+		expect(await skyY()).toBeLessThan(44);
 	});
 
 	test('the night completes on a win — moon fully set, sun risen', async ({ page }) => {

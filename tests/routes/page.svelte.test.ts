@@ -417,6 +417,12 @@ describe('Save the Sun page', () => {
 		// resolution sentence lives in the Oracle panel, which wraps responsively on its own.
 		expect(screen.container.querySelector('.header-background-image')).not.toBeNull();
 		expect(screen.container.querySelector('.sun-risen')).toBeNull();
+		// The loss freezes the night mid-sink — nightT snaps to 1 only when the dawn is won.
+		expect(
+			screen.container
+				.querySelector<HTMLElement>('.rite-header')
+				?.style.getPropertyValue('--night-t')
+		).toMatch(/^0\.\d+$/);
 		await expect
 			.element(screen.getByTestId('outcome-line'))
 			.toHaveTextContent('Sköll takes the sun.');
