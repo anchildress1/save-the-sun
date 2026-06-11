@@ -320,9 +320,9 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 **v1.5 (fast follow), in order:**
 
 1. Gemini voice interaction
-2. Screen-reader narration & navigation — `aria-live="polite"` on the Rite transcript and every Oracle answer/refusal; per-card full trait + crossed-state exposure; turn-change announcements
-3. Graphic elements in UI
-4. Splash screen
+2. ~~Screen-reader narration & navigation — `aria-live="polite"` on the Rite transcript and every Oracle answer/refusal; per-card full trait + crossed-state exposure; turn-change announcements~~
+3. ~~Graphic elements in UI~~
+4. ~~Splash screen~~
 5. Sköll escalation taunts wired to candidate-count
 
 **v2 (immersion build), in order:**
@@ -332,7 +332,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 3. Cast win animation — glyph carves into stone + luminous Sól beat; honors reduced motion
 4. Voice interaction with Gemini — speak the Ask, hear the Oracle/Sköll (TTS)
 5. Wrong-cast penalty — cap ≈2 wrong casts per player (threshold on the v1 counter; alternation unaffected)
-6. Small-desktop support down to 1024px — a responsive board below the v1 1280px floor (v1 just shows the best-on-desktop notice there)
+6. Small-desktop support down to 750px — a responsive board below the v1 1280px floor (v1 just shows the best-on-desktop notice there)
 7. Asset delivery pipeline — generate AVIF/WebP fallbacks for large stone, banner, chalk, and rune assets; ship responsive variants where the UI has multiple display sizes; keep a checked bundle-size budget so deploy cost and first-load weight do not creep back up
    - [ ] Cleanup: align all generated image assets to one stable stylized art direction before adding more format variants
    - [ ] Generate AVIF/WebP fallbacks for large stone, banner, chalk, rune, element, color, and fill assets
