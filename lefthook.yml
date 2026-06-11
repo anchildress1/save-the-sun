@@ -4,9 +4,11 @@ pre-commit:
     format:
       glob: '*.{js,ts,svelte,json,md}'
       run: pnpm exec prettier --write {staged_files}
+      stage_fixed: true
     lint:
       glob: '*.{js,ts,svelte}'
       run: pnpm exec eslint {staged_files}
+      stage_fixed: true
     secret-scan:
       run: pnpm exec secretlint {staged_files}
     actionlint:
@@ -19,7 +21,7 @@ commit-msg:
       run: pnpm exec commitlint --edit {1}
 
 pre-push:
-  parallel: true
+  parallel: false
   commands:
     typecheck:
       run: pnpm run check
