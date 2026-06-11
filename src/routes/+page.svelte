@@ -865,7 +865,14 @@
 		position: absolute;
 		inset: 0;
 		z-index: 1;
-		background: linear-gradient(180deg, transparent 52%, rgba(233, 200, 119, 0.26) 100%);
+		background:
+			linear-gradient(
+				160deg,
+				rgba(220, 171, 73, 0.2) 0%,
+				rgba(56, 79, 130, 0.18) 42%,
+				rgba(6, 9, 18, 0) 72%
+			),
+			linear-gradient(180deg, rgba(6, 9, 18, 0) 0%, rgba(220, 171, 73, 0.14) 100%);
 		opacity: var(--night-t, 0);
 		pointer-events: none;
 		transition: opacity 1.2s ease;

@@ -372,9 +372,12 @@ describe('Save the Sun page', () => {
 	it('hydrates the page dawn gradient from the loaded turn count', () => {
 		const screen = render(Page, propsWith({ ...HUMAN_TURN, turns: 6 }));
 		const pageShell = screen.container.querySelector('main') as HTMLElement;
+		const header = screen.container.querySelector('.rite-header') as HTMLElement;
 		expect(pageShell.style.getPropertyValue('--night-t')).toMatch(/^0\.\d{3}$/);
 		expect(getComputedStyle(pageShell, '::before').backgroundImage).toContain('rgba(220, 171, 73');
 		expect(Number(getComputedStyle(pageShell, '::before').opacity)).toBeGreaterThan(0);
+		expect(getComputedStyle(header, '::after').backgroundImage).toContain('rgba(220, 171, 73');
+		expect(Number(getComputedStyle(header, '::after').opacity)).toBeGreaterThan(0);
 	});
 
 	it('advances the night-progress as turns are spent on an Ask', async () => {
