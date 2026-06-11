@@ -494,7 +494,10 @@
 	<!-- Assets the preload scanner can't see: the title splash mounts only after hydration
 	     (Onboarding) and the divider hides behind a CSS var — both paint on first load, so
 	     fetch them with the document instead of after it. -->
-	<link rel="preload" as="image" type="image/webp" href={introSplash} fetchpriority="high" />
+	<!-- The header sky is the LCP element; it alone keeps high priority so the title splash,
+	     fonts, and chrome don't starve it of (throttled) bandwidth before first paint. -->
+	<link rel="preload" as="image" type="image/webp" href={moonSplash} fetchpriority="high" />
+	<link rel="preload" as="image" type="image/webp" href={introSplash} />
 	<link rel="preload" as="image" type="image/webp" href={uiDivider} />
 </svelte:head>
 
