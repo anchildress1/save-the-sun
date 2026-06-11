@@ -84,8 +84,12 @@ describe('RuneCard', () => {
 		expect(cardBackground).toBeInstanceOf(HTMLImageElement);
 
 		expect(getComputedStyle(elementMark as Element).flexDirection).toBe('column');
-		expect(getComputedStyle(elementIcon as Element).width).toBe('34px');
-		expect(getComputedStyle(colorIcon as Element).width).toBe('40px');
+		// Element and color icons share one size — mismatched corner icons read as a
+		// visual hierarchy that doesn't exist (neither trait outranks the other).
+		expect(getComputedStyle(elementIcon as Element).width).toBe('36px');
+		expect(getComputedStyle(colorIcon as Element).width).toBe(
+			getComputedStyle(elementIcon as Element).width
+		);
 		expect(getComputedStyle(fillIcon as Element).width).toBe('18px');
 		expect(getComputedStyle(elementName as Element).color).toBe('rgb(243, 232, 207)');
 		expect(getComputedStyle(colorName as Element).color).toBe('rgb(243, 232, 207)');

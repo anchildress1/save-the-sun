@@ -198,8 +198,9 @@
 		--card-text: #f4ead6;
 		--card-label: #f3e8cf;
 		--card-muted: #d9ccb0;
-		--element-icon-size: 34px;
-		--color-icon-size: 40px;
+		/* One size for both corner icons — the art fills its canvas edge-to-edge in both
+		   sets, so equal boxes is what makes them read as equal on the card. */
+		--trait-icon-size: 36px;
 		--pip-icon-size: 18px;
 		--stone-brightness: 1;
 		--stone-contrast: 1;
@@ -289,8 +290,8 @@
 
 	.color-icon-image {
 		display: block;
-		width: var(--color-icon-size);
-		height: var(--color-icon-size);
+		width: var(--trait-icon-size);
+		height: var(--trait-icon-size);
 		object-fit: contain;
 		filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
 	}
@@ -403,9 +404,9 @@
 	}
 	.element-icon-image {
 		display: block;
-		width: var(--element-icon-size);
-		height: var(--element-icon-size);
-		flex: 0 0 var(--element-icon-size);
+		width: var(--trait-icon-size);
+		height: var(--trait-icon-size);
+		flex: 0 0 var(--trait-icon-size);
 		object-fit: contain;
 		filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
 	}
