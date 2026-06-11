@@ -139,7 +139,7 @@
 
 	// View-state resume (S8.5): the engine resumes server-side, but the client's presentation — the
 	// crossings and the voiced Oracle line — is otherwise thrown away on reload. Persist it keyed by a
-	// stable per-round token (boardSeed reshuffles, so it can't be the key) and restore it on mount.
+	// stable per-round token (opaque, minted with the round) and restore it on mount.
 	let roundIdOverride: string | null = $state(null);
 	let roundId = $derived(roundIdOverride ?? data.roundId);
 	let crossings = $state<number[]>([]);

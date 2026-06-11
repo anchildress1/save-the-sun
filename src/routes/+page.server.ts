@@ -1,4 +1,4 @@
-import { getEngine, getSkoll, getRoundId } from '$lib/server/engine/session';
+import { getEngine, getSkoll, getRoundId, getBoardSeed } from '$lib/server/engine/session';
 import { gameState, type PendingReaction } from '$lib/server/engine/actions';
 import { skollAskEcho } from '$lib/server/skoll/skoll';
 import type { PageServerLoad } from './$types';
@@ -8,7 +8,7 @@ import type { PageServerLoad } from './$types';
 // shared with Sköll so he reasons over the same layout. It is NOT the secret. The secret
 // rune is the engine's own concern (backend referee, chosen independently) and must never
 // be derivable from this public order. Generated on the server so SSR and hydration share
-// one order.
+// one order, and held per round so a reload does not reshuffle the board mid-rite.
 export const load: PageServerLoad = ({ locals }) => {
 	// Lazily ensure the session's engine — a refresh resumes the same round, it does NOT
 	// reseed. The secret lives as long as the session; a fresh round comes from POST
@@ -34,13 +34,11 @@ export const load: PageServerLoad = ({ locals }) => {
 		}
 	}
 
-	// Web Crypto rather than Math.random — harmless for a display seed and keeps a single
-	// secure RNG path (and clears the Sonar weak-PRNG hotspot). Returns a uint32, which
-	// mulberry32 consumes via seed >>> 0.
 	return {
-		boardSeed: crypto.getRandomValues(new Uint32Array(1))[0],
-		// Stable per-round token (independent of boardSeed, which reshuffles) — the client keys its
-		// persisted crossings/transcript to it so a refresh restores the view and a new round clears it.
+		// Held for the round's lifetime: a reload resumes the same layout; only a new round reshuffles.
+		boardSeed: getBoardSeed(locals.sessionId),
+		// Stable per-round token (independent of boardSeed) — the client keys its persisted
+		// crossings/transcript to it so a refresh restores the view and a new round clears it.
 		roundId: getRoundId(locals.sessionId),
 		// Hydrate the real turn/round state so a resumed round (incl. one already won) renders
 		// truthfully on load instead of guessing "Your move." and flipping on the first action.
