@@ -198,7 +198,7 @@ export function createSpeaker(): Speaker {
 
 function rms(samples: Float32Array): number {
 	let sum = 0;
-	for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i];
+	for (const sample of samples) sum += sample * sample;
 	return Math.sqrt(sum / (samples.length || 1));
 }
 
@@ -213,9 +213,9 @@ function toBase64Pcm(samples: Float32Array): string {
 
 function bytesToBase64(bytes: Uint8Array): string {
 	let binary = '';
-	// 8KB slices keep String.fromCharCode under the engine's argument cap.
+	// 8KB slices keep String.fromCodePoint under the engine's argument cap.
 	for (let i = 0; i < bytes.length; i += 0x2000) {
-		binary += String.fromCharCode(...bytes.subarray(i, i + 0x2000));
+		binary += String.fromCodePoint(...bytes.subarray(i, i + 0x2000));
 	}
 	return btoa(binary);
 }
@@ -223,6 +223,6 @@ function bytesToBase64(bytes: Uint8Array): string {
 function base64ToBytes(base64: string): Uint8Array {
 	const binary = atob(base64);
 	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+	for (let i = 0; i < binary.length; i++) bytes[i] = binary.codePointAt(i) ?? 0;
 	return bytes;
 }

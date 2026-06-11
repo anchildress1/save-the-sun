@@ -2,7 +2,13 @@
 // wake()/sleep(), narrated to the UI as events. Any lifecycle failure emits 'error' and settles
 // back to asleep — the button game never depends on this module being alive.
 
-import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from '@google/genai';
+import {
+	GoogleGenAI,
+	Modality,
+	type LiveServerMessage,
+	type Part,
+	type Session
+} from '@google/genai';
 import { LIVE_MODEL, MIC_SAMPLE_RATE, ORACLE_VOICE } from '$lib/voice/config';
 import { ORACLE_SYSTEM_INSTRUCTION } from '$lib/voice/oraclePersona';
 import {
@@ -74,7 +80,7 @@ export function createVoiceSession(): VoiceSession {
 	const listeners = new Set<VoiceListener>();
 
 	function emit(event: VoiceEvent): void {
-		for (const listener of [...listeners]) {
+		for (const listener of listeners) {
 			try {
 				listener(event);
 			} catch (err) {
@@ -221,33 +227,38 @@ export function createVoiceSession(): VoiceSession {
 			awaitingDrain = false;
 			toState('hearing');
 		}
-		if (content.inputTranscription?.text) {
-			emit({ type: 'transcript', direction: 'in', text: content.inputTranscription.text });
-		}
-		if (content.outputTranscription?.text) {
-			emit({ type: 'transcript', direction: 'out', text: content.outputTranscription.text });
-		}
-		for (const part of content.modelTurn?.parts ?? []) {
+		relayTranscript('in', content.inputTranscription?.text);
+		relayTranscript('out', content.outputTranscription?.text);
+		playOracleAudio(content.modelTurn?.parts ?? []);
+		if (content.turnComplete) settleTurn();
+	}
+
+	function relayTranscript(direction: 'in' | 'out', text: string | undefined): void {
+		if (text) emit({ type: 'transcript', direction, text });
+	}
+
+	function playOracleAudio(parts: Part[]): void {
+		for (const part of parts) {
 			const data = part.inlineData?.data;
-			if (typeof data === 'string' && data.length > 0) {
-				try {
-					speaker?.enqueue(data);
-				} catch {
-					// A malformed chunk must not throw into the SDK's socket callback.
-					teeDebug('error', 'voice audio chunk rejected by the speaker');
-					continue;
-				}
-				if (thinkingRescueTimer) clearTimeout(thinkingRescueTimer);
-				thinkingRescueTimer = null;
-				toState('speaking');
+			if (typeof data !== 'string' || data.length === 0) continue;
+			try {
+				speaker?.enqueue(data);
+			} catch {
+				// A malformed chunk must not throw into the SDK's socket callback.
+				teeDebug('error', 'voice audio chunk rejected by the speaker');
+				continue;
 			}
+			if (thinkingRescueTimer) clearTimeout(thinkingRescueTimer);
+			thinkingRescueTimer = null;
+			toState('speaking');
 		}
-		if (content.turnComplete) {
-			if (speaker?.busy) {
-				awaitingDrain = true;
-			} else if (state === 'speaking' || state === 'thinking') {
-				toState('listening');
-			}
+	}
+
+	function settleTurn(): void {
+		if (speaker?.busy) {
+			awaitingDrain = true;
+		} else if (state === 'speaking' || state === 'thinking') {
+			toState('listening');
 		}
 	}
 
@@ -257,48 +268,53 @@ export function createVoiceSession(): VoiceSession {
 		if (state === 'speaking') toState('listening');
 	}
 
-	async function wake(): Promise<void> {
-		if (state !== 'asleep' || waking) return;
-		waking = true;
-		setupFailureDetail = null;
-		const myGeneration = ++generation;
-
-		// Mic first: the permission prompt lands right after the tap, and a denial never burns
-		// a rate-limited token mint.
+	// Mic first: the permission prompt lands right after the tap, and a denial never burns
+	// a rate-limited token mint.
+	async function acquireMic(stale: () => boolean): Promise<boolean> {
 		const verdict = await openMic(onMicChunk);
-		if (generation !== myGeneration) {
+		if (stale()) {
 			if (verdict.ok) verdict.mic.stop();
-			return;
+			return false;
 		}
 		if (!verdict.ok) {
 			fail(verdict.reason, verdict.detail);
-			return;
+			return false;
 		}
 		mic = verdict.mic;
+		return true;
+	}
 
-		let token: string;
+	async function acquireToken(stale: () => boolean): Promise<string | null> {
 		try {
 			const response = await fetch('/api/voice/token', { method: 'POST' });
 			if (!response.ok) throw new Error(`token endpoint returned ${response.status}`);
-			token = ((await response.json()) as { token?: string }).token ?? '';
+			const token = ((await response.json()) as { token?: string }).token ?? '';
 			if (!token) throw new Error('token endpoint returned no token');
 			mintedToken = token;
+			return stale() ? null : token;
 		} catch (err) {
-			if (generation !== myGeneration) return;
-			fail('token', err instanceof Error ? err.message : String(err));
-			return;
+			if (!stale()) fail('token', err instanceof Error ? err.message : String(err));
+			return null;
 		}
-		if (generation !== myGeneration) return;
+	}
 
+	function openSpeaker(): boolean {
 		try {
 			speaker = createSpeaker();
 			speaker.onDrained(onDrained);
+			return true;
 		} catch (err) {
-			// Synchronous since the last generation check — no staleness to guard against.
+			// Synchronous since the caller's last staleness check — nothing to guard against.
 			fail('audio', err instanceof Error ? err.message : String(err));
-			return;
+			return false;
 		}
+	}
 
+	async function connectSession(
+		token: string,
+		myGeneration: number,
+		stale: () => boolean
+	): Promise<boolean> {
 		let connected: Session;
 		try {
 			const client = new GoogleGenAI({ apiKey: token, httpOptions: { apiVersion: 'v1alpha' } });
@@ -327,21 +343,23 @@ export function createVoiceSession(): VoiceSession {
 				}
 			});
 		} catch (err) {
-			if (generation !== myGeneration) return;
-			fail('socket', err instanceof Error ? err.message : String(err));
-			return;
+			if (!stale()) fail('socket', err instanceof Error ? err.message : String(err));
+			return false;
 		}
-		if (generation !== myGeneration) {
+		if (stale()) {
 			// Slept while connecting: teardown already ran, so this socket must die here or leak.
 			try {
 				connected.close();
 			} catch {
 				// Already closed.
 			}
-			return;
+			return false;
 		}
 		session = connected;
+		return true;
+	}
 
+	async function awaitSetup(stale: () => boolean): Promise<boolean> {
 		const ready = await new Promise<boolean>((resolve) => {
 			setupResolver = resolve;
 			setTimeout(() => {
@@ -351,11 +369,27 @@ export function createVoiceSession(): VoiceSession {
 				}
 			}, SETUP_TIMEOUT_MS);
 		});
-		if (generation !== myGeneration) return;
+		if (stale()) return false;
 		if (!ready) {
 			fail('socket', setupFailureDetail ?? 'session setup never completed');
-			return;
+			return false;
 		}
+		return true;
+	}
+
+	async function wake(): Promise<void> {
+		if (state !== 'asleep' || waking) return;
+		waking = true;
+		setupFailureDetail = null;
+		const myGeneration = ++generation;
+		const stale = () => generation !== myGeneration;
+
+		if (!(await acquireMic(stale))) return;
+		const token = await acquireToken(stale);
+		if (token === null) return;
+		if (!openSpeaker()) return;
+		if (!(await connectSession(token, myGeneration, stale))) return;
+		if (!(await awaitSetup(stale))) return;
 
 		liveReady = true;
 		waking = false;
