@@ -49,6 +49,10 @@ export default defineConfig({
 				'src/lib/pwaAssets.ts': { lines: 100, branches: 100 },
 				'src/routes/api/action/+server.ts': { lines: 90, branches: 85 },
 				'src/routes/api/new-game/+server.ts': { lines: 90, branches: 85 },
+				// The voice token mint guards the long-lived key; pure abuse-guard logic holds
+				// the engine-adjacent bar, the route holds the route floor.
+				'src/lib/server/voice/rateLimit.ts': { lines: 100, branches: 95 },
+				'src/routes/api/voice/token/+server.ts': { lines: 90, branches: 85 },
 				'src/lib/components/**': { lines: 80, branches: 70 },
 				'src/routes/+page.svelte': { lines: 80, branches: 70 }
 			}

@@ -95,8 +95,9 @@ function toSerializable(value: unknown): unknown {
 
 // The one hard secrecy rule of this log: the Gemini API key never enters it. SDK error strings can
 // embed the request URL (and with it the key), so every string is scrubbed at both sinks
-// (logEvent and captureGemini) before it is stored.
-function maskApiKey(value: string): string {
+// (logEvent and captureGemini) before it is stored. Exported as the single implementation of the
+// rule — any other sink that logs SDK errors (e.g. the voice token route) masks through this.
+export function maskApiKey(value: string): string {
 	const key = env.GEMINI_API_KEY;
 	return key ? value.split(key).join('[gemini-api-key]') : value;
 }

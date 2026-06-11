@@ -11,10 +11,10 @@
 
 Add endpoint to existing Cloud Run server: mint Live API ephemeral token using Gemini key from Google Secret Manager.
 
-- [ ] `POST /api/voice/token` returns short-lived ephemeral token per Live API spec
-- [ ] Long-lived key never in any response, log, or client bundle
-- [ ] Deploys with existing server; no new infra
-- [ ] Rate-limit the endpoint (basic abuse guard)
+- [x] `POST /api/voice/token` returns short-lived ephemeral token per Live API spec
+- [x] Long-lived key never in any response, log, or client bundle
+- [x] Deploys with existing server; no new infra
+- [x] Rate-limit the endpoint (basic abuse guard)
 
 ### S2 — Live session client (R1)
 
