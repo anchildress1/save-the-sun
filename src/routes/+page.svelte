@@ -1428,6 +1428,7 @@
 		}
 
 		.board-section :global(.rune-card) {
+			max-width: 13.25rem;
 			--pip-icon-size: 14px;
 			--symbol-box-height: 2.8rem;
 			--symbol-image-width: auto;

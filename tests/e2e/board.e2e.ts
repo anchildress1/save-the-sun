@@ -73,6 +73,28 @@ test.describe('the live board (past the title screen)', () => {
 		expect(symbolNameOverlaps).toEqual([]);
 	});
 
+	test('keeps embed-mode rune cards capped at their natural 4:5 ratio', async ({ page }) => {
+		await page.setViewportSize({ width: 1024, height: 768 });
+		await page.goto('/');
+		const cards = await page.locator('.rune-card').evaluateAll((els) =>
+			els.slice(0, 4).map((el) => {
+				const card = el.getBoundingClientRect();
+				const wrapper = el.parentElement!.getBoundingClientRect();
+				return {
+					width: card.width,
+					height: card.height,
+					centerDelta: Math.abs(card.left + card.width / 2 - (wrapper.left + wrapper.width / 2))
+				};
+			})
+		);
+		expect(cards).toHaveLength(4);
+		for (const card of cards) {
+			expect(card.width).toBeLessThanOrEqual(213);
+			expect(card.width / card.height).toBeCloseTo(4 / 5, 1);
+			expect(card.centerDelta).toBeLessThan(1);
+		}
+	});
+
 	test('shows the rite, not the notice, at desktop width', async ({ page }) => {
 		await page.setViewportSize({ width: 1440, height: 900 });
 		await page.goto('/');

@@ -159,10 +159,11 @@
 	}
 
 	.rune-card-wrapper {
-		/* Stable positioning wrapper for the staggered entrance. Block (not flex/stretch)
-		   so the card's aspect-ratio governs its height. Visible by default so a
-		   failed/absent GSAP run never leaves the board blank. */
-		display: block;
+		/* Stable positioning wrapper for the staggered entrance. Centering keeps capped
+		   embed cards from clinging to one side of an oversized grid cell. */
+		display: flex;
+		justify-content: center;
+		width: 100%;
 	}
 
 	.sr-only {
