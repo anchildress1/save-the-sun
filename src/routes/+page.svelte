@@ -7,7 +7,9 @@
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
-	import moonSplash from '$lib/assets-webp/banners/moon-splash-header.webp?url&no-inline';
+	// ?inline (against the repo's no-inline convention) on purpose: this 10KB sky is the LCP
+	// element, and shipping it inside the HTML removes the fetch entirely — it paints at first render.
+	import moonSplash from '$lib/assets-webp/banners/moon-splash-header.webp?inline';
 	import skollBanner from '$lib/assets-webp/banners/skoll-banner.webp?url&no-inline';
 	import introSplash from '$lib/assets-webp/banners/intro-splash.webp?url&no-inline';
 	import uiDivider from '$lib/assets-webp/ui/divider.webp?url&no-inline';
@@ -494,9 +496,6 @@
 	<!-- Assets the preload scanner can't see: the title splash mounts only after hydration
 	     (Onboarding) and the divider hides behind a CSS var — both paint on first load, so
 	     fetch them with the document instead of after it. -->
-	<!-- The header sky is the LCP element; it alone keeps high priority so the title splash,
-	     fonts, and chrome don't starve it of (throttled) bandwidth before first paint. -->
-	<link rel="preload" as="image" type="image/webp" href={moonSplash} fetchpriority="high" />
 	<link rel="preload" as="image" type="image/webp" href={introSplash} />
 	<link rel="preload" as="image" type="image/webp" href={uiDivider} />
 </svelte:head>
@@ -508,6 +507,8 @@
 
 <main style="--night-t: {nightT.toFixed(3)}">
 	<header class="rite-header" style="--night-t: {nightT.toFixed(3)}">
+		<!-- decoding=sync: the sky is inlined (no fetch), so async decode would only push the
+		     LCP paint past first render for nothing. -->
 		<img
 			class="header-background-image"
 			src={moonSplash}
@@ -515,7 +516,7 @@
 			height="187"
 			alt=""
 			aria-hidden="true"
-			decoding="async"
+			decoding="sync"
 			fetchpriority="high"
 		/>
 		<div class="title-block">
