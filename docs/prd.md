@@ -31,7 +31,7 @@ A two-player race to name one hidden rune before Sköll, the wolf who hunts the 
 3. **Adaptive Sköll difficulty or profiling.** Sköll responds only to the current round state. There is no cross-round learning, player profile, or rubber-banding; the deterministic policy is a fallback floor, not the opponent.
 4. **Any literal card mechanic** — deck, hand, draw, discard, or drag-to-cast. Runes are cards visually; the only action is cross-off. Scry/Hex are one-use reactions, not cards.
 5. **Original recorded voiceover.** Audio is ambient beds, not authored narration.
-6. **Mobile-first polish.** Desktop web is the target surface; small screens get a "best on desktop" notice rather than a responsive reflow.
+6. **Mobile-first polish.** Desktop web is the target surface; the embedded board works down to 750px, and smaller screens get a "best on desktop" notice rather than a responsive reflow.
 7. **Localization.** English-only build; the world-noun consistency in `ux-copy.md` is for voice, not translation.
 
 ## Players & Audience
@@ -170,7 +170,7 @@ Deterministic fallback (acceptance criteria — this is the floor that fires **o
 
 **R9. Accessibility basics (screen reader deferred to v1.5).** v1 must cover keyboard operability with visible focus, semantic labels for controls, no information by color alone (the color name accompanies every swatch and element carries text), WCAG 2.1 AA contrast including the dark palette, `prefers-reduced-motion` cutting motion to instant and keeping audio muted while responding to live changes, operability at 200% zoom, and a Lighthouse a11y pass in CI. Full screen-reader narration/navigation is v1.5.
 
-**R10. Best-on-desktop notice** below the 1280px minimum — no responsive reflow. (Small-desktop/1024px support is deferred to v2.)
+**R10. Best-on-desktop notice** below the 750px minimum. The 750px+ embedded board uses a compact single-column layout; smaller screens get the notice.
 
 **R11. End screen** — win/lose lines and in-world replay.
 

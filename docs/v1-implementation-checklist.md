@@ -269,13 +269,13 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [x] WCAG 2.1 AA contrast across **both** light and dark rune palettes
 - [x] No information by color alone (cross-check S4)
 - [x] `prefers-reduced-motion` → motion instant, audio muted, still reflects live state changes
-- [x] At 200% zoom the effective width falls below the **1280px** floor → the best-on-desktop notice shows (no reflow — consistent with the width rules); full in-game operability at 200% zoom is a v2 concern with 1024px responsive support
-- [x] Best-on-desktop notice below the **1280px** minimum — **no** responsive reflow attempted (1024px support is v2)
+- [x] At 200% zoom the 1536px desktop target still has a 768px effective width → the compact embedded board remains playable above the **750px** floor
+- [x] Best-on-desktop notice below the **750px** minimum; the rite renders in a compact embedded layout at 750px+
 - [x] Degradation: Plain (v1) round fully winnable on the static grid, audio muted by default; Reduced tier (reduced-motion) stays unaffected and fair
 
 **Implementation (S10):** the a11y surface was built in over S3–S9 (`sr-only` field labels, `:focus-visible` rings on every control via the `--focus-ring` token, `aria-label`s on the rune-card buttons that carry power + light/dark in the accessible name, no-color-alone trait text, the global `prefers-reduced-motion` cut in `theme.css` plus the GSAP-skip in `RuneGrid`/`EndScreen`). S10 **proves** it rather than adding to it: an axe sweep (`@axe-core/playwright`, `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`) over every surface — the live board, the crossed + armed states (both rune palettes on screen at once), the first-run title, the coach-mark tour, the reaction prompt, and both end screens — comes back with zero violations; a keyboard suite plays the whole round (arm → select → name it, ask, cross, Hex) with no pointer and asserts the focus ring + untrapped Tab order; reduced-motion is checked at the component level (the end-screen verse and the board entrance are present at full opacity at once) and end-to-end (a full round is winnable with motion cut). v1 ships **no** audio and **no** WebGL, so "audio muted by default" is structural (nothing to unmute) and reduced-motion is the only reduced tier.
 
-**Tests landed:** [E][A] keyboard round + full keyboard cast path, visible focus ring, untrapped Tab order (`a11y.e2e`) · [A] axe names/roles + contrast + color-independence across all surfaces (`a11y.e2e`) · [C] reduced-motion motion-instant + still-live (`reducedMotion.svelte.test`) · [E] Reduced-tier round winnable + fair, no audio element (`degradation.e2e`) · [E] 200%-zoom / best-on-desktop notice below 1280 (`board.e2e`). [S] fairness invariant is the in-CI round-solvability property test (engine).
+**Tests landed:** [E][A] keyboard round + full keyboard cast path, visible focus ring, untrapped Tab order (`a11y.e2e`) · [A] axe names/roles + contrast + color-independence across all surfaces (`a11y.e2e`) · [C] reduced-motion motion-instant + still-live (`reducedMotion.svelte.test`) · [E] Reduced-tier round winnable + fair, no audio element (`degradation.e2e`) · [E] 750px embed floor / best-on-desktop notice below 750 (`board.e2e`). [S] fairness invariant is the in-CI round-solvability property test (engine).
 
 **Done when:** the a11y suites are green in CI. _(The literal Lighthouse-a11y CI gate is **not** wired: the global no-lhci-in-GHA rule stands, so the in-CI a11y gate is the axe sweep — run in the existing e2e step, failing the build on any violation. `lhci autorun` stays available locally via `make perf` for the ≥ 0.95 score check.)_
 
@@ -332,7 +332,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 3. Cast win animation — glyph carves into stone + luminous Sól beat; honors reduced motion
 4. Voice interaction with Gemini — speak the Ask, hear the Oracle/Sköll (TTS)
 5. Wrong-cast penalty — cap ≈2 wrong casts per player (threshold on the v1 counter; alternation unaffected)
-6. Small-desktop support down to 750px — a responsive board below the v1 1280px floor (v1 just shows the best-on-desktop notice there)
+6. ~~Small-desktop support down to 750px — compact embedded board at 750px+, best-on-desktop notice below that floor~~
 7. Asset delivery pipeline — generate AVIF/WebP fallbacks for large stone, banner, chalk, and rune assets; ship responsive variants where the UI has multiple display sizes; keep a checked bundle-size budget so deploy cost and first-load weight do not creep back up
    - [ ] Cleanup: align all generated image assets to one stable stylized art direction before adding more format variants
    - [ ] Generate AVIF/WebP fallbacks for large stone, banner, chalk, rune, element, color, and fill assets

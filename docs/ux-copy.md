@@ -214,7 +214,7 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 | Board, before any Ask | "Twenty-four runes stand. None ruled out. Ask the Oracle." |
 | Connection / engine error | "The Oracle falls silent — the rite can't reach Sól. Draw breath, and ask again." |
 | Action while it's Sköll's move | "The wolf is moving. Hold." |
-| Below the desktop minimum (1280px)—best-on-desktop notice, no reflow (R10) | "The rite needs a wider sky. Return on a desktop to take up the runes." |
+| Below the desktop minimum (750px)—best-on-desktop notice (R10) | "The rite needs a wider sky. Return on a desktop to take up the runes." |
 
 ---
 
