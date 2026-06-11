@@ -31,5 +31,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (dev) console.debug(`[session] created ${sessionId}`);
 	}
 	event.locals.sessionId = sessionId;
-	return resolve(event);
+	const response = await resolve(event);
+
+	// Every deploy replaces the Cloud Run image, deleting the previous build's hashed
+	// /_app/immutable assets. A cached HTML document outlives the assets it references,
+	// so the page must always revalidate — otherwise stale HTML 404s on its own CSS/JS.
+	if (response.headers.get('content-type')?.includes('text/html')) {
+		response.headers.set('cache-control', 'no-cache');
+	}
+	return response;
 };
