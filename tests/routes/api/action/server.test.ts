@@ -321,10 +321,11 @@ describe('POST /api/action', () => {
 	const geminiIO = () => byOwner('Sköll').filter((e) => e.sensitive);
 
 	describe('debug log (S8)', () => {
-		it('opens the round with the secret as a sensitive Engine event tagged Round', () => {
+		it('opens the round without exposing the secret or its seed', () => {
 			const secretEv = byOwner('Engine').find((e) => e.part === 'Round')!;
-			expect(secretEv).toMatchObject({ kind: 'deterministic', sensitive: true, part: 'Round' });
-			expect(secretEv.data).toMatchObject({ secret: SECRET });
+			expect(secretEv).toMatchObject({ kind: 'deterministic', part: 'Round' });
+			expect(secretEv.message).not.toContain(SECRET);
+			expect(secretEv.data).toBeUndefined();
 		});
 
 		it('splits a human Ask into her input, the Oracle’s reading, and the engine’s verdict', async () => {
