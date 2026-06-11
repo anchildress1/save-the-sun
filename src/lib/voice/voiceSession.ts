@@ -296,8 +296,10 @@ export function createVoiceSession(): VoiceSession {
 			if (!response.ok) throw new Error(`token endpoint returned ${response.status}`);
 			const token = ((await response.json()) as { token?: string }).token ?? '';
 			if (!token) throw new Error('token endpoint returned no token');
+			// A canceled wake can finish after a later wake; never let its token replace the active scrubber.
+			if (stale()) return null;
 			mintedToken = token;
-			return stale() ? null : token;
+			return token;
 		} catch (err) {
 			if (!stale()) fail('token', err instanceof Error ? err.message : String(err));
 			return null;

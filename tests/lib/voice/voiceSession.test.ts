@@ -387,6 +387,38 @@ describe('voiceSession sleep', () => {
 		expect(eventTypes()).toEqual(['waking', 'asleep']);
 	});
 
+	it('a stale token response never replaces the scrub token for a later wake', async () => {
+		let tokenMints = 0;
+		let mintStaleToken!: (value: unknown) => void;
+		fetchMock.mockImplementation((url: string) => {
+			if (url !== '/api/voice/token') return Promise.resolve({ ok: true, status: 204 });
+			tokenMints++;
+			if (tokenMints === 1) {
+				return new Promise((resolve) => {
+					mintStaleToken = resolve;
+				});
+			}
+			return Promise.resolve(tokenResponse({ token: 'auth_tokens/active' }));
+		});
+
+		const staleWake = vs.wake();
+		await vi.advanceTimersByTimeAsync(0);
+		vs.sleep();
+
+		const activeWake = vs.wake();
+		await vi.advanceTimersByTimeAsync(0);
+		callbacks!.onmessage({ setupComplete: {} });
+		await activeWake;
+
+		mintStaleToken(tokenResponse({ token: 'auth_tokens/stale' }));
+		await staleWake;
+		callbacks!.onclose({ code: 1011, reason: 'quota for auth_tokens/active' });
+
+		const teed = teeBodies().join(' ');
+		expect(teed).toContain('[ephemeral-token]');
+		expect(teed).not.toContain('auth_tokens/active');
+	});
+
 	it('sleep racing the mic grant releases the mic the moment it lands', async () => {
 		let grantMic!: (verdict: unknown) => void;
 		audio.openMic.mockImplementationOnce(
