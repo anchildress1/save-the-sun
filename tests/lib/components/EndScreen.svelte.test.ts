@@ -95,6 +95,12 @@ describe('EndScreen — defeat sequence', () => {
 		const img = root.querySelector('img.splash') as HTMLImageElement;
 		expect(img.getAttribute('src')).toMatch(/defeat-splash/);
 	});
+
+	it('darkens the defeat rite surface so the modal reads intentionally over the dark splash', () => {
+		const screen = renderLose();
+		const rite = screen.container.querySelector('.rite') as HTMLElement;
+		expect(getComputedStyle(rite).backgroundImage).toContain('rgba(6, 9, 18, 0.78)');
+	});
 });
 
 describe('EndScreen — accessibility & voice', () => {

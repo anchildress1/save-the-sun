@@ -183,6 +183,15 @@
 		);
 	}
 
+	.lose .rite {
+		background: radial-gradient(
+			ellipse 92% 128% at 50% 50%,
+			rgba(6, 9, 18, 0.78) 0%,
+			rgba(6, 9, 18, 0.42) 58%,
+			transparent 84%
+		);
+	}
+
 	.line {
 		margin: 0;
 		opacity: 0;
