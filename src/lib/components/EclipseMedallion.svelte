@@ -39,7 +39,7 @@
 		data-testid="eclipse-medallion"
 		data-voice-state={current}
 		aria-label={MEDALLION_LABEL[current]}
-		style="--flare: {flare}"
+		style="--flare: {flare}; --ring-step: {360 / RING_RUNES.length}deg"
 		onclick={onToggle}
 	>
 		<span class="visual" aria-hidden="true">
@@ -162,7 +162,7 @@
 		width: 1rem;
 		height: 1rem;
 		margin: -0.5rem;
-		transform: rotate(calc(var(--i) * 45deg)) translateY(calc(var(--ring-r) * -1));
+		transform: rotate(calc(var(--i) * var(--ring-step))) translateY(calc(var(--ring-r) * -1));
 		/* The card glyphs are carved-stone dark; re-tint them aged gold for the rim. */
 		--rune-tint: invert(0.78) sepia(0.55) saturate(4) hue-rotate(-18deg) brightness(1.15);
 		filter: var(--rune-tint);

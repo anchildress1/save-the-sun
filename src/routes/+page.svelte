@@ -175,8 +175,8 @@
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
 	);
 
-	// The medallion mirrors the voice session (S3). Its state is a superset of VoiceState:
-	// 'skoll-speaking' arrives with the S13 director, never from the session itself. The failure
+	// The medallion mirrors the voice session. Its state is a superset of VoiceState:
+	// 'skoll-speaking' arrives with the director, never from the session itself. The failure
 	// notice renders by the medallion — not in the Oracle's answer frame, which is her voiced
 	// surface and persists across reloads; a transient voice failure must do neither.
 	let voiceState = $state<MedallionState>('asleep');
@@ -193,17 +193,24 @@
 				voiceState = 'asleep';
 				voiceAmplitude = 0;
 				break;
-			case 'listening':
-				voiceState = 'listening';
-				voiceNotice = ''; // a successful wake clears the last failure
-				break;
 			case 'waking':
+				voiceState = 'waking';
+				// Cleared as the retry STARTS, not on success: a stale failure line under a stirring
+				// medallion contradicts it, and an identical re-failure must re-announce (same string
+				// assigned over itself is no change — no narration).
+				voiceNotice = '';
+				break;
+			case 'listening':
 			case 'thinking':
 			case 'speaking':
 				voiceState = event.type;
 				break;
 			case 'error':
 				voiceNotice = event.notice;
+				// The session emits asleep right after every error, but settle locally too — a
+				// medallion stranded in waking would promise a silence-tap it can't honor.
+				voiceState = 'asleep';
+				voiceAmplitude = 0;
 				break;
 			case 'transcript':
 				break; // rendered by S10
@@ -673,10 +680,9 @@
 			/>
 
 			<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
-			{#if voiceNotice}
-				<!-- role=status: the quiet voice-failure line is narrated without stealing focus. -->
-				<p class="voice-notice" data-testid="voice-notice" role="status">{voiceNotice}</p>
-			{/if}
+			<!-- Rendered unconditionally: a live region mounted with its content already inside is
+			     skipped by most screen readers — it must exist first, then change. -->
+			<p class="voice-notice" data-testid="voice-notice" role="status">{voiceNotice}</p>
 
 			<div class="turn-pill-row">
 				<!-- role=status: turn changes are narrated politely without stealing focus (v1.5 SR pass). -->
@@ -1177,6 +1183,11 @@
 		font-size: 0.85rem;
 		font-style: italic;
 		color: var(--ink-muted);
+	}
+
+	/* The region stays mounted while empty (live-region rule); don't let it leave a gap. */
+	.voice-notice:empty {
+		margin: 0;
 	}
 
 	.oracle-title {

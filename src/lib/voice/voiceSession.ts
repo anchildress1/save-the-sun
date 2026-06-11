@@ -36,7 +36,8 @@ export type VoiceEvent =
 export type VoiceListener = (event: VoiceEvent) => void;
 
 export interface VoiceSession {
-	/** Open the Live session: mic, token, socket. Resolves once listening (or after failing). */
+	/** Open the Live session: mic, token, socket. Resolves once listening, or after the wake
+	 * fails or is canceled by sleep(). Never rejects. */
 	wake(): Promise<void>;
 	/** Close everything and return to asleep. Safe in any state. */
 	sleep(): void;
@@ -315,33 +316,38 @@ export function createVoiceSession(): VoiceSession {
 		}
 	}
 
-	// A connect that resolves after losing the race must die here, or its socket leaks.
+	// A connect that resolves after losing the race must die here, or its socket leaks — and a
+	// late settle of either kind must reach /debug, or the timeout line is the only diagnostic
+	// left when the endpoint was merely slow.
 	function raceConnectTimeout(attempt: Promise<Session>): Promise<Session> {
-		return new Promise((resolve, reject) => {
-			let timedOut = false;
-			const timer = setTimeout(() => {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let timedOut = false;
+		const timeout = new Promise<never>((_, reject) => {
+			timer = setTimeout(() => {
 				timedOut = true;
 				reject(new Error(`live connect timed out after ${CONNECT_TIMEOUT_MS}ms`));
 			}, CONNECT_TIMEOUT_MS);
-			attempt.then(
-				(session) => {
-					clearTimeout(timer);
-					if (!timedOut) {
-						resolve(session);
-						return;
-					}
-					try {
-						session.close();
-					} catch {
-						// Already dead.
-					}
-				},
-				(err) => {
-					clearTimeout(timer);
-					if (!timedOut) reject(err);
-				}
-			);
 		});
+		attempt.then(
+			(session) => {
+				clearTimeout(timer);
+				if (!timedOut) return;
+				teeDebug('info', 'live connect resolved after the timeout — closing the stale socket');
+				try {
+					session.close();
+				} catch {
+					// Already dead.
+				}
+			},
+			(err) => {
+				clearTimeout(timer);
+				if (timedOut) {
+					const detail = err instanceof Error ? err.message : String(err);
+					teeDebug('error', `late connect rejection after timeout: ${detail}`);
+				}
+			}
+		);
+		return Promise.race([attempt, timeout]);
 	}
 
 	async function connectSession(

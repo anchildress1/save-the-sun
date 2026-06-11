@@ -4,11 +4,12 @@
 import type { VoiceState } from '$lib/voice/voiceSession';
 import type { RuneName } from './runeVisuals';
 
-/** Display union: S2's five voice states plus Sköll's playback, driven by the S13 director. */
+/** Display union: every session voice state plus Sköll's playback, driven by the S13 director. */
 export type MedallionState = VoiceState | 'skoll-speaking';
 
 // Canonical copy: docs/ux-copy.md §6 (eclipse medallion). State first, then what a tap does.
-export const MEDALLION_LABEL: Record<MedallionState, string> = {
+// Frozen: mutating these at runtime would silently fork them from the canonical copy.
+export const MEDALLION_LABEL = {
 	asleep: 'The voice sleeps. Wake the Oracle.',
 	waking: 'The Oracle stirs. Silence the voice.',
 	listening: 'The Oracle listens. Silence the voice.',
@@ -16,12 +17,12 @@ export const MEDALLION_LABEL: Record<MedallionState, string> = {
 	thinking: 'The Oracle considers. Silence the voice.',
 	speaking: 'The Oracle speaks. Silence the voice.',
 	'skoll-speaking': 'Sköll speaks. Silence the voice.'
-};
+} as const satisfies Record<MedallionState, string>;
 
 // Polite live-region lines for the transitions a player must never miss: mic privacy and who
 // holds the fire. null = stay quiet (hearing/thinking are still "listening" to a listener,
 // and announcing every utterance would drown the screen reader in chatter).
-export const MEDALLION_ANNOUNCEMENT: Record<MedallionState, string | null> = {
+export const MEDALLION_ANNOUNCEMENT = {
 	asleep: 'The voice sleeps.',
 	waking: 'The Oracle stirs.',
 	listening: 'The Oracle listens.',
@@ -29,7 +30,7 @@ export const MEDALLION_ANNOUNCEMENT: Record<MedallionState, string | null> = {
 	thinking: null,
 	speaking: 'The Oracle speaks.',
 	'skoll-speaking': 'Sköll speaks.'
-};
+} as const satisfies Record<MedallionState, string | null>;
 
 // Rim glyphs (decorative, reused card assets per R6). Ansuz leads — the rune of the spoken word.
 export const RING_RUNES: readonly RuneName[] = [

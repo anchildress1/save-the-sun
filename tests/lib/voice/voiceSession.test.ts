@@ -272,6 +272,17 @@ describe('voiceSession oracle speech', () => {
 		expect(vs.state).toBe('listening');
 	});
 
+	it('a turnComplete with no audio settles thinking straight back to listening', async () => {
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
+		// The model can end a turn without speaking (e.g. a safety skip) — the UI must not sit
+		// in thinking for the full rescue window.
+		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		expect(vs.state).toBe('listening');
+	});
+
 	it('a mid-turn buffer gap never reads as the turn ending', () => {
 		callbacks!.onmessage({
 			serverContent: { modelTurn: { parts: [{ inlineData: { data: 'one' } }] } }
@@ -355,6 +366,25 @@ describe('voiceSession sleep', () => {
 		expect(eventTypes()).toEqual(['waking', 'asleep']);
 		expect(vs.state).toBe('asleep');
 		expect(teeBodies().join(' ')).toContain('voice wake canceled');
+	});
+
+	it('sleep racing the token mint never opens the speaker or socket', async () => {
+		let mintToken!: (value: unknown) => void;
+		fetchMock.mockImplementation((url: string) =>
+			url === '/api/voice/token'
+				? new Promise((resolve) => {
+						mintToken = resolve;
+					})
+				: Promise.resolve({ ok: true, status: 204 })
+		);
+		const woke = vs.wake();
+		await vi.advanceTimersByTimeAsync(0); // mic granted, mint still pending
+		vs.sleep();
+		mintToken(tokenResponse());
+		await woke;
+		expect(audio.createSpeaker).not.toHaveBeenCalled();
+		expect(sdk.connect).not.toHaveBeenCalled();
+		expect(eventTypes()).toEqual(['waking', 'asleep']);
 	});
 
 	it('sleep racing the mic grant releases the mic the moment it lands', async () => {
@@ -533,6 +563,28 @@ describe('voiceSession failures', () => {
 		finishConnect();
 		await vi.advanceTimersByTimeAsync(0);
 		expect(liveSession.close).toHaveBeenCalledTimes(1);
+		// The late settle is diagnosable: "alive but slow" and "dead" are different tunings.
+		expect(teeBodies().join(' ')).toContain('closing the stale socket');
+	});
+
+	it('a connect rejecting after its timeout lands its reason in the tee, token scrubbed', async () => {
+		let failConnect!: (err: Error) => void;
+		sdk.connect.mockImplementationOnce(
+			() =>
+				new Promise((_, reject) => {
+					failConnect = reject;
+				})
+		);
+		const woke = vs.wake();
+		await vi.advanceTimersByTimeAsync(0);
+		await vi.advanceTimersByTimeAsync(10_000);
+		await woke;
+		failConnect(new Error('quota refused for auth_tokens/t1'));
+		await vi.advanceTimersByTimeAsync(0);
+		const teed = teeBodies().join(' ');
+		expect(teed).toContain('late connect rejection after timeout');
+		expect(teed).toContain('[ephemeral-token]');
+		expect(teed).not.toContain('auth_tokens/t1');
 	});
 
 	it('a socket that closes during setup fails the wake exactly once', async () => {

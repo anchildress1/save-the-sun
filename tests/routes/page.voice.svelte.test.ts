@@ -171,6 +171,13 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 		expect((medallion.element() as HTMLElement).style.getPropertyValue('--flare')).toBe('0');
 	});
 
+	it('mounts the notice region empty from first paint — a region born with content is never narrated', async () => {
+		const screen = render(Page, pageProps);
+		const notice = screen.getByTestId('voice-notice').element();
+		expect(notice.getAttribute('role')).toBe('status');
+		expect(notice.textContent).toBe('');
+	});
+
 	it('shows the failure notice by the medallion — never in the Oracle answer frame', async () => {
 		const screen = render(Page, pageProps);
 		emit({
@@ -178,31 +185,29 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 			reason: 'socket',
 			notice: "The Oracle's voice falters. The rite continues by hand."
 		});
-		emit({ type: 'asleep' });
 		await expect
 			.element(screen.getByTestId('voice-notice'))
 			.toHaveTextContent("The Oracle's voice falters. The rite continues by hand.");
-		// role=status: a blind player must hear why the voice died, politely.
-		expect(screen.getByTestId('voice-notice').element().getAttribute('role')).toBe('status');
 		// The answer frame is her voiced surface (and persists across reloads) — it must stay clean.
 		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
+		// The error alone settles the medallion — it must never strand in waking promising
+		// a silence-tap it can't honor, even if the session's asleep event were lost.
 		await expect
 			.element(screen.getByTestId('eclipse-medallion'))
 			.toHaveAttribute('data-voice-state', 'asleep');
 	});
 
-	it('clears the failure notice once a later wake reaches listening', async () => {
+	it('clears the failure notice the moment a retry starts waking — a re-failure re-announces', async () => {
 		const screen = render(Page, pageProps);
-		emit({
-			type: 'error',
-			reason: 'token',
-			notice: 'The fire does not carry your voice tonight. The rite continues by hand.'
-		});
-		await expect.element(screen.getByTestId('voice-notice')).toBeInTheDocument();
-		emit({ type: 'listening' });
-		await expect
-			.poll(() => screen.container.querySelector('[data-testid="voice-notice"]'))
-			.toBeNull();
+		const notice = 'The fire does not carry your voice tonight. The rite continues by hand.';
+		emit({ type: 'error', reason: 'token', notice });
+		await expect.element(screen.getByTestId('voice-notice')).toHaveTextContent(notice);
+		// Retry starts: the stale line must not sit under a stirring medallion...
+		emit({ type: 'waking' });
+		await expect.poll(() => screen.getByTestId('voice-notice').element().textContent).toBe('');
+		// ...and the identical failure landing again is a real content change — narrated.
+		emit({ type: 'error', reason: 'token', notice });
+		await expect.element(screen.getByTestId('voice-notice')).toHaveTextContent(notice);
 	});
 
 	it('ignores transcript fragments — they belong to S10, and must not disturb the panel', async () => {
@@ -212,7 +217,7 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 			.element(screen.getByTestId('eclipse-medallion'))
 			.toHaveAttribute('data-voice-state', 'asleep');
 		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
-		expect(screen.container.querySelector('[data-testid="voice-notice"]')).toBeNull();
+		expect(screen.getByTestId('voice-notice').element().textContent).toBe('');
 	});
 
 	it('unsubscribes and sleeps the session when the page unmounts — the mic never outlives the UI', async () => {
