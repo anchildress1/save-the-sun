@@ -53,6 +53,11 @@ export default defineConfig({
 				// the engine-adjacent bar, the route holds the route floor.
 				'src/lib/server/voice/rateLimit.ts': { lines: 100, branches: 95 },
 				'src/routes/api/voice/token/+server.ts': { lines: 90, branches: 85 },
+				// The Live session client must always settle to asleep on failure — the button game
+				// never depends on it — so the state machine holds an engine-adjacent bar.
+				'src/lib/voice/voiceSession.ts': { lines: 95, branches: 80 },
+				'src/lib/voice/audio.ts': { lines: 95, branches: 80 },
+				'src/routes/api/voice/debug/+server.ts': { lines: 90, branches: 85 },
 				'src/lib/components/**': { lines: 80, branches: 70 },
 				'src/routes/+page.svelte': { lines: 80, branches: 70 }
 			}

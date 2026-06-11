@@ -1,7 +1,7 @@
 # Save the Sun — v2 Implementation Checklist (Voice Story Order) 🎫
 
 > Implementation units for AI agents. Source of truth: `voice-interaction-spec.md`. Refs = requirement IDs there.
-> Config constants: Oracle voice `Gacrux` (fallback `Kore` if absent on Live), Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, silence timeout 8000ms.
+> Config constants: Oracle voice `Gacrux` (verified on Live 2026-06-11 — `Kore` fallback not needed), Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, silence timeout 8000ms.
 
 ---
 
@@ -20,11 +20,11 @@ Add endpoint to existing Cloud Run server: mint Live API ephemeral token using G
 
 Client module owning the Live API WebSocket lifecycle: connect with ephemeral token, stream mic PCM (16-bit/16kHz) in, play audio (24kHz) out.
 
-- [ ] `voiceSession.wake()` / `voiceSession.sleep()` API consumed by UI
-- [ ] Barge-in: player speech interrupts Oracle playback immediately
-- [ ] Emits events: `listening`, `hearing`, `thinking`, `speaking`, `asleep`, `error`, `transcript(in|out)`
-- [ ] On socket drop/error: emit `error`, revert to asleep, non-blocking notice; game continues on buttons
-- [ ] System instruction: Oracle persona (measured, ritual cadence, knows the answer before you ask)
+- [x] `voiceSession.wake()` / `voiceSession.sleep()` API consumed by UI
+- [x] Barge-in: player speech interrupts Oracle playback immediately
+- [x] Emits events: `listening`, `hearing`, `thinking`, `speaking`, `asleep`, `error`, `transcript(in|out)`
+- [x] On socket drop/error: emit `error`, revert to asleep, non-blocking notice; game continues on buttons
+- [x] System instruction: Oracle persona (measured, ritual cadence, knows the answer before you ask)
 - Depends: S1
 
 ### S3 — Eclipse medallion component (R6)
