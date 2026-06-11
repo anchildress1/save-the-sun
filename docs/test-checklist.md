@@ -106,7 +106,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [C] Each card shows glyph, swatch, name + meaning, power as a row of pips (count = power, no numeral), element symbol + name, color name (rune id not shown; light/dark encoded by pip color — white light / black dark; pip count + fill spoken in the accessible name as "{n} light/dark power", never as visible text)
 - [x] [A] Color name + element name accompany icons — nothing by color alone
 - [x] [C] Card dims in place when crossed; restore affordance works
-- [x] [C] Header: title, tagline, night-progress; turn pill ("Your move." / "Sköll moves.") sits at the top of the Oracle panel, beside the controls it gates _(moved off the header in S7)_
+- [x] [C][E] Header: title, tagline, night-progress; the painted moon sinks as turns pass and fully sets on a human win; turn pill ("Your move." / "Sköll moves.") sits at the top of the Oracle panel, beside the controls it gates _(moved off the header in S7)_
 - [x] [C] Round resolved: header swaps the moon → risen sun on a human win, holds the moon on a Sköll win, with the short resolution tag; the outcome pill flips and the Oracle panel carries the full resolution line
 - [ ] [V] Visual regression snapshots for grid + crossed/armed states _(→ v1.5 with the separate graphics layer; v1 captures state screenshots as e2e artifacts only — no pixel-diff baselines)_
 

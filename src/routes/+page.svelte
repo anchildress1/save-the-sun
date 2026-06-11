@@ -98,6 +98,8 @@
 	let nightProgress = $derived(
 		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
 	);
+	// Asymptotic: every turn visibly moves the sky, but the moon only sets if the dawn is won.
+	let nightT = $derived(humanWon ? 1 : 1 - Math.pow(0.85, turns));
 	// Cross-off is a private aid, never turn-gated — RuneGrid owns it and stays enabled through Sköll's turn.
 	let canAct = $derived(activePlayer === 'Human' && !roundOver);
 	let turnPill = $derived(
@@ -502,7 +504,7 @@
 </div>
 
 <main>
-	<header class="rite-header">
+	<header class="rite-header" style="--night-t: {nightT.toFixed(3)}">
 		<img
 			class="header-background-image"
 			src={moonSplash}
@@ -831,6 +833,18 @@
 		pointer-events: none;
 	}
 
+	/* Dawn seeps up the header as turns pass — the sky warms instead of the board darkening. */
+	.rite-header::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		background: linear-gradient(180deg, transparent 52%, rgba(233, 200, 119, 0.26) 100%);
+		opacity: var(--night-t, 0);
+		pointer-events: none;
+		transition: opacity 1.2s ease;
+	}
+
 	.ornate-divider {
 		position: relative;
 		z-index: 2;
@@ -854,16 +868,19 @@
 		z-index: 2;
 	}
 
+	/* 44px of sky hangs hidden above the header; sliding it down sets the painted moon as turns pass. */
 	.header-background-image {
 		position: absolute;
-		inset: 0;
+		inset: -44px 0 0;
 		z-index: 0;
 		width: 100%;
-		height: 100%;
+		height: calc(100% + 44px);
 		object-fit: cover;
 		object-position: 50% 50%;
+		translate: 0 calc(var(--night-t, 0) * 44px);
 		filter: saturate(1.04) brightness(0.92) contrast(1.02);
 		pointer-events: none;
+		transition: translate 1.2s ease;
 	}
 
 	.title-block {

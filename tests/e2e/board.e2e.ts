@@ -367,3 +367,69 @@ test.describe('first-run onboarding', () => {
 		await expect(page.locator('.rune-card')).toHaveCount(24);
 	});
 });
+
+test.describe('the night advances', () => {
+	test.beforeEach(async ({ page }) => {
+		await page.addInitScript((key) => {
+			try {
+				localStorage.setItem(key, '1');
+			} catch {
+				/* storage blocked */
+			}
+		}, ONBOARDED_KEY);
+	});
+
+	test('the painted moon sinks as turns pass', async ({ page }) => {
+		await page.route('**/api/action', (route) => {
+			const body = route.request().postDataJSON?.() ?? {};
+			if (body?.type === 'Advance') return route.fulfill({ json: { type: 'Advance', state: {} } });
+			return route.fulfill({
+				json: {
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'No. Sól is not reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: { activePlayer: 'Human', status: 'active', winner: null, turns: 3 }
+				}
+			});
+		});
+		await page.goto('/');
+
+		const sky = page.locator('.header-background-image');
+		const at = () => sky.evaluate((el) => getComputedStyle(el).translate);
+		const start = await at();
+
+		await page.getByLabel(/ask the oracle/i).fill('Is it a fire rune?');
+		await page.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect(page.getByTestId('answer')).toContainText('fire rune');
+
+		await expect.poll(at).not.toBe(start);
+	});
+
+	test('the night completes on a win — moon fully set, sun risen', async ({ page }) => {
+		await page.route('**/api/action', (route) =>
+			route.fulfill({
+				json: {
+					type: 'Cast',
+					cast: { ok: true, won: true, rune: { name: 'Sowilo' }, turnConsumed: true },
+					state: { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 4 }
+				}
+			})
+		);
+		await page.goto('/');
+
+		await page.getByRole('button', { name: 'Cast the rune' }).click();
+		await page.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await page.getByRole('button', { name: 'Name it' }).click();
+
+		await expect(page.locator('.sun-risen')).toBeVisible();
+		// nightT snaps to 1 on a human win: the sky finishes its full 44px descent.
+		await expect
+			.poll(() =>
+				page.locator('.header-background-image').evaluate((el) => getComputedStyle(el).translate)
+			)
+			.toBe('0px 44px');
+	});
+});
