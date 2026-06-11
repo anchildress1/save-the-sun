@@ -30,6 +30,9 @@
 
 	const ownerClass = (e: DebugEvent) => e.owner.toLowerCase().replace('ö', 'o'); // 'Sköll' → 'skoll'
 	const KIND_LABEL = { input: 'input', llm: 'Gemini AI', deterministic: 'deterministic' } as const;
+	// Raw Gemini I/O is multi-KB per call — collapsed by default so the stream reads as the
+	// parsed turn story; the full request/response is one click away (and one click back).
+	const isRawGemini = (e: DebugEvent) => e.message.startsWith('raw Gemini');
 </script>
 
 <svelte:head><title>Save the Sun — debug</title></svelte:head>
@@ -54,7 +57,16 @@
 					</div>
 
 					<p class="msg">{event.message}</p>
-					{#if event.data}<pre>{pretty(event.data)}</pre>{/if}
+					{#if event.data}
+						{#if isRawGemini(event)}
+							<details class="io">
+								<summary>full request / response</summary>
+								<pre>{pretty(event.data)}</pre>
+							</details>
+						{:else}
+							<pre>{pretty(event.data)}</pre>
+						{/if}
+					{/if}
 				</li>
 			{/each}
 		</ol>
@@ -186,6 +198,29 @@
 	.msg {
 		margin: 0;
 		overflow-wrap: anywhere; /* break long unbroken tokens (echoes, names) rather than overflow */
+	}
+	.io {
+		margin-top: 0.4rem;
+	}
+	.io summary {
+		display: inline-block;
+		padding: 0.1rem 0.2rem;
+		color: #8f95a8;
+		font-size: 0.75rem;
+		letter-spacing: 0.03em;
+		cursor: pointer;
+		user-select: none;
+	}
+	.io summary:hover {
+		color: #c8cdda;
+	}
+	.io summary:focus-visible {
+		outline: 2px solid #ffe08a;
+		outline-offset: 2px;
+		border-radius: 0.2rem;
+	}
+	.io[open] summary {
+		color: #c8cdda;
 	}
 	pre {
 		margin: 0.4rem 0 0;

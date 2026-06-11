@@ -112,6 +112,31 @@ describe('/debug view', () => {
 		expect(card.querySelector('.msg')?.textContent).toContain('raw Gemini move call');
 	});
 
+	it('collapses raw Gemini I/O by default and toggles open/closed on click', async () => {
+		const gemini: DebugEvent = {
+			seq: 7,
+			owner: 'Sköll',
+			kind: 'llm',
+			part: 'Cast',
+			level: 'info',
+			message: 'raw Gemini move call',
+			data: { request: { contents: 'board…' }, response: { text: '{}' } }
+		};
+		const screen = renderWith([gemini, floor]);
+		const { container } = screen;
+		// The parsed turn info (head + message) stays visible; only the raw I/O hides.
+		expect(container.textContent).toContain('raw Gemini move call');
+		const details = container.querySelector<HTMLDetailsElement>('details.io')!;
+		expect(details.open).toBe(false);
+		// Gemini calls only: the floor event's data block stays inline, no expander.
+		expect(container.querySelectorAll('details.io')).toHaveLength(1);
+		expect(container.querySelectorAll('pre').length).toBeGreaterThanOrEqual(2);
+		await screen.getByText('full request / response').click();
+		expect(details.open).toBe(true);
+		await screen.getByText('full request / response').click();
+		expect(details.open).toBe(false);
+	});
+
 	it('renders an event as a message + JSON detail, flagging warn', async () => {
 		const { container } = renderWith([floor]);
 		await expect
@@ -174,6 +199,8 @@ describe('/debug view', () => {
 			}
 		};
 		const { container } = renderWith([heavy]);
+		// Raw I/O ships collapsed; open it — the wrap contract applies to the expanded view.
+		container.querySelector<HTMLDetailsElement>('details.io')!.open = true;
 		const pre = container.querySelector<HTMLElement>('pre')!;
 		await expect.element(pre).toBeInTheDocument();
 		// The long pre must not be wider than its card, and the page must not scroll sideways.
