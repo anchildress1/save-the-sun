@@ -328,14 +328,12 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 **v2 (immersion build), in order:**
 
-1. Gemini voice interaction
-2. Night→dawn mood — continuous tide + event stingers, Sköll and Sól embodied; degrades per the contract, nothing essential depends on it
-3. Ambient audio bed — looped, crossfading, pausable, muted by default, ambient only
-4. Cast win animation — glyph carves into stone + luminous Sól beat; honors reduced motion
-5. Voice interaction with Gemini — speak the Ask, hear the Oracle/Sköll (TTS)
-6. Wrong-cast penalty — cap ≈2 wrong casts per player (threshold on the v1 counter; alternation unaffected)
-7. ~~Small-desktop support down to 750px — compact embedded board at 750px+, best-on-desktop notice below that floor~~
-8. Asset delivery pipeline — generate AVIF/WebP fallbacks for large stone, banner, chalk, and rune assets; ship responsive variants where the UI has multiple display sizes; keep a checked bundle-size budget so deploy cost and first-load weight do not creep back up
+1. Night→dawn mood — continuous tide + event stingers, Sköll and Sól embodied; degrades per the contract, nothing essential depends on it
+2. Ambient audio bed — looped, crossfading, pausable, muted by default, ambient only
+3. Voice interaction with Gemini — speak the Ask, hear the Oracle/Sköll (TTS)
+4. Wrong-cast penalty — cap ≈2 wrong casts per player (threshold on the v1 counter; alternation unaffected)
+5. ~~Small-desktop support down to 750px — compact embedded board at 750px+, best-on-desktop notice below that floor~~
+6. Asset delivery pipeline — generate AVIF/WebP fallbacks for large stone, banner, chalk, and rune assets; ship responsive variants where the UI has multiple display sizes; keep a checked bundle-size budget so deploy cost and first-load weight do not creep back up
    - [ ] Cleanup: align all generated image assets to one stable stylized art direction before adding more format variants
    - [ ] Generate AVIF/WebP fallbacks for large stone, banner, chalk, rune, element, color, and fill assets
    - [ ] Ship responsive image variants anywhere the same art renders at materially different sizes
@@ -360,10 +358,10 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 ## Global Definition of Done (every story)
 
 - [ ] Module's own test suite lands **with** the module (`test-plan.md` build-order rule)
-- [ ] Module meets or exceeds its CI coverage floor
-- [ ] Player-facing strings pass the voice/terminology lint
-- [ ] Engine remains the single source of truth — no truth logic leaks into UI or Gemini
-- [ ] Degrades cleanly to the tier below, or it doesn't ship
+- [x] Module meets or exceeds its CI coverage floor
+- [x] Player-facing strings pass the voice/terminology lint
+- [x] Engine remains the single source of truth — no truth logic leaks into UI or Gemini
+- [x] Degrades cleanly to the tier below, or it doesn't ship
 
 ## Key Dates
 
