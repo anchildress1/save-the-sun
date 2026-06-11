@@ -175,7 +175,6 @@ Local secrets live in `.env` (gitignored). Deployed, the key rides Google Secret
 
 - **v2 — the Oracle speaks:** voice via the Gemini Live API — wake the Oracle, ask aloud, barge-in allowed. Spec'd in [`docs/v2-implementation-checklist.md`](docs/v2-implementation-checklist.md).
 - Sköll escalation taunts wired to how close he is.
-- Auto-pass when both reactions are spent.
 
 ---
 
