@@ -11,3 +11,6 @@ poc
 
 # Miscellaneous
 /static/
+
+# Release Please owns this file; prettier rewrites its bullet style on every format run
+CHANGELOG.md
