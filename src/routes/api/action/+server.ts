@@ -93,10 +93,13 @@ function humanAsks(sessionId: string, question: string): void {
 function geminiEvents(sessionId: string, movePart: TurnPart): void {
 	for (const call of drainGemini(sessionId)) {
 		const oracle = call.label === 'oracle';
+		let part: TurnPart = movePart;
+		if (oracle) part = 'Ask';
+		else if (call.label === 'reaction') part = 'React';
 		logEvent(sessionId, {
 			owner: oracle ? 'Oracle' : 'Sköll',
 			kind: 'llm',
-			part: oracle ? 'Ask' : call.label === 'reaction' ? 'React' : movePart,
+			part,
 			level: call.error ? 'error' : 'info',
 			message: `raw Gemini ${call.label} call${call.error ? ' failed' : ''}`,
 			data: call.error
