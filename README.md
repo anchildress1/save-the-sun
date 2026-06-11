@@ -143,10 +143,10 @@ make dev                     # vite dev server
 
 ## Configuration
 
-| Variable         | Required | What it does                                                                                                                                    |
-| ---------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GEMINI_API_KEY` | Yes      | Server-side only — powers the Oracle and Sköll. Get one at [AI Studio](https://aistudio.google.com/apikey).                                     |
-| `DEBUG_LOG`      | No       | `/debug` log exposure: `verbose` (everything, incl. the secret), `demo` (screen-shareable), `off`. Defaults to `verbose` in dev, `off` in prod. |
+| Variable         | Required | What it does                                                                                                                                                                    |
+| ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY` | Yes      | Server-side only — powers the Oracle and Sköll. Get one at [AI Studio](https://aistudio.google.com/apikey).                                                                     |
+| `DEBUG_LOG`      | No       | `/debug` event-stream exposure — player inputs, engine verdicts, and the raw Gemini request/response I/O. The secret is never in the stream at any level. Set `off` to disable. |
 
 Local secrets live in `.env` (gitignored). Deployed, the key rides Google Secret Manager via [`deploy.sh`](deploy.sh).
 
@@ -154,11 +154,10 @@ Local secrets live in `.env` (gitignored). Deployed, the key rides Google Secret
 
 ## Security
 
-- The secret rune never leaves the server — it isn't in any response, client bundle, or public board seed, and tests assert it.
+- The secret rune never leaves the server — it isn't in any response, client bundle, public board seed, or the `/debug` log at any level, and tests assert it. Gemini prompts are secret-free by construction: the model interprets language and plays the wolf; the engine alone holds and judges the answer.
 - `GEMINI_API_KEY` is server-side only: `.env` locally, Secret Manager on Cloud Run.
 - Sessions are an `httpOnly`, `secure`, `sameSite=lax` cookie holding an opaque UUID — no user data, no accounts, nothing durable.
 - `secretlint` runs in the pre-commit hook; CodeQL runs in CI.
-- Never deploy with `DEBUG_LOG=verbose` — it exposes the secret and raw model I/O on `/debug`.
 
 ---
 
@@ -195,4 +194,6 @@ Local secrets live in `.env` (gitignored). Deployed, the key rides Google Secret
 
 ## Author
 
-**Ashley Childress** — [anchildress1.dev](https://anchildress1.dev) · [GitHub](https://github.com/anchildress1) · [dev.to](https://dev.to/anchildress1) · [LinkedIn](https://linkedin.com/in/anchildress1)
+**Ashley Childress**
+
+[![anchildress1.dev](https://img.shields.io/badge/anchildress1.dev-d9a94a?style=for-the-badge)](https://anchildress1.dev) [![GitHub](https://img.shields.io/badge/GitHub-anchildress1-181717?style=for-the-badge&logo=github)](https://github.com/anchildress1) [![dev.to](https://img.shields.io/badge/dev.to-anchildress1-0A0A0A?style=for-the-badge&logo=devdotto)](https://dev.to/anchildress1) [![LinkedIn](https://img.shields.io/badge/LinkedIn-anchildress1-0A66C2?style=for-the-badge)](https://linkedin.com/in/anchildress1)
