@@ -1,4 +1,4 @@
-<h1 align="center">Save the Sun</h1>
+<h1 align="center">☀️ Save the Sun</h1>
 
 <p align="center"><em>A deduction race against Sköll, the wolf who hunts the sun — name the hidden rune before he does.</em></p>
 
