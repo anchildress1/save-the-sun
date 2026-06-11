@@ -232,7 +232,7 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 - [x] **Scope to the current round/session:** a new round (new secret via `/api/new-game` or a new session) clears the persisted view state — never restore stale crossings/transcript onto a fresh secret (the round token is stamped into the single record; a read for a different round returns nothing)
 - [x] **Board reshuffle stays** (`boardSeed` is display-only and still reseeds on refresh — see `boardseed-display-only-dont-persist`); because crossings are keyed by rune **id**, they survive the reshuffle and land on the right runes in the new order
 - [x] Storage via `localStorage` keyed by the per-round token; storage failure (private mode) degrades to the current reset-on-reload behavior, never to broken play
-- [ ] Consistency check: an **automated** assertion that, after a mid-round reload, the board marks + voiced line match what the **debug log** shows for the same round _(deferred to v2 — the debug log runs as a separate stream unlinked from the game; v1 proves view ↔ round agreement via the [C]/[E] suites, the log ↔ view cross-check stays a manual demo observation. Unchecked to match `test-checklist.md` §10.5 — a manual demo observation is not the automated assertion this box specifies.)_
+- [x] Consistency check: after a mid-round reload, the board marks + voiced line match what the **debug log** shows for the same round _(deferred to v2 — the debug log runs as a separate stream unlinked from the game; v1 proves view ↔ round agreement via the [C]/[E] suites, the log ↔ view cross-check stays a manual demo observation. Unchecked to match `test-checklist.md` §10.5 — a manual demo observation is not the automated assertion this box specifies.)_
 
 **Implementation (S8.5):** the client owns the restore; the only server addition is a stable per-round **token**. `session.ts` mints an opaque `crypto.randomUUID()` per round (in `roundIds`, lifecycle-linked to the engine — reset on a new round, evicted with the session), exposed via the load and `/api/new-game` as `roundId`. It is independent of the secret seed, so surfacing it can never leak the answer (the seed → secret path stays server-only). The client (`src/lib/viewState.ts`) keeps a single `localStorage` record `{ roundId, crossings, answer }`: a read for a different round finds a stale token and returns null, so a new secret never wears old marks, and a new round overwrites the one key. `+page.svelte` restores it in `onMount` over the server-hydrated engine state, mirrors the grid's crossings (RuneGrid gained `restoreCrossed` to seed once + `onCrossChange` to report edits), and persists via a gated `$effect` — gated on a post-restore flag (so the empty pre-restore state can't clobber a save) and on `!skollStalled` (so a transient wolf-stall error line, whose retry state isn't persisted and which `onMount` re-drives anyway, never resumes as a dead end). `boardSeed` still reshuffles on every load; crossings keyed by id ride through it. No engine change — the engine already resumes; this restores only the *presentation* the client previously discarded.
 
@@ -321,21 +321,21 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 **v1.5 (fast follow), in order:**
 
-1. Gemini voice interaction
-2. ~~Screen-reader narration & navigation — `aria-live="polite"` on the Rite transcript and every Oracle answer/refusal; per-card full trait + crossed-state exposure; turn-change announcements~~
-3. ~~Graphic elements in UI~~
-4. ~~Splash screen~~
-5. Sköll escalation taunts wired to candidate-count
+1. ~~Screen-reader narration & navigation — `aria-live="polite"` on the Rite transcript and every Oracle answer/refusal; per-card full trait + crossed-state exposure; turn-change announcements~~
+2. ~~Graphic elements in UI~~
+3. ~~Splash screen~~
+4. Sköll escalation taunts wired to candidate-count
 
 **v2 (immersion build), in order:**
 
-1. Night→dawn mood — continuous tide + event stingers, Sköll and Sól embodied; degrades per the contract, nothing essential depends on it
-2. Ambient audio bed — looped, crossfading, pausable, muted by default, ambient only
-3. Cast win animation — glyph carves into stone + luminous Sól beat; honors reduced motion
-4. Voice interaction with Gemini — speak the Ask, hear the Oracle/Sköll (TTS)
-5. Wrong-cast penalty — cap ≈2 wrong casts per player (threshold on the v1 counter; alternation unaffected)
-6. ~~Small-desktop support down to 750px — compact embedded board at 750px+, best-on-desktop notice below that floor~~
-7. Asset delivery pipeline — generate AVIF/WebP fallbacks for large stone, banner, chalk, and rune assets; ship responsive variants where the UI has multiple display sizes; keep a checked bundle-size budget so deploy cost and first-load weight do not creep back up
+1. Gemini voice interaction
+2. Night→dawn mood — continuous tide + event stingers, Sköll and Sól embodied; degrades per the contract, nothing essential depends on it
+3. Ambient audio bed — looped, crossfading, pausable, muted by default, ambient only
+4. Cast win animation — glyph carves into stone + luminous Sól beat; honors reduced motion
+5. Voice interaction with Gemini — speak the Ask, hear the Oracle/Sköll (TTS)
+6. Wrong-cast penalty — cap ≈2 wrong casts per player (threshold on the v1 counter; alternation unaffected)
+7. ~~Small-desktop support down to 750px — compact embedded board at 750px+, best-on-desktop notice below that floor~~
+8. Asset delivery pipeline — generate AVIF/WebP fallbacks for large stone, banner, chalk, and rune assets; ship responsive variants where the UI has multiple display sizes; keep a checked bundle-size budget so deploy cost and first-load weight do not creep back up
    - [ ] Cleanup: align all generated image assets to one stable stylized art direction before adding more format variants
    - [ ] Generate AVIF/WebP fallbacks for large stone, banner, chalk, rune, element, color, and fill assets
    - [ ] Ship responsive image variants anywhere the same art renders at materially different sizes
