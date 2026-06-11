@@ -101,7 +101,7 @@ Declare five functions on the Live session: `ask`, `hex`, `scry`, `pass`, `cast_
 
 ### S12 — Sköll script + generation pipeline (R8)
 
-- [ ] Script file: lines grouped by trigger bucket—`taunt`, `hex_resolved`, `rune_cast`, `win`, `lose`, `idle`—2–3 variants each. **Blocked: script content from Ashley**
+- [x] Script content: spoken taunt library drafted in `ux-copy.md` §2 — trigger buckets (expanded beyond the original six) with 1–3 variants each, pending Ashley's approval. The machine-readable script file lands with the build script below.
 - [ ] Build script: each line → Gemini TTS (`Algieba`, `gemini-3.1-flash-tts-preview`, director's-notes style prompt) → audio file + caption text in app assets
 - [ ] One command regenerates the full library
 - [ ] Retry logic for the TTS model's occasional 500s
@@ -123,6 +123,6 @@ Declare five functions on the Live session: `ask`, `hex`, `scry`, `pass`, `cast_
 ## Order 🧭
 
 S1 → S2 → {S3, S6, S7} → {S4, S5, S10, S11} → S8 → S9 → S12 → S13.
-Phases 1+2 ship together minimum. S12 blocked on Sköll script content.
+Phases 1+2 ship together minimum. S12 script content is drafted (`ux-copy.md` §2); approval + the generation pipeline remain.
 
 🤖 *Drafted with AI assistance; decisions by Ashley.* ☀️

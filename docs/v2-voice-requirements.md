@@ -155,7 +155,7 @@ Voice is an enhancement layer, never the sole carrier of game information.
 ## Open Questions ❓
 
 - ~~**Gacrux on Live** (engineering)~~ **Resolved 2026-06-11 (S2):** Gacrux verified working on `gemini-3.1-flash-live-preview` against the real API (audio + transcripts returned). No Kore fallback needed; the voice is the single `ORACLE_VOICE` constant in `src/lib/voice/config.ts`.
-- **Sköll script** (Ashley): trigger buckets and line variants need writing before the library can be generated. Blocking for R8.
+- ~~**Sköll script** (Ashley)~~ **Drafted 2026-06-11:** spoken taunt library lives in `ux-copy.md` §2 (trigger buckets + variants), pending approval. R8 generation unblocks on approval.
 - **Taunt detection rules** (engineering): keyword list vs. lightweight intent check on transcripts for routing to the wolf. Resolve during implementation.
 - **Live session limits** (engineering): confirm session duration limits and whether session resumption is needed for long games. Resolve during implementation.
 
