@@ -155,6 +155,9 @@ Voiced in the **Oracle text**, in the rite's own voice (third person—never his
 
 ## 4. Win / Lose
 
+### Wrong Cast
+**"{Rune} is not the one. The night holds."** _(repeat the named rune; no generic "the rune" fallback.)_
+
 ### Victory—your correct Cast (glyph carves into stone)
 1. On the cast landing: **"The rune is true."**
 2. As the glyph carves: **"Sól crests the rim of the world."**

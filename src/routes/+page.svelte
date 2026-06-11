@@ -34,7 +34,7 @@
 		wolfMoving: 'The wolf is moving. Hold.',
 		oracleSilent: "The Oracle falls silent — the rite can't reach Sól. Draw breath, and ask again.",
 		castFalters: 'The rite falters. The rune slips away.',
-		wrongCast: 'The rune is not the one. The night holds.',
+		wrongCast: (name: string) => `${name} is not the one. The night holds.`,
 		runeTrue: 'The rune is true.',
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
@@ -474,7 +474,7 @@
 			});
 			applyState(state);
 			if (cast.ok) {
-				answer = cast.won ? RITE.runeTrue : RITE.wrongCast;
+				answer = cast.won ? RITE.runeTrue : RITE.wrongCast(selectedRune.name);
 			} else {
 				console.warn('[ui] Cast rejected by engine:', cast.reason);
 				answer = RITE.castFalters;
@@ -503,7 +503,7 @@
 	<p class="notice-line">{RITE.desktopOnly}</p>
 </div>
 
-<main>
+<main style="--night-t: {nightT.toFixed(3)}">
 	<header class="rite-header" style="--night-t: {nightT.toFixed(3)}">
 		<img
 			class="header-background-image"
@@ -801,6 +801,29 @@
 		--skoll-saturation: 1.04;
 		--skoll-brightness: 1.06;
 		--skoll-contrast: 1.04;
+	}
+
+	main::before {
+		content: '';
+		position: fixed;
+		inset: 0;
+		z-index: -1;
+		background:
+			linear-gradient(
+				160deg,
+				rgba(220, 171, 73, 0.2) 0%,
+				rgba(56, 79, 130, 0.18) 42%,
+				rgba(6, 9, 18, 0) 72%
+			),
+			linear-gradient(
+				180deg,
+				rgba(16, 23, 43, 0.4) 0%,
+				rgba(6, 9, 18, 0) 54%,
+				rgba(220, 171, 73, 0.12) 100%
+			);
+		opacity: var(--night-t, 0);
+		pointer-events: none;
+		transition: opacity 1.2s ease;
 	}
 
 	.rite-header {

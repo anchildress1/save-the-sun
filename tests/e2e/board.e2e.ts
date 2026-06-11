@@ -140,9 +140,7 @@ test.describe('the live board (past the title screen)', () => {
 		await page.getByRole('button', { name: 'Cast the rune' }).click();
 		await page.getByRole('button', { name: /select sowilo as cast target/i }).click();
 		await page.getByRole('button', { name: 'Name it' }).click();
-		await expect(page.getByTestId('answer')).toHaveText(
-			'The rune is not the one. The night holds.'
-		);
+		await expect(page.getByTestId('answer')).toHaveText('Sowilo is not the one. The night holds.');
 
 		// Round continues: the crossing is intact and the human can ask again.
 		await expect(page.getByRole('button', { name: /restore sowilo/i })).toBeVisible();
@@ -411,7 +409,10 @@ test.describe('the night advances', () => {
 			page
 				.locator('.header-background-image')
 				.evaluate((el) => parseFloat(getComputedStyle(el).translate.split(' ')[1] ?? '0'));
+		const pageDawnOpacity = () =>
+			page.locator('main').evaluate((el) => Number(getComputedStyle(el, '::before').opacity));
 		expect(await skyY()).toBe(0);
+		expect(await pageDawnOpacity()).toBe(0);
 
 		await page.getByLabel(/ask the oracle/i).fill('Is it a fire rune?');
 		await page.getByRole('button', { name: 'Ask the Oracle' }).click();
@@ -420,6 +421,7 @@ test.describe('the night advances', () => {
 		// Sinks, but never the full 44px band mid-game — only a won dawn completes the descent.
 		await expect.poll(skyY).toBeGreaterThan(0);
 		expect(await skyY()).toBeLessThan(44);
+		await expect.poll(pageDawnOpacity).toBeGreaterThan(0);
 	});
 
 	test('the night completes on a win — moon fully set, sun risen', async ({ page }) => {

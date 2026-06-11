@@ -244,7 +244,9 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Cast the rune' }).click();
 		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
 		await screen.getByRole('button', { name: 'Name it' }).click();
-		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rune is not the one');
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Sowilo is not the one. The night holds.');
 	});
 
 	it('cancels a cast with no turn spent', async () => {
@@ -365,6 +367,14 @@ describe('Save the Sun page', () => {
 		await expect
 			.element(screen.getByTestId('night-progress'))
 			.toHaveTextContent('Dawn gathers at the edge of the world.');
+	});
+
+	it('hydrates the page dawn gradient from the loaded turn count', () => {
+		const screen = render(Page, propsWith({ ...HUMAN_TURN, turns: 6 }));
+		const pageShell = screen.container.querySelector('main') as HTMLElement;
+		expect(pageShell.style.getPropertyValue('--night-t')).toMatch(/^0\.\d{3}$/);
+		expect(getComputedStyle(pageShell, '::before').backgroundImage).toContain('rgba(220, 171, 73');
+		expect(Number(getComputedStyle(pageShell, '::before').opacity)).toBeGreaterThan(0);
 	});
 
 	it('advances the night-progress as turns are spent on an Ask', async () => {
