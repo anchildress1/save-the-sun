@@ -4,6 +4,9 @@
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 	import Onboarding from '$lib/components/Onboarding.svelte';
 	import EndScreen from '$lib/components/EndScreen.svelte';
+	import EclipseMedallion from '$lib/components/EclipseMedallion.svelte';
+	import type { MedallionState } from '$lib/components/medallionState';
+	import { voiceSession, type VoiceEvent } from '$lib/voice/voiceSession';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
@@ -172,6 +175,58 @@
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
 	);
 
+	// The medallion mirrors the voice session (S3). Its state is a superset of VoiceState:
+	// 'skoll-speaking' arrives with the S13 director, never from the session itself. The failure
+	// notice renders by the medallion — not in the Oracle's answer frame, which is her voiced
+	// surface and persists across reloads; a transient voice failure must do neither.
+	let voiceState = $state<MedallionState>('asleep');
+	let voiceAmplitude = $state(0);
+	let voiceNotice = $state('');
+
+	function onVoiceEvent(event: VoiceEvent) {
+		switch (event.type) {
+			case 'hearing':
+				voiceState = 'hearing';
+				voiceAmplitude = event.amplitude;
+				break;
+			case 'asleep':
+				voiceState = 'asleep';
+				voiceAmplitude = 0;
+				break;
+			case 'listening':
+				voiceState = 'listening';
+				voiceNotice = ''; // a successful wake clears the last failure
+				break;
+			case 'thinking':
+			case 'speaking':
+				voiceState = event.type;
+				break;
+			case 'error':
+				voiceNotice = event.notice;
+				break;
+			case 'transcript':
+				break; // rendered by S10
+			default:
+				event satisfies never; // a new S10/S13 event type must be handled, not dropped
+		}
+	}
+
+	// The session reports 'asleep' for the whole mic-permission + token + connect stretch, so the
+	// page tracks the in-flight wake itself: a second tap there must cancel (sleep() aborts a
+	// pending wake), never be silently dropped into the wake() re-entry guard.
+	let wakePending = false;
+
+	function toggleVoice() {
+		if (!wakePending && voiceSession.state === 'asleep') {
+			wakePending = true;
+			void voiceSession.wake().finally(() => {
+				wakePending = false;
+			});
+		} else {
+			voiceSession.sleep();
+		}
+	}
+
 	// Return type is derived from the action's `type`, so a caller can't request a
 	// mismatched result shape.
 	async function dispatch<T extends GameAction['type']>(
@@ -253,10 +308,13 @@
 		}
 		window.addEventListener('resize', onReposition);
 		window.addEventListener('scroll', onReposition, true);
+		const unsubscribeVoice = voiceSession.subscribe(onVoiceEvent);
 		return () => {
 			window.removeEventListener('resize', onReposition);
 			window.removeEventListener('scroll', onReposition, true);
 			clearTimeout(aiNoteHideTimer); // don't let a scheduled hide fire after teardown
+			unsubscribeVoice();
+			voiceSession.sleep(); // never leave the mic streaming with no UI attached
 		};
 	});
 
@@ -621,6 +679,12 @@
 				decoding="async"
 				fetchpriority="low"
 			/>
+
+			<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
+			{#if voiceNotice}
+				<!-- role=status: the quiet voice-failure line is narrated without stealing focus. -->
+				<p class="voice-notice" data-testid="voice-notice" role="status">{voiceNotice}</p>
+			{/if}
 
 			<div class="turn-pill-row">
 				<!-- role=status: turn changes are narrated politely without stealing focus (v1.5 SR pass). -->
@@ -1112,6 +1176,15 @@
 
 	.oracle-panel > .turn-pill-row {
 		z-index: 4;
+	}
+
+	.voice-notice {
+		margin: -0.35rem 0 0;
+		text-align: center;
+		font-family: var(--font-story-body);
+		font-size: 0.85rem;
+		font-style: italic;
+		color: var(--ink-muted);
 	}
 
 	.oracle-title {

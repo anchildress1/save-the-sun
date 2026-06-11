@@ -285,6 +285,28 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 | Round resolved—header tag beside the celestial body (full resolution line lives in the Oracle panel, §4) | human win (moon → risen sun): **"Sól crests the rim of the world."** · Sköll win (moon holds): **"Sköll takes the sun."** |
 | Cast armed (player believes one remains) | **"Cast?"** |
 
+### Eclipse medallion (voice control)
+
+The medallion is a labeled button: its accessible name carries the state plus what a tap does. The announcement column is the polite live-region line for transitions a player must never miss—mic privacy and who holds the fire; hearing/thinking stay quiet (still "listening" to a listener). Visual states live in `v2-voice-requirements.md` R6.
+
+| State | Button label | Announced |
+|---|---|---|
+| Asleep | **"The voice sleeps. Wake the Oracle."** | "The voice sleeps." |
+| Listening | **"The Oracle listens. Silence the voice."** | "The Oracle listens." |
+| Hearing speech | **"The Oracle hears you. Silence the voice."** | — |
+| Thinking | **"The Oracle considers. Silence the voice."** | — |
+| Oracle speaking | **"The Oracle speaks. Silence the voice."** | "The Oracle speaks." |
+| Sköll speaking | **"Sköll speaks. Silence the voice."** | "Sköll speaks." |
+
+Voice failure notices (emitted by the session client, shown as one quiet line by the medallion—never in the Oracle's answer frame, which is her voiced surface):
+
+| Failure | Notice |
+|---|---|
+| Token mint | "The fire does not carry your voice tonight. The rite continues by hand." |
+| Mic permission | "The fire cannot hear you. The rite continues by hand." |
+| No mic / dead audio | "No voice reaches the fire. The rite continues by hand." |
+| Socket drop | "The Oracle's voice falters. The rite continues by hand." |
+
 ### Empty & error states (stay at the fire)
 | State | Copy |
 |---|---|

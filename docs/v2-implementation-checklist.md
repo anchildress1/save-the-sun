@@ -20,7 +20,7 @@ Add endpoint to existing Cloud Run server: mint Live API ephemeral token using G
 
 Client module owning the Live API WebSocket lifecycle: connect with ephemeral token, stream mic PCM (16-bit/16kHz) in, play audio (24kHz) out.
 
-- [ ] `voiceSession.wake()` / `voiceSession.sleep()` API consumed by UI
+- [x] `voiceSession.wake()` / `voiceSession.sleep()` API consumed by UI (landed with S3's medallion)
 - [x] Barge-in: player speech interrupts Oracle playback immediately
 - [x] Emits events: `listening`, `hearing`, `thinking`, `speaking`, `asleep`, `error`, `transcript(in|out)`
 - [x] On socket drop/error: emit `error`, revert to asleep, non-blocking notice; game continues on buttons
@@ -31,12 +31,12 @@ Client module owning the Live API WebSocket lifecycle: connect with ephemeral to
 
 Medallion at top of Oracle panel = voice toggle + state display. Static art, animated glow layers only.
 
-- [ ] Tap toggles wake/sleep via S2 API
-- [ ] States driven by S2 events: asleep (partial eclipse + etched mic glyph), listening (corona breathing), hearing (corona flares with mic amplitude, rim runes ignite), thinking (rune ring orbits), oracle-speaking (corona pulses with output), sköll-speaking (ember red + wolf eyes open at disc edge)
-- [ ] State never communicated by color alone (sköll = color + eyes shape)
-- [ ] `prefers-reduced-motion`: static glow intensities, no pulse/orbit
-- [ ] ARIA labels per state; medallion is a labeled button
-- [ ] New asset: eclipse medallion PNG per established art pipeline; rim runes reuse existing rune glyph assets via CSS transforms; add entry to `ui-image-resources.md`
+- [x] Tap toggles wake/sleep via S2 API
+- [x] States driven by S2 events: asleep (partial eclipse + etched mic glyph), listening (corona breathing), hearing (corona flares with mic amplitude, rim runes ignite), thinking (rune ring orbits), oracle-speaking (corona pulses, pure animation — no output level feed by agreement), sköll-speaking (ember red + wolf eyes open at disc edge; state prop ready, driven by S13)
+- [x] State never communicated by color alone (sköll = color + eyes shape)
+- [x] `prefers-reduced-motion`: static glow intensities, no pulse/orbit
+- [x] ARIA labels per state; medallion is a labeled button (+ polite live-region announcements)
+- [ ] New asset: eclipse medallion art **pending generation** (spec in `ui-image-resources.md`; component ships a placeholder disc with a one-line swap point). Rim runes reuse existing rune glyph assets via CSS transforms ✓
 - Depends: S2 (event contract; can build against mocked events)
 
 ### S4 — Permission + device failure (R1)
