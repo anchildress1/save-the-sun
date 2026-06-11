@@ -176,6 +176,8 @@
 
 {#if phase === 'title'}
 	<div class="backdrop title-backdrop" data-testid="onboarding">
+		<!-- The first-run LCP, mounted only after hydration — preloaded from +page's head;
+		     high priority so a still-in-flight fetch jumps the board's card images. -->
 		<img
 			class="title-splash"
 			src={introSplash}
@@ -184,6 +186,7 @@
 			alt=""
 			aria-hidden="true"
 			decoding="async"
+			fetchpriority="high"
 		/>
 		<div
 			class="title-card"

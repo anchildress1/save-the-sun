@@ -9,6 +9,8 @@
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
 	import moonSplash from '$lib/assets-webp/banners/moon-splash-header.webp?url&no-inline';
 	import skollBanner from '$lib/assets-webp/banners/skoll-banner.webp?url&no-inline';
+	import introSplash from '$lib/assets-webp/banners/intro-splash.webp?url&no-inline';
+	import uiDivider from '$lib/assets-webp/ui/divider.webp?url&no-inline';
 	import type {
 		GameAction,
 		ActionResponse,
@@ -476,6 +478,14 @@
 	}
 </script>
 
+<svelte:head>
+	<!-- Assets the preload scanner can't see: the title splash mounts only after hydration
+	     (Onboarding) and the divider hides behind a CSS var — both paint on first load, so
+	     fetch them with the document instead of after it. -->
+	<link rel="preload" as="image" type="image/webp" href={introSplash} fetchpriority="high" />
+	<link rel="preload" as="image" type="image/webp" href={uiDivider} />
+</svelte:head>
+
 <div class="desktop-notice" data-testid="desktop-notice">
 	<p class="notice-title">Save the Sun</p>
 	<p class="notice-line">{RITE.desktopOnly}</p>
@@ -587,6 +597,7 @@
 		</section>
 
 		<aside class="oracle-panel">
+			<!-- Decorative and bottom-anchored — must not compete with the board's card images. -->
 			<img
 				class="skoll-banner"
 				src={skollBanner}
@@ -595,6 +606,7 @@
 				alt=""
 				aria-hidden="true"
 				decoding="async"
+				fetchpriority="low"
 			/>
 
 			<div class="turn-pill-row">
