@@ -17,7 +17,8 @@ import { env } from '$env/dynamic/private';
 // (→ badge), part (→ chip). A verdict is the ENGINE's, never the actor's whose turn it was.
 export type Owner = 'Human' | 'Oracle' | 'Sköll' | 'Engine';
 export type Kind = 'input' | 'llm' | 'deterministic';
-export type TurnPart = 'Ask' | 'Cast' | 'React' | 'Round';
+// 'Voice' = the Live-session channel, teed from the browser via /api/voice/debug.
+export type TurnPart = 'Ask' | 'Cast' | 'React' | 'Round' | 'Voice';
 
 export interface DebugEvent {
 	// Monotonic within a round, so the view renders in order even after the buffer trims.

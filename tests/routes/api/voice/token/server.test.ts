@@ -48,7 +48,7 @@ describe('POST /api/voice/token', () => {
 		vi.restoreAllMocks();
 	});
 
-	it('mints a single-use ephemeral token constrained to the Live model', async () => {
+	it('mints a single-use ephemeral token constrained to the Live model only', async () => {
 		sdk.create.mockResolvedValueOnce({ name: 'auth_tokens/abc123' });
 
 		const response = await call('mint-happy');
@@ -62,7 +62,8 @@ describe('POST /api/voice/token', () => {
 				// 30 minutes of session, 60 seconds to connect — asserted as absolute instants.
 				expireTime: '2026-06-11T12:30:00.000Z',
 				newSessionExpireTime: '2026-06-11T12:01:00.000Z',
-				liveConnectConstraints: { model: LIVE_MODEL }
+				liveConnectConstraints: { model: LIVE_MODEL },
+				lockAdditionalFields: []
 			}
 		});
 	});

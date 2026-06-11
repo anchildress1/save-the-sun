@@ -154,7 +154,7 @@ Voice is an enhancement layer, never the sole carrier of game information.
 
 ## Open Questions ❓
 
-- **Gacrux on Live** (engineering): voices cast (Gacrux, Algieba). Verify Gacrux is selectable on the Live API model in use—Live's voice list is smaller than TTS's 30 and varies by model. If unavailable, fall back to the nearest Live-supported voice (Kore) pending Ashley's call. Non-blocking for Sköll; Algieba is TTS-only usage and always available.
+- ~~**Gacrux on Live** (engineering)~~ **Resolved 2026-06-11 (S2):** Gacrux verified working on `gemini-3.1-flash-live-preview` against the real API (audio + transcripts returned). No Kore fallback needed; the voice is the single `ORACLE_VOICE` constant in `src/lib/voice/config.ts`.
 - **Sköll script** (Ashley): trigger buckets and line variants need writing before the library can be generated. Blocking for R8.
 - **Taunt detection rules** (engineering): keyword list vs. lightweight intent check on transcripts for routing to the wolf. Resolve during implementation.
 - **Live session limits** (engineering): confirm session duration limits and whether session resumption is needed for long games. Resolve during implementation.
