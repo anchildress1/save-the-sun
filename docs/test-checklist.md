@@ -136,6 +136,12 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [U] Each icon route serves its asset with the correct content-type (`.ico` → `image/x-icon`, the rest → `image/png`) + immutable caching
 - [x] [U] `/site.webmanifest` is `application/manifest+json` with version-busted icon `src` (192/512, correct sizes/types)
 - [x] [U] **Every** `SESSIONLESS_PATHS` entry (all 7, parameterized) bypasses session-cookie creation — a typo would silently re-cookie an asset and kill its cacheability
+- [x] [E] Font files and the button-border WebP preload from immutable local assets; Google Fonts is not requested; the shared `.btn` frame resolves the optimized border _(`meta.e2e`)_
+
+## 6.9 Social embed metadata & author footer
+
+- [x] [E] SSR HTML carries canonical, description, OG, and Twitter card tags with absolute URLs; `og:image` resolves from the served build _(`meta.e2e`)_
+- [x] [E] Author footer exposes the copyright and public profile links _(`meta.e2e`)_
 
 ## 7. Accessibility (v1; screen reader = v1.5)
 
@@ -144,9 +150,9 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 - [x] [A] WCAG 2.1 AA contrast across light **and** dark palettes (axe `wcag21aa` color-contrast — both rune palettes are on the board at once) _(`a11y.e2e`)_
 - [x] [A][manual] No information by color alone
 - [x] [C][E] `prefers-reduced-motion` → motion instant (entrance + end-screen rise cut), no audio to unmute (v1 ships none), still reflects live state _(`reducedMotion.svelte.test`, `degradation.e2e`)_
-- [x] [E] At 200% zoom the effective width falls below the 1280px floor → the best-on-desktop notice shows (no reflow, per the width rules) — the same below-minimum path as §9; full in-game operability at 200% zoom waits on v2 responsive (1024px) support
+- [x] [E] At 200% zoom the 1536px desktop target still has a 768px effective width → the compact embedded board remains playable above the 750px floor
 - [ ] [A][CI] Lighthouse a11y ≥ 0.95 (target ≈ 1.0) _(not added — the global no-lhci-in-GHA rule stands; the in-CI a11y gate is the axe sweep above, run in the existing e2e step and failing the build on any violation. `lhci autorun` stays local via `make perf`.)_
-- [ ] _(v1.5, not gated)_ Screen-reader: `aria-live="polite"`, per-card traits, turn-change announcements
+- [x] [C] _(v1.5)_ Screen-reader: turn pill, Oracle frame, and Sköll frame are polite status regions (turn-change, answer/refusal, and Ask announcements); per-card full traits + crossed state in the accessible name _(`page.svelte.test`, `RuneCard.svelte.test`)_
 
 ## 8. Degradation tiers
 
@@ -159,7 +165,7 @@ Legend: **[U]** unit · **[I]** integration · **[C]** component · **[E]** e2e 
 
 - [x] [I][E] Connection/engine error shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**
 - [x] [C] Empty submit refused with "Speak your question, witch."
-- [x] [E] Below the 1280px minimum: best-on-desktop notice — no responsive reflow (1024px support is v2) _(e2e at 1024px asserts the notice shows and the rite is hidden; 1440px asserts the reverse)_
+- [x] [E] Below the 750px minimum: best-on-desktop notice; at 750px the compact embedded layout renders the full board and controls _(e2e asserts 749px notice, 750px playable embed, and 1440px desktop)_
 - [x] [I] Invalid Ask costs only the rephrase, never a false answer
 - [x] [S] Every seeded round winnable through legal Asks; Oracle never lies (fuzz across secrets/seeds)
 

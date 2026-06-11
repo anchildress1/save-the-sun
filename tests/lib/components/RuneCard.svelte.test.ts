@@ -232,21 +232,37 @@ describe('RuneCard', () => {
 		expect(onAction).toHaveBeenCalledWith(6);
 	});
 
-	it('shows a restore label (with power + fill) and the chalk cross image when crossed', async () => {
+	it('shows a restore label (full traits + crossed state) and the chalk cross image when crossed', async () => {
 		const screen = render(RuneCard, { rune: uruz, crossed: true, onAction: vi.fn() });
-		// The power + fill suffix must survive on every aria-label branch, not just cross-off.
+		// Power + fill, element, color, and the crossed state must survive on every aria-label
+		// branch — a screen-reader player gets the whole card from the name (v1.5 SR pass).
 		await expect
-			.element(screen.getByRole('button', { name: /restore uruz, 4 light power/i }))
+			.element(
+				screen.getByRole('button', {
+					name: /restore uruz, 4 light power, fire, purple, crossed off/i
+				})
+			)
 			.toBeInTheDocument();
 		const strikeout = screen.container.querySelector('.strikeout');
 		expect(strikeout).toBeInstanceOf(HTMLImageElement);
 		expect((strikeout as HTMLImageElement).src).toMatch(/chalk-cross\.webp/);
 	});
 
-	it('exposes a cast-target label (with power + fill) when armed', async () => {
+	it('exposes a cast-target label (full traits) when armed', async () => {
 		const screen = render(RuneCard, { rune: uruz, armed: true, onAction: vi.fn() });
 		await expect
-			.element(screen.getByRole('button', { name: /select uruz as cast target, 4 light power/i }))
+			.element(
+				screen.getByRole('button', {
+					name: /select uruz as cast target, 4 light power, fire, purple/i
+				})
+			)
+			.toBeInTheDocument();
+	});
+
+	it('exposes full traits in the cross-off accessible name — element and color ride with power', async () => {
+		const screen = render(RuneCard, { rune: uruz, onAction: vi.fn() });
+		await expect
+			.element(screen.getByRole('button', { name: /cross off uruz, 4 light power, fire, purple/i }))
 			.toBeInTheDocument();
 	});
 

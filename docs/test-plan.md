@@ -196,9 +196,9 @@ The lineage bar is Lighthouse a11y ≈ 1.0; this build inherits it.
 | Contrast — incl. dark palette | Automated + manual | WCAG 2.1 AA contrast across light and dark rune palettes. |
 | Color independence | Automated + manual | No information by color alone (see §6). |
 | Reduced motion | Component + manual | `prefers-reduced-motion` cuts motion to instant and keeps audio muted, while still reflecting live state changes. |
-| 200% zoom | E2E | At 200% zoom the effective width drops below the 1280px floor → the best-on-desktop notice shows (no reflow, per the width rules) — the same below-minimum path as §9. Full in-game operability at 200% zoom is v2 (1024px responsive). |
+| 200% zoom | E2E | At 200% zoom the 1536px desktop target still has a 768px effective width, so the embedded board remains playable above the 750px floor. |
 | Lighthouse gate | **CI** | Automated Lighthouse a11y run in CI; build fails below threshold (target ≈ 1.0, floor 0.95). |
-| Screen reader (v1.5) | Deferred | `aria-live="polite"` announcements, per-card trait exposure, turn-change announcements — **planned, not gated in v1**. |
+| Screen reader (v1.5) | Component | Shipped in v1.5: turn pill, Oracle frame, and Sköll frame are polite `role="status"` regions (turn-change + answer/refusal + Ask announcements); per-card full trait + crossed-state exposure in the accessible name. Gated in the component suites. |
 
 ---
 
@@ -221,7 +221,7 @@ A mood feature that can't degrade to the tier below doesn't ship — so each tie
 |---|---|---|
 | Connection / engine error | Integration + E2E | Shown in-world ("The Oracle falls silent…") **without losing crossings or turn state**. |
 | Empty submit | Component | Refused with "Speak your question, witch." |
-| Best-on-desktop notice | e2e | Below the 1280px minimum the notice shows and the rite is hidden — no responsive reflow attempted (asserted at 1024px and 1440px; 1024px support is v2). |
+| Best-on-desktop notice | e2e | Below the 750px minimum the notice shows and the rite is hidden; at 750px the compact embedded layout renders the full board and controls. |
 | Malformed Ask recovery | Integration | Invalid Ask costs only the rephrase, never a false answer (ties to §2). |
 | Round solvability | Property | Every seeded round is winnable through legal Asks alone; Oracle never lies (fuzz across many secrets/seeds). |
 

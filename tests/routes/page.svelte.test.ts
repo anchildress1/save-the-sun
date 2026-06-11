@@ -104,6 +104,16 @@ describe('Save the Sun page', () => {
 		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
 	});
 
+	it('narrates the rite — turn pill, Oracle frame, and Sköll frame are polite status regions', async () => {
+		const screen = render(Page, pageProps);
+		const regions = screen.getByRole('status').elements();
+		const ids = regions.map((el) => el.getAttribute('data-testid'));
+		expect(ids).toContain('turn-pill');
+		expect(ids).toContain('skoll-frame');
+		// The Oracle frame carries no testid of its own; the voiced answer lives inside it.
+		expect(regions.some((el) => el.querySelector('[data-testid="answer"]') !== null)).toBe(true);
+	});
+
 	it('reopens the title splash from the header wordmark, without resetting the round', async () => {
 		const spy = stubFetch(async () => new Response('{}'));
 		const screen = render(Page, pageProps);

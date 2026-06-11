@@ -30,12 +30,47 @@ test.describe('the live board (past the title screen)', () => {
 		);
 	});
 
-	test('steps aside for the best-on-desktop notice below the 1280px minimum', async ({ page }) => {
-		await page.setViewportSize({ width: 1024, height: 800 });
+	test('steps aside for the best-on-desktop notice below the 750px minimum', async ({ page }) => {
+		await page.setViewportSize({ width: 749, height: 800 });
 		await page.goto('/');
 		await expect(page.getByTestId('desktop-notice')).toBeVisible();
 		await expect(page.getByText('The rite needs a wider sky.')).toBeVisible();
 		await expect(page.locator('main')).toBeHidden();
+	});
+
+	test('renders the playable rite at the 750px embed floor', async ({ page }) => {
+		await page.setViewportSize({ width: 750, height: 800 });
+		await page.goto('/');
+		await expect(page.locator('main')).toBeVisible();
+		await expect(page.getByTestId('desktop-notice')).toBeHidden();
+		await expect(page.locator('.rune-card')).toHaveCount(24);
+		await expect(page.getByRole('button', { name: 'Ask the Oracle' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Cast the rune' })).toBeVisible();
+		const sowiloCard = page.locator('.rune-card[data-rune-name="Sowilo"]');
+		const cardBox = await sowiloCard.boundingBox();
+		const footerBox = await sowiloCard.locator('.traits').boundingBox();
+		expect(cardBox).not.toBeNull();
+		expect(footerBox).not.toBeNull();
+		expect(footerBox!.y + footerBox!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height);
+		const sixPowerCard = page.locator('.rune-card[data-rune-name="Wunjo"]');
+		const sixPowerCardBox = await sixPowerCard.boundingBox();
+		const sixPowerLabelBox = await sixPowerCard.locator('.power-label').boundingBox();
+		expect(sixPowerCardBox).not.toBeNull();
+		expect(sixPowerLabelBox).not.toBeNull();
+		expect(sixPowerLabelBox!.x + sixPowerLabelBox!.width).toBeLessThanOrEqual(
+			sixPowerCardBox!.x + sixPowerCardBox!.width
+		);
+		const symbolNameOverlaps = await page.locator('.rune-card').evaluateAll((cards) =>
+			cards
+				.map((card) => {
+					const name = card.getAttribute('data-rune-name');
+					const symbol = card.querySelector('.rune-symbol-image')?.getBoundingClientRect();
+					const label = card.querySelector('.name')?.getBoundingClientRect();
+					return symbol && label && symbol.bottom > label.top ? name : null;
+				})
+				.filter(Boolean)
+		);
+		expect(symbolNameOverlaps).toEqual([]);
 	});
 
 	test('shows the rite, not the notice, at desktop width', async ({ page }) => {

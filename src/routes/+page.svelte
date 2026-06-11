@@ -9,6 +9,10 @@
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
 	import moonSplash from '$lib/assets-webp/banners/moon-splash-header.webp?url&no-inline';
 	import skollBanner from '$lib/assets-webp/banners/skoll-banner.webp?url&no-inline';
+	import introSplash from '$lib/assets-webp/banners/intro-splash.webp?url&no-inline';
+	import uiDivider from '$lib/assets-webp/ui/divider.webp?url&no-inline';
+	import dawnSplash from '$lib/assets-webp/banners/dawn-splash.webp?url&no-inline';
+	import defeatSplash from '$lib/assets-webp/banners/defeat-splash.webp?url&no-inline';
 	import type {
 		GameAction,
 		ActionResponse,
@@ -217,6 +221,14 @@
 	// own guard no-ops otherwise). Wrapped so the async return isn't mistaken for an onMount cleanup.
 	onMount(() => {
 		advanceSkoll();
+		// Warm the end-screen splashes at idle — EndScreen mounts only when the round resolves,
+		// and a cold fetch there pops the closing rite in late. Idle (or a generous timeout where
+		// requestIdleCallback is missing) keeps them out of the first-paint contest.
+		const warmEndSplashes = () => {
+			for (const src of [dawnSplash, defeatSplash]) new Image().src = src;
+		};
+		if ('requestIdleCallback' in window) requestIdleCallback(warmEndSplashes);
+		else setTimeout(warmEndSplashes, 1500);
 		// Restore the resumed round's view over the server-hydrated engine state — crossings onto the
 		// board, the last voiced line into the panel. Layered on top: the engine stays the source of
 		// truth (turn pill, status, pending reaction), this only restores presentation. A blank stored
@@ -476,6 +488,14 @@
 	}
 </script>
 
+<svelte:head>
+	<!-- Assets the preload scanner can't see: the title splash mounts only after hydration
+	     (Onboarding) and the divider hides behind a CSS var — both paint on first load, so
+	     fetch them with the document instead of after it. -->
+	<link rel="preload" as="image" type="image/webp" href={introSplash} fetchpriority="high" />
+	<link rel="preload" as="image" type="image/webp" href={uiDivider} />
+</svelte:head>
+
 <div class="desktop-notice" data-testid="desktop-notice">
 	<p class="notice-title">Save the Sun</p>
 	<p class="notice-line">{RITE.desktopOnly}</p>
@@ -587,6 +607,7 @@
 		</section>
 
 		<aside class="oracle-panel">
+			<!-- Decorative and bottom-anchored — must not compete with the board's card images. -->
 			<img
 				class="skoll-banner"
 				src={skollBanner}
@@ -595,10 +616,18 @@
 				alt=""
 				aria-hidden="true"
 				decoding="async"
+				fetchpriority="low"
 			/>
 
 			<div class="turn-pill-row">
-				<div class="turn-pill" class:won={humanWon} class:lost={skollWon} data-testid="turn-pill">
+				<!-- role=status: turn changes are narrated politely without stealing focus (v1.5 SR pass). -->
+				<div
+					class="turn-pill"
+					class:won={humanWon}
+					class:lost={skollWon}
+					data-testid="turn-pill"
+					role="status"
+				>
 					{turnPill}
 				</div>
 				<span class="ai-note-wrap">
@@ -636,12 +665,15 @@
 			<hr class="ornate-divider oracle-divider" aria-hidden="true" />
 
 			<h2 class="oracle-title">The Oracle</h2>
-			<div class="oracle-frame">
+			<!-- role=status: every Oracle answer and refusal is narrated as it is voiced. -->
+			<div class="oracle-frame" role="status">
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
 			<h2 class="skoll-title" data-testid="skoll-title">Sköll</h2>
-			<div class="skoll-frame" data-testid="skoll-frame">
+			<!-- role=status: Sköll's Ask is narrated when it lands — it opens the reaction window,
+			     so a screen-reader player must hear it without hunting for the frame. -->
+			<div class="skoll-frame" data-testid="skoll-frame" role="status">
 				{#if skollEcho}
 					<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
 				{/if}
@@ -1266,13 +1298,139 @@
 		pointer-events: none;
 	}
 
-	/* The one deliberate width breakpoint: below the 1280px minimum the rite steps aside for this
-	   notice rather than reflowing. The desktop layout above the floor stays intrinsic. */
+	/* The one deliberate floor: below 750px the rite steps aside; 750px+ gets a compact
+	   embedded layout so the playable board works in narrow embeds. */
 	.desktop-notice {
 		display: none;
 	}
 
-	@media (max-width: 1279.98px) {
+	@media (min-width: 750px) and (max-width: 1279.98px) {
+		main {
+			max-width: 100%;
+			min-height: 100svh;
+			padding: 0.75rem;
+			gap: 0.5rem;
+		}
+
+		.rite-header {
+			grid-template-columns: minmax(0, 1fr) auto;
+			grid-template-areas:
+				'title night'
+				'controls controls';
+			gap: 0.65rem;
+			min-height: auto;
+			padding: 0.7rem;
+		}
+
+		.title-block {
+			grid-area: title;
+			min-width: 0;
+			gap: 0.6rem;
+		}
+
+		.app-sigil {
+			width: 56px;
+			height: 56px;
+		}
+
+		h1 {
+			font-size: 1.55rem;
+		}
+
+		.tagline {
+			font-size: 0.85rem;
+		}
+
+		.night-block {
+			grid-area: night;
+		}
+
+		.night-progress {
+			font-size: 0.78rem;
+		}
+
+		.header-controls {
+			grid-area: controls;
+			justify-self: stretch;
+			justify-content: flex-end;
+			flex-wrap: wrap;
+			gap: 0.55rem;
+		}
+
+		.header-controls .btn {
+			min-height: 2.45rem;
+			padding: 0.58rem 0.9rem;
+			font-size: 0.72rem;
+		}
+
+		.game-layout {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 0.75rem;
+		}
+
+		.board-section {
+			justify-content: flex-start;
+		}
+
+		.board-section :global(.rune-grid) {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+
+		.board-section :global(.rune-card) {
+			--pip-icon-size: 14px;
+			--symbol-box-height: 2.8rem;
+			--symbol-image-width: auto;
+			--symbol-image-height: 2.8rem;
+			--symbol-image-max-width: 58%;
+			--symbol-image-max-height: 100%;
+			padding: 0.62rem 0.64rem 0.82rem;
+		}
+
+		.board-section :global(.middle) {
+			gap: 0.34rem;
+		}
+
+		.board-section :global(.name) {
+			font-size: 0.92rem;
+			line-height: 1.05;
+		}
+
+		.board-section :global(.meaning) {
+			font-size: 0.68rem;
+		}
+
+		.board-section :global(.trait.power) {
+			gap: 0.04rem;
+		}
+
+		.board-section :global(.power-label) {
+			font-size: 0.62rem;
+		}
+
+		.oracle-panel {
+			--speaker-title-size: 0.92rem;
+			--speaker-title-tracking: 0.24em;
+			--frame-pad: 0.48rem 0.6rem;
+			--frame-min-h: 2.35rem;
+			--reaction-min-h: 2.45rem;
+			--reaction-font: 0.72rem;
+
+			gap: 0.6rem;
+			padding: 0.85rem 0.9rem 0;
+		}
+
+		.frame-text,
+		.skoll-echo {
+			font-size: 0.92rem;
+			line-height: 1.4;
+		}
+
+		.skoll-banner {
+			height: min(36%, 16rem);
+		}
+	}
+
+	@media (max-width: 749.98px) {
 		main {
 			display: none;
 		}

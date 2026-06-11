@@ -50,10 +50,10 @@
 	onclick={() => onAction(rune.id)}
 	style={cardStyle}
 	aria-label={armed
-		? `Select ${rune.name} as cast target, ${rune.power} ${fillWord} power`
+		? `Select ${rune.name} as cast target, ${rune.power} ${fillWord} power, ${rune.element}, ${rune.color}`
 		: crossed
-			? `Restore ${rune.name}, ${rune.power} ${fillWord} power`
-			: `Cross off ${rune.name}, ${rune.power} ${fillWord} power`}
+			? `Restore ${rune.name}, ${rune.power} ${fillWord} power, ${rune.element}, ${rune.color}, crossed off`
+			: `Cross off ${rune.name}, ${rune.power} ${fillWord} power, ${rune.element}, ${rune.color}`}
 >
 	<img
 		class="card-background-image"
@@ -202,6 +202,11 @@
 		   sets, so equal boxes is what makes them read as equal on the card. */
 		--trait-icon-size: 36px;
 		--pip-icon-size: 18px;
+		--symbol-box-height: clamp(3.2rem, 5.7vw, 4.9rem);
+		--symbol-image-width: min(68%, 4.35rem);
+		--symbol-image-height: 100%;
+		--symbol-image-max-width: none;
+		--symbol-image-max-height: none;
 		--stone-brightness: 1;
 		--stone-contrast: 1;
 		--card-glow-opacity: 0.14;
@@ -323,13 +328,15 @@
 		display: grid;
 		place-items: center;
 		width: 100%;
-		height: clamp(3.2rem, 5.7vw, 4.9rem);
+		height: var(--symbol-box-height);
 	}
 
 	.rune-symbol-image {
 		display: block;
-		width: min(68%, 4.35rem);
-		height: 100%;
+		width: var(--symbol-image-width);
+		height: var(--symbol-image-height);
+		max-width: var(--symbol-image-max-width);
+		max-height: var(--symbol-image-max-height);
 		object-fit: contain;
 		filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
 	}

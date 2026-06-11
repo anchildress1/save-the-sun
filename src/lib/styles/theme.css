@@ -1,6 +1,46 @@
 /* Save the Sun — visual theme tokens.
    Midnight-navy ground + warm-gold ritual accent, matching the POC board. */
 
+@font-face {
+	font-family: 'Cinzel';
+	src: url('../assets/fonts/cinzel-latin.woff2?no-inline') format('woff2');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Cinzel';
+	src: url('../assets/fonts/cinzel-latin.woff2?no-inline') format('woff2');
+	font-weight: 600;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'IM Fell English';
+	src: url('../assets/fonts/im-fell-english-latin.woff2?no-inline') format('woff2');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'IM Fell English';
+	src: url('../assets/fonts/im-fell-english-italic-latin.woff2?no-inline') format('woff2');
+	font-weight: 400;
+	font-style: italic;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'IM Fell English SC';
+	src: url('../assets/fonts/im-fell-english-sc-latin.woff2?no-inline') format('woff2');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
 :root {
 	/* Ground */
 	--bg-deep: #060912;
@@ -55,6 +95,7 @@
 
 	/* Ornate UI assets */
 	--ui-divider: url('../assets-webp/ui/divider.webp?no-inline');
+	--button-border: url('../assets-webp/ui/button-border.webp?no-inline');
 	--modal-bg: url('../assets-webp/banners/modal-background.webp?no-inline');
 }
 
@@ -64,11 +105,13 @@
    size. The look is flat with a soft drop shadow (no 90s bevel/glow) and a tactile press. Splash
    surfaces scale them up via their own container, not a third class. */
 .btn {
+	position: relative;
+	isolation: isolate;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	min-height: 2.85rem;
-	padding: 0.7rem 1.35rem;
+	padding: 0.78rem 1.55rem;
 	font-family: var(--font-display);
 	font-size: 0.8rem;
 	font-weight: 600;
@@ -76,6 +119,7 @@
 	text-transform: uppercase;
 	border: 1px solid transparent;
 	border-radius: 10px;
+	overflow: visible;
 	cursor: pointer;
 	transition:
 		background 0.18s ease,
@@ -83,6 +127,31 @@
 		box-shadow 0.18s ease,
 		color 0.18s ease,
 		transform 0.12s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.btn::before {
+	content: '';
+	position: absolute;
+	inset: -0.2rem -0.3rem;
+	z-index: 0;
+	pointer-events: none;
+	border: 10px solid transparent;
+	border-image-source: var(--button-border);
+	border-image-slice: 44 56;
+	border-image-width: 10px 14px;
+	border-image-repeat: stretch;
+	border-radius: 12px;
+	opacity: 0.82;
+	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.42));
+	transition:
+		filter 0.18s ease,
+		opacity 0.18s ease;
+}
+
+.btn:hover:not(:disabled)::before,
+.btn:focus-visible::before {
+	opacity: 1;
+	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 6px rgba(217, 169, 74, 0.22));
 }
 
 .btn--primary {
@@ -132,6 +201,11 @@
 	transform: none;
 	box-shadow: none;
 	filter: saturate(0.55) brightness(0.94);
+}
+
+.btn:disabled::before {
+	opacity: 0.38;
+	filter: none;
 }
 
 .btn--secondary:disabled {
