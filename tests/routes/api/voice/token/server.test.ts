@@ -63,8 +63,6 @@ describe('POST /api/voice/token', () => {
 				expireTime: '2026-06-11T12:30:00.000Z',
 				newSessionExpireTime: '2026-06-11T12:01:00.000Z',
 				liveConnectConstraints: { model: LIVE_MODEL },
-				// Omitting this locks the whole LiveConnectConfig and every session dies with 1011;
-				// the empty array means "lock only the model" and leaves voice/persona to the client.
 				lockAdditionalFields: []
 			}
 		});

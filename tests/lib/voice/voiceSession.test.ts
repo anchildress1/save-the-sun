@@ -22,7 +22,7 @@ import { ORACLE_SYSTEM_INSTRUCTION } from '$lib/voice/oraclePersona';
 interface Callbacks {
 	onmessage: (message: unknown) => void;
 	onerror: (event: { message?: string }) => void;
-	onclose: (event: { code?: number }) => void;
+	onclose: (event: { code?: number; reason?: string }) => void;
 }
 
 let vs: VoiceSession;
@@ -423,6 +423,35 @@ describe('voiceSession failures', () => {
 		expect(micStop).toHaveBeenCalledTimes(1);
 		expect(sdk.connect).not.toHaveBeenCalled();
 		expect(vs.state).toBe('asleep');
+	});
+
+	it('a socket close after awake carries its reason into the tee, token scrubbed', async () => {
+		await awaken();
+		callbacks!.onclose({ code: 1011, reason: 'quota exceeded for auth_tokens/t1' });
+		const teed = teeBodies().join(' ');
+		expect(teed).toContain('close 1011 quota exceeded');
+		expect(teed).toContain('[ephemeral-token]');
+		expect(teed).not.toContain('auth_tokens/t1');
+	});
+
+	it('stale server messages after sleep are ignored', async () => {
+		await awaken();
+		vs.sleep();
+		events = [];
+		callbacks!.onmessage({
+			serverContent: { modelTurn: { parts: [{ inlineData: { data: 'late' } }] } }
+		});
+		expect(events).toEqual([]);
+		expect(speaker.enqueue).not.toHaveBeenCalled();
+	});
+
+	it('the thinking rescue tees an info event so dropped turns are diagnosable', async () => {
+		await awaken();
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		await vi.advanceTimersByTimeAsync(10_000);
+		expect(teeBodies().join(' ')).toContain('thinking rescue fired');
 	});
 
 	it('connect rejection emits error socket and scrubs the token from the debug tee', async () => {

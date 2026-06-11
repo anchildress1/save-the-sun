@@ -42,8 +42,9 @@ export const POST: RequestHandler = async ({ locals }) => {
 				expireTime: new Date(now + SESSION_TTL_MS).toISOString(),
 				newSessionExpireTime: new Date(now + CONNECT_WINDOW_MS).toISOString(),
 				liveConnectConstraints: { model: LIVE_MODEL },
-				// Omitting this locks the WHOLE LiveConnectConfig (not just the model) and every
-				// session dies with close 1011; the empty array means "lock only what's set above".
+				// Omitting this locks the WHOLE LiveConnectConfig, not just the model. SDK docs claim
+				// locked fields are merely "ignored", but observed against the real API: every session
+				// died at setup with close 1011. The empty array means "lock only what's set above".
 				lockAdditionalFields: []
 			}
 		});

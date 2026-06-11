@@ -1,6 +1,6 @@
-// Live session client (S2): WebSocket lifecycle, mic streaming, and Oracle playback behind
-// wake()/sleep(), narrated to the UI as events. Any failure emits 'error' and settles back to
-// asleep — the button game never depends on this module being alive.
+// Live session client: WebSocket lifecycle, mic streaming, and Oracle playback behind
+// wake()/sleep(), narrated to the UI as events. Any lifecycle failure emits 'error' and settles
+// back to asleep — the button game never depends on this module being alive.
 
 import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from '@google/genai';
 import { LIVE_MODEL, MIC_SAMPLE_RATE, ORACLE_VOICE } from '$lib/voice/config';
@@ -37,7 +37,8 @@ export interface VoiceSession {
 	subscribe(listener: VoiceListener): () => void;
 }
 
-// Local RMS only drives the hearing glow; turn-taking belongs to the server VAD.
+// Local RMS only drives UI state (hearing glow, thinking handoff); turn-taking belongs to the
+// server VAD.
 const SPEECH_RMS_FLOOR = 0.02;
 const HEARING_HOLD_MS = 800;
 // A cough can reach thinking with no reply ever coming.
@@ -55,7 +56,7 @@ const NOTICE: Record<VoiceErrorReason, string> = {
 
 export function createVoiceSession(): VoiceSession {
 	let state: VoiceState = 'asleep';
-	// Bumped by every teardown; stale async continuations and socket callbacks go quiet.
+	// Bumped by every wake and teardown; stale async continuations and socket callbacks go quiet.
 	let generation = 0;
 	let waking = false;
 	let liveReady = false;
@@ -69,6 +70,7 @@ export function createVoiceSession(): VoiceSession {
 	let setupResolver: ((ready: boolean) => void) | null = null;
 	let setupFailureDetail: string | null = null;
 	let sendFailureTeed = false;
+	let mintedToken = '';
 	const listeners = new Set<VoiceListener>();
 
 	function emit(event: VoiceEvent): void {
@@ -89,7 +91,7 @@ export function createVoiceSession(): VoiceSession {
 		thinkingRescueTimer = null;
 	}
 
-	// 'hearing' re-emits every chunk so the medallion corona can track live amplitude (S3).
+	// 'hearing' re-emits every chunk so the medallion corona can track live amplitude.
 	function toState(next: VoiceState): void {
 		const changed = state !== next;
 		state = next;
@@ -123,16 +125,19 @@ export function createVoiceSession(): VoiceSession {
 
 	// The console fallback matters most when the network just died — the failure that kills the
 	// socket kills the tee in the same instant, and the diagnostics must not die with it.
+	// Scrubbing lives here, the single sink: SDK error and close strings can embed the session's
+	// ephemeral token in a URL, and the /debug stream is public.
 	function teeDebug(level: 'info' | 'error', message: string): void {
+		const scrubbed = mintedToken ? message.split(mintedToken).join('[ephemeral-token]') : message;
 		void fetch('/api/voice/debug', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ level, message })
+			body: JSON.stringify({ level, message: scrubbed })
 		})
 			.then((response) => {
-				if (!response.ok) console.warn('[voice] debug tee rejected:', response.status, message);
+				if (!response.ok) console.warn('[voice] debug tee rejected:', response.status, scrubbed);
 			})
-			.catch(() => console.warn('[voice] debug tee unreachable:', message));
+			.catch(() => console.warn('[voice] debug tee unreachable:', scrubbed));
 	}
 
 	function fail(reason: VoiceErrorReason, detail: string): void {
@@ -161,7 +166,11 @@ export function createVoiceSession(): VoiceSession {
 		if (thinkingRescueTimer) clearTimeout(thinkingRescueTimer);
 		thinkingRescueTimer = setTimeout(() => {
 			thinkingRescueTimer = null;
-			if (state === 'thinking') toState('listening');
+			if (state === 'thinking') {
+				// Routine for a cough; a PATTERN of these in /debug means real turns are being dropped.
+				teeDebug('info', 'thinking rescue fired — no reply arrived');
+				toState('listening');
+			}
 		}, THINKING_FALLBACK_MS);
 	}
 
@@ -273,6 +282,7 @@ export function createVoiceSession(): VoiceSession {
 			if (!response.ok) throw new Error(`token endpoint returned ${response.status}`);
 			token = ((await response.json()) as { token?: string }).token ?? '';
 			if (!token) throw new Error('token endpoint returned no token');
+			mintedToken = token;
 		} catch (err) {
 			if (generation !== myGeneration) return;
 			fail('token', err instanceof Error ? err.message : String(err));
@@ -309,17 +319,16 @@ export function createVoiceSession(): VoiceSession {
 						if (generation === myGeneration) onSocketDown(`error: ${event?.message ?? ''}`);
 					},
 					onclose: (event) => {
-						if (generation === myGeneration) onSocketDown(`close ${event?.code ?? ''}`);
+						// The reason text is where the API explains itself (quota, bad model, 1011 detail).
+						if (generation === myGeneration) {
+							onSocketDown(`close ${event?.code ?? ''} ${event?.reason ?? ''}`.trim());
+						}
 					}
 				}
 			});
 		} catch (err) {
 			if (generation !== myGeneration) return;
-			// The connect error can embed the single-use token in a URL; keep the stream clean.
-			const detail = (err instanceof Error ? err.message : String(err))
-				.split(token)
-				.join('[ephemeral-token]');
-			fail('socket', detail);
+			fail('socket', err instanceof Error ? err.message : String(err));
 			return;
 		}
 		if (generation !== myGeneration) {

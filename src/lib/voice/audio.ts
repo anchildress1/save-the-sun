@@ -84,8 +84,15 @@ export async function openMic(onChunk: MicChunkHandler): Promise<MicVerdict> {
 		return { ok: false, reason: micFailure(err), detail: failureDetail(err) };
 	}
 
+	let context: AudioContext;
 	try {
-		const context = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
+		context = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
+	} catch (err) {
+		for (const track of stream.getTracks()) track.stop();
+		return { ok: false, reason: 'audio', detail: failureDetail(err) };
+	}
+
+	try {
 		// A context created outside the tap's synchronous call stack can start suspended.
 		void context.resume();
 		const workletUrl = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'text/javascript' }));
@@ -115,8 +122,10 @@ export async function openMic(onChunk: MicChunkHandler): Promise<MicVerdict> {
 			}
 		};
 	} catch (err) {
-		// Release the granted mic so the browser's recording indicator turns off.
+		// Release the granted mic so the browser's recording indicator turns off, and close the
+		// context — browsers cap live AudioContexts, so leaking one per failed wake starves later ones.
 		for (const track of stream.getTracks()) track.stop();
+		void context.close();
 		return { ok: false, reason: 'audio', detail: failureDetail(err) };
 	}
 }

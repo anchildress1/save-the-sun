@@ -2,7 +2,8 @@
 // connect with the exact model the ephemeral token was constrained to — one constant, two sides.
 export const LIVE_MODEL = 'gemini-3.1-flash-live-preview';
 
-// Verified on the Live model against the real API (2026-06-11) — no Kore fallback needed.
+// Confirmed available on LIVE_MODEL by a real connect — re-verify if the model changes.
+// No Kore fallback needed.
 export const ORACLE_VOICE = 'Gacrux';
 
 // Live API audio contract: PCM16 mono, 16kHz up, 24kHz down. Not tunable.

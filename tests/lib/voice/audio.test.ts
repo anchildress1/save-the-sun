@@ -161,7 +161,7 @@ describe('openMic', () => {
 		});
 	});
 
-	it('releases the granted mic when worklet setup fails', async () => {
+	it('releases the granted mic and closes the context when worklet setup fails', async () => {
 		vi.stubGlobal(
 			'AudioContext',
 			class extends FakeAudioContext {
@@ -174,6 +174,24 @@ describe('openMic', () => {
 			ok: false,
 			reason: 'audio',
 			detail: 'Error: no worklet'
+		});
+		expect(track.stop).toHaveBeenCalledTimes(1);
+		expect(FakeAudioContext.instances[0].close).toHaveBeenCalledTimes(1);
+	});
+
+	it('releases the granted mic when the AudioContext itself cannot be created', async () => {
+		vi.stubGlobal(
+			'AudioContext',
+			class {
+				constructor() {
+					throw new Error('context limit reached');
+				}
+			}
+		);
+		expect(await openMic(vi.fn())).toEqual({
+			ok: false,
+			reason: 'audio',
+			detail: 'Error: context limit reached'
 		});
 		expect(track.stop).toHaveBeenCalledTimes(1);
 	});
