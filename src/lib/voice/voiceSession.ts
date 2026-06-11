@@ -284,7 +284,7 @@ export function createVoiceSession(): VoiceSession {
 			speaker = createSpeaker();
 			speaker.onDrained(onDrained);
 		} catch (err) {
-			if (generation !== myGeneration) return;
+			// Synchronous since the last generation check — no staleness to guard against.
 			fail('audio', err instanceof Error ? err.message : String(err));
 			return;
 		}
