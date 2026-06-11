@@ -109,25 +109,6 @@
 	});
 </script>
 
-<!-- 
-  Hero SVG Filters - Dormant in steady state. 
-  Referenced via CSS during transient events like cast stingers.
--->
-<svg width="0" height="0" class="sr-only">
-	<defs>
-		<filter id="hero-displacement">
-			<feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" result="noise" />
-			<feDisplacementMap
-				in="SourceGraphic"
-				in2="noise"
-				scale="10"
-				xChannelSelector="R"
-				yChannelSelector="G"
-			/>
-		</filter>
-	</defs>
-</svg>
-
 <div class="rune-grid" data-testid="rune-grid" bind:this={gridContainer}>
 	{#each board as rune (rune.id)}
 		<div class="rune-card-wrapper">
@@ -162,19 +143,9 @@
 
 	.rune-card-wrapper {
 		/* Stable positioning wrapper for the staggered entrance. Visible by default so a
-		   failed/absent GSAP run never leaves the board blank. */
+		   failed/absent GSAP run never leaves the board blank. Also the card's size
+		   container: the card's cqi-scaled internals track the grid cell, not the viewport. */
 		display: block;
-	}
-
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		padding: 0;
-		margin: -1px;
-		overflow: hidden;
-		clip: rect(0, 0, 0, 0);
-		white-space: nowrap;
-		border-width: 0;
+		container-type: inline-size;
 	}
 </style>

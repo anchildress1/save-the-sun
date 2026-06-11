@@ -148,7 +148,8 @@
 
 <style>
 	.site-footer {
-		padding: 0.75rem 1rem 1rem;
+		padding: 1.1rem 1rem 1rem;
+		border-top: 1px solid var(--gold-faint);
 		text-align: center;
 		font-family: var(--font-body);
 		font-size: 0.72rem;
@@ -167,9 +168,10 @@
 		gap: 1.15rem;
 	}
 
+	/* Padding lifts the 17px glyphs to a ≥24px hit target (WCAG 2.2 target size). */
 	.profile-links a {
 		display: inline-flex;
-		padding: 0.15rem;
+		padding: 0.25rem;
 		color: var(--gold);
 	}
 

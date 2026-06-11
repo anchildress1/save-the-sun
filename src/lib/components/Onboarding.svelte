@@ -346,10 +346,13 @@
 	}
 
 	.popover {
+		position: fixed;
+		z-index: 102;
 		display: flex;
 		flex-direction: column;
 		gap: 0.9rem;
 		padding: 1.6rem 1.8rem;
+		overflow-y: auto;
 		text-align: center;
 		/* Moon art stays visible without competing with the tour copy. */
 		background:
@@ -358,12 +361,6 @@
 		border: 1px solid var(--gold-dim);
 		border-radius: 12px;
 		box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
-	}
-
-	.popover {
-		position: fixed;
-		z-index: 102;
-		overflow-y: auto;
 	}
 
 	/* No anchor target — center the popover in the viewport. */
