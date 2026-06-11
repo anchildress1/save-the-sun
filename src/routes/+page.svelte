@@ -1207,10 +1207,16 @@
 		border: 0;
 	}
 
+	.ask {
+		/* Near-opaque, not the translucent inset: the field must read as a field over the
+		   bottom-anchored wolf art, especially in the short embed panel. */
+		--ask-field-bg: rgba(9, 13, 26, 0.88);
+	}
+
 	.ask input {
 		padding: 0.65rem 0.7rem;
-		background: var(--surface-inset);
-		border: 1px solid var(--gold-dim);
+		background: var(--ask-field-bg);
+		border: 1px solid rgba(233, 200, 119, 0.4);
 		border-radius: 5px;
 		color: var(--ink);
 		font-size: 0.92rem;
@@ -1226,7 +1232,7 @@
 	.ask input:-webkit-autofill:hover,
 	.ask input:-webkit-autofill:active {
 		-webkit-text-fill-color: var(--ink);
-		-webkit-box-shadow: 0 0 0 1000px var(--surface-inset) inset;
+		-webkit-box-shadow: 0 0 0 1000px var(--ask-field-bg) inset;
 		caret-color: var(--ink);
 		transition: background-color 9999s ease-in-out 0s;
 	}
@@ -1234,7 +1240,7 @@
 	.ask input:-webkit-autofill:focus {
 		-webkit-box-shadow:
 			var(--focus-ring),
-			0 0 0 1000px var(--surface-inset) inset;
+			0 0 0 1000px var(--ask-field-bg) inset;
 	}
 
 	.cast {
@@ -1446,6 +1452,8 @@
 			--reaction-min-h: 2.45rem;
 			--reaction-font: 0.72rem;
 
+			/* The rite's controls lead in the single-column embed; the board follows. */
+			order: -1;
 			gap: 0.6rem;
 			padding: 0.85rem 0.9rem 0;
 		}
