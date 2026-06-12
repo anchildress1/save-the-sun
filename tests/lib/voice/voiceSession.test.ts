@@ -264,9 +264,11 @@ describe('voiceSession mic streaming and player states', () => {
 		await vi.advanceTimersByTimeAsync(800); // thinking, rescue armed
 		callbacks!.onmessage({ serverContent: { turnComplete: true } }); // settles to listening, timer left live
 		events = [];
+		// The R7 silence clock idles the session at the 5s mark; its teardown also clears the
+		// stale rescue, so the only event in this window is the silent asleep.
 		await vi.advanceTimersByTimeAsync(10_000);
-		expect(events).toEqual([]);
-		expect(vs.state).toBe('listening');
+		expect(events).toEqual([{ type: 'asleep' }]);
+		expect(vs.state).toBe('asleep');
 		expect(teeBodies().join(' ')).not.toContain('thinking rescue fired');
 	});
 
@@ -438,6 +440,136 @@ describe('voiceSession oracle speech', () => {
 		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'is it a fire rune' } } });
 		vs.sleep();
 		expect(teeBodies().join(' ')).toContain('heard: is it a fire rune');
+	});
+});
+
+describe('voiceSession silence timeout (S5)', () => {
+	beforeEach(async () => {
+		await awaken();
+		events = [];
+	});
+
+	it('idles to asleep after 5s of no recognizable speech — mic, socket, and speaker all close', async () => {
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(micStop).toHaveBeenCalledTimes(1);
+		expect(liveSession.close).toHaveBeenCalledTimes(1);
+		expect(speaker.close).toHaveBeenCalledTimes(1);
+		expect(events).toEqual([{ type: 'asleep' }]);
+		expect(vs.state).toBe('asleep');
+		expect(teeBodies().join(' ')).toContain('silence timeout');
+	});
+
+	it('idles silently — no error event, no notice, no audio nudge (R7)', async () => {
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(eventTypes()).not.toContain('error');
+		expect(vs.notice).toBeNull();
+		expect(speaker.enqueue).not.toHaveBeenCalled();
+	});
+
+	it('an input transcript resets the clock — recognizable speech keeps the session awake', async () => {
+		await vi.advanceTimersByTimeAsync(4_000);
+		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'oracle' } } });
+		await vi.advanceTimersByTimeAsync(4_000); // 8s total, but only 4s since the last words
+		expect(vs.state).toBe('listening');
+		await vi.advanceTimersByTimeAsync(1_000); // 5s since the last words
+		expect(vs.state).toBe('asleep');
+	});
+
+	it('a transcript landing mid-hearing resets the clock — a long sentence is never cut off', async () => {
+		for (let i = 0; i < 8; i++) {
+			micChunk!('speech', 0.5);
+			callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'word ' } } });
+			await vi.advanceTimersByTimeAsync(1_000);
+		}
+		expect(vs.state).toBe('hearing'); // 8s of continuous speech outlives the 5s clock
+		await vi.advanceTimersByTimeAsync(5_000); // then true silence idles it
+		expect(vs.state).toBe('asleep');
+	});
+
+	it('RMS noise never resets the clock — a fan flaring the corona is not recognizable speech', async () => {
+		for (let i = 0; i < 5; i++) {
+			micChunk!('hum', 0.5);
+			await vi.advanceTimersByTimeAsync(1_000);
+		}
+		expect(vs.state).toBe('asleep');
+	});
+
+	it("the clock pauses while the Oracle speaks — her speech never counts as the player's silence", async () => {
+		callbacks!.onmessage({
+			serverContent: { modelTurn: { parts: [{ inlineData: { data: 'line' } }] } }
+		});
+		await vi.advanceTimersByTimeAsync(20_000);
+		expect(vs.state).toBe('speaking');
+	});
+
+	it('the clock starts fresh only after her playback drains past turnComplete', async () => {
+		callbacks!.onmessage({
+			serverContent: { modelTurn: { parts: [{ inlineData: { data: 'line' } }] } }
+		});
+		speaker.busy = true;
+		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		await vi.advanceTimersByTimeAsync(4_000); // would have idled already if speaking counted
+		speaker.busy = false;
+		speaker.drain!();
+		expect(vs.state).toBe('listening');
+		await vi.advanceTimersByTimeAsync(4_999);
+		expect(vs.state).toBe('listening');
+		await vi.advanceTimersByTimeAsync(1);
+		expect(vs.state).toBe('asleep');
+	});
+
+	it('the clock pauses in thinking — waiting on the Oracle is not the player going quiet', async () => {
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800); // thinking at t=800
+		await vi.advanceTimersByTimeAsync(6_000); // past any leaked 5s expiry, before the 10s rescue
+		expect(vs.state).toBe('thinking');
+	});
+
+	it("a final transcript landing in thinking never arms a clock the Oracle's turn owns", async () => {
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800); // thinking
+		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'late words' } } });
+		await vi.advanceTimersByTimeAsync(6_000);
+		expect(vs.state).toBe('thinking');
+	});
+
+	it('a barge-in into hearing arms the clock — a false interrupt with no speech still idles', async () => {
+		callbacks!.onmessage({
+			serverContent: { modelTurn: { parts: [{ inlineData: { data: 'line' } }] } }
+		});
+		callbacks!.onmessage({ serverContent: { interrupted: true } }); // speaking → hearing, clock was paused
+		expect(vs.state).toBe('hearing');
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(vs.state).toBe('asleep');
+	});
+
+	it('the thinking rescue hands the clock back — a dropped turn still idles from listening', async () => {
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		await vi.advanceTimersByTimeAsync(10_000); // rescue → listening
+		expect(vs.state).toBe('listening');
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(vs.state).toBe('asleep');
+	});
+
+	it('a medallion tap resumes after a silence idle (R7)', async () => {
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(vs.state).toBe('asleep');
+		events = [];
+		await awaken();
+		expect(vs.state).toBe('listening');
+		expect(audio.openMic).toHaveBeenCalledTimes(2);
+	});
+
+	it('sleep clears the clock — no ghost idle after the mic closes', async () => {
+		vs.sleep();
+		events = [];
+		await vi.advanceTimersByTimeAsync(6_000);
+		expect(events).toEqual([]);
+		expect(teeBodies().join(' ')).not.toContain('silence timeout');
 	});
 });
 
