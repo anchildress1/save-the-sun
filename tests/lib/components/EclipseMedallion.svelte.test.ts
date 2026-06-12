@@ -97,29 +97,29 @@ describe('EclipseMedallion — state visuals', () => {
 	});
 });
 
-describe('EclipseMedallion — voice sprite disc', () => {
-	it('renders the sprite sheet as the disc art once the page goes idle', async () => {
+describe('EclipseMedallion — voice level strip disc', () => {
+	it('renders the level strip as the disc art once the page goes idle', async () => {
 		const { button } = renderMedallion('asleep');
 		// Deferred off the critical path (perf gate) — it must still arrive, idle or not.
 		await vi.waitFor(
 			() =>
-				expect(layer(button, '.disc').style.backgroundImage).toContain('voice-medallion-sprite'),
+				expect(layer(button, '.disc').style.backgroundImage).toContain('voice-medallion-levels'),
 			{ timeout: 3000 }
 		);
 	});
 
 	it.each([
-		{ state: 'asleep' as const, amplitude: 0, col: '0', row: '0' },
-		{ state: 'waking' as const, amplitude: 0, col: '0', row: '1' },
-		{ state: 'hearing' as const, amplitude: 0.3, col: '7', row: '3' },
-		{ state: 'speaking' as const, amplitude: 0, col: '7', row: '3' }
-	])('points $state at sheet cell ($col, $row)', ({ state, amplitude, col, row }) => {
+		{ state: 'asleep' as const, amplitude: 0, level: '0' },
+		{ state: 'waking' as const, amplitude: 0, level: '1' },
+		{ state: 'hearing' as const, amplitude: 0.15, level: '3' },
+		{ state: 'hearing' as const, amplitude: 0.3, level: '5' },
+		{ state: 'speaking' as const, amplitude: 0, level: '5' }
+	])('points $state (amp $amplitude) at strip level $level', ({ state, amplitude, level }) => {
 		const { button } = renderMedallion(state, amplitude);
-		expect(button.style.getPropertyValue('--sprite-col')).toBe(col);
-		expect(button.style.getPropertyValue('--sprite-row')).toBe(row);
+		expect(button.style.getPropertyValue('--sprite-level')).toBe(level);
 	});
 
-	it('freezes the playback loop under reduced motion — the static frame stands in', () => {
+	it('freezes the playback loop under reduced motion — the static level stands in', () => {
 		for (const state of ['listening', 'speaking', 'skoll-speaking'] as const) {
 			const { button } = renderMedallion(state);
 			expect(getComputedStyle(layer(button, '.disc')).animationName).toBe('none');

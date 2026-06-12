@@ -44,29 +44,31 @@ export const RING_RUNES: readonly RuneName[] = [
 	'Jera'
 ];
 
-// Sprite sheet geometry (assets-webp/ui/voice-medallion-sprite.webp): 8×6 grid of 256px frames,
-// authored as one dim→bright→dim glow loop. Frame 31 (row 4's end) is the peak.
-export const SPRITE_COLS = 8;
-export const SPRITE_ROWS = 6;
-const SPRITE_PEAK_FRAME = 31;
+// Volume-level strip (assets-webp/ui/voice-medallion-levels.webp): 6 frames of 128px laid out
+// horizontally, glow intensity 0 (rest) → 5 (peak), per the asset's authoring manifest.
+export const SPRITE_LEVELS = 6;
+const SPRITE_PEAK_LEVEL = SPRITE_LEVELS - 1;
 
-/** Static sprite frame for a state; hearing climbs the brightness ramp with the flare.
- * Looping states (listening/speaking/sköll) animate through the sheet in CSS — their value
- * here is the frozen frame reduced motion falls back to. */
-export function spriteFrame(state: MedallionState, flare = 0): number {
+/** Glow level for a state; hearing maps mic flare with the asset's own volume formula.
+ * Looping states (listening/speaking/sköll) ping-pong the strip in CSS — their value here
+ * is the frozen level reduced motion falls back to. */
+export function spriteLevel(state: MedallionState, flare = 0): number {
 	switch (state) {
 		case 'asleep':
 			return 0;
 		case 'waking':
-			return 8;
+			return 1;
 		case 'hearing':
-			return Math.round(Math.min(1, Math.max(0, flare)) * SPRITE_PEAK_FRAME);
+			return Math.min(
+				SPRITE_PEAK_LEVEL,
+				Math.floor(Math.min(1, Math.max(0, flare)) * SPRITE_LEVELS)
+			);
 		case 'thinking':
 		case 'listening':
-			return 12;
+			return 2;
 		case 'speaking':
 		case 'skoll-speaking':
-			return SPRITE_PEAK_FRAME;
+			return SPRITE_PEAK_LEVEL;
 	}
 }
 

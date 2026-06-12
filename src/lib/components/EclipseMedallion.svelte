@@ -4,13 +4,12 @@
 		MEDALLION_ANNOUNCEMENT,
 		MEDALLION_LABEL,
 		RING_RUNES,
-		SPRITE_COLS,
 		flareLevel,
-		spriteFrame,
+		spriteLevel,
 		type MedallionState
 	} from './medallionState';
 	import { RUNE_SYMBOL_ASSET } from './runeVisuals';
-	import spriteSheet from '$lib/assets-webp/ui/voice-medallion-sprite.webp?url&no-inline';
+	import levelStrip from '$lib/assets-webp/ui/voice-medallion-levels.webp?url&no-inline';
 
 	// Presentation + toggle only: the page owns the voiceSession subscription and decides what
 	// `state` means, so the S13 director can drive skoll-speaking through the same prop.
@@ -26,15 +25,13 @@
 	} = $props();
 
 	let flare = $derived(flareLevel(amplitude));
-	let frame = $derived(spriteFrame(current, flare));
-	let spriteCol = $derived(frame % SPRITE_COLS);
-	let spriteRow = $derived(Math.floor(frame / SPRITE_COLS));
+	let level = $derived(spriteLevel(current, flare));
 
-	// The sheet loads at idle, never against the LCP fetch — the perf gate holds the line.
+	// The strip loads at idle, never against the LCP fetch — the perf gate holds the line.
 	// Until it lands the glow layers carry the medallion alone.
-	let sheetUrl = $state('');
+	let stripUrl = $state('');
 	onMount(() => {
-		const load = () => (sheetUrl = spriteSheet);
+		const load = () => (stripUrl = levelStrip);
 		// The timeout bounds a page that never goes idle — the art must still arrive.
 		if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 1500 });
 		else setTimeout(load, 500);
@@ -56,16 +53,15 @@
 		data-testid="eclipse-medallion"
 		data-voice-state={current}
 		aria-label={MEDALLION_LABEL[current]}
-		style="--flare: {flare}; --ring-step: {360 /
-			RING_RUNES.length}deg; --sprite-col: {spriteCol}; --sprite-row: {spriteRow}"
+		style="--flare: {flare}; --ring-step: {360 / RING_RUNES.length}deg; --sprite-level: {level}"
 		onclick={onToggle}
 	>
 		<span class="visual" aria-hidden="true">
 			<span class="corona"></span>
 			<span class="clip">
-				<!-- The disc renders the voice sprite sheet (docs/ui-image-resources.md): static
-				     frame per state, flare-indexed on hearing, stepped loop while a voice plays. -->
-				<span class="disc" style={sheetUrl ? `background-image: url(${sheetUrl})` : ''}></span>
+				<!-- The disc renders the 6-level volume strip (docs/ui-image-resources.md): static
+				     level per state, flare-indexed on hearing, ping-pong loop while a voice plays. -->
+				<span class="disc" style={stripUrl ? `background-image: url(${stripUrl})` : ''}></span>
 				<span class="rune-ring">
 					{#each RING_RUNES as name, i (name)}
 						<img
@@ -158,31 +154,27 @@
 		overflow: hidden;
 	}
 
-	/* The voice sprite sheet: 8×6 frames, sized so exactly one frame fills the disc. The
-	   background-position fractions are (count - 1) because N background-position stops span
-	   0–100% in N-1 steps. Inline --sprite-col/--sprite-row pick the static frame; the looping
-	   states' animations below override it (animations outrank inline styles in the cascade). */
+	/* The 6-level volume strip, sized so exactly one frame fills the disc. The position
+	   fraction divides by (levels - 1) because N background-position stops span 0–100% in
+	   N-1 steps. Inline --sprite-level picks the static frame; the looping states' animations
+	   below override it (animations outrank inline styles in the cascade). */
 	.disc {
 		position: absolute;
 		inset: 0;
 		border-radius: 50%;
-		background-size: 800% 600%;
-		background-position: calc(var(--sprite-col) * 100% / 7) calc(var(--sprite-row) * 100% / 5);
+		background-size: 600% 100%;
+		background-position: calc(var(--sprite-level) * 100% / 5) 0%;
 	}
 
-	/* One pass through the sheet is one authored glow cycle (dim→bright→dim): the x animation
-	   walks a row's 8 columns, the y animation drops a row each x cycle — 6× the x duration. */
+	/* The strip is a monotonic 0→5 intensity ramp, so alternate plays it as a breath:
+	   up the ramp, back down — one full pulse per two passes. */
 	.medallion[data-voice-state='listening'] .disc {
-		animation:
-			sprite-x 0.8s steps(8, jump-none) infinite,
-			sprite-y 4.8s steps(6, jump-none) infinite;
+		animation: sprite-level 2.1s steps(6, jump-none) infinite alternate;
 	}
 
 	.medallion[data-voice-state='speaking'] .disc,
 	.medallion[data-voice-state='skoll-speaking'] .disc {
-		animation:
-			sprite-x 0.25s steps(8, jump-none) infinite,
-			sprite-y 1.5s steps(6, jump-none) infinite;
+		animation: sprite-level 0.7s steps(6, jump-none) infinite alternate;
 	}
 
 	/* Ember shift for the wolf — paired with the eyes below, never the only signal. */
@@ -190,21 +182,12 @@
 		filter: hue-rotate(-40deg) saturate(1.25);
 	}
 
-	@keyframes sprite-x {
+	@keyframes sprite-level {
 		from {
 			background-position-x: 0%;
 		}
 		to {
 			background-position-x: 100%;
-		}
-	}
-
-	@keyframes sprite-y {
-		from {
-			background-position-y: 0%;
-		}
-		to {
-			background-position-y: 100%;
 		}
 	}
 

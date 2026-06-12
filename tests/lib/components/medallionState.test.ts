@@ -3,10 +3,9 @@ import {
 	MEDALLION_ANNOUNCEMENT,
 	MEDALLION_LABEL,
 	RING_RUNES,
-	SPRITE_COLS,
-	SPRITE_ROWS,
+	SPRITE_LEVELS,
 	flareLevel,
-	spriteFrame,
+	spriteLevel,
 	type MedallionState
 } from '$lib/components/medallionState';
 import { RUNE_SYMBOL_ASSET } from '$lib/components/runeVisuals';
@@ -66,38 +65,40 @@ describe('RING_RUNES', () => {
 	});
 });
 
-describe('spriteFrame', () => {
-	it('keeps every state inside the sheet', () => {
-		const frames = SPRITE_COLS * SPRITE_ROWS;
+describe('spriteLevel', () => {
+	it('keeps every state inside the strip', () => {
 		for (const state of ALL_STATES) {
 			for (const flare of [0, 0.5, 1]) {
-				const frame = spriteFrame(state, flare);
-				expect(Number.isInteger(frame)).toBe(true);
-				expect(frame).toBeGreaterThanOrEqual(0);
-				expect(frame).toBeLessThan(frames);
+				const level = spriteLevel(state, flare);
+				expect(Number.isInteger(level)).toBe(true);
+				expect(level).toBeGreaterThanOrEqual(0);
+				expect(level).toBeLessThan(SPRITE_LEVELS);
 			}
 		}
 	});
 
 	it.each([
-		{ state: 'asleep' as const, frame: 0 },
-		{ state: 'waking' as const, frame: 8 },
-		{ state: 'listening' as const, frame: 12 },
-		{ state: 'thinking' as const, frame: 12 },
-		{ state: 'speaking' as const, frame: 31 },
-		{ state: 'skoll-speaking' as const, frame: 31 }
-	])('rests $state on frame $frame', ({ state, frame }) => {
-		expect(spriteFrame(state)).toBe(frame);
+		{ state: 'asleep' as const, level: 0 },
+		{ state: 'waking' as const, level: 1 },
+		{ state: 'listening' as const, level: 2 },
+		{ state: 'thinking' as const, level: 2 },
+		{ state: 'speaking' as const, level: 5 },
+		{ state: 'skoll-speaking' as const, level: 5 }
+	])('rests $state on level $level', ({ state, level }) => {
+		expect(spriteLevel(state)).toBe(level);
 	});
 
+	// The mapping is the asset's own manifest formula: min(5, floor(volume01 * 6)).
 	it.each([
-		{ label: 'silence', flare: 0, frame: 0 },
-		{ label: 'half flare', flare: 0.5, frame: 16 },
-		{ label: 'full flare', flare: 1, frame: 31 },
-		{ label: 'a negative flare clamped to the dim end', flare: -1, frame: 0 },
-		{ label: 'an over-range flare clamped to the peak', flare: 2, frame: 31 }
-	])('climbs the hearing ramp with $label', ({ flare, frame }) => {
-		expect(spriteFrame('hearing', flare)).toBe(frame);
+		{ label: 'silence', flare: 0, level: 0 },
+		{ label: 'a whisper', flare: 0.1, level: 0 },
+		{ label: 'low speech', flare: 0.2, level: 1 },
+		{ label: 'half flare', flare: 0.5, level: 3 },
+		{ label: 'full flare', flare: 1, level: 5 },
+		{ label: 'a negative flare clamped to the dim end', flare: -1, level: 0 },
+		{ label: 'an over-range flare clamped to the peak', flare: 2, level: 5 }
+	])('climbs the hearing ramp with $label', ({ flare, level }) => {
+		expect(spriteLevel('hearing', flare)).toBe(level);
 	});
 });
 
