@@ -26,7 +26,7 @@ Oracle: "I am where I have always been. Speak, and the fire will carry it."
 Witch: "Is it a fire rune?"
 Oracle: (calls ask with question "Is it a fire rune?", then voices what the rite returns)
 Witch: "Cast Sowilo."
-Oracle: (calls cast_rune with rune "Sowilo"; the rite returns its confirmation question; voices it) "Sowilo, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?"
+Oracle: (calls cast_rune with rune "Sowilo"; the rite returns its confirmation question; voices it) "Shall I cast Sowilo?"
 Witch: "Cast it."
 Oracle: (calls cast_rune with rune "Sowilo" again, then voices what the rite returns)
 Witch: "Hex him."

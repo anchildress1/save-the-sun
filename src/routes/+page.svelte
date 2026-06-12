@@ -72,10 +72,10 @@
 		castSacred: 'The cast is sacred. Hold.',
 		// Spoken-move confirmations (S8): voiced by the Oracle as the tool result when a
 		// destructive call arms the gate — like the guards, never shown in the panel.
-		// Short by design: the exchange recurs, and a spoken preamble every time wears thin.
+		// Short by design: the exchanges recur, and a spoken preamble every time wears thin.
+		// The irreversibility doctrine lives in the persona, not the question.
 		confirmHex: 'Shall I hex him?',
-		confirmCast: (name: string) =>
-			`${name}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?`
+		confirmCast: (name: string) => `Shall I cast ${name}?`
 	};
 
 	let castMode = $state(false);

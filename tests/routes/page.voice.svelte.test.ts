@@ -76,8 +76,7 @@ function mockAction(result: object) {
 
 // S8 canon (ux-copy.md §1): the confirmation questions, and the player reply that opens the gate.
 const CONFIRM_HEX = 'Shall I hex him?';
-const confirmCast = (name: string) =>
-	`${name}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?`;
+const confirmCast = (name: string) => `Shall I cast ${name}?`;
 const playerSpeaks = () => emit({ type: 'transcript', direction: 'in', text: 'yes, do it' });
 
 beforeEach(() => {
@@ -552,9 +551,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		// Spoken rune names arrive in whatever case the transcript carried. The cast is
 		// destructive, so the voiced path runs through the S8 confirmation exchange first.
 		const question = await executor()({ name: 'cast_rune', args: { rune: 'sowilo' } });
-		expect(question).toBe(
-			'Sowilo, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?'
-		);
+		expect(question).toBe(confirmCast('Sowilo'));
 		emit({ type: 'transcript', direction: 'in', text: 'cast it' });
 		const outcome = await executor()({ name: 'cast_rune', args: { rune: 'sowilo' } });
 		expect(outcome).toBe('Sowilo is not the one. The night holds.');

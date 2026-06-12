@@ -92,8 +92,10 @@ A spoken hex or cast never executes on the first call: the rite answers with a c
 
 | Trigger | Line |
 |---|---|
-| Hex, first call (short by design — the exchange recurs, and a preamble every time wears thin) | "Shall I hex him?" |
-| Cast, first call | "{Rune}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?" |
+| Hex, first call | "Shall I hex him?" |
+| Cast, first call (per rune — the question names the target) | "Shall I cast {Rune}?" |
+
+Both questions are short by design: the exchanges recur, and a spoken preamble every time wears thin. The irreversibility doctrine lives in the persona and the retraction refusal below, not in the question.
 
 Retraction is refused in character — the persona carries the doctrine verbatim: *"What is written in fire does not unwrite. The rune stands."*
 
