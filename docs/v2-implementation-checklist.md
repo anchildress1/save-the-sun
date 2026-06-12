@@ -66,9 +66,9 @@ Medallion at top of Oracle panel = voice toggle + state display. Static art, ani
 
 Declare five functions on the Live session: `ask`, `hex`, `scry`, `pass`, `cast_rune`. Tool call → same engine function the button calls → `toolResponse` with result → Oracle voices outcome.
 
-- [ ] Voice and button paths produce identical engine state (assert in tests)
-- [ ] Typed question while session awake → existing Ask flow → Oracle speaks the answer (input path never changes behavior)
-- [ ] No voice-only actions exist
+- [x] Voice and button paths produce identical engine state (assert in tests) — the page-registered executor reuses the exact button dispatch paths (`performAsk`/`performReact`/`performCast`); parity asserted on the wire payloads, and the tool result is the same line the panel shows
+- [x] Typed question while session awake → existing Ask flow → Oracle speaks the answer (input path never changes behavior) — the answer rides a stage-direction turn (`voiceSession.direct`), dropped by the session unless idle; her persona now acts through the tools instead of deflecting to the board (the S6 conflict)
+- [x] No voice-only actions exist — a spoken move the board would not offer (closed reaction window, not your turn, round decided, unknown rune) answers with an engine-truth guard line and dispatches nothing
 - Depends: S2
 
 ### S8 — Destructive action confirmation (R4)

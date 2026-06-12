@@ -70,6 +70,18 @@ Spoken once per round on the first successful wake of the voice session—the vo
 
 > "The fire wakes, and I with it. Ask, or bid me hex, scry, pass, or cast the rune."
 
+### Spoken moves (voice, S7)
+
+A voiced action calls the same engine function as its button, and the Oracle voices the same line the panel shows. When a spoken move isn't on offer, nothing executes; the engine truth below reaches the model as the tool result, voiced in her register (these never show in the panel — no move was made):
+
+| Trigger | Line |
+|---|---|
+| Ask or Cast while Sköll's question hangs | "Sköll's question hangs. Scry, hex, or pass before another move." |
+| Ask or Cast on Sköll's turn | "The wolf is moving. Hold." |
+| Scry / Hex / Pass with no hanging question | "Sköll asks nothing. There is no question to scry, hex, or pass." |
+| Any move after the round resolves | "The longest day is decided. Begin another night to play again." |
+| Cast of a rune not on the board | "No rune named {name} lies on the board." |
+
 ### Interpretation echo (public, before the answer)
 Pattern: **`You ask after {paraphrase}.`**—then a held beat, then the answer.
 
