@@ -53,6 +53,34 @@ const pageProps = {
 	form: null
 };
 
+// The page-registered executor, exactly as the session would invoke it (S7+).
+const executor = () =>
+	voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
+		name: string;
+		args: Record<string, unknown>;
+	}) => Promise<string>;
+
+// Every action body that reached the engine, in dispatch order.
+const actionBodies = () =>
+	vi
+		.mocked(fetch)
+		.mock.calls.filter(([url]) => String(url) === '/api/action')
+		.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+
+function mockAction(result: object) {
+	vi.mocked(fetch).mockImplementation(async (input) => {
+		if (String(input) === '/api/action') return new Response(JSON.stringify(result));
+		return new Response('{}');
+	});
+}
+
+// S8 canon (ux-copy.md §1): the confirmation questions, and the player reply that opens the gate.
+const CONFIRM_HEX =
+	'His question dies unanswered and the hex is spent. Say it plain: shall I hex him?';
+const confirmCast = (name: string) =>
+	`${name}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?`;
+const playerSpeaks = () => emit({ type: 'transcript', direction: 'in', text: 'yes, do it' });
+
 beforeEach(() => {
 	// Reset here, not in afterEach: the previous test's component cleanup calls sleep() on
 	// unmount, and that teardown ordering must never leak into this test's call counts. Reset
@@ -479,27 +507,7 @@ describe('Save the Sun page — wake invitation (S6)', () => {
 });
 
 describe('Save the Sun page — engine tool calls (S7)', () => {
-	// The page-registered executor, exactly as the session would invoke it.
-	const executor = () =>
-		voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
-			name: string;
-			args: Record<string, unknown>;
-		}) => Promise<string>;
-
-	const actionBodies = () =>
-		vi
-			.mocked(fetch)
-			.mock.calls.filter(([url]) => String(url) === '/api/action')
-			.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
-
 	const askAnswer = 'Yes. Sól is reaching for a fire rune.';
-
-	function mockAction(result: object) {
-		vi.mocked(fetch).mockImplementation(async (input) => {
-			if (String(input) === '/api/action') return new Response(JSON.stringify(result));
-			return new Response('{}');
-		});
-	}
 
 	it('registers the executor at mount and unregisters at unmount', async () => {
 		const screen = render(Page, pageProps);
@@ -678,18 +686,6 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 });
 
 describe('Save the Sun page — voiced tool guards (S7 review fixes)', () => {
-	const executor = () =>
-		voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
-			name: string;
-			args: Record<string, unknown>;
-		}) => Promise<string>;
-
-	const actionBodies = () =>
-		vi
-			.mocked(fetch)
-			.mock.calls.filter(([url]) => String(url) === '/api/action')
-			.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
-
 	it('an inherited object key is not a tool — model names only match own reactions', async () => {
 		// With the window open, `in`-based matching would have routed toString into a React
 		// dispatch carrying a function as the reaction.
@@ -819,32 +815,6 @@ describe('Save the Sun page — voiced tool guards (S7 review fixes)', () => {
 });
 
 describe('Save the Sun page — destructive confirmation gate (S8)', () => {
-	const executor = () =>
-		voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
-			name: string;
-			args: Record<string, unknown>;
-		}) => Promise<string>;
-
-	const actionBodies = () =>
-		vi
-			.mocked(fetch)
-			.mock.calls.filter(([url]) => String(url) === '/api/action')
-			.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
-
-	function mockAction(result: object) {
-		vi.mocked(fetch).mockImplementation(async (input) => {
-			if (String(input) === '/api/action') return new Response(JSON.stringify(result));
-			return new Response('{}');
-		});
-	}
-
-	const CONFIRM_HEX =
-		'His question dies unanswered and the hex is spent. Say it plain: shall I hex him?';
-	const confirmCast = (name: string) =>
-		`${name}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?`;
-	// The player's reply since arming — the only thing that opens the gate.
-	const playerSpeaks = () => emit({ type: 'transcript', direction: 'in', text: 'yes, do it' });
-
 	const reactProps = {
 		...pageProps,
 		data: {
@@ -1068,22 +1038,7 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 });
 
 describe('Save the Sun page — cast lockout (S9)', () => {
-	const executor = () =>
-		voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
-			name: string;
-			args: Record<string, unknown>;
-		}) => Promise<string>;
-
-	const actionBodies = () =>
-		vi
-			.mocked(fetch)
-			.mock.calls.filter(([url]) => String(url) === '/api/action')
-			.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
-
 	const CAST_SACRED = 'The cast is sacred. Hold.';
-	const confirmCast = (name: string) =>
-		`${name}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?`;
-	const playerSpeaks = () => emit({ type: 'transcript', direction: 'in', text: 'yes, cast it' });
 	const wrongCast = { type: 'Cast', cast: { ok: true, won: false, turnConsumed: true } };
 
 	// Holds the Cast round-trip open under the test's control; every other action answers at once.
@@ -1244,10 +1199,7 @@ describe('Save the Sun page — cast lockout (S9)', () => {
 			.toHaveTextContent('Sowilo is not the one. The night holds.');
 		// The answer paints before the board lock releases — wait for the release itself.
 		await expect.element(reactScreen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
-		const outcome = await executor()({ name: 'hex', args: {} });
-		expect(outcome).toBe(
-			'His question dies unanswered and the hex is spent. Say it plain: shall I hex him?'
-		);
+		expect(await executor()({ name: 'hex', args: {} })).toBe(CONFIRM_HEX);
 		expect(actionBodies().filter((body) => body.type === 'React')).toHaveLength(0);
 	});
 
@@ -1272,9 +1224,7 @@ describe('Save the Sun page — cast lockout (S9)', () => {
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('Sowilo is not the one. The night holds.');
 		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
-		expect(await executor()({ name: 'hex', args: {} })).toBe(
-			'His question dies unanswered and the hex is spent. Say it plain: shall I hex him?'
-		);
+		expect(await executor()({ name: 'hex', args: {} })).toBe(CONFIRM_HEX);
 		expect(actionBodies().filter((body) => body.type === 'React')).toHaveLength(0);
 	});
 
