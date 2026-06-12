@@ -480,8 +480,14 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	async function wake(): Promise<void> {
-		if (state !== 'asleep') return;
-		setupFailureDetail = null;
+		if (state === 'eclipsed') return;
+		if (state !== 'asleep') {
+			// info, not error: a double-tap race lands here routinely — and 'warn' isn't a level
+			// the /debug stream accepts.
+			teeDebug('info', 'voice session already awake');
+			return;
+		}
+		notice = null;
 		const myGeneration = ++generation;
 		const stale = () => generation !== myGeneration;
 		// Announced before the first await: the permission prompt + mint + connect stretch can run
