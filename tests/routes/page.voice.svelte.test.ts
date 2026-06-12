@@ -269,6 +269,20 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 
 	it('leaves the button game untouched by the seal — Ask still dispatches (S4)', async () => {
 		const fetchMock = vi.mocked(fetch);
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		fetchMock.mockResolvedValueOnce(
+			new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'No. Sól is not reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: HUMAN_TURN
+				})
+			)
+		);
 		const screen = render(Page, pageProps);
 		emit({
 			type: 'error',
@@ -284,6 +298,10 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 			const actionCalls = fetchMock.mock.calls.filter(([url]) => url === '/api/action');
 			expect(actionCalls).toHaveLength(1);
 		});
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
+		expect(consoleError).not.toHaveBeenCalled();
 	});
 
 	it('ignores transcript fragments — they belong to S10, and must not disturb the panel', async () => {
