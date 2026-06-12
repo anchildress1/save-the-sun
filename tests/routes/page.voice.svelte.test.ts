@@ -16,6 +16,8 @@ const voiceMock = vi.hoisted(() => {
 		notice: null as string | null,
 		wake: vi.fn(async () => {}),
 		sleep: vi.fn(),
+		setToolExecutor: vi.fn(),
+		direct: vi.fn(),
 		emit(event: unknown) {
 			for (const listener of listeners) listener(event);
 		}
@@ -26,6 +28,8 @@ vi.mock('$lib/voice/voiceSession', () => ({
 	voiceSession: {
 		wake: voiceMock.wake,
 		sleep: voiceMock.sleep,
+		setToolExecutor: voiceMock.setToolExecutor,
+		direct: voiceMock.direct,
 		get state() {
 			return voiceMock.state;
 		},
@@ -42,6 +46,7 @@ vi.mock('$lib/voice/voiceSession', () => ({
 const emit = (event: VoiceEvent) => voiceMock.emit(event);
 
 const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
+const RITE_MOVING = 'The rite is moving. Hold.';
 const pageProps = {
 	data: { boardSeed: 0, roundId: 'test-round', state: HUMAN_TURN, pendingReaction: null },
 	params: {},
@@ -470,5 +475,339 @@ describe('Save the Sun page — wake invitation (S6)', () => {
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await medallion.click();
 		expect(voiceMock.wake).toHaveBeenLastCalledWith({ invitation: true });
+	});
+});
+
+describe('Save the Sun page — engine tool calls (S7)', () => {
+	// The page-registered executor, exactly as the session would invoke it.
+	const executor = () =>
+		voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
+			name: string;
+			args: Record<string, unknown>;
+		}) => Promise<string>;
+
+	const actionBodies = () =>
+		vi
+			.mocked(fetch)
+			.mock.calls.filter(([url]) => String(url) === '/api/action')
+			.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+
+	const askAnswer = 'Yes. Sól is reaching for a fire rune.';
+
+	function mockAction(result: object) {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/action') return new Response(JSON.stringify(result));
+			return new Response('{}');
+		});
+	}
+
+	it('registers the executor at mount and unregisters at unmount', async () => {
+		const screen = render(Page, pageProps);
+		expect(voiceMock.setToolExecutor).toHaveBeenCalledExactlyOnceWith(expect.any(Function));
+		screen.unmount();
+		expect(voiceMock.setToolExecutor).toHaveBeenLastCalledWith(null);
+	});
+
+	it('a voiced ask dispatches the identical engine action as the typed Ask', async () => {
+		mockAction({
+			type: 'Ask',
+			oracle: { ok: true, answer: askAnswer, turnConsumed: true },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+
+		const outcome = await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		// The tool result is the same line the panel voices…
+		expect(outcome).toBe(askAnswer);
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent(askAnswer);
+		// …and the wire carried the same action both times: identical engine state by construction.
+		const [typed, voiced] = actionBodies();
+		expect(voiced).toEqual(typed);
+		expect(voiced).toEqual({ type: 'Ask', player: 'Human', question: 'is it a fire rune?' });
+	});
+
+	it('a voiced cast dispatches the identical engine action as the board cast', async () => {
+		mockAction({
+			type: 'Cast',
+			cast: { ok: true, won: false, turnConsumed: true },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await screen.getByRole('button', { name: 'Name it' }).click();
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+
+		// Spoken rune names arrive in whatever case the transcript carried.
+		const outcome = await executor()({ name: 'cast_rune', args: { rune: 'sowilo' } });
+		expect(outcome).toBe('Sowilo is not the one. The night holds.');
+		const [board, voiced] = actionBodies();
+		expect(voiced).toEqual(board);
+		expect(voiced).toEqual({ type: 'Cast', player: 'Human', runeName: 'Sowilo' });
+	});
+
+	it('a voiced scry dispatches the identical engine action as the prompt button', async () => {
+		const reactProps = {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+			}
+		};
+		mockAction({
+			type: 'React',
+			outcome: { ok: true, choice: 'Scry', shareAnswer: true },
+			skollReaction: { hexed: false, scried: { answer: askAnswer } },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, reactProps);
+		await screen.getByRole('button', { name: 'Scry' }).click();
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+		screen.unmount();
+
+		// A fresh window for the voiced path — the first render's Scry already closed its own.
+		render(Page, reactProps);
+		const outcome = await executor()({ name: 'scry', args: {} });
+		expect(outcome).toBe(
+			`You lean into the dark and listen. His answer is yours too. ${askAnswer}`
+		);
+		const [button, voiced] = actionBodies();
+		expect(voiced).toEqual(button);
+		expect(voiced).toEqual({ type: 'React', player: 'Human', reaction: 'Scry' });
+	});
+
+	it('a voiced reaction with no hanging question dispatches nothing', async () => {
+		render(Page, pageProps);
+		const outcome = await executor()({ name: 'hex', args: {} });
+		expect(outcome).toBe('Sköll asks nothing. There is no question to scry, hex, or pass.');
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it("a voiced ask during Sköll's move dispatches nothing", async () => {
+		const skollTurn: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		mockAction({ type: 'Advance', state: skollTurn });
+		render(Page, { ...pageProps, data: { ...pageProps.data, state: skollTurn } });
+		const outcome = await executor()({ name: 'ask', args: { question: 'is it gold?' } });
+		expect(outcome).toBe('The wolf is moving. Hold.');
+		// Only the mount-driven Advance reached the wire — never an Ask.
+		expect(actionBodies().filter((body) => body.type === 'Ask')).toHaveLength(0);
+	});
+
+	it('a voiced move after the round resolves dispatches nothing', async () => {
+		const won: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 6 };
+		render(Page, { ...pageProps, data: { ...pageProps.data, state: won } });
+		const outcome = await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
+		expect(outcome).toBe('The longest day is decided. Begin another night to play again.');
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('a voiced cast of a rune not on the board dispatches nothing', async () => {
+		render(Page, pageProps);
+		const outcome = await executor()({ name: 'cast_rune', args: { rune: 'Excalibur' } });
+		expect(outcome).toBe('No rune named Excalibur lies on the board.');
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('a voiced empty question dispatches nothing', async () => {
+		render(Page, pageProps);
+		const outcome = await executor()({ name: 'ask', args: {} });
+		expect(outcome).toBe('Speak your question, witch.');
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('an unknown tool rejects — the session answers the model with the error', async () => {
+		render(Page, pageProps);
+		await expect(executor()({ name: 'summon_wolf', args: {} })).rejects.toThrow(
+			'unknown tool: summon_wolf'
+		);
+	});
+
+	it('a typed answer is spoken at the fire — the session decides whether it can land', async () => {
+		mockAction({
+			type: 'Ask',
+			oracle: { ok: true, answer: askAnswer, turnConsumed: true },
+			state: HUMAN_TURN
+		});
+		voiceMock.state = 'listening';
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await vi.waitFor(() => expect(voiceMock.direct).toHaveBeenCalledOnce());
+		const direction = String(voiceMock.direct.mock.calls[0][0]);
+		expect(direction).toContain('Stage direction');
+		expect(direction).toContain(askAnswer);
+	});
+
+	it('a voiced ask is never re-spoken — the tool result already carries the line', async () => {
+		mockAction({
+			type: 'Ask',
+			oracle: { ok: true, answer: askAnswer, turnConsumed: true },
+			state: HUMAN_TURN
+		});
+		voiceMock.state = 'listening';
+		render(Page, pageProps);
+		await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		expect(voiceMock.direct).not.toHaveBeenCalled();
+	});
+
+	it("a typed Ask that Sköll hexes is not spoken — his Hex closed the Oracle's lips", async () => {
+		mockAction({ type: 'Ask', skollVsYou: { reaction: 'Hex' }, state: HUMAN_TURN });
+		voiceMock.state = 'listening';
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent("Sköll closes the Oracle's lips. Your question dies in the dark.");
+		expect(voiceMock.direct).not.toHaveBeenCalled();
+	});
+});
+
+describe('Save the Sun page — voiced tool guards (S7 review fixes)', () => {
+	const executor = () =>
+		voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
+			name: string;
+			args: Record<string, unknown>;
+		}) => Promise<string>;
+
+	const actionBodies = () =>
+		vi
+			.mocked(fetch)
+			.mock.calls.filter(([url]) => String(url) === '/api/action')
+			.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+
+	it('an inherited object key is not a tool — model names only match own reactions', async () => {
+		// With the window open, `in`-based matching would have routed toString into a React
+		// dispatch carrying a function as the reaction.
+		render(Page, {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+			}
+		});
+		await expect(executor()({ name: 'toString', args: {} })).rejects.toThrow(
+			'unknown tool: toString'
+		);
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('a voiced ask holds the board lock until the wolf settles', async () => {
+		const skollTurn: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		let settleAdvance!: (response: Response) => void;
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit | undefined)?.body));
+			if (body.type === 'Ask')
+				return new Response(
+					JSON.stringify({
+						type: 'Ask',
+						oracle: {
+							ok: true,
+							answer: 'Yes. Sól is reaching for a fire rune.',
+							turnConsumed: true
+						},
+						state: skollTurn
+					})
+				);
+			return new Promise<Response>((resolve) => {
+				settleAdvance = resolve;
+			});
+		});
+		const screen = render(Page, pageProps);
+		const outcome = await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		// The tool result returned promptly, but his move is still in flight — the board stays
+		// locked so a "Begin another night" can't interleave a reset under the Advance.
+		expect(outcome).toBe('Yes. Sól is reaching for a fire rune.');
+		const newNight = screen.getByRole('button', { name: 'Begin another night' });
+		await expect.element(newNight).toBeDisabled();
+		settleAdvance(new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN })));
+		await expect.element(newNight).toBeEnabled();
+	});
+
+	it('voice tools cannot dispatch while a typed Ask is pending', async () => {
+		let settleAsk!: (response: Response) => void;
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			return new Promise<Response>((resolve) => {
+				settleAsk = resolve;
+			});
+		});
+		const screen = render(Page, pageProps);
+		const input = screen.getByLabelText('Ask the Oracle').element() as HTMLInputElement;
+		input.value = 'is it a fire rune?';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		(screen.getByRole('button', { name: 'Ask the Oracle' }).element() as HTMLButtonElement).click();
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+
+		const outcome = await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
+		expect(outcome).toBe(RITE_MOVING);
+		expect(actionBodies()).toEqual([
+			{ type: 'Ask', player: 'Human', question: 'is it a fire rune?' }
+		]);
+
+		settleAsk(
+			new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'Yes. Sól is reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: HUMAN_TURN
+				})
+			)
+		);
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Yes. Sól is reaching for a fire rune.');
+	});
+
+	it('a second model tool call in the same batch gets the pending guard, not a second action', async () => {
+		let settleAsk!: (response: Response) => void;
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			return new Promise<Response>((resolve) => {
+				settleAsk = resolve;
+			});
+		});
+		render(Page, pageProps);
+		const first = executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+
+		const second = await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
+		expect(second).toBe(RITE_MOVING);
+		expect(actionBodies()).toEqual([
+			{ type: 'Ask', player: 'Human', question: 'is it a fire rune?' }
+		]);
+
+		settleAsk(
+			new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'Yes. Sól is reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: HUMAN_TURN
+				})
+			)
+		);
+		await expect(first).resolves.toBe('Yes. Sól is reaching for a fire rune.');
 	});
 });

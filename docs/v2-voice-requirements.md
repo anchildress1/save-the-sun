@@ -61,25 +61,25 @@ The game's core loop—Ask, Hex, Scry, Pass, Cast—runs entirely on buttons and
 **R1 — Live Oracle session.**
 The client opens a Gemini Live API session (audio in, audio out, voice `Gacrux`) when the player taps the medallion.
 
-- [ ] Given the medallion is tapped from asleep, when the session opens, then the medallion enters the listening state and mic audio streams to the session.
-- [ ] On first wake of a game, the Oracle speaks an in-character invitation that names the speakable actions ("Ask, or bid me hex, scry, pass, or cast the rune")—this is the voice tutorial; no UI chrome teaches it.
-- [ ] Given the Oracle is speaking, when the player speaks over her, then her audio stops (barge-in) and the new utterance is processed.
-- [ ] Given the session drops (network), then the UI falls back to button mode with a non-blocking notice—the game never stalls on voice failure.
-- [ ] Given mic permission is denied or no mic device exists, then the medallion settles into a permanently eclipsed, inert state (or hides), a single quiet notice explains voice is unavailable, and the button game is untouched. No repeated permission prompts.
+- [x] Given the medallion is tapped from asleep, when the session opens, then the medallion enters the listening state and mic audio streams to the session.
+- [x] On first wake of a game, the Oracle speaks an in-character invitation that names the speakable actions ("Ask, or bid me hex, scry, pass, or cast the rune")—this is the voice tutorial; no UI chrome teaches it.
+- [x] Given the Oracle is speaking, when the player speaks over her, then her audio stops (barge-in) and the new utterance is processed.
+- [x] Given the session drops (network), then the UI falls back to button mode with a non-blocking notice—the game never stalls on voice failure.
+- [x] Given mic permission is denied or no mic device exists, then the medallion settles into a permanently eclipsed, inert state (or hides), a single quiet notice explains voice is unavailable, and the button game is untouched. No repeated permission prompts.
 
 **R2 — Ephemeral token endpoint.**
 The existing Cloud Run server gains one endpoint that mints short-lived Live API tokens using the Gemini key from Google Secret Manager.
 
-- [ ] The browser never receives or stores the long-lived API key.
-- [ ] Tokens are scoped and short-lived per the Live API ephemeral token spec.
-- [ ] Deploys with the existing server—no new infrastructure.
+- [x] The browser never receives or stores the long-lived API key.
+- [x] Tokens are scoped and short-lived per the Live API ephemeral token spec.
+- [x] Deploys with the existing server—no new infrastructure.
 
 **R3 — Engine actions as tool calls.**
 Ask, Hex, Scry, Pass, and Cast the Rune are exposed to the Oracle session as function declarations. A tool call from the model invokes the same engine function the corresponding button invokes.
 
-- [ ] Given the player says "I pass," when the model emits the `pass` tool call, then the engine executes it and the Oracle acknowledges in voice.
-- [ ] Given the player asks a question—spoken or typed—while the session is awake, then it routes through the existing Ask flow and the Oracle speaks the answer. Input path never changes her behavior.
-- [ ] Voice-initiated and button-initiated actions produce identical engine state. No action exists in voice that lacks a button equivalent.
+- [x] Given the player says "I pass," when the model emits the `pass` tool call, then the engine executes it and the Oracle acknowledges in voice.
+- [x] Given the player asks a question—spoken or typed—while the session is awake, then it routes through the existing Ask flow and the Oracle speaks the answer. Input path never changes her behavior.
+- [x] Voice-initiated and button-initiated actions produce identical engine state. No action exists in voice that lacks a button equivalent.
 
 **R4 — Confirmation for destructive actions.**
 Hex and Cast the Rune require a spoken confirmation exchange before the engine executes.
@@ -97,22 +97,22 @@ Per game rules, Hex targets an Ask and a Cast cannot be interrupted.
 **R6 — Eclipse medallion: control + indicator.**
 A medallion at the top of the Oracle panel is both the voice toggle and the state display. Static art, animated light: the artwork never deforms; only glow layers animate.
 
-- [ ] Tapping the medallion wakes or sleeps the voice session. It is the only voice control besides the output mute.
-- [ ] **Asleep / mic off**: Sköll's shadow bites into the disc—partial eclipse, small mic glyph etched in. Default state.
-- [ ] **Waking** *(added during S3)*: corona faintly kindling—the stretch between the tap and listening (permission prompt, token, connect). A tap here cancels the wake.
-- [ ] **Listening**: disc unveiled, gold corona glow breathing slowly.
-- [ ] **Hearing speech**: corona flares with the player's voice; rune glyphs around the rim ignite.
-- [ ] **Oracle thinking**: rune ring orbits slowly.
-- [ ] **Oracle speaking**: corona pulses with her voice.
-- [ ] **Sköll speaking**: glow shifts gold to ember red AND the wolf's eyes open at the disc edge—state is never communicated by color alone.
-- [ ] All glow animation respects `prefers-reduced-motion`: static glow intensities replace pulsing.
-- [ ] Medallion states carry ARIA labels announcing listening/asleep/speaking.
-- [ ] Asset: one new eclipse-medallion image in the established pipeline (dark Norse folk-art, aged gold, transparent background). Ring uses existing rune glyph assets via CSS transforms. Add to `ui-image-resources.md`.
+- [x] Tapping the medallion wakes or sleeps the voice session. It is the only voice control besides the output mute.
+- [x] **Asleep / mic off**: Sköll's shadow bites into the disc—partial eclipse, small mic glyph etched in. Default state.
+- [x] **Waking** *(added during S3)*: corona faintly kindling—the stretch between the tap and listening (permission prompt, token, connect). A tap here cancels the wake.
+- [x] **Listening**: disc unveiled, gold corona glow breathing slowly.
+- [x] **Hearing speech**: corona flares with the player's voice; rune glyphs around the rim ignite.
+- [x] **Oracle thinking**: rune ring orbits slowly.
+- [x] **Oracle speaking**: corona pulses with her voice. *(pure animation, no output level feed — by agreement, S3)*
+- [x] **Sköll speaking**: glow shifts gold to ember red AND the wolf's eyes open at the disc edge—state is never communicated by color alone. *(state shipped in S3; driven by the S13 director)*
+- [x] All glow animation respects `prefers-reduced-motion`: static glow intensities replace pulsing.
+- [x] Medallion states carry ARIA labels announcing listening/asleep/speaking.
+- [x] Asset: one new eclipse-medallion image in the established pipeline (dark Norse folk-art, aged gold, transparent background). Ring uses existing rune glyph assets via CSS transforms. Add to `ui-image-resources.md`.
 
 **R7 — Silence timeout.**
-- [ ] Given 5 seconds pass with no recognizable speech, then mic audio stops streaming, the session idles, and the medallion returns to the asleep state—silently, no verbal nudge.
-- [ ] The 5-second clock starts only after the Oracle (or Sköll) finishes speaking—their speech never counts as the player's silence.
-- [ ] Tapping the medallion resumes listening.
+- [x] Given 5 seconds pass with no recognizable speech, then mic audio stops streaming, the session idles, and the medallion returns to the asleep state—silently, no verbal nudge.
+- [x] The 5-second clock starts only after the Oracle (or Sköll) finishes speaking—their speech never counts as the player's silence.
+- [x] Tapping the medallion resumes listening.
 
 **R8 — Sköll clip library.**
 A build-time script generates Sköll's audio with Gemini TTS (voice `Algieba`, director's-notes style prompt) from a script file grouped by trigger bucket (working set drafted in `ux-copy.md` §2). One to three variants per trigger.
