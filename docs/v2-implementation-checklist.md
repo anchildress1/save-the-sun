@@ -37,7 +37,7 @@ Medallion at top of Oracle panel = voice toggle + state display. Static art, ani
 - [x] State never communicated by color alone (sköll = color + eyes shape)
 - [x] `prefers-reduced-motion`: static glow intensities, no pulse/orbit
 - [x] ARIA labels per state; medallion is a labeled button (+ polite live-region announcements)
-- [x] New asset: voice medallion level strip (6 frames @128px, 21K — spec + regeneration in `ui-image-resources.md`); the disc renders it per state with flare-indexed and ping-pong playback. Rim runes reuse existing rune glyph assets via CSS transforms ✓
+- [x] New asset: voice medallion level strip (12 frames @128px, 43K — spec + regeneration in `ui-image-resources.md`); the disc renders it per state with flare-indexed and ping-pong playback. Rim runes reuse existing rune glyph assets via CSS transforms ✓
 - Depends: S2 (event contract; can build against mocked events)
 
 ### S4 — Permission + device failure (R1)

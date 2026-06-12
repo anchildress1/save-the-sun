@@ -44,9 +44,9 @@ export const RING_RUNES: readonly RuneName[] = [
 	'Jera'
 ];
 
-// Volume-level strip (assets-webp/ui/voice-medallion-levels.webp): 6 frames of 128px laid out
-// horizontally, glow intensity 0 (rest) → 5 (peak), per the asset's authoring manifest.
-export const SPRITE_LEVELS = 6;
+// Volume-level strip (assets-webp/ui/voice-medallion-levels.webp): 12 frames of 128px laid out
+// horizontally, glow intensity 0 (rest) → 11 (peak), per the asset's authoring manifest.
+export const SPRITE_LEVELS = 12;
 const SPRITE_PEAK_LEVEL = SPRITE_LEVELS - 1;
 
 /** Glow level for a state; hearing maps mic flare with the asset's own volume formula.
@@ -57,7 +57,7 @@ export function spriteLevel(state: MedallionState, flare = 0): number {
 		case 'asleep':
 			return 0;
 		case 'waking':
-			return 1;
+			return 2;
 		case 'hearing':
 			return Math.min(
 				SPRITE_PEAK_LEVEL,
@@ -65,7 +65,7 @@ export function spriteLevel(state: MedallionState, flare = 0): number {
 			);
 		case 'thinking':
 		case 'listening':
-			return 2;
+			return 4;
 		case 'speaking':
 		case 'skoll-speaking':
 			return SPRITE_PEAK_LEVEL;

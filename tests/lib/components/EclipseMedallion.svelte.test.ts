@@ -110,10 +110,10 @@ describe('EclipseMedallion — voice level strip disc', () => {
 
 	it.each([
 		{ state: 'asleep' as const, amplitude: 0, level: '0' },
-		{ state: 'waking' as const, amplitude: 0, level: '1' },
-		{ state: 'hearing' as const, amplitude: 0.15, level: '3' },
-		{ state: 'hearing' as const, amplitude: 0.3, level: '5' },
-		{ state: 'speaking' as const, amplitude: 0, level: '5' }
+		{ state: 'waking' as const, amplitude: 0, level: '2' },
+		{ state: 'hearing' as const, amplitude: 0.15, level: '6' },
+		{ state: 'hearing' as const, amplitude: 0.3, level: '11' },
+		{ state: 'speaking' as const, amplitude: 0, level: '11' }
 	])('points $state (amp $amplitude) at strip level $level', ({ state, amplitude, level }) => {
 		const { button } = renderMedallion(state, amplitude);
 		expect(button.style.getPropertyValue('--sprite-level')).toBe(level);

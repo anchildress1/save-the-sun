@@ -9,10 +9,10 @@
 | | |
 |---|---|
 | File | `src/lib/assets-webp/ui/voice-medallion-levels.webp` |
-| Status | **Live (volume-levels, 128px)** — `EclipseMedallion.svelte` renders it as the `.disc` layer |
-| Strip | 768×128: 6 frames of 128px laid out horizontally, glow intensity 0 (rest) → 5 (peak), opaque dark background, 21K |
-| Authoring | Monotonic intensity ramp; the manifest's mapping `level = min(5, floor(volume01 * 6))` is implemented verbatim by `spriteLevel()` in `medallionState.ts`. |
-| Playback | Static level per state (asleep 0, waking 1, listening/thinking rest 2, peak 5); hearing maps mic flare through the manifest formula; listening/speaking/Sköll ping-pong the ramp via a single `steps(6, jump-none)` + `alternate` animation. Reduced motion freezes on the static level. |
+| Status | **Live (volume-levels-12, 128px)** — `EclipseMedallion.svelte` renders it as the `.disc` layer |
+| Strip | 1536×128: 12 frames of 128px laid out horizontally, glow intensity 0 (rest) → 11 (peak), opaque dark background, 43K |
+| Authoring | Monotonic intensity ramp; the manifest's mapping `level = min(11, floor(volume01 * 12))` is implemented verbatim by `spriteLevel()` in `medallionState.ts`. |
+| Playback | Static level per state (asleep 0, waking 2, listening/thinking rest 4, peak 11); hearing maps mic flare through the manifest formula; listening/speaking/Sköll ping-pong the ramp via a single `steps(12, jump-none)` + `alternate` animation. Reduced motion freezes on the static level. |
 | Sköll | Same strip, `hue-rotate`/`saturate` ember tint — always paired with the wolf-eyes shape signal. |
 | Regenerate | Export a new 6-frame 128px strip and drop it in place (the source pipeline already emits webp). A different level count means updating `SPRITE_LEVELS` and the CSS `background-size`/step count together. |
 | Source | `voice-temp/` (untracked, temporary; per-frame PNGs + 96px variants live there) |

@@ -162,19 +162,19 @@
 		position: absolute;
 		inset: 0;
 		border-radius: 50%;
-		background-size: 600% 100%;
-		background-position: calc(var(--sprite-level) * 100% / 5) 0%;
+		background-size: 1200% 100%;
+		background-position: calc(var(--sprite-level) * 100% / 11) 0%;
 	}
 
-	/* The strip is a monotonic 0→5 intensity ramp, so alternate plays it as a breath:
+	/* The strip is a monotonic 0→11 intensity ramp, so alternate plays it as a breath:
 	   up the ramp, back down — one full pulse per two passes. */
 	.medallion[data-voice-state='listening'] .disc {
-		animation: sprite-level 2.1s steps(6, jump-none) infinite alternate;
+		animation: sprite-level 2.2s steps(12, jump-none) infinite alternate;
 	}
 
 	.medallion[data-voice-state='speaking'] .disc,
 	.medallion[data-voice-state='skoll-speaking'] .disc {
-		animation: sprite-level 0.7s steps(6, jump-none) infinite alternate;
+		animation: sprite-level 0.75s steps(12, jump-none) infinite alternate;
 	}
 
 	/* Ember shift for the wolf — paired with the eyes below, never the only signal. */

@@ -79,24 +79,24 @@ describe('spriteLevel', () => {
 
 	it.each([
 		{ state: 'asleep' as const, level: 0 },
-		{ state: 'waking' as const, level: 1 },
-		{ state: 'listening' as const, level: 2 },
-		{ state: 'thinking' as const, level: 2 },
-		{ state: 'speaking' as const, level: 5 },
-		{ state: 'skoll-speaking' as const, level: 5 }
+		{ state: 'waking' as const, level: 2 },
+		{ state: 'listening' as const, level: 4 },
+		{ state: 'thinking' as const, level: 4 },
+		{ state: 'speaking' as const, level: 11 },
+		{ state: 'skoll-speaking' as const, level: 11 }
 	])('rests $state on level $level', ({ state, level }) => {
 		expect(spriteLevel(state)).toBe(level);
 	});
 
-	// The mapping is the asset's own manifest formula: min(5, floor(volume01 * 6)).
+	// The mapping is the asset's own manifest formula: min(11, floor(volume01 * 12)).
 	it.each([
 		{ label: 'silence', flare: 0, level: 0 },
-		{ label: 'a whisper', flare: 0.1, level: 0 },
-		{ label: 'low speech', flare: 0.2, level: 1 },
-		{ label: 'half flare', flare: 0.5, level: 3 },
-		{ label: 'full flare', flare: 1, level: 5 },
+		{ label: 'a whisper', flare: 0.1, level: 1 },
+		{ label: 'low speech', flare: 0.2, level: 2 },
+		{ label: 'half flare', flare: 0.5, level: 6 },
+		{ label: 'full flare', flare: 1, level: 11 },
 		{ label: 'a negative flare clamped to the dim end', flare: -1, level: 0 },
-		{ label: 'an over-range flare clamped to the peak', flare: 2, level: 5 }
+		{ label: 'an over-range flare clamped to the peak', flare: 2, level: 11 }
 	])('climbs the hearing ramp with $label', ({ flare, level }) => {
 		expect(spriteLevel('hearing', flare)).toBe(level);
 	});
