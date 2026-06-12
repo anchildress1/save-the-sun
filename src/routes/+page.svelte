@@ -228,6 +228,12 @@
 				voiceNotice = '';
 				break;
 			case 'listening':
+				// A no-audio model turn can settle straight from thinking to listening. If the
+				// player already answered the confirmation and no matching tool call landed, it
+				// was a decline or drift — do not leave the destructive gate armed.
+				if (voiceConfirm?.spoke && voiceConfirm.heard) voiceConfirm = null;
+				voiceState = event.type;
+				break;
 			case 'thinking':
 				voiceState = event.type;
 				break;

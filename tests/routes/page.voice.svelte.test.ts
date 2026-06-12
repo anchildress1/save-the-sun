@@ -991,6 +991,21 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		expect(actionBodies()).toHaveLength(0);
 	});
 
+	it('a silent Oracle turn after the player replies disarms — no-audio decline never executes later', async () => {
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		emit({ type: 'speaking' }); // she voices the confirmation question
+		emit({ type: 'listening' });
+		playerSpeaks();
+		emit({ type: 'thinking' });
+		emit({ type: 'listening' }); // model turn completed without audio or a tool call
+
+		const outcome = await executor()({ name: 'hex', args: {} });
+
+		expect(outcome).toBe(CONFIRM_HEX);
+		expect(actionBodies()).toHaveLength(0);
+	});
+
 	it('sleep clears the armed gate — silence through the timeout never executes', async () => {
 		// The R7 silence timeout is a full sleep, so this is also the decline-by-silence path.
 		render(Page, reactProps);
