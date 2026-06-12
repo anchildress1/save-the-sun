@@ -6,7 +6,8 @@
 	import EndScreen from '$lib/components/EndScreen.svelte';
 	import EclipseMedallion from '$lib/components/EclipseMedallion.svelte';
 	import type { MedallionState } from '$lib/components/medallionState';
-	import { voiceSession, type VoiceEvent } from '$lib/voice/voiceSession';
+	import { voiceSession, type VoiceEvent, type VoiceToolCall } from '$lib/voice/voiceSession';
+	import { oracleBoardEcho } from '$lib/voice/oraclePersona';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
@@ -58,7 +59,13 @@
 		nightDawn: 'Dawn gathers at the edge of the world.',
 		chooseTarget: 'Choose a rune from the board.',
 		desktopOnly: 'The rite needs a wider sky. Return on a desktop to take up the runes.',
-		castPrompt: (name: string) => `Cast ${name}?`
+		castPrompt: (name: string) => `Cast ${name}?`,
+		// Spoken-move guards (S7): engine truth handed to the model when a voiced action can't
+		// run — never shown in the panel, since no move was made.
+		wolfAsking: "Sköll's question hangs. Scry, hex, or pass before another move.",
+		noReactionWindow: 'Sköll asks nothing. There is no question to scry, hex, or pass.',
+		riteDone: 'The longest day is decided. Begin another night to play again.',
+		unknownRune: (name: string) => `No rune named ${name} lies on the board.`
 	};
 
 	let castMode = $state(false);
@@ -323,6 +330,9 @@
 		window.addEventListener('resize', onReposition);
 		window.addEventListener('scroll', onReposition, true);
 		const unsubscribeVoice = voiceSession.subscribe(onVoiceEvent);
+		// S7: the model's tool calls run against this page's game. Registered before any wake can
+		// happen (the medallion renders with this mount), so a call can never find no executor.
+		voiceSession.setToolExecutor(executeVoiceTool);
 		// The session is a module singleton and the eclipse seal (S4) survives unmount — a remount
 		// must adopt the live state, or the medallion would promise a wake the session will refuse.
 		voiceState = voiceSession.state;
@@ -334,6 +344,7 @@
 			window.removeEventListener('scroll', onReposition, true);
 			clearTimeout(aiNoteHideTimer); // don't let a scheduled hide fire after teardown
 			unsubscribeVoice();
+			voiceSession.setToolExecutor(null); // a dead page's game must not answer tool calls
 			voiceSession.sleep(); // never leave the mic streaming with no UI attached
 		};
 	});
@@ -398,6 +409,54 @@
 		showOnboarding = true;
 	}
 
+	// One Ask path for the typed field and the spoken `ask` tool (S7): identical dispatch,
+	// identical panel updates. `hers` marks lines the Oracle herself voices (answer, refusal) —
+	// system lines stay text-only; `consumed` tells the typed path whether to clear the field.
+	// Never throws: a failed dispatch settles the panel and reports the silent-Oracle line.
+	async function performAsk(
+		question: string
+	): Promise<{ line: string; hers: boolean; consumed: boolean }> {
+		try {
+			const { oracle, state, skollVsYou } = await dispatch({
+				type: 'Ask',
+				player: 'Human',
+				question
+			});
+			applyState(state);
+			let outcome: { line: string; hers: boolean; consumed: boolean };
+			if (skollVsYou?.reaction === 'Hex') {
+				// The Oracle text names the Hex — the question died, so it replaces the answer.
+				// Not hers to voice: his Hex closed her lips.
+				outcome = { line: RITE.skollHexes, hers: false, consumed: true };
+			} else if (skollVsYou?.reaction === 'Scry' && oracle?.ok) {
+				// The Oracle still speaks your answer (he overheard it), with his Scry noted after it.
+				outcome = { line: `${oracle.answer} ${RITE.skollScried}`, hers: true, consumed: true };
+			} else if (oracle?.ok) {
+				outcome = { line: oracle.answer, hers: true, consumed: true };
+			} else if (oracle?.reason === 'refusal') {
+				outcome = { line: oracle.line, hers: true, consumed: false };
+			} else if (oracle) {
+				// not-your-turn means the engine has handed the turn to Sköll.
+				outcome = {
+					line: oracle.engineReason === 'not-your-turn' ? RITE.wolfMoving : RITE.oracleSilent,
+					hers: false,
+					consumed: false
+				};
+			} else {
+				// no oracle and not a Hex — unexpected; fail to a safe line
+				outcome = { line: RITE.oracleSilent, hers: false, consumed: false };
+			}
+			answer = outcome.line;
+			return outcome;
+		} catch (err) {
+			// A real 500 here means something the server-side degradation did NOT catch — keep
+			// a trace so it's distinguishable from an expected in-world refusal.
+			console.error('[ui] Ask dispatch failed:', err);
+			answer = RITE.oracleSilent;
+			return { line: RITE.oracleSilent, hers: false, consumed: false };
+		}
+	}
+
 	async function submitAsk() {
 		const question = askValue.trim();
 		if (question === '') {
@@ -407,44 +466,19 @@
 		}
 		pending = true;
 		try {
-			const { oracle, state, skollVsYou } = await dispatch({
-				type: 'Ask',
-				player: 'Human',
-				question
-			});
-			applyState(state);
-			if (skollVsYou?.reaction === 'Hex') {
-				// The Oracle text names the Hex — the question died, so it replaces the answer.
-				answer = RITE.skollHexes;
-				askValue = '';
-			} else if (skollVsYou?.reaction === 'Scry' && oracle?.ok) {
-				// The Oracle still speaks your answer (he overheard it), with his Scry noted after it.
-				answer = `${oracle.answer} ${RITE.skollScried}`;
-				askValue = '';
-			} else if (oracle?.ok) {
-				answer = oracle.answer;
-				askValue = '';
-			} else if (oracle?.reason === 'refusal') {
-				answer = oracle.line;
-			} else if (oracle) {
-				// not-your-turn means the engine has handed the turn to Sköll.
-				answer = oracle.engineReason === 'not-your-turn' ? RITE.wolfMoving : RITE.oracleSilent;
-			} else {
-				answer = RITE.oracleSilent; // no oracle and not a Hex — unexpected; fail to a safe line
-			}
+			const outcome = await performAsk(question);
+			if (outcome.consumed) askValue = '';
+			// The witch typed instead of speaking; if the session is awake her answer is spoken
+			// too (S7) — the session drops the direction unless it is idle.
+			if (outcome.hers) voiceSession.direct(oracleBoardEcho(outcome.line));
 			await advanceSkoll();
-		} catch (err) {
-			// A real 500 here means something the server-side degradation did NOT catch — keep
-			// a trace so it's distinguishable from an expected in-world refusal.
-			console.error('[ui] Ask dispatch failed:', err);
-			answer = RITE.oracleSilent;
 		} finally {
 			pending = false;
 		}
 	}
 
-	async function submitReact(choice: ReactionChoice) {
-		pending = true;
+	// Never throws — see performAsk.
+	async function performReact(choice: ReactionChoice): Promise<string> {
 		try {
 			const { state, skollReaction } = await dispatch({
 				type: 'React',
@@ -457,19 +491,30 @@
 			// Key on what the engine actually DID (skollReaction), not what was requested — a Scry/Hex
 			// can fail (e.g. no charge after a desync), which the server resolves as a Pass. Spend the
 			// charge only when the reaction truly landed, so the UI never diverges from engine truth.
+			let line: string;
 			if (skollReaction?.hexed) {
-				answer = RITE.hexHim;
+				line = RITE.hexHim;
 				heldHex = false;
 			} else if (skollReaction?.scried) {
 				// §3: the Scry framing leads, then the answer he was owed — now yours too.
-				answer = `${RITE.scryHim} ${skollReaction.scried.answer}`;
+				line = `${RITE.scryHim} ${skollReaction.scried.answer}`;
 				heldScry = false;
 			} else {
-				answer = RITE.passHim; // a Pass, or a reaction that didn't land
+				line = RITE.passHim; // a Pass, or a reaction that didn't land
 			}
+			answer = line;
+			return line;
 		} catch (err) {
 			console.error('[ui] React dispatch failed:', err);
 			answer = RITE.oracleSilent;
+			return RITE.oracleSilent;
+		}
+	}
+
+	async function submitReact(choice: ReactionChoice) {
+		pending = true;
+		try {
+			await performReact(choice);
 		} finally {
 			pending = false;
 		}
@@ -543,30 +588,90 @@
 		}
 	}
 
-	async function commitCast() {
-		if (selectedRune === null) return;
-		pending = true;
+	// Never throws — see performAsk.
+	async function performCast(runeName: string): Promise<string> {
 		try {
 			const { cast, state } = await dispatch({
 				type: 'Cast',
 				player: 'Human',
-				runeName: selectedRune.name
+				runeName
 			});
 			applyState(state);
+			let line: string;
 			if (cast.ok) {
-				answer = cast.won ? RITE.runeTrue : RITE.wrongCast(selectedRune.name);
+				line = cast.won ? RITE.runeTrue : RITE.wrongCast(runeName);
 			} else {
 				console.warn('[ui] Cast rejected by engine:', cast.reason);
-				answer = RITE.castFalters;
+				line = RITE.castFalters;
 			}
-			await advanceSkoll();
+			answer = line;
+			return line;
 		} catch (err) {
 			console.error('[ui] Cast dispatch failed:', err);
 			answer = RITE.castFalters;
+			return RITE.castFalters;
 		} finally {
-			pending = false;
 			cancelCast();
 		}
+	}
+
+	async function commitCast() {
+		if (selectedRune === null) return;
+		pending = true;
+		try {
+			await performCast(selectedRune.name);
+			await advanceSkoll();
+		} finally {
+			pending = false;
+		}
+	}
+
+	// S7: the model's five declared actions land here — the SAME dispatch the buttons use, so a
+	// voiced move and a clicked move are indistinguishable to the engine. The returned line is
+	// the tool result the Oracle voices; guard lines report a move the board would not offer
+	// (its button disabled or target missing) without touching the panel.
+	const REACTION_TOOLS: Record<string, ReactionChoice> = { scry: 'Scry', hex: 'Hex', pass: 'Pass' };
+
+	async function executeVoiceTool({ name, args }: VoiceToolCall): Promise<string> {
+		if (name === 'ask') {
+			const question = typeof args.question === 'string' ? args.question.trim() : '';
+			if (question === '') return RITE.emptyAsk;
+			if (skollAsking) return RITE.wolfAsking;
+			if (!canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
+			pending = true;
+			try {
+				return (await performAsk(question)).line;
+			} finally {
+				pending = false;
+				// Not awaited: the tool result must reach the model now, not after the wolf's move.
+				void advanceSkoll();
+			}
+		}
+		if (name in REACTION_TOOLS) {
+			if (!skollAsking) return RITE.noReactionWindow;
+			pending = true;
+			try {
+				return await performReact(REACTION_TOOLS[name]);
+			} finally {
+				pending = false;
+			}
+		}
+		if (name === 'cast_rune') {
+			const spoken = typeof args.rune === 'string' ? args.rune.trim() : '';
+			if (spoken === '') return RITE.chooseTarget;
+			const rune = runes.find((r) => r.name.toLowerCase() === spoken.toLowerCase());
+			if (!rune) return RITE.unknownRune(spoken);
+			if (skollAsking) return RITE.wolfAsking;
+			if (!canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
+			pending = true;
+			try {
+				return await performCast(rune.name);
+			} finally {
+				pending = false;
+				void advanceSkoll();
+			}
+		}
+		throw new Error(`unknown tool: ${name}`);
 	}
 </script>
 
