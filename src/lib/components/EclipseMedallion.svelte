@@ -79,7 +79,6 @@
 						/>
 					{/each}
 				</span>
-				<span class="shadow-bite"></span>
 				<svg class="mic-glyph" viewBox="0 0 28 28">
 					<rect x="11" y="4" width="6" height="11" rx="3" />
 					<path d="M7.5 13a6.5 6.5 0 0 0 13 0" />
@@ -151,7 +150,7 @@
 		transition: opacity 0.25s ease;
 	}
 
-	/* The disc clips the bite and the eyes; the corona stays outside so its glow can spill. */
+	/* The disc clips the inner layers; the corona stays outside so its glow can spill. */
 	.clip {
 		position: absolute;
 		inset: 0;
@@ -231,31 +230,8 @@
 			filter 0.25s ease;
 	}
 
-	/* Asleep: Sköll's shadow bites into the disc — the partial eclipse. closest-side pins the
-	   shadow circle to the element box (farthest-corner math made it swallow half the face),
-	   and the offset leaves only a crescent overlapping; the edge stays near-crisp because a
-	   soft falloff reads as a blurry drop shadow, not an eclipse. */
-	.shadow-bite {
-		position: absolute;
-		top: -52%;
-		left: -52%;
-		width: 100%;
-		height: 100%;
-		border-radius: 50%;
-		background: radial-gradient(
-			circle closest-side,
-			rgba(5, 7, 14, 0.88) 97%,
-			rgba(5, 7, 14, 0) 100%
-		);
-		opacity: 0;
-		transition: opacity 0.25s ease;
-	}
-
-	.medallion[data-voice-state='asleep'] .shadow-bite {
-		opacity: 1;
-	}
-
-	/* Asleep: the etched mic glyph is the discoverability cue. */
+	/* Asleep: the sprite's dim eclipsed-sun frame IS the partial eclipse — a CSS shadow on top
+	   of it read as a black blob, so the etched mic glyph alone marks the rest state. */
 	.mic-glyph {
 		position: absolute;
 		left: 50%;
@@ -275,12 +251,8 @@
 		opacity: 1;
 	}
 
-	/* Waking: the shadow half-lifts and the corona kindles — static (no animation), so the
-	   permission-prompt stretch reads as pending without needing a reduced-motion variant. */
-	.medallion[data-voice-state='waking'] .shadow-bite {
-		opacity: 0.45;
-	}
-
+	/* Waking: the corona kindles — static (no animation), so the permission-prompt stretch
+	   reads as pending without needing a reduced-motion variant. */
 	.medallion[data-voice-state='waking'] .corona {
 		opacity: 0.18;
 	}

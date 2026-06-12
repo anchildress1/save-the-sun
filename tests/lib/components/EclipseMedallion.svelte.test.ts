@@ -60,24 +60,23 @@ describe('EclipseMedallion — labeled button (R6)', () => {
 });
 
 describe('EclipseMedallion — state visuals', () => {
-	it('bites the disc and etches the mic glyph while asleep; the wolf stays hidden', () => {
+	it('etches the mic glyph while asleep; the wolf stays hidden', () => {
 		const { button } = renderMedallion('asleep');
-		expect(getComputedStyle(layer(button, '.shadow-bite')).opacity).toBe('1');
 		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('1');
 		expect(getComputedStyle(layer(button, '.wolf-eyes')).opacity).toBe('0');
+		// The sprite's eclipsed-sun frame carries the asleep look — no shadow layer on top.
+		expect(button.querySelector('.shadow-bite')).toBeNull();
 	});
 
-	it('half-lifts the shadow and kindles the corona while waking — pending, not asleep', () => {
+	it('kindles the corona while waking — pending, not asleep', () => {
 		const { button } = renderMedallion('waking');
-		expect(getComputedStyle(layer(button, '.shadow-bite')).opacity).toBe('0.45');
 		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('0');
 		// Brighter than the asleep corona (base 0.08), or waking is indistinguishable from asleep.
 		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.08);
 	});
 
-	it('unveils the disc on listening — no bite, no mic glyph, corona lit', () => {
+	it('unveils the disc on listening — no mic glyph, corona lit', () => {
 		const { button } = renderMedallion('listening');
-		expect(getComputedStyle(layer(button, '.shadow-bite')).opacity).toBe('0');
 		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('0');
 		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.2);
 	});

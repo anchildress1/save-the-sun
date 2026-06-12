@@ -1150,19 +1150,16 @@
 		isolation: isolate;
 	}
 
+	/* The panel's own background already dims its top; this once stacked a second near-opaque
+	   fade on it (combined ≈0.98 alpha) whose 44→76% stops drew a visible band edge — read as a
+	   dark box behind the medallion. Keep only the gold crown halo and a whisper of depth. */
 	.oracle-panel::before {
 		content: '';
 		position: absolute;
 		inset: 0;
 		z-index: 1;
 		background:
-			linear-gradient(
-				180deg,
-				rgba(6, 9, 18, 0.78) 0%,
-				rgba(6, 9, 18, 0.5) 44%,
-				rgba(6, 9, 18, 0.08) 76%,
-				transparent 100%
-			),
+			linear-gradient(180deg, rgba(6, 9, 18, 0.28) 0%, transparent 65%),
 			radial-gradient(circle at 50% 0%, rgba(217, 169, 74, 0.1) 0%, transparent 36%);
 		pointer-events: none;
 	}

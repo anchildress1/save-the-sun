@@ -17,8 +17,8 @@
 | Regenerate | Re-export the sheet at the same grid, then `cwebp -q 80 -m 6 <png> -o src/lib/assets-webp/ui/voice-medallion-sprite.webp`. A different grid means updating `SPRITE_COLS`/`SPRITE_ROWS` and the CSS `background-size`/step counts together. |
 | Source | `poc-voice-sprite/` (untracked, temporary) |
 
-The rim runes and the eclipse shadow bite are **not** part of this asset: runes reuse
-`src/lib/assets-webp/runes/*.webp` via CSS transforms (`RING_RUNES` in `medallionState.ts`),
-and the bite/mic glyph/wolf eyes stay CSS layers on top.
+The rim runes are **not** part of this asset: they reuse `src/lib/assets-webp/runes/*.webp`
+via CSS transforms (`RING_RUNES` in `medallionState.ts`); the mic glyph and wolf eyes stay CSS
+layers on top. The eclipse itself lives in the artwork — no CSS shadow is painted over it.
 
 🤖 _Drafted with AI assistance; decisions by Ashley._ ☀️

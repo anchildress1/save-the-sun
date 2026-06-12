@@ -99,7 +99,7 @@ A medallion at the top of the Oracle panel is both the voice toggle and the stat
 
 - [ ] Tapping the medallion wakes or sleeps the voice session. It is the only voice control besides the output mute.
 - [ ] **Asleep / mic off**: Sköll's shadow bites into the disc—partial eclipse, small mic glyph etched in. Default state.
-- [ ] **Waking** *(added during S3)*: shadow half-lifted, corona faintly kindling—the stretch between the tap and listening (permission prompt, token, connect). A tap here cancels the wake.
+- [ ] **Waking** *(added during S3)*: corona faintly kindling—the stretch between the tap and listening (permission prompt, token, connect). A tap here cancels the wake.
 - [ ] **Listening**: disc unveiled, gold corona glow breathing slowly.
 - [ ] **Hearing speech**: corona flares with the player's voice; rune glyphs around the rim ignite.
 - [ ] **Oracle thinking**: rune ring orbits slowly.
