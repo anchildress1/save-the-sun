@@ -103,8 +103,11 @@
 	}
 
 	.medallion {
-		--size: 7.5rem;
-		--ring-r: 2.8rem;
+		/* Sized so the corona's spill still fits under the panel's top padding — the panel
+		   clips overflow, and a taller disc had its glow crown sliced flat while shoving the
+		   content stack down over the wolf banner. */
+		--size: 6.25rem;
+		--ring-r: 2.35rem;
 		--corona-rgb: 217, 169, 74; /* gold */
 		position: relative;
 		width: var(--size);
@@ -134,7 +137,7 @@
 
 	.corona {
 		position: absolute;
-		inset: -16%;
+		inset: -12%;
 		border-radius: 50%;
 		background: radial-gradient(
 			circle,
