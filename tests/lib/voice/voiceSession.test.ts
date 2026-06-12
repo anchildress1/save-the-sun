@@ -493,21 +493,128 @@ describe('voiceSession sleep', () => {
 });
 
 describe('voiceSession failures', () => {
+	// S4: a denied or absent mic is final — the session seals into eclipsed, never asleep.
 	it.each([
 		['mic-permission', 'The fire cannot hear you. The rite continues by hand.'],
-		['mic-missing', 'No voice reaches the fire. The rite continues by hand.'],
-		['audio', 'No voice reaches the fire. The rite continues by hand.']
-	] as const)('mic failure %s emits its notice and never mints a token', async (reason, notice) => {
-		audio.openMic.mockResolvedValueOnce({ ok: false, reason, detail: 'NotAllowedError: denied' });
+		['mic-missing', 'No voice reaches the fire. The rite continues by hand.']
+	] as const)(
+		'mic failure %s emits its notice, never mints a token, and seals into eclipsed',
+		async (reason, notice) => {
+			audio.openMic.mockResolvedValueOnce({ ok: false, reason, detail: 'NotAllowedError: denied' });
+			await vs.wake();
+			expect(events).toEqual([
+				{ type: 'waking' },
+				{ type: 'error', reason, notice },
+				{ type: 'eclipsed' }
+			]);
+			expect(tokenCalls()).toHaveLength(0);
+			expect(vs.state).toBe('eclipsed');
+			expect(teeBodies().join(' ')).toContain('NotAllowedError: denied');
+		}
+	);
+
+	it('a generic audio failure stays retryable — it settles to asleep, not eclipsed', async () => {
+		audio.openMic.mockResolvedValueOnce({
+			ok: false,
+			reason: 'audio',
+			detail: 'AudioContext refused'
+		});
 		await vs.wake();
 		expect(events).toEqual([
 			{ type: 'waking' },
-			{ type: 'error', reason, notice },
+			{
+				type: 'error',
+				reason: 'audio',
+				notice: 'No voice reaches the fire. The rite continues by hand.'
+			},
 			{ type: 'asleep' }
 		]);
 		expect(tokenCalls()).toHaveLength(0);
 		expect(vs.state).toBe('asleep');
-		expect(teeBodies().join(' ')).toContain('NotAllowedError: denied');
+	});
+
+	it('a wake after the eclipse is a silent no-op — the player is never re-prompted (S4)', async () => {
+		audio.openMic.mockResolvedValueOnce({
+			ok: false,
+			reason: 'mic-permission',
+			detail: 'NotAllowedError: denied'
+		});
+		await vs.wake();
+		events = [];
+		await vs.wake();
+		expect(audio.openMic).toHaveBeenCalledTimes(1);
+		expect(events).toEqual([]);
+		expect(vs.state).toBe('eclipsed');
+	});
+
+	it('a denial landing after a cancel tap still seals — the next tap must not re-prompt (S4)', async () => {
+		let denyMic!: (verdict: unknown) => void;
+		audio.openMic.mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					denyMic = resolve;
+				})
+		);
+		const woke = vs.wake();
+		vs.sleep(); // cancel while the permission prompt is still up
+		denyMic({ ok: false, reason: 'mic-permission', detail: 'NotAllowedError: denied' });
+		await woke;
+		expect(eventTypes()).toEqual(['waking', 'asleep', 'error', 'eclipsed']);
+		expect(vs.state).toBe('eclipsed');
+		await vs.wake();
+		expect(audio.openMic).toHaveBeenCalledTimes(1);
+	});
+
+	it('a stale audio failure after a cancel stays retryable — only the mic verdicts seal', async () => {
+		let failMic!: (verdict: unknown) => void;
+		audio.openMic.mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					failMic = resolve;
+				})
+		);
+		const woke = vs.wake();
+		vs.sleep();
+		failMic({ ok: false, reason: 'audio', detail: 'AudioContext refused' });
+		await woke;
+		expect(eventTypes()).toEqual(['waking', 'asleep']);
+		expect(vs.state).toBe('asleep');
+	});
+
+	it('a stale denial never blows away a newer in-flight wake — it observes its own verdict', async () => {
+		let denyFirst!: (verdict: unknown) => void;
+		audio.openMic.mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					denyFirst = resolve;
+				})
+		);
+		const first = vs.wake();
+		vs.sleep();
+		const second = vs.wake(); // default mock grants this wake's mic
+		await vi.advanceTimersByTimeAsync(0);
+		callbacks!.onmessage({ setupComplete: {} });
+		await second;
+		denyFirst({ ok: false, reason: 'mic-permission', detail: 'NotAllowedError: denied' });
+		await first;
+		expect(vs.state).toBe('listening');
+		expect(audio.openMic).toHaveBeenCalledTimes(2);
+	});
+
+	it('sleep while eclipsed leaves the seal — it never re-arms wake() through asleep (S4)', async () => {
+		audio.openMic.mockResolvedValueOnce({
+			ok: false,
+			reason: 'mic-missing',
+			detail: 'NotFoundError: no device'
+		});
+		await vs.wake();
+		events = [];
+		vs.sleep();
+		expect(events).toEqual([]);
+		expect(vs.state).toBe('eclipsed');
+		// And the seal still holds against a wake after the sleep attempt.
+		await vs.wake();
+		expect(audio.openMic).toHaveBeenCalledTimes(1);
 	});
 
 	it.each([

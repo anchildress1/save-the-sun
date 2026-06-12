@@ -11,6 +11,8 @@ export type MedallionState = VoiceState | 'skoll-speaking';
 // Readonly via `as const` (compile-time): TS-guarded code can't fork them from the canon.
 export const MEDALLION_LABEL = {
 	asleep: 'The voice sleeps. Wake the Oracle.',
+	// Eclipsed is sealed (S4): no action tail — a tap does nothing, and the label must not promise one.
+	eclipsed: 'The voice is sealed. The rite continues by hand.',
 	waking: 'The Oracle stirs. Silence the voice.',
 	listening: 'The Oracle listens. Silence the voice.',
 	hearing: 'The Oracle hears you. Silence the voice.',
@@ -24,6 +26,7 @@ export const MEDALLION_LABEL = {
 // and announcing every utterance would drown the screen reader in chatter).
 export const MEDALLION_ANNOUNCEMENT = {
 	asleep: 'The voice sleeps.',
+	eclipsed: 'The voice is sealed.',
 	waking: 'The Oracle stirs.',
 	listening: 'The Oracle listens.',
 	hearing: null,
@@ -55,6 +58,7 @@ const SPRITE_PEAK_LEVEL = SPRITE_LEVELS - 1;
 export function spriteLevel(state: MedallionState, flare = 0): number {
 	switch (state) {
 		case 'asleep':
+		case 'eclipsed':
 			return 0;
 		case 'waking':
 			return 2;

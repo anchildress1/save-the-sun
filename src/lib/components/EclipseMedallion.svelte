@@ -54,10 +54,14 @@
 		data-testid="eclipse-medallion"
 		data-voice-state={current}
 		aria-label={MEDALLION_LABEL[current]}
+		aria-disabled={current === 'eclipsed'}
 		style="--flare: {flare}; --ring-step: {360 /
 			RING_RUNES.length}deg; --sprite-level: {level}; --sprite-size: {SPRITE_LEVELS *
 			100}%; --sprite-peak: {SPRITE_LEVELS - 1}"
-		onclick={onToggle}
+		onclick={() => {
+			// Sealed for the session (S4): the tap must die here, whatever the page wires in.
+			if (current !== 'eclipsed') onToggle();
+		}}
 	>
 		<span class="visual" aria-hidden="true">
 			<span class="corona"></span>
@@ -83,6 +87,7 @@
 					<path d="M7.5 13a6.5 6.5 0 0 0 13 0" />
 					<line x1="14" y1="19.5" x2="14" y2="23" />
 					<line x1="10.5" y1="23" x2="17.5" y2="23" />
+					<line class="mic-strike" x1="7" y1="5" x2="21" y2="23" />
 				</svg>
 				<span class="wolf-eyes">
 					<span class="eye eye--left"></span>
@@ -233,6 +238,24 @@
 
 	.medallion[data-voice-state='asleep'] .mic-glyph {
 		opacity: 1;
+	}
+
+	.mic-strike {
+		display: none;
+	}
+
+	/* Eclipsed (S4): the dim rest frame holds, but the struck glyph is the shape signal that
+	   this is the seal, not sleep — and the cursor drops the tap affordance with it. */
+	.medallion[data-voice-state='eclipsed'] {
+		cursor: default;
+	}
+
+	.medallion[data-voice-state='eclipsed'] .mic-glyph {
+		opacity: 0.45;
+	}
+
+	.medallion[data-voice-state='eclipsed'] .mic-strike {
+		display: inline;
 	}
 
 	/* Waking: the corona kindles — static (no animation), so the permission-prompt stretch
