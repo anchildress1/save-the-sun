@@ -143,7 +143,7 @@
 		position: absolute;
 		inset: 0;
 		border-radius: 50%;
-		background: radial-gradient(circle at 38% 30%, #46517f 0%, #242d55 52%, #111733 100%);
+		background: radial-gradient(circle at 38% 30%, #5d6898 0%, #333d6c 55%, #1a2148 100%);
 		box-shadow:
 			inset 0 0 0 3px rgba(233, 200, 119, 0.9),
 			inset 0 0 0 5px rgba(158, 113, 42, 0.65),
@@ -178,14 +178,14 @@
 	   soft falloff reads as a blurry drop shadow, not an eclipse. */
 	.shadow-bite {
 		position: absolute;
-		top: -46%;
-		left: -46%;
+		top: -52%;
+		left: -52%;
 		width: 100%;
 		height: 100%;
 		border-radius: 50%;
 		background: radial-gradient(
 			circle closest-side,
-			rgba(5, 7, 14, 0.97) 97%,
+			rgba(5, 7, 14, 0.88) 97%,
 			rgba(5, 7, 14, 0) 100%
 		);
 		opacity: 0;
@@ -198,7 +198,7 @@
 
 	/* Even asleep the gold must read at a glance — the medallion is the voice's front door. */
 	.medallion[data-voice-state='asleep'] .corona {
-		opacity: 0.14;
+		opacity: 0.22;
 	}
 
 	/* Asleep: the etched mic glyph is the discoverability cue. */
@@ -228,7 +228,7 @@
 	}
 
 	.medallion[data-voice-state='waking'] .corona {
-		opacity: 0.18;
+		opacity: 0.3;
 	}
 
 	/* Listening: disc unveiled, corona breathing slow. */
