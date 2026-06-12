@@ -62,6 +62,8 @@ const SPEECH_RMS_FLOOR = 0.02;
 const HEARING_HOLD_MS = 800;
 // A cough can reach thinking with no reply ever coming.
 const THINKING_FALLBACK_MS = 10_000;
+// R7: this long with no recognizable player speech idles the session back to asleep.
+const SILENCE_TIMEOUT_MS = 5_000;
 const SETUP_TIMEOUT_MS = 10_000;
 // A hung token endpoint or blackholed handshake must fail the wake, not strand it in waking.
 const TOKEN_TIMEOUT_MS = 10_000;
@@ -89,6 +91,7 @@ export function createVoiceSession(): VoiceSession {
 	let awaitingDrain = false;
 	let hearingQuietTimer: ReturnType<typeof setTimeout> | null = null;
 	let thinkingRescueTimer: ReturnType<typeof setTimeout> | null = null;
+	let silenceTimer: ReturnType<typeof setTimeout> | null = null;
 	let setupResolver: ((ready: boolean) => void) | null = null;
 	let setupFailureDetail: string | null = null;
 	let sendFailureTeed = false;
@@ -113,12 +116,35 @@ export function createVoiceSession(): VoiceSession {
 		if (thinkingRescueTimer) clearTimeout(thinkingRescueTimer);
 		hearingQuietTimer = null;
 		thinkingRescueTimer = null;
+		clearSilenceClock();
+	}
+
+	function clearSilenceClock(): void {
+		if (silenceTimer) clearTimeout(silenceTimer);
+		silenceTimer = null;
+	}
+
+	function restartSilenceClock(): void {
+		clearSilenceClock();
+		silenceTimer = setTimeout(() => {
+			silenceTimer = null;
+			// Silent by design (R7): no error, no notice, no nudge — the medallion just sleeps.
+			teardown();
+			teeDebug('info', 'voice session idled — silence timeout');
+			toState('asleep');
+		}, SILENCE_TIMEOUT_MS);
 	}
 
 	// 'hearing' re-emits every chunk so the medallion corona can track live amplitude.
 	function toState(next: VoiceState): void {
 		const changed = state !== next;
 		state = next;
+		// R7 clock runs only on the player's turn; hearing arms-if-unset so RMS never resets
+		// it, while a barge-in cutting straight from speaking still gets a fresh clock.
+		if (next === 'listening') restartSilenceClock();
+		else if (next === 'hearing') {
+			if (!silenceTimer) restartSilenceClock();
+		} else clearSilenceClock();
 		if (!changed && next !== 'hearing') return;
 		if (next === 'hearing') emit({ type: 'hearing', amplitude: lastAmplitude });
 		else emit({ type: next });
@@ -270,8 +296,13 @@ export function createVoiceSession(): VoiceSession {
 	function relayTranscript(direction: 'in' | 'out', text: string | undefined): void {
 		if (!text) return;
 		emit({ type: 'transcript', direction, text });
-		if (direction === 'in') transcriptIn += text;
-		else transcriptOut += text;
+		if (direction === 'in') {
+			transcriptIn += text;
+			// A final transcript landing in thinking must not arm a clock the Oracle's turn owns.
+			if (state === 'listening' || state === 'hearing') restartSilenceClock();
+		} else {
+			transcriptOut += text;
+		}
 	}
 
 	// Transcripts reach the UI as live fragments (S10's surface); the /debug stream gets one
