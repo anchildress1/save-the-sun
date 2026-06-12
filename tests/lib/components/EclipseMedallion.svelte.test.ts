@@ -98,6 +98,31 @@ describe('EclipseMedallion — state visuals', () => {
 	});
 });
 
+describe('EclipseMedallion — voice sprite disc', () => {
+	it('renders the sprite sheet as the disc art', () => {
+		const { button } = renderMedallion('asleep');
+		expect(layer(button, '.disc').style.backgroundImage).toContain('voice-medallion-sprite');
+	});
+
+	it.each([
+		{ state: 'asleep' as const, amplitude: 0, col: '0', row: '0' },
+		{ state: 'waking' as const, amplitude: 0, col: '0', row: '1' },
+		{ state: 'hearing' as const, amplitude: 0.3, col: '7', row: '3' },
+		{ state: 'speaking' as const, amplitude: 0, col: '7', row: '3' }
+	])('points $state at sheet cell ($col, $row)', ({ state, amplitude, col, row }) => {
+		const { button } = renderMedallion(state, amplitude);
+		expect(button.style.getPropertyValue('--sprite-col')).toBe(col);
+		expect(button.style.getPropertyValue('--sprite-row')).toBe(row);
+	});
+
+	it('freezes the playback loop under reduced motion — the static frame stands in', () => {
+		for (const state of ['listening', 'speaking', 'skoll-speaking'] as const) {
+			const { button } = renderMedallion(state);
+			expect(getComputedStyle(layer(button, '.disc')).animationName).toBe('none');
+		}
+	});
+});
+
 describe('EclipseMedallion — amplitude flare (hearing)', () => {
 	it.each([
 		{ label: 'half-scale speech', amplitude: 0.15, flare: '0.5' },

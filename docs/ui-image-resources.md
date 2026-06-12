@@ -4,18 +4,21 @@
 > art direction), exported as WebP into `src/lib/assets-webp/`, imported with `?url&no-inline`.
 > One entry per asset that needs more context than its filename.
 
-## Eclipse medallion (S3 / R6)
+## Voice medallion sprite (S3 / R6)
 
 | | |
 |---|---|
-| File | `src/lib/assets-webp/ui/eclipse-medallion.webp` |
-| Status | **Pending generation** — `EclipseMedallion.svelte` paints a placeholder disc until the art lands |
-| Spec | 512×512, transparent background, circular composition filling the frame |
-| Direction | Dark Norse folk-art sun disc: aged-gold rim, deep midnight face. Matches the rune-card stone carving and the divider/button-border gilt. |
-| Constraint | **Static art only.** Every state effect — corona glow, eclipse shadow bite, mic glyph, rune ring, wolf eyes — is a CSS layer on top. The artwork must not bake in glow, glyphs, or eyes, and never deforms. |
-| Swap point | `.disc` in `EclipseMedallion.svelte`: replace the painted gradient with the `<img>`. Nothing else changes. |
+| File | `src/lib/assets-webp/ui/voice-medallion-sprite.webp` |
+| Status | **Live (POC, test1)** — `EclipseMedallion.svelte` renders it as the `.disc` layer |
+| Sheet | 2048×1536, 8 columns × 6 rows = 48 frames of 256px, black background |
+| Authoring | One dim→bright→dim glow loop across the sheet, read left-to-right then top-to-bottom; frame 31 (end of row 4) is the peak. `spriteFrame()` in `medallionState.ts` owns the state→frame map. |
+| Playback | Static frame per state (asleep 0, waking 8, listening/thinking rest 12, peak 31); hearing climbs the ramp with mic flare; listening/speaking/Sköll step the full loop via paired `steps()` animations (x walks a row, y drops a row per x cycle). Reduced motion freezes on the static frame. |
+| Sköll | Same sheet, `hue-rotate`/`saturate` ember tint — always paired with the wolf-eyes shape signal. |
+| Regenerate | Re-export the sheet at the same grid, then `cwebp -q 80 -m 6 <png> -o src/lib/assets-webp/ui/voice-medallion-sprite.webp`. A different grid means updating `SPRITE_COLS`/`SPRITE_ROWS` and the CSS `background-size`/step counts together. |
+| Source | `poc-voice-sprite/` (untracked, temporary) |
 
-The rim runes are **not** part of this asset: they reuse `src/lib/assets-webp/runes/*.webp`
-positioned via CSS transforms (`RING_RUNES` in `medallionState.ts`).
+The rim runes and the eclipse shadow bite are **not** part of this asset: runes reuse
+`src/lib/assets-webp/runes/*.webp` via CSS transforms (`RING_RUNES` in `medallionState.ts`),
+and the bite/mic glyph/wolf eyes stay CSS layers on top.
 
 🤖 _Drafted with AI assistance; decisions by Ashley._ ☀️

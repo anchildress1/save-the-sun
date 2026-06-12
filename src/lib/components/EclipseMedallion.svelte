@@ -3,10 +3,13 @@
 		MEDALLION_ANNOUNCEMENT,
 		MEDALLION_LABEL,
 		RING_RUNES,
+		SPRITE_COLS,
 		flareLevel,
+		spriteFrame,
 		type MedallionState
 	} from './medallionState';
 	import { RUNE_SYMBOL_ASSET } from './runeVisuals';
+	import spriteSheet from '$lib/assets-webp/ui/voice-medallion-sprite.webp?url&no-inline';
 
 	// Presentation + toggle only: the page owns the voiceSession subscription and decides what
 	// `state` means, so the S13 director can drive skoll-speaking through the same prop.
@@ -22,6 +25,9 @@
 	} = $props();
 
 	let flare = $derived(flareLevel(amplitude));
+	let frame = $derived(spriteFrame(current, flare));
+	let spriteCol = $derived(frame % SPRITE_COLS);
+	let spriteRow = $derived(Math.floor(frame / SPRITE_COLS));
 
 	// Sticky: states mapped to null announce nothing, so the last meaningful line holds and the
 	// region only re-announces when its content actually changes (no listening↔hearing chatter).
@@ -39,15 +45,16 @@
 		data-testid="eclipse-medallion"
 		data-voice-state={current}
 		aria-label={MEDALLION_LABEL[current]}
-		style="--flare: {flare}; --ring-step: {360 / RING_RUNES.length}deg"
+		style="--flare: {flare}; --ring-step: {360 /
+			RING_RUNES.length}deg; --sprite-col: {spriteCol}; --sprite-row: {spriteRow}"
 		onclick={onToggle}
 	>
 		<span class="visual" aria-hidden="true">
 			<span class="corona"></span>
 			<span class="clip">
-				<!-- Swap point for the generated eclipse-medallion art (docs/ui-image-resources.md):
-				     replace .disc's painted gradient with the <img>. Every glow layer stays CSS. -->
-				<span class="disc"></span>
+				<!-- The disc renders the voice sprite sheet (docs/ui-image-resources.md): static
+				     frame per state, flare-indexed on hearing, stepped loop while a voice plays. -->
+				<span class="disc" style="background-image: url({spriteSheet})"></span>
 				<span class="rune-ring">
 					{#each RING_RUNES as name, i (name)}
 						<img
@@ -136,18 +143,54 @@
 		overflow: hidden;
 	}
 
-	/* Placeholder art until the generated medallion lands: aged-gold rim on a moonlit face.
-	   The face must sit clearly brighter than the panel, or the eclipse bite has nothing
-	   visible to bite and reads as a smudged shadow. */
+	/* The voice sprite sheet: 8×6 frames, sized so exactly one frame fills the disc. The
+	   background-position fractions are (count - 1) because N background-position stops span
+	   0–100% in N-1 steps. Inline --sprite-col/--sprite-row pick the static frame; the looping
+	   states' animations below override it (animations outrank inline styles in the cascade). */
 	.disc {
 		position: absolute;
 		inset: 0;
 		border-radius: 50%;
-		background: radial-gradient(circle at 38% 30%, #5d6898 0%, #333d6c 55%, #1a2148 100%);
-		box-shadow:
-			inset 0 0 0 3px rgba(233, 200, 119, 0.9),
-			inset 0 0 0 5px rgba(158, 113, 42, 0.65),
-			inset 0 0 26px rgba(0, 0, 0, 0.65);
+		background-size: 800% 600%;
+		background-position: calc(var(--sprite-col) * 100% / 7) calc(var(--sprite-row) * 100% / 5);
+	}
+
+	/* One pass through the sheet is one authored glow cycle (dim→bright→dim): the x animation
+	   walks a row's 8 columns, the y animation drops a row each x cycle — 6× the x duration. */
+	.medallion[data-voice-state='listening'] .disc {
+		animation:
+			sprite-x 0.8s steps(8, jump-none) infinite,
+			sprite-y 4.8s steps(6, jump-none) infinite;
+	}
+
+	.medallion[data-voice-state='speaking'] .disc,
+	.medallion[data-voice-state='skoll-speaking'] .disc {
+		animation:
+			sprite-x 0.25s steps(8, jump-none) infinite,
+			sprite-y 1.5s steps(6, jump-none) infinite;
+	}
+
+	/* Ember shift for the wolf — paired with the eyes below, never the only signal. */
+	.medallion[data-voice-state='skoll-speaking'] .disc {
+		filter: hue-rotate(-40deg) saturate(1.25);
+	}
+
+	@keyframes sprite-x {
+		from {
+			background-position-x: 0%;
+		}
+		to {
+			background-position-x: 100%;
+		}
+	}
+
+	@keyframes sprite-y {
+		from {
+			background-position-y: 0%;
+		}
+		to {
+			background-position-y: 100%;
+		}
 	}
 
 	.rune-ring {
@@ -336,9 +379,11 @@
 	   frame, so the animations are removed and each state gets a fixed intensity. */
 	@media (prefers-reduced-motion: reduce) {
 		/* Selector specificity must match the per-state rules above, or their animation
-		   shorthand would win and the pulse/orbit would survive reduced motion. */
+		   shorthand would win and the pulse/orbit would survive reduced motion. The disc
+		   freezes on its inline static frame (spriteFrame's reduced-motion fallback). */
 		.medallion[data-voice-state] .corona,
-		.medallion[data-voice-state] .rune-ring {
+		.medallion[data-voice-state] .rune-ring,
+		.medallion[data-voice-state] .disc {
 			animation: none;
 		}
 

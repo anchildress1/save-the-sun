@@ -44,6 +44,32 @@ export const RING_RUNES: readonly RuneName[] = [
 	'Jera'
 ];
 
+// Sprite sheet geometry (assets-webp/ui/voice-medallion-sprite.webp): 8×6 grid of 256px frames,
+// authored as one dim→bright→dim glow loop. Frame 31 (row 4's end) is the peak.
+export const SPRITE_COLS = 8;
+export const SPRITE_ROWS = 6;
+const SPRITE_PEAK_FRAME = 31;
+
+/** Static sprite frame for a state; hearing climbs the brightness ramp with the flare.
+ * Looping states (listening/speaking/sköll) animate through the sheet in CSS — their value
+ * here is the frozen frame reduced motion falls back to. */
+export function spriteFrame(state: MedallionState, flare = 0): number {
+	switch (state) {
+		case 'asleep':
+			return 0;
+		case 'waking':
+			return 8;
+		case 'hearing':
+			return Math.round(Math.min(1, Math.max(0, flare)) * SPRITE_PEAK_FRAME);
+		case 'thinking':
+		case 'listening':
+			return 12;
+		case 'speaking':
+		case 'skoll-speaking':
+			return SPRITE_PEAK_FRAME;
+	}
+}
+
 // Mic RMS at which the corona reads fully flared; conversational speech peaks well below 1.0 raw.
 const FLARE_FULL_RMS = 0.3;
 

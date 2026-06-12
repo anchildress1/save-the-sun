@@ -37,19 +37,19 @@ Medallion at top of Oracle panel = voice toggle + state display. Static art, ani
 - [x] State never communicated by color alone (sköll = color + eyes shape)
 - [x] `prefers-reduced-motion`: static glow intensities, no pulse/orbit
 - [x] ARIA labels per state; medallion is a labeled button (+ polite live-region announcements)
-- [ ] New asset: eclipse medallion art **pending generation** (spec in `ui-image-resources.md`; component ships a placeholder disc with a one-line swap point). Rim runes reuse existing rune glyph assets via CSS transforms ✓
+- [x] New asset: voice medallion sprite (POC test1, 8×6 sheet — spec + regeneration in `ui-image-resources.md`); the disc renders it per state with flare-indexed and looped playback. Rim runes reuse existing rune glyph assets via CSS transforms ✓
 - Depends: S2 (event contract; can build against mocked events)
 
 ### S4 — Permission + device failure (R1)
 
-- [ ] Mic permission denied → medallion enters permanent inert eclipsed state (or hides), one quiet notice, never re-prompts that session
+- [ ] Mic permission denied → medallion enters permanent inert eclipsed state, one quiet notice, never re-prompts that session
 - [ ] No mic device → same path
 - [ ] Button game fully unaffected in both cases
 - Depends: S2, S3
 
 ### S5 — Silence timeout (R7)
 
-- [ ] 8000ms of no recognizable player speech → stop mic streaming, session idles, medallion → asleep; no audio nudge
+- [ ] 5000ms of no recognizable player speech → stop mic streaming, session idles, medallion → asleep; no audio nudge
 - [ ] Clock starts only after Oracle/Sköll playback ends; their speech never counts toward it
 - [ ] Medallion tap resumes
 - Depends: S2, S3
