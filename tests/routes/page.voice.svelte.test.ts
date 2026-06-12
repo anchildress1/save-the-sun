@@ -13,6 +13,7 @@ const voiceMock = vi.hoisted(() => {
 	return {
 		listeners,
 		state: 'asleep',
+		notice: null as string | null,
 		wake: vi.fn(async () => {}),
 		sleep: vi.fn(),
 		emit(event: unknown) {
@@ -27,6 +28,9 @@ vi.mock('$lib/voice/voiceSession', () => ({
 		sleep: voiceMock.sleep,
 		get state() {
 			return voiceMock.state;
+		},
+		get notice() {
+			return voiceMock.notice;
 		},
 		subscribe(listener: (event: unknown) => void) {
 			voiceMock.listeners.add(listener);
@@ -51,6 +55,7 @@ beforeEach(() => {
 	vi.resetAllMocks();
 	voiceMock.listeners.clear();
 	voiceMock.state = 'asleep';
+	voiceMock.notice = null;
 	localStorage.setItem('save-the-sun:onboarded', '1');
 	vi.stubGlobal(
 		'fetch',
@@ -261,10 +266,14 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 		// it), so a fresh mount that defaulted to asleep would render a wake button the session
 		// silently refuses.
 		voiceMock.state = 'eclipsed';
+		voiceMock.notice = 'The fire cannot hear you. The rite continues by hand.';
 		const screen = render(Page, pageProps);
 		await expect
 			.element(screen.getByTestId('eclipse-medallion'))
 			.toHaveAttribute('data-voice-state', 'eclipsed');
+		await expect
+			.element(screen.getByTestId('voice-notice'))
+			.toHaveTextContent('The fire cannot hear you. The rite continues by hand.');
 	});
 
 	it('leaves the button game untouched by the seal — Ask still dispatches (S4)', async () => {

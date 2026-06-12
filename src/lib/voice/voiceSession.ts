@@ -52,6 +52,7 @@ export interface VoiceSession {
 	/** Close everything and return to asleep. Safe in any state; eclipsed stays sealed. */
 	sleep(): void;
 	readonly state: VoiceState;
+	readonly notice: string | null;
 	subscribe(listener: VoiceListener): () => void;
 }
 
@@ -77,6 +78,7 @@ const NOTICE: Record<VoiceErrorReason, string> = {
 
 export function createVoiceSession(): VoiceSession {
 	let state: VoiceState = 'asleep';
+	let notice: string | null = null;
 	// Bumped by every wake and teardown; stale async continuations and socket callbacks go quiet.
 	let generation = 0;
 	let liveReady = false;
@@ -170,7 +172,8 @@ export function createVoiceSession(): VoiceSession {
 
 	function fail(reason: VoiceErrorReason, detail: string): void {
 		teardown();
-		emit({ type: 'error', reason, notice: NOTICE[reason] });
+		notice = NOTICE[reason];
+		emit({ type: 'error', reason, notice });
 		teeDebug('error', `voice wake failed (${reason}): ${detail}`);
 		// A denied or absent mic is final for the session: eclipsed seals wake() shut so the
 		// player is never re-prompted. Everything else settles to asleep and stays retryable.
@@ -513,6 +516,9 @@ export function createVoiceSession(): VoiceSession {
 		sleep,
 		get state() {
 			return state;
+		},
+		get notice() {
+			return notice;
 		},
 		subscribe(listener: VoiceListener) {
 			listeners.add(listener);

@@ -315,6 +315,9 @@
 		// The session is a module singleton and the eclipse seal (S4) survives unmount — a remount
 		// must adopt the live state, or the medallion would promise a wake the session will refuse.
 		voiceState = voiceSession.state;
+		if (voiceState === 'eclipsed' && voiceSession.notice) {
+			voiceNotice = voiceSession.notice;
+		}
 		return () => {
 			window.removeEventListener('resize', onReposition);
 			window.removeEventListener('scroll', onReposition, true);
