@@ -667,6 +667,17 @@
 		</section>
 
 		<aside class="oracle-panel">
+			<!-- The moon from the same art, ghosted behind the controls. -->
+			<img
+				class="skoll-moon"
+				src={skollBanner}
+				width="768"
+				height="1376"
+				alt=""
+				aria-hidden="true"
+				decoding="async"
+				fetchpriority="low"
+			/>
 			<div class="voice-stack">
 				<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
 				<!-- Always mounted (a live region born with content is skipped by screen readers) and
@@ -1174,7 +1185,29 @@
 		pointer-events: none;
 	}
 
-	.oracle-panel > :not(.skoll-banner) {
+	.skoll-moon {
+		position: absolute;
+		top: 47%;
+		left: 0;
+		z-index: 0;
+		width: 100%;
+		height: 42%;
+		object-fit: cover;
+		object-position: 50% 0%;
+		opacity: 0.6;
+		filter: brightness(1.35);
+		mask-image: linear-gradient(180deg, transparent 0%, black 8%, black 58%, transparent 92%);
+		-webkit-mask-image: linear-gradient(
+			180deg,
+			transparent 0%,
+			black 8%,
+			black 58%,
+			transparent 92%
+		);
+		pointer-events: none;
+	}
+
+	.oracle-panel > :not(.skoll-banner):not(.skoll-moon) {
 		position: relative;
 		z-index: 2;
 	}
