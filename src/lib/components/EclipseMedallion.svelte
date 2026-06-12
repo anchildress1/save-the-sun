@@ -143,7 +143,7 @@
 		position: absolute;
 		inset: 0;
 		border-radius: 50%;
-		background: radial-gradient(circle at 38% 30%, #38426a 0%, #1c2444 52%, #0d1228 100%);
+		background: radial-gradient(circle at 38% 30%, #46517f 0%, #242d55 52%, #111733 100%);
 		box-shadow:
 			inset 0 0 0 3px rgba(233, 200, 119, 0.9),
 			inset 0 0 0 5px rgba(158, 113, 42, 0.65),
@@ -172,16 +172,22 @@
 			filter 0.25s ease;
 	}
 
-	/* Asleep: Sköll's shadow bites into the disc — the partial eclipse. The edge must stay
-	   near-crisp: a soft falloff smears across the face and reads as a blurry shadow. */
+	/* Asleep: Sköll's shadow bites into the disc — the partial eclipse. closest-side pins the
+	   shadow circle to the element box (farthest-corner math made it swallow half the face),
+	   and the offset leaves only a crescent overlapping; the edge stays near-crisp because a
+	   soft falloff reads as a blurry drop shadow, not an eclipse. */
 	.shadow-bite {
 		position: absolute;
-		top: -34%;
-		left: -34%;
-		width: 92%;
-		height: 92%;
+		top: -46%;
+		left: -46%;
+		width: 100%;
+		height: 100%;
 		border-radius: 50%;
-		background: radial-gradient(circle, rgba(5, 7, 14, 0.97) 67%, rgba(5, 7, 14, 0) 70.5%);
+		background: radial-gradient(
+			circle closest-side,
+			rgba(5, 7, 14, 0.97) 97%,
+			rgba(5, 7, 14, 0) 100%
+		);
 		opacity: 0;
 		transition: opacity 0.25s ease;
 	}
