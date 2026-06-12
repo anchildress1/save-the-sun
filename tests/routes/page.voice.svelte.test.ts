@@ -313,6 +313,15 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 		expect(consoleError).not.toHaveBeenCalled();
 	});
 
+	it('ignores an event type it does not know — a newer session must not crash an older page', async () => {
+		const screen = render(Page, pageProps);
+		voiceMock.emit({ type: 'directors-cut' });
+		await expect
+			.element(screen.getByTestId('eclipse-medallion'))
+			.toHaveAttribute('data-voice-state', 'asleep');
+		expect(screen.getByTestId('voice-notice').element().textContent).toBe('');
+	});
+
 	it('ignores transcript fragments — they belong to S10, and must not disturb the panel', async () => {
 		const screen = render(Page, pageProps);
 		emit({ type: 'transcript', direction: 'out', text: 'The fire holds your answer.' });

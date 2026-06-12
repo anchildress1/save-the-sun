@@ -161,6 +161,31 @@ describe('openMic', () => {
 		});
 	});
 
+	it('maps an unrecognized DOMException name to audio — not every DOMException is a device verdict', async () => {
+		getUserMedia.mockRejectedValueOnce(new DOMException('interrupted', 'AbortError'));
+		expect(await openMic(vi.fn())).toEqual({
+			ok: false,
+			reason: 'audio',
+			detail: 'AbortError: interrupted'
+		});
+	});
+
+	it('stringifies a non-Error getUserMedia rejection into the detail', async () => {
+		getUserMedia.mockRejectedValueOnce('flat refusal');
+		expect(await openMic(vi.fn())).toEqual({
+			ok: false,
+			reason: 'audio',
+			detail: 'flat refusal'
+		});
+	});
+
+	it('reads an empty capture chunk as silence instead of dividing by zero', async () => {
+		const onChunk = vi.fn();
+		await openMic(onChunk);
+		FakeAudioWorkletNode.instances[0].port.onmessage!({ data: new Float32Array(0) });
+		expect(onChunk).toHaveBeenCalledExactlyOnceWith('', 0);
+	});
+
 	it('releases the granted mic and closes the context when worklet setup fails', async () => {
 		vi.stubGlobal(
 			'AudioContext',
