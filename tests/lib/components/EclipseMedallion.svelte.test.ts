@@ -71,8 +71,8 @@ describe('EclipseMedallion — state visuals', () => {
 		const { button } = renderMedallion('waking');
 		expect(getComputedStyle(layer(button, '.shadow-bite')).opacity).toBe('0.45');
 		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('0');
-		// Brighter than the asleep corona (0.22), or waking is indistinguishable from asleep.
-		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.22);
+		// Brighter than the asleep corona (base 0.08), or waking is indistinguishable from asleep.
+		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.08);
 	});
 
 	it('unveils the disc on listening — no bite, no mic glyph, corona lit', () => {
@@ -101,9 +101,11 @@ describe('EclipseMedallion — state visuals', () => {
 describe('EclipseMedallion — voice sprite disc', () => {
 	it('renders the sprite sheet as the disc art once the page goes idle', async () => {
 		const { button } = renderMedallion('asleep');
-		// Deferred off the critical path (perf gate) — it must still arrive.
-		await vi.waitFor(() =>
-			expect(layer(button, '.disc').style.backgroundImage).toContain('voice-medallion-sprite')
+		// Deferred off the critical path (perf gate) — it must still arrive, idle or not.
+		await vi.waitFor(
+			() =>
+				expect(layer(button, '.disc').style.backgroundImage).toContain('voice-medallion-sprite'),
+			{ timeout: 3000 }
 		);
 	});
 

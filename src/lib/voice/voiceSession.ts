@@ -81,6 +81,8 @@ export function createVoiceSession(): VoiceSession {
 	let setupFailureDetail: string | null = null;
 	let sendFailureTeed = false;
 	let mintedToken = '';
+	let transcriptIn = '';
+	let transcriptOut = '';
 	const listeners = new Set<VoiceListener>();
 
 	function emit(event: VoiceEvent): void {
@@ -111,6 +113,9 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	function teardown(): void {
+		// First, while the tee can still name the turn: a mid-turn sleep/failure must not
+		// swallow what was already transcribed.
+		flushTranscripts();
 		generation++;
 		liveReady = false;
 		awaitingDrain = false;
@@ -228,16 +233,33 @@ export function createVoiceSession(): VoiceSession {
 		if (content.interrupted) {
 			speaker?.stop();
 			awaitingDrain = false;
+			// The barge-in cuts her line; what was already transcribed is still worth the tee.
+			flushTranscripts();
 			toState('hearing');
 		}
 		relayTranscript('in', content.inputTranscription?.text);
 		relayTranscript('out', content.outputTranscription?.text);
 		playOracleAudio(content.modelTurn?.parts ?? []);
-		if (content.turnComplete) settleTurn();
+		if (content.turnComplete) {
+			flushTranscripts();
+			settleTurn();
+		}
 	}
 
 	function relayTranscript(direction: 'in' | 'out', text: string | undefined): void {
-		if (text) emit({ type: 'transcript', direction, text });
+		if (!text) return;
+		emit({ type: 'transcript', direction, text });
+		if (direction === 'in') transcriptIn += text;
+		else transcriptOut += text;
+	}
+
+	// Transcripts reach the UI as live fragments (S10's surface); the /debug stream gets one
+	// assembled line per side per turn instead of a fragment flood.
+	function flushTranscripts(): void {
+		if (transcriptIn) teeDebug('info', `heard: ${transcriptIn}`);
+		if (transcriptOut) teeDebug('info', `spoke: ${transcriptOut}`);
+		transcriptIn = '';
+		transcriptOut = '';
 	}
 
 	function playOracleAudio(parts: Part[]): void {

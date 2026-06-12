@@ -337,6 +337,36 @@ describe('voiceSession oracle speech', () => {
 		callbacks!.onmessage({ serverContent: {} });
 		expect(events).toEqual([]);
 	});
+
+	it('tees one assembled transcript line per side on turnComplete — no fragment flood', () => {
+		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'cast ' } } });
+		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'the rune' } } });
+		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'It is cast.' } } });
+		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		const tees = teeBodies();
+		expect(tees.filter((body) => body.includes('heard:'))).toHaveLength(1);
+		expect(tees.join(' ')).toContain('heard: cast the rune');
+		expect(tees.join(' ')).toContain('spoke: It is cast.');
+	});
+
+	it('a silent turnComplete tees no transcript lines', () => {
+		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		const teed = teeBodies().join(' ');
+		expect(teed).not.toContain('heard:');
+		expect(teed).not.toContain('spoke:');
+	});
+
+	it('a barge-in flushes the cut line to the tee', () => {
+		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'The night holds' } } });
+		callbacks!.onmessage({ serverContent: { interrupted: true } });
+		expect(teeBodies().join(' ')).toContain('spoke: The night holds');
+	});
+
+	it('sleep mid-turn surfaces the partial transcript instead of swallowing it', () => {
+		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'is it a fire rune' } } });
+		vs.sleep();
+		expect(teeBodies().join(' ')).toContain('heard: is it a fire rune');
+	});
 });
 
 describe('voiceSession sleep', () => {

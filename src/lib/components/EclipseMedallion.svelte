@@ -35,7 +35,8 @@
 	let sheetUrl = $state('');
 	onMount(() => {
 		const load = () => (sheetUrl = spriteSheet);
-		if ('requestIdleCallback' in window) requestIdleCallback(load);
+		// The timeout bounds a page that never goes idle — the art must still arrive.
+		if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 1500 });
 		else setTimeout(load, 500);
 	});
 
@@ -222,9 +223,9 @@
 		margin: -0.5rem;
 		transform: rotate(calc(var(--i) * var(--ring-step))) translateY(calc(var(--ring-r) * -1));
 		/* The card glyphs are carved-stone dark; re-tint them aged gold for the rim. */
-		--rune-tint: invert(0.78) sepia(0.55) saturate(4) hue-rotate(-18deg) brightness(1.15);
+		--rune-tint: invert(0.78) sepia(0.55) saturate(4) hue-rotate(-18deg);
 		filter: var(--rune-tint);
-		opacity: 0.34;
+		opacity: 0.2;
 		transition:
 			opacity 0.25s ease,
 			filter 0.25s ease;
@@ -254,11 +255,6 @@
 		opacity: 1;
 	}
 
-	/* Even asleep the gold must read at a glance — the medallion is the voice's front door. */
-	.medallion[data-voice-state='asleep'] .corona {
-		opacity: 0.22;
-	}
-
 	/* Asleep: the etched mic glyph is the discoverability cue. */
 	.mic-glyph {
 		position: absolute;
@@ -267,7 +263,7 @@
 		width: 1.6rem;
 		height: 1.6rem;
 		transform: translate(-50%, -50%);
-		stroke: rgba(233, 200, 119, 0.85);
+		stroke: rgba(233, 200, 119, 0.55);
 		fill: none;
 		stroke-width: 1.6;
 		stroke-linecap: round;
@@ -286,7 +282,7 @@
 	}
 
 	.medallion[data-voice-state='waking'] .corona {
-		opacity: 0.3;
+		opacity: 0.18;
 	}
 
 	/* Listening: disc unveiled, corona breathing slow. */
