@@ -17,7 +17,7 @@ vi.mock('@google/genai', () => ({ GoogleGenAI: sdk.GoogleGenAI, Modality: { AUDI
 
 import { createVoiceSession, type VoiceEvent, type VoiceSession } from '$lib/voice/voiceSession';
 import { LIVE_MODEL, ORACLE_VOICE } from '$lib/voice/config';
-import { ORACLE_SYSTEM_INSTRUCTION } from '$lib/voice/oraclePersona';
+import { ORACLE_INVITATION_TRIGGER, ORACLE_SYSTEM_INSTRUCTION } from '$lib/voice/oraclePersona';
 
 interface Callbacks {
 	onmessage: (message: unknown) => void;
@@ -40,7 +40,11 @@ let speaker: {
 	drain: (() => void) | undefined;
 };
 let callbacks: Callbacks | undefined;
-let liveSession: { sendRealtimeInput: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> };
+let liveSession: {
+	sendRealtimeInput: ReturnType<typeof vi.fn>;
+	sendClientContent: ReturnType<typeof vi.fn>;
+	close: ReturnType<typeof vi.fn>;
+};
 let fetchMock: ReturnType<typeof vi.fn>;
 
 function tokenResponse(body: unknown = { token: 'auth_tokens/t1' }, ok = true, status = 200) {
@@ -83,7 +87,7 @@ beforeEach(() => {
 		drain: undefined
 	};
 	audio.createSpeaker.mockReturnValue(speaker);
-	liveSession = { sendRealtimeInput: vi.fn(), close: vi.fn() };
+	liveSession = { sendRealtimeInput: vi.fn(), sendClientContent: vi.fn(), close: vi.fn() };
 	sdk.connect.mockImplementation(async ({ callbacks: registered }: { callbacks: Callbacks }) => {
 		callbacks = registered;
 		return liveSession;
@@ -570,6 +574,105 @@ describe('voiceSession silence timeout (S5)', () => {
 		await vi.advanceTimersByTimeAsync(6_000);
 		expect(events).toEqual([]);
 		expect(teeBodies().join(' ')).not.toContain('silence timeout');
+	});
+});
+
+describe('voiceSession wake invitation (S6)', () => {
+	/** Drives wake({ invitation: true }) through mic + token + connect, then completes setup. */
+	async function awakenInvited(): Promise<void> {
+		const woke = vs.wake({ invitation: true });
+		await vi.advanceTimersByTimeAsync(0);
+		callbacks!.onmessage({ setupComplete: {} });
+		await woke;
+	}
+
+	it('sends one stage-direction turn and waits in thinking — never a first listening', async () => {
+		await awakenInvited();
+		expect(liveSession.sendClientContent).toHaveBeenCalledExactlyOnceWith({
+			turns: [{ role: 'user', parts: [{ text: ORACLE_INVITATION_TRIGGER }] }],
+			turnComplete: true
+		});
+		expect(vs.state).toBe('thinking');
+		expect(eventTypes()).toEqual(['waking', 'thinking']);
+		expect(teeBodies().join(' ')).toContain('voice invitation sent');
+	});
+
+	it('a wake without the invitation never sends a turn — subsequent wakes resume silent', async () => {
+		await awaken();
+		expect(liveSession.sendClientContent).not.toHaveBeenCalled();
+		expect(vs.state).toBe('listening');
+	});
+
+	it('the silence clock stays paused while the invitation is pending', async () => {
+		await awakenInvited();
+		await vi.advanceTimersByTimeAsync(6_000); // past the 5s clock, before the 10s rescue
+		expect(vs.state).toBe('thinking');
+	});
+
+	it('her invitation plays through speaking and the clock arms only after it drains', async () => {
+		await awakenInvited();
+		callbacks!.onmessage({
+			serverContent: { modelTurn: { parts: [{ inlineData: { data: 'inv' } }] } }
+		});
+		expect(vs.state).toBe('speaking');
+		speaker.busy = true;
+		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		await vi.advanceTimersByTimeAsync(20_000); // her speech never counts as the player's silence
+		expect(vs.state).toBe('speaking');
+		speaker.busy = false;
+		speaker.drain!();
+		expect(vs.state).toBe('listening');
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(vs.state).toBe('asleep');
+	});
+
+	it('an invitation the model never answers rescues to listening, then idles', async () => {
+		await awakenInvited();
+		await vi.advanceTimersByTimeAsync(10_000);
+		expect(vs.state).toBe('listening');
+		expect(teeBodies().join(' ')).toContain('thinking rescue fired');
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(vs.state).toBe('asleep');
+	});
+
+	it('barge-in cuts the invitation like any other line', async () => {
+		await awakenInvited();
+		callbacks!.onmessage({
+			serverContent: { modelTurn: { parts: [{ inlineData: { data: 'inv' } }] } }
+		});
+		callbacks!.onmessage({ serverContent: { interrupted: true } });
+		expect(speaker.stop).toHaveBeenCalledTimes(1);
+		expect(vs.state).toBe('hearing');
+	});
+
+	it('a failed invitation send fails the wake — the invitation is never burned unspoken', async () => {
+		liveSession.sendClientContent.mockImplementation(() => {
+			throw new Error('socket already closing');
+		});
+		await awakenInvited();
+		expect(eventTypes()).toEqual(['waking', 'error', 'asleep']);
+		expect(events[1]).toMatchObject({ reason: 'socket' });
+		expect(vs.state).toBe('asleep');
+		expect(micStop).toHaveBeenCalledTimes(1);
+		expect(teeBodies().join(' ')).toContain('invitation send failed: socket already closing');
+	});
+
+	it('an invitation send throwing a non-Error still tees its text', async () => {
+		liveSession.sendClientContent.mockImplementation(() => {
+			throw 'serializer died';
+		});
+		await awakenInvited();
+		expect(vs.state).toBe('asleep');
+		expect(teeBodies().join(' ')).toContain('invitation send failed: serializer died');
+	});
+
+	it('a canceled invitation wake never sends the turn', async () => {
+		const woke = vs.wake({ invitation: true });
+		await vi.advanceTimersByTimeAsync(0); // connected, setup still pending
+		vs.sleep();
+		await woke;
+		expect(liveSession.sendClientContent).not.toHaveBeenCalled();
+		expect(vs.state).toBe('asleep');
 	});
 });
 

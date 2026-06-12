@@ -341,3 +341,134 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 		expect(voiceMock.sleep).toHaveBeenCalled();
 	});
 });
+
+describe('Save the Sun page — wake invitation (S6)', () => {
+	const VIEW_KEY = 'save-the-sun:view';
+
+	function wakeSucceeds() {
+		voiceMock.wake.mockImplementation(async () => {
+			voiceMock.state = 'thinking';
+			emit({ type: 'thinking' });
+		});
+	}
+
+	it('first tap carries the invitation; the next wake resumes silent', async () => {
+		wakeSucceeds();
+		const screen = render(Page, pageProps);
+		const medallion = screen.getByTestId('eclipse-medallion');
+		await medallion.click();
+		expect(voiceMock.wake).toHaveBeenCalledExactlyOnceWith({ invitation: true });
+		// Delivery persists with the round's view, so a reload also resumes silent.
+		await vi.waitFor(() => {
+			expect(JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}').voiceInvited).toBe(true);
+		});
+		await medallion.click(); // sleeps
+		voiceMock.state = 'asleep';
+		emit({ type: 'asleep' });
+		await medallion.click();
+		expect(voiceMock.wake).toHaveBeenLastCalledWith({ invitation: false });
+	});
+
+	it('a reload mid-round resumes silent — the invitation rides the saved view', async () => {
+		localStorage.setItem(
+			VIEW_KEY,
+			JSON.stringify({ roundId: 'test-round', crossings: [], answer: '', voiceInvited: true })
+		);
+		wakeSucceeds();
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('eclipse-medallion').click();
+		expect(voiceMock.wake).toHaveBeenCalledExactlyOnceWith({ invitation: false });
+	});
+
+	it('a failed first wake re-invites on the retry', async () => {
+		voiceMock.wake.mockImplementation(async () => {
+			emit({
+				type: 'error',
+				reason: 'token',
+				notice: 'The fire does not carry your voice tonight. The rite continues by hand.'
+			});
+			emit({ type: 'asleep' });
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('eclipse-medallion').click();
+		await screen.getByTestId('eclipse-medallion').click();
+		expect(voiceMock.wake).toHaveBeenCalledTimes(2);
+		expect(voiceMock.wake).toHaveBeenLastCalledWith({ invitation: true });
+	});
+
+	it('an eclipsed first wake never marks the invitation delivered', async () => {
+		voiceMock.wake.mockImplementation(async () => {
+			voiceMock.state = 'eclipsed';
+			emit({
+				type: 'error',
+				reason: 'mic-permission',
+				notice: 'The fire cannot hear you. The rite continues by hand.'
+			});
+			emit({ type: 'eclipsed' });
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('eclipse-medallion').click();
+		expect(voiceMock.wake).toHaveBeenCalledExactlyOnceWith({ invitation: true });
+		await vi.waitFor(() => {
+			expect(JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}').voiceInvited).toBe(false);
+		});
+	});
+
+	it('a new game during an in-flight wake cancels it and never marks the fresh round invited', async () => {
+		let settleWake!: () => void;
+		voiceMock.wake.mockImplementation(() => {
+			voiceMock.state = 'waking';
+			emit({ type: 'waking' });
+			return new Promise<void>((resolve) => {
+				settleWake = resolve;
+			});
+		});
+		voiceMock.sleep.mockImplementation(() => {
+			voiceMock.state = 'asleep';
+			emit({ type: 'asleep' });
+		});
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			const url = String(input);
+			if (url.includes('/api/new-game'))
+				return new Response(
+					JSON.stringify({ boardSeed: 99, roundId: 'next-round', state: HUMAN_TURN })
+				);
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		const medallion = screen.getByTestId('eclipse-medallion');
+		await medallion.click(); // wake hangs in the permission+token+connect stretch
+		await screen.getByRole('button', { name: 'Begin another night' }).click();
+		expect(voiceMock.sleep).toHaveBeenCalled(); // the old round's session never crosses over
+		settleWake(); // the canceled wake settles asleep — delivery must not be marked
+		await medallion.click();
+		expect(voiceMock.wake).toHaveBeenLastCalledWith({ invitation: true });
+		await vi.waitFor(() => {
+			const saved = JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}');
+			expect(saved.roundId).toBe('next-round');
+			expect(saved.voiceInvited).toBe(false);
+		});
+	});
+
+	it('a new game re-arms the invitation', async () => {
+		wakeSucceeds();
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			const url = String(input);
+			if (url.includes('/api/new-game'))
+				return new Response(
+					JSON.stringify({ boardSeed: 99, roundId: 'next-round', state: HUMAN_TURN })
+				);
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		const medallion = screen.getByTestId('eclipse-medallion');
+		await medallion.click();
+		expect(voiceMock.wake).toHaveBeenLastCalledWith({ invitation: true });
+		await medallion.click(); // sleeps
+		voiceMock.state = 'asleep';
+		emit({ type: 'asleep' });
+		await screen.getByRole('button', { name: 'Begin another night' }).click();
+		await medallion.click();
+		expect(voiceMock.wake).toHaveBeenLastCalledWith({ invitation: true });
+	});
+});

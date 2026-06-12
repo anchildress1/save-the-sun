@@ -64,6 +64,12 @@ Emoji in diegetic copy. Exclamation marks in Oracle/Sól lines (Sköll earns one
 
 ## 1. Oracle
 
+### Wake invitation (voice, first wake of a round)
+
+Spoken once per round on the first successful wake of the voice session—the voice tutorial (R1); no UI chrome teaches the speakable actions. Later wakes resume silent, including across a mid-round reload. The line is fixed: the model is directed to speak it verbatim (`oraclePersona.ts`), so a variant can never drop an action or invent one.
+
+> "The fire wakes, and I with it. Ask, or bid me hex, scry, pass, or cast the rune."
+
 ### Interpretation echo (public, before the answer)
 Pattern: **`You ask after {paraphrase}.`**—then a held beat, then the answer.
 
