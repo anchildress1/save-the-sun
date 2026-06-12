@@ -13,6 +13,7 @@ const voiceMock = vi.hoisted(() => {
 	return {
 		listeners,
 		state: 'asleep',
+		notice: null as string | null,
 		wake: vi.fn(async () => {}),
 		sleep: vi.fn(),
 		emit(event: unknown) {
@@ -27,6 +28,9 @@ vi.mock('$lib/voice/voiceSession', () => ({
 		sleep: voiceMock.sleep,
 		get state() {
 			return voiceMock.state;
+		},
+		get notice() {
+			return voiceMock.notice;
 		},
 		subscribe(listener: (event: unknown) => void) {
 			voiceMock.listeners.add(listener);
@@ -51,6 +55,7 @@ beforeEach(() => {
 	vi.resetAllMocks();
 	voiceMock.listeners.clear();
 	voiceMock.state = 'asleep';
+	voiceMock.notice = null;
 	localStorage.setItem('save-the-sun:onboarded', '1');
 	vi.stubGlobal(
 		'fetch',
@@ -157,7 +162,8 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 		{ event: { type: 'listening' } as VoiceEvent, state: 'listening' },
 		{ event: { type: 'thinking' } as VoiceEvent, state: 'thinking' },
 		{ event: { type: 'speaking' } as VoiceEvent, state: 'speaking' },
-		{ event: { type: 'asleep' } as VoiceEvent, state: 'asleep' }
+		{ event: { type: 'asleep' } as VoiceEvent, state: 'asleep' },
+		{ event: { type: 'eclipsed' } as VoiceEvent, state: 'eclipsed' }
 	])('mirrors the $state event onto the medallion', async ({ event, state }) => {
 		const screen = render(Page, pageProps);
 		emit(event);
@@ -221,6 +227,99 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 		// ...and the identical failure landing again is a real content change — narrated.
 		emit({ type: 'error', reason: 'token', notice });
 		await expect.element(screen.getByTestId('voice-notice')).toHaveTextContent(notice);
+	});
+
+	// S4: mic permission denied / no device. The session seals itself; the page must show the
+	// one quiet notice, render the medallion inert, and leave the button game untouched.
+	it('seals the medallion after a mic failure — one notice, no second prompt, ever', async () => {
+		voiceMock.wake.mockImplementation(async () => {
+			voiceMock.state = 'eclipsed';
+			emit({
+				type: 'error',
+				reason: 'mic-permission',
+				notice: 'The fire cannot hear you. The rite continues by hand.'
+			});
+			emit({ type: 'eclipsed' });
+		});
+		const screen = render(Page, pageProps);
+		const medallion = screen.getByTestId('eclipse-medallion');
+		await medallion.click();
+		expect(voiceMock.wake).toHaveBeenCalledOnce();
+		await expect.element(medallion).toHaveAttribute('data-voice-state', 'eclipsed');
+		await expect.element(medallion).toHaveAttribute('aria-disabled', 'true');
+		await expect
+			.element(screen.getByTestId('voice-notice'))
+			.toHaveTextContent('The fire cannot hear you. The rite continues by hand.');
+		// A second tap dies in the medallion: no re-prompt (wake) and no false sleep.
+		// force: aria-disabled makes Playwright refuse the click; a real pointer still lands.
+		await medallion.click({ force: true });
+		expect(voiceMock.wake).toHaveBeenCalledOnce();
+		expect(voiceMock.sleep).not.toHaveBeenCalled();
+		// The notice is permanent for the session — nothing clears it once sealed.
+		await expect
+			.element(screen.getByTestId('voice-notice'))
+			.toHaveTextContent('The fire cannot hear you. The rite continues by hand.');
+	});
+
+	it('adopts the live session state at mount — a remount after the seal must not promise a wake', async () => {
+		// The session is a module singleton: the eclipse survives unmount (sleep() cannot clear
+		// it), so a fresh mount that defaulted to asleep would render a wake button the session
+		// silently refuses.
+		voiceMock.state = 'eclipsed';
+		voiceMock.notice = 'The fire cannot hear you. The rite continues by hand.';
+		const screen = render(Page, pageProps);
+		await expect
+			.element(screen.getByTestId('eclipse-medallion'))
+			.toHaveAttribute('data-voice-state', 'eclipsed');
+		await expect
+			.element(screen.getByTestId('voice-notice'))
+			.toHaveTextContent('The fire cannot hear you. The rite continues by hand.');
+	});
+
+	it('leaves the button game untouched by the seal — Ask still dispatches (S4)', async () => {
+		const fetchMock = vi.mocked(fetch);
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		fetchMock.mockResolvedValueOnce(
+			new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'No. Sól is not reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: HUMAN_TURN
+				})
+			)
+		);
+		const screen = render(Page, pageProps);
+		emit({
+			type: 'error',
+			reason: 'mic-missing',
+			notice: 'No voice reaches the fire. The rite continues by hand.'
+		});
+		emit({ type: 'eclipsed' });
+		const input = screen.container.querySelector<HTMLInputElement>('#oracle-ask')!;
+		expect(input.disabled).toBe(false);
+		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await vi.waitFor(() => {
+			const actionCalls = fetchMock.mock.calls.filter(([url]) => url === '/api/action');
+			expect(actionCalls).toHaveLength(1);
+		});
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
+		expect(consoleError).not.toHaveBeenCalled();
+	});
+
+	it('ignores an event type it does not know — a newer session must not crash an older page', async () => {
+		const screen = render(Page, pageProps);
+		voiceMock.emit({ type: 'directors-cut' });
+		await expect
+			.element(screen.getByTestId('eclipse-medallion'))
+			.toHaveAttribute('data-voice-state', 'asleep');
+		expect(screen.getByTestId('voice-notice').element().textContent).toBe('');
 	});
 
 	it('ignores transcript fragments — they belong to S10, and must not disturb the panel', async () => {

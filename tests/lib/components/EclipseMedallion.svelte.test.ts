@@ -54,6 +54,22 @@ describe('EclipseMedallion — labeled button (R6)', () => {
 		expect(onToggle).toHaveBeenCalledOnce();
 	});
 
+	it('swallows the tap while eclipsed — the seal is inert whatever the page wires in (S4)', async () => {
+		const { screen, button, onToggle } = renderMedallion('eclipsed');
+		// force: aria-disabled makes Playwright refuse the click, but a real pointer still lands —
+		// the guard under test is the component's own.
+		await screen.getByTestId('eclipse-medallion').click({ force: true });
+		expect(onToggle).not.toHaveBeenCalled();
+		expect(button.getAttribute('aria-disabled')).toBe('true');
+	});
+
+	it('stays an enabled-but-inert button while eclipsed — focusable so the label can explain', () => {
+		const { button } = renderMedallion('eclipsed');
+		// disabled would drop it from the tab order; the sealed state must remain discoverable.
+		expect(button.disabled).toBe(false);
+		expect(getComputedStyle(button).cursor).toBe('default');
+	});
+
 	it('hides every visual layer from assistive tech — the label is the whole story', () => {
 		const { button } = renderMedallion('hearing', 0.2);
 		expect(layer(button, '.visual').getAttribute('aria-hidden')).toBe('true');
@@ -68,6 +84,16 @@ describe('EclipseMedallion — state visuals', () => {
 		const { button } = renderMedallion('asleep');
 		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('1');
 		expect(getComputedStyle(layer(button, '.wolf-eyes')).opacity).toBe('0');
+		// The strike is the eclipse seal's mark — it must never bleed into ordinary sleep.
+		expect(getComputedStyle(layer(button, '.mic-strike')).display).toBe('none');
+	});
+
+	it('strikes the dimmed glyph while eclipsed — a shape signal that this is the seal, not sleep (S4)', () => {
+		const { button } = renderMedallion('eclipsed');
+		expect(getComputedStyle(layer(button, '.mic-strike')).display).not.toBe('none');
+		const glyphOpacity = Number(getComputedStyle(layer(button, '.mic-glyph')).opacity);
+		expect(glyphOpacity).toBeGreaterThan(0);
+		expect(glyphOpacity).toBeLessThan(1);
 	});
 
 	it('kindles the corona while waking — pending, not asleep', () => {
@@ -112,6 +138,7 @@ describe('EclipseMedallion — voice level strip disc', () => {
 
 	it.each([
 		{ state: 'asleep' as const, amplitude: 0, level: '0' },
+		{ state: 'eclipsed' as const, amplitude: 0, level: '0' },
 		{ state: 'waking' as const, amplitude: 0, level: '2' },
 		{ state: 'hearing' as const, amplitude: 0.15, level: '6' },
 		{ state: 'hearing' as const, amplitude: 0.3, level: '11' },

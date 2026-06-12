@@ -12,6 +12,7 @@ import { RUNE_SYMBOL_ASSET } from '$lib/components/runeVisuals';
 
 const ALL_STATES: MedallionState[] = [
 	'asleep',
+	'eclipsed',
 	'waking',
 	'listening',
 	'hearing',
@@ -30,9 +31,14 @@ describe('MEDALLION_LABEL', () => {
 
 	it('invites the wake action only while asleep — every awake state offers silence', () => {
 		expect(MEDALLION_LABEL.asleep).toContain('Wake');
-		for (const state of ALL_STATES.filter((s) => s !== 'asleep')) {
+		for (const state of ALL_STATES.filter((s) => s !== 'asleep' && s !== 'eclipsed')) {
 			expect(MEDALLION_LABEL[state]).toContain('Silence the voice');
 		}
+	});
+
+	it('promises no action while eclipsed — the seal is permanent and a tap does nothing (S4)', () => {
+		expect(MEDALLION_LABEL.eclipsed).not.toContain('Wake');
+		expect(MEDALLION_LABEL.eclipsed).not.toContain('Silence');
 	});
 
 	it('names the speaker unambiguously when someone holds the fire', () => {
@@ -46,6 +52,7 @@ describe('MEDALLION_ANNOUNCEMENT', () => {
 		expect(Object.keys(MEDALLION_ANNOUNCEMENT).sort()).toEqual([...ALL_STATES].sort());
 		// Mic on/off and who speaks must announce; hearing/thinking are still "listening".
 		expect(MEDALLION_ANNOUNCEMENT.asleep).toBeTruthy();
+		expect(MEDALLION_ANNOUNCEMENT.eclipsed).toBeTruthy(); // the seal is a mic-privacy state — named
 		expect(MEDALLION_ANNOUNCEMENT.waking).toBeTruthy(); // the mic is being opened — never silent
 		expect(MEDALLION_ANNOUNCEMENT.listening).toBeTruthy();
 		expect(MEDALLION_ANNOUNCEMENT.speaking).toBeTruthy();
@@ -79,6 +86,7 @@ describe('spriteLevel', () => {
 
 	it.each([
 		{ state: 'asleep' as const, level: 0 },
+		{ state: 'eclipsed' as const, level: 0 },
 		{ state: 'waking' as const, level: 2 },
 		{ state: 'listening' as const, level: 4 },
 		{ state: 'thinking' as const, level: 4 },

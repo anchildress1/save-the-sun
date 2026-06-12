@@ -189,8 +189,11 @@
 				voiceState = 'hearing';
 				voiceAmplitude = event.amplitude;
 				break;
+			// Eclipsed (S4): terminal mic seal. The medallion renders it inert and the session
+			// refuses further wakes; the notice set by the preceding error stays for the session.
 			case 'asleep':
-				voiceState = 'asleep';
+			case 'eclipsed':
+				voiceState = event.type;
 				voiceAmplitude = 0;
 				break;
 			case 'waking':
@@ -207,8 +210,9 @@
 				break;
 			case 'error':
 				voiceNotice = event.notice;
-				// The session emits asleep right after every error, but settle locally too — a
-				// medallion stranded in waking would promise a silence-tap it can't honor.
+				// The session emits asleep (or eclipsed, for mic failures) right after every error,
+				// but settle locally too — a medallion stranded in waking would promise a
+				// silence-tap it can't honor.
 				voiceState = 'asleep';
 				voiceAmplitude = 0;
 				break;
@@ -308,6 +312,12 @@
 		window.addEventListener('resize', onReposition);
 		window.addEventListener('scroll', onReposition, true);
 		const unsubscribeVoice = voiceSession.subscribe(onVoiceEvent);
+		// The session is a module singleton and the eclipse seal (S4) survives unmount — a remount
+		// must adopt the live state, or the medallion would promise a wake the session will refuse.
+		voiceState = voiceSession.state;
+		if (voiceState === 'eclipsed' && voiceSession.notice) {
+			voiceNotice = voiceSession.notice;
+		}
 		return () => {
 			window.removeEventListener('resize', onReposition);
 			window.removeEventListener('scroll', onReposition, true);

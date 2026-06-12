@@ -1,6 +1,7 @@
 // Live session client: WebSocket lifecycle, mic streaming, and Oracle playback behind
 // wake()/sleep(), narrated to the UI as events. Any lifecycle failure emits 'error' and settles
-// back to asleep — the button game never depends on this module being alive.
+// back to asleep — except a denied or absent mic, which seals the session into the terminal
+// eclipsed state (R1: never re-prompt). The button game never depends on this module being alive.
 
 import {
 	GoogleGenAI,
@@ -19,7 +20,14 @@ import {
 	type Speaker
 } from '$lib/voice/audio';
 
-export type VoiceState = 'asleep' | 'waking' | 'listening' | 'hearing' | 'thinking' | 'speaking';
+export type VoiceState =
+	| 'asleep'
+	| 'waking'
+	| 'listening'
+	| 'hearing'
+	| 'thinking'
+	| 'speaking'
+	| 'eclipsed';
 export type VoiceErrorReason = MicFailure | 'token' | 'socket';
 
 export type VoiceEvent =
@@ -29,6 +37,7 @@ export type VoiceEvent =
 	| { type: 'thinking' }
 	| { type: 'speaking' }
 	| { type: 'asleep' }
+	| { type: 'eclipsed' }
 	| { type: 'error'; reason: VoiceErrorReason; notice: string }
 	// Text arrives as incremental fragments; turn boundaries ride the state events.
 	| { type: 'transcript'; direction: 'in' | 'out'; text: string };
@@ -37,11 +46,13 @@ export type VoiceListener = (event: VoiceEvent) => void;
 
 export interface VoiceSession {
 	/** Open the Live session: mic, token, socket. Resolves once listening, or after the wake
-	 * fails or is canceled by sleep(). Never rejects. */
+	 * fails or is canceled by sleep(). Never rejects. A no-op once eclipsed — the player who
+	 * denied the mic (or has none) is never re-prompted this session. */
 	wake(): Promise<void>;
-	/** Close everything and return to asleep. Safe in any state. */
+	/** Close everything and return to asleep. Safe in any state; eclipsed stays sealed. */
 	sleep(): void;
 	readonly state: VoiceState;
+	readonly notice: string | null;
 	subscribe(listener: VoiceListener): () => void;
 }
 
@@ -67,6 +78,7 @@ const NOTICE: Record<VoiceErrorReason, string> = {
 
 export function createVoiceSession(): VoiceSession {
 	let state: VoiceState = 'asleep';
+	let notice: string | null = null;
 	// Bumped by every wake and teardown; stale async continuations and socket callbacks go quiet.
 	let generation = 0;
 	let liveReady = false;
@@ -160,9 +172,12 @@ export function createVoiceSession(): VoiceSession {
 
 	function fail(reason: VoiceErrorReason, detail: string): void {
 		teardown();
-		emit({ type: 'error', reason, notice: NOTICE[reason] });
+		notice = NOTICE[reason];
+		emit({ type: 'error', reason, notice });
 		teeDebug('error', `voice wake failed (${reason}): ${detail}`);
-		toState('asleep');
+		// A denied or absent mic is final for the session: eclipsed seals wake() shut so the
+		// player is never re-prompted. Everything else settles to asleep and stays retryable.
+		toState(reason === 'mic-permission' || reason === 'mic-missing' ? 'eclipsed' : 'asleep');
 	}
 
 	function onSocketDown(detail: string): void {
@@ -304,7 +319,16 @@ export function createVoiceSession(): VoiceSession {
 	async function acquireMic(stale: () => boolean): Promise<boolean> {
 		const verdict = await openMic(onMicChunk);
 		if (stale()) {
-			if (verdict.ok) verdict.mic.stop();
+			if (verdict.ok) {
+				verdict.mic.stop();
+			} else if (
+				(verdict.reason === 'mic-permission' || verdict.reason === 'mic-missing') &&
+				state === 'asleep'
+			) {
+				// A denial landing after a cancel tap is still a fact about the player (R1): seal it,
+				// or the next tap re-prompts. A newer in-flight wake observes the denial itself.
+				fail(verdict.reason, verdict.detail);
+			}
 			return false;
 		}
 		if (!verdict.ok) {
@@ -456,8 +480,14 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	async function wake(): Promise<void> {
-		if (state !== 'asleep') return;
-		setupFailureDetail = null;
+		if (state === 'eclipsed') return;
+		if (state !== 'asleep') {
+			// info, not error: a double-tap race lands here routinely — and 'warn' isn't a level
+			// the /debug stream accepts.
+			teeDebug('info', 'voice session already awake');
+			return;
+		}
+		notice = null;
 		const myGeneration = ++generation;
 		const stale = () => generation !== myGeneration;
 		// Announced before the first await: the permission prompt + mint + connect stretch can run
@@ -478,7 +508,9 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	function sleep(): void {
-		if (state === 'asleep') return;
+		// Eclipsed is terminal: a sleep (medallion tap, page unmount) must not re-arm wake()
+		// by settling back to asleep.
+		if (state === 'asleep' || state === 'eclipsed') return;
 		const canceled = state === 'waking';
 		teardown();
 		teeDebug('info', canceled ? 'voice wake canceled' : 'voice session slept');
@@ -490,6 +522,9 @@ export function createVoiceSession(): VoiceSession {
 		sleep,
 		get state() {
 			return state;
+		},
+		get notice() {
+			return notice;
 		},
 		subscribe(listener: VoiceListener) {
 			listeners.add(listener);

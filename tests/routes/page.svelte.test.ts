@@ -149,6 +149,18 @@ describe('Save the Sun page', () => {
 		await vi.waitFor(() => expect(note.matches(':popover-open')).toBe(true));
 	});
 
+	it('dismisses the AI note on Escape and holds it open for any other key', async () => {
+		const screen = render(Page, pageProps);
+		const note = screen.container.querySelector('#ai-note') as HTMLElement;
+		const btn = screen.getByRole('button', { name: /about the gemini ai/i }).element();
+		btn.focus();
+		await vi.waitFor(() => expect(note.matches(':popover-open')).toBe(true));
+		btn.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+		expect(note.matches(':popover-open')).toBe(true);
+		btn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+		await vi.waitFor(() => expect(note.matches(':popover-open')).toBe(false));
+	});
+
 	it('turns off browser autofill on the question field so it keeps the dark panel background', async () => {
 		const screen = render(Page, pageProps);
 		const input = screen.getByLabelText(/ask the oracle/i).element();

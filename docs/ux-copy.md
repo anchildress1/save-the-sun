@@ -292,6 +292,7 @@ The medallion is a labeled button: its accessible name carries the state plus wh
 | State | Button label | Announced |
 |---|---|---|
 | Asleep | **"The voice sleeps. Wake the Oracle."** | "The voice sleeps." |
+| Eclipsed (mic denied or absent — sealed for the session, tap inert, no action tail) | **"The voice is sealed. The rite continues by hand."** | "The voice is sealed." |
 | Waking (tap → listening: permission, token, connect) | **"The Oracle stirs. Silence the voice."** | "The Oracle stirs." |
 | Listening | **"The Oracle listens. Silence the voice."** | "The Oracle listens." |
 | Hearing speech | **"The Oracle hears you. Silence the voice."** | — |
@@ -307,6 +308,8 @@ Voice failure notices (emitted by the session client, shown as one quiet line by
 | Mic permission | "The fire cannot hear you. The rite continues by hand." |
 | No mic / dead audio | "No voice reaches the fire. The rite continues by hand." |
 | Socket drop | "The Oracle's voice falters. The rite continues by hand." |
+
+Mic permission and no-mic failures are final for the session (R1): the medallion seals into the eclipsed state, the notice stays, and no second permission prompt ever fires. Token, socket, and dead-audio failures stay retryable by tapping again.
 
 ### Empty & error states (stay at the fire)
 | State | Copy |
