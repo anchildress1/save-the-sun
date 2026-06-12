@@ -7,3 +7,4 @@
 - [x] Keep spent Scry/Hex visible but disabled; Pass remains manual
 - [x] Prevent board from shuffle on reload when session doesn't change _(`boardSeed` is held per round in `session.ts` — stable across a refresh, reminted with the round; e2e asserts order stability on reload)_
 - [ ] Fine-tune Sköll prompt to allow for wins between 7.5-9 turns with randomizer. Keep metrics output as corpus.
+- [ ] Add session scoping to the /debug screen

@@ -19,10 +19,11 @@ import {
 	type Speaker
 } from '$lib/voice/audio';
 
-export type VoiceState = 'asleep' | 'listening' | 'hearing' | 'thinking' | 'speaking';
+export type VoiceState = 'asleep' | 'waking' | 'listening' | 'hearing' | 'thinking' | 'speaking';
 export type VoiceErrorReason = MicFailure | 'token' | 'socket';
 
 export type VoiceEvent =
+	| { type: 'waking' }
 	| { type: 'listening' }
 	| { type: 'hearing'; amplitude: number }
 	| { type: 'thinking' }
@@ -35,7 +36,8 @@ export type VoiceEvent =
 export type VoiceListener = (event: VoiceEvent) => void;
 
 export interface VoiceSession {
-	/** Open the Live session: mic, token, socket. Resolves once listening (or after failing). */
+	/** Open the Live session: mic, token, socket. Resolves once listening, or after the wake
+	 * fails or is canceled by sleep(). Never rejects. */
 	wake(): Promise<void>;
 	/** Close everything and return to asleep. Safe in any state. */
 	sleep(): void;
@@ -50,6 +52,9 @@ const HEARING_HOLD_MS = 800;
 // A cough can reach thinking with no reply ever coming.
 const THINKING_FALLBACK_MS = 10_000;
 const SETUP_TIMEOUT_MS = 10_000;
+// A hung token endpoint or blackholed handshake must fail the wake, not strand it in waking.
+const TOKEN_TIMEOUT_MS = 10_000;
+const CONNECT_TIMEOUT_MS = 10_000;
 
 // Player-facing notices in the Rite's quiet system register (docs/ux-copy.md).
 const NOTICE: Record<VoiceErrorReason, string> = {
@@ -64,7 +69,6 @@ export function createVoiceSession(): VoiceSession {
 	let state: VoiceState = 'asleep';
 	// Bumped by every wake and teardown; stale async continuations and socket callbacks go quiet.
 	let generation = 0;
-	let waking = false;
 	let liveReady = false;
 	let session: Session | null = null;
 	let mic: MicCapture | null = null;
@@ -77,6 +81,8 @@ export function createVoiceSession(): VoiceSession {
 	let setupFailureDetail: string | null = null;
 	let sendFailureTeed = false;
 	let mintedToken = '';
+	let transcriptIn = '';
+	let transcriptOut = '';
 	const listeners = new Set<VoiceListener>();
 
 	function emit(event: VoiceEvent): void {
@@ -107,8 +113,9 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	function teardown(): void {
+		// A mid-turn sleep/failure must not swallow what was already transcribed.
+		flushTranscripts();
 		generation++;
-		waking = false;
 		liveReady = false;
 		awaitingDrain = false;
 		lastAmplitude = 0;
@@ -133,12 +140,17 @@ export function createVoiceSession(): VoiceSession {
 	// socket kills the tee in the same instant, and the diagnostics must not die with it.
 	// Scrubbing lives here, the single sink: SDK error and close strings can embed the session's
 	// ephemeral token in a URL, and the /debug stream is public.
-	function teeDebug(level: 'info' | 'error', message: string): void {
-		const scrubbed = mintedToken ? message.split(mintedToken).join('[ephemeral-token]') : message;
+	function teeDebug(level: 'info' | 'error', message: string, extraToken = ''): void {
+		let scrubbed = message;
+		for (const token of new Set([mintedToken, extraToken])) {
+			if (token) scrubbed = scrubbed.split(token).join('[ephemeral-token]');
+		}
+		// keepalive: the final slept/transcript tees fire during page teardown and must survive it.
 		void fetch('/api/voice/debug', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ level, message: scrubbed })
+			body: JSON.stringify({ level, message: scrubbed }),
+			keepalive: true
 		})
 			.then((response) => {
 				if (!response.ok) console.warn('[voice] debug tee rejected:', response.status, scrubbed);
@@ -175,6 +187,8 @@ export function createVoiceSession(): VoiceSession {
 			if (state === 'thinking') {
 				// Routine for a cough; a PATTERN of these in /debug means real turns are being dropped.
 				teeDebug('info', 'thinking rescue fired — no reply arrived');
+				// Flush what was heard NOW, or it silently rides into the next turn's heard: line.
+				flushTranscripts();
 				toState('listening');
 			}
 		}, THINKING_FALLBACK_MS);
@@ -225,16 +239,33 @@ export function createVoiceSession(): VoiceSession {
 		if (content.interrupted) {
 			speaker?.stop();
 			awaitingDrain = false;
+			// The barge-in cuts her line; what was already transcribed is still worth the tee.
+			flushTranscripts();
 			toState('hearing');
 		}
 		relayTranscript('in', content.inputTranscription?.text);
 		relayTranscript('out', content.outputTranscription?.text);
 		playOracleAudio(content.modelTurn?.parts ?? []);
-		if (content.turnComplete) settleTurn();
+		if (content.turnComplete) {
+			flushTranscripts();
+			settleTurn();
+		}
 	}
 
 	function relayTranscript(direction: 'in' | 'out', text: string | undefined): void {
-		if (text) emit({ type: 'transcript', direction, text });
+		if (!text) return;
+		emit({ type: 'transcript', direction, text });
+		if (direction === 'in') transcriptIn += text;
+		else transcriptOut += text;
+	}
+
+	// Transcripts reach the UI as live fragments (S10's surface); the /debug stream gets one
+	// assembled line per side per turn instead of a fragment flood.
+	function flushTranscripts(): void {
+		if (transcriptIn) teeDebug('info', `heard: ${transcriptIn}`);
+		if (transcriptOut) teeDebug('info', `spoke: ${transcriptOut}`);
+		transcriptIn = '';
+		transcriptOut = '';
 	}
 
 	function playOracleAudio(parts: Part[]): void {
@@ -286,12 +317,17 @@ export function createVoiceSession(): VoiceSession {
 
 	async function acquireToken(stale: () => boolean): Promise<string | null> {
 		try {
-			const response = await fetch('/api/voice/token', { method: 'POST' });
+			const response = await fetch('/api/voice/token', {
+				method: 'POST',
+				signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS)
+			});
 			if (!response.ok) throw new Error(`token endpoint returned ${response.status}`);
 			const token = ((await response.json()) as { token?: string }).token ?? '';
 			if (!token) throw new Error('token endpoint returned no token');
+			// A canceled wake can finish after a later wake; never let its token replace the active scrubber.
+			if (stale()) return null;
 			mintedToken = token;
-			return stale() ? null : token;
+			return token;
 		} catch (err) {
 			if (!stale()) fail('token', err instanceof Error ? err.message : String(err));
 			return null;
@@ -310,6 +346,40 @@ export function createVoiceSession(): VoiceSession {
 		}
 	}
 
+	// A connect that resolves after losing the race must die here, or its socket leaks — and a
+	// late settle of either kind must reach /debug, or the timeout line is the only diagnostic
+	// left when the endpoint was merely slow.
+	function raceConnectTimeout(attempt: Promise<Session>, attemptToken: string): Promise<Session> {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let timedOut = false;
+		const timeout = new Promise<never>((_, reject) => {
+			timer = setTimeout(() => {
+				timedOut = true;
+				reject(new Error(`live connect timed out after ${CONNECT_TIMEOUT_MS}ms`));
+			}, CONNECT_TIMEOUT_MS);
+		});
+		attempt.then(
+			(session) => {
+				clearTimeout(timer);
+				if (!timedOut) return;
+				teeDebug('info', 'live connect resolved after the timeout — closing the stale socket');
+				try {
+					session.close();
+				} catch {
+					// Already dead.
+				}
+			},
+			(err) => {
+				clearTimeout(timer);
+				if (timedOut) {
+					const detail = err instanceof Error ? err.message : String(err);
+					teeDebug('error', `late connect rejection after timeout: ${detail}`, attemptToken);
+				}
+			}
+		);
+		return Promise.race([attempt, timeout]);
+	}
+
 	async function connectSession(
 		token: string,
 		myGeneration: number,
@@ -318,30 +388,38 @@ export function createVoiceSession(): VoiceSession {
 		let connected: Session;
 		try {
 			const client = new GoogleGenAI({ apiKey: token, httpOptions: { apiVersion: 'v1alpha' } });
-			connected = await client.live.connect({
-				model: LIVE_MODEL,
-				config: {
-					responseModalities: [Modality.AUDIO],
-					speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: ORACLE_VOICE } } },
-					systemInstruction: ORACLE_SYSTEM_INSTRUCTION,
-					inputAudioTranscription: {},
-					outputAudioTranscription: {}
-				},
-				callbacks: {
-					onmessage: (message) => {
-						if (generation === myGeneration) onMessage(message);
+			connected = await raceConnectTimeout(
+				client.live.connect({
+					model: LIVE_MODEL,
+					config: {
+						responseModalities: [Modality.AUDIO],
+						speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: ORACLE_VOICE } } },
+						systemInstruction: ORACLE_SYSTEM_INSTRUCTION,
+						inputAudioTranscription: {},
+						outputAudioTranscription: {}
 					},
-					onerror: (event) => {
-						if (generation === myGeneration) onSocketDown(`error: ${event?.message ?? ''}`);
-					},
-					onclose: (event) => {
-						// The reason text is where the API explains itself (quota, bad model, 1011 detail).
-						if (generation === myGeneration) {
-							onSocketDown(`close ${event?.code ?? ''} ${event?.reason ?? ''}`.trim());
+					callbacks: {
+						onmessage: (message) => {
+							if (generation === myGeneration) onMessage(message);
+						},
+						onerror: (event) => {
+							if (generation === myGeneration) onSocketDown(`error: ${event?.message ?? ''}`);
+						},
+						onclose: (event) => {
+							// The reason text is where the API explains itself (quota, bad model, 1011 detail).
+							const detail = `close ${event?.code ?? ''} ${event?.reason ?? ''}`.trim();
+							if (generation === myGeneration) {
+								onSocketDown(detail);
+							} else if (event?.reason) {
+								// A close landing after the wake already failed (e.g. setup timeout) carries
+								// the only explanation of WHY — generation-gating must not eat it.
+								teeDebug('info', `stale socket ${detail}`, token);
+							}
 						}
 					}
-				}
-			});
+				}),
+				token
+			);
 		} catch (err) {
 			if (!stale()) fail('socket', err instanceof Error ? err.message : String(err));
 			return false;
@@ -378,11 +456,14 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	async function wake(): Promise<void> {
-		if (state !== 'asleep' || waking) return;
-		waking = true;
+		if (state !== 'asleep') return;
 		setupFailureDetail = null;
 		const myGeneration = ++generation;
 		const stale = () => generation !== myGeneration;
+		// Announced before the first await: the permission prompt + mint + connect stretch can run
+		// long, and the UI must never read as asleep while the mic is being opened. Waking doubles
+		// as the re-entry guard, and it routes a cancel tap into sleep().
+		toState('waking');
 
 		if (!(await acquireMic(stale))) return;
 		const token = await acquireToken(stale);
@@ -392,16 +473,15 @@ export function createVoiceSession(): VoiceSession {
 		if (!(await awaitSetup(stale))) return;
 
 		liveReady = true;
-		waking = false;
 		teeDebug('info', 'voice session awake');
 		toState('listening');
 	}
 
 	function sleep(): void {
-		if (state === 'asleep' && !waking) return;
-		const wasAwake = state !== 'asleep';
+		if (state === 'asleep') return;
+		const canceled = state === 'waking';
 		teardown();
-		if (wasAwake) teeDebug('info', 'voice session slept');
+		teeDebug('info', canceled ? 'voice wake canceled' : 'voice session slept');
 		toState('asleep');
 	}
 

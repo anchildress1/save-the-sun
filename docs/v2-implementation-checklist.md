@@ -1,7 +1,7 @@
 # Save the Sun — v2 Implementation Checklist (Voice Story Order) 🎫
 
 > Implementation units for AI agents. Source of truth: `voice-interaction-spec.md`. Refs = requirement IDs there.
-> Config constants: Oracle voice `Gacrux` (verified on Live 2026-06-11 — `Kore` fallback not needed), Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, silence timeout 8000ms.
+> Config constants: Oracle voice `Gacrux` (verified on Live 2026-06-11 — `Kore` fallback not needed), Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, silence timeout 5000ms.
 
 ---
 
@@ -20,35 +20,36 @@ Add endpoint to existing Cloud Run server: mint Live API ephemeral token using G
 
 Client module owning the Live API WebSocket lifecycle: connect with ephemeral token, stream mic PCM (16-bit/16kHz) in, play audio (24kHz) out.
 
-- [ ] `voiceSession.wake()` / `voiceSession.sleep()` API consumed by UI
+- [x] `voiceSession.wake()` / `voiceSession.sleep()` API consumed by UI (landed with S3's medallion)
 - [x] Barge-in: player speech interrupts Oracle playback immediately
 - [x] Emits events: `listening`, `hearing`, `thinking`, `speaking`, `asleep`, `error`, `transcript(in|out)`
 - [x] On socket drop/error: emit `error`, revert to asleep, non-blocking notice; game continues on buttons
 - [x] System instruction: Oracle persona (measured, ritual cadence, knows the answer before you ask)
+- [x] Wake hardening (landed with S3): `waking` state/event covers the tap→listening stretch (tap cancels), token mint + Live connect carry 10s timeouts so a hung endpoint fails the wake instead of stranding it
 - Depends: S1
 
 ### S3 — Eclipse medallion component (R6)
 
 Medallion at top of Oracle panel = voice toggle + state display. Static art, animated glow layers only.
 
-- [ ] Tap toggles wake/sleep via S2 API
-- [ ] States driven by S2 events: asleep (partial eclipse + etched mic glyph), listening (corona breathing), hearing (corona flares with mic amplitude, rim runes ignite), thinking (rune ring orbits), oracle-speaking (corona pulses with output), sköll-speaking (ember red + wolf eyes open at disc edge)
-- [ ] State never communicated by color alone (sköll = color + eyes shape)
-- [ ] `prefers-reduced-motion`: static glow intensities, no pulse/orbit
-- [ ] ARIA labels per state; medallion is a labeled button
-- [ ] New asset: eclipse medallion PNG per established art pipeline; rim runes reuse existing rune glyph assets via CSS transforms; add entry to `ui-image-resources.md`
+- [x] Tap toggles wake/sleep via S2 API
+- [x] States driven by S2 events: asleep (partial eclipse + etched mic glyph), listening (corona breathing), hearing (corona flares with mic amplitude, rim runes ignite), thinking (rune ring orbits), oracle-speaking (corona pulses, pure animation — no output level feed by agreement), sköll-speaking (ember red + wolf eyes open at disc edge; state prop ready, driven by S13)
+- [x] State never communicated by color alone (sköll = color + eyes shape)
+- [x] `prefers-reduced-motion`: static glow intensities, no pulse/orbit
+- [x] ARIA labels per state; medallion is a labeled button (+ polite live-region announcements)
+- [x] New asset: voice medallion level strip (12 frames @128px, 43K — spec + regeneration in `ui-image-resources.md`); the disc renders it per state with flare-indexed and ping-pong playback. Rim runes reuse existing rune glyph assets via CSS transforms ✓
 - Depends: S2 (event contract; can build against mocked events)
 
 ### S4 — Permission + device failure (R1)
 
-- [ ] Mic permission denied → medallion enters permanent inert eclipsed state (or hides), one quiet notice, never re-prompts that session
+- [ ] Mic permission denied → medallion enters permanent inert eclipsed state, one quiet notice, never re-prompts that session
 - [ ] No mic device → same path
 - [ ] Button game fully unaffected in both cases
 - Depends: S2, S3
 
 ### S5 — Silence timeout (R7)
 
-- [ ] 8000ms of no recognizable player speech → stop mic streaming, session idles, medallion → asleep; no audio nudge
+- [ ] 5000ms of no recognizable player speech → stop mic streaming, session idles, medallion → asleep; no audio nudge
 - [ ] Clock starts only after Oracle/Sköll playback ends; their speech never counts toward it
 - [ ] Medallion tap resumes
 - Depends: S2, S3
@@ -101,7 +102,7 @@ Declare five functions on the Live session: `ask`, `hex`, `scry`, `pass`, `cast_
 
 ### S12 — Sköll script + generation pipeline (R8)
 
-- [ ] Script file: lines grouped by trigger bucket—`taunt`, `hex_resolved`, `rune_cast`, `win`, `lose`, `idle`—2–3 variants each. **Blocked: script content from Ashley**
+- [x] Script content: spoken taunt library drafted in `ux-copy.md` §2 — trigger buckets (expanded beyond the original six) with 1–3 variants each, pending Ashley's approval. The machine-readable script file lands with the build script below.
 - [ ] Build script: each line → Gemini TTS (`Algieba`, `gemini-3.1-flash-tts-preview`, director's-notes style prompt) → audio file + caption text in app assets
 - [ ] One command regenerates the full library
 - [ ] Retry logic for the TTS model's occasional 500s
@@ -123,6 +124,6 @@ Declare five functions on the Live session: `ask`, `hex`, `scry`, `pass`, `cast_
 ## Order 🧭
 
 S1 → S2 → {S3, S6, S7} → {S4, S5, S10, S11} → S8 → S9 → S12 → S13.
-Phases 1+2 ship together minimum. S12 blocked on Sköll script content.
+Phases 1+2 ship together minimum. S12 script content is drafted (`ux-copy.md` §2); approval + the generation pipeline remain.
 
 🤖 *Drafted with AI assistance; decisions by Ashley.* ☀️

@@ -4,6 +4,9 @@
 	import ReactionPrompt from '$lib/components/ReactionPrompt.svelte';
 	import Onboarding from '$lib/components/Onboarding.svelte';
 	import EndScreen from '$lib/components/EndScreen.svelte';
+	import EclipseMedallion from '$lib/components/EclipseMedallion.svelte';
+	import type { MedallionState } from '$lib/components/medallionState';
+	import { voiceSession, type VoiceEvent } from '$lib/voice/voiceSession';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
@@ -172,6 +175,57 @@
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
 	);
 
+	// The medallion mirrors the voice session. Its state is a superset of VoiceState:
+	// 'skoll-speaking' arrives with the director, never from the session itself. The failure
+	// notice renders by the medallion — not in the Oracle's answer frame, which is her voiced
+	// surface and persists across reloads; a transient voice failure must do neither.
+	let voiceState = $state<MedallionState>('asleep');
+	let voiceAmplitude = $state(0);
+	let voiceNotice = $state('');
+
+	function onVoiceEvent(event: VoiceEvent) {
+		switch (event.type) {
+			case 'hearing':
+				voiceState = 'hearing';
+				voiceAmplitude = event.amplitude;
+				break;
+			case 'asleep':
+				voiceState = 'asleep';
+				voiceAmplitude = 0;
+				break;
+			case 'waking':
+				voiceState = 'waking';
+				// Cleared as the retry STARTS, not on success: a stale failure line under a stirring
+				// medallion contradicts it, and an identical re-failure must re-announce (same string
+				// assigned over itself is no change — no narration).
+				voiceNotice = '';
+				break;
+			case 'listening':
+			case 'thinking':
+			case 'speaking':
+				voiceState = event.type;
+				break;
+			case 'error':
+				voiceNotice = event.notice;
+				// The session emits asleep right after every error, but settle locally too — a
+				// medallion stranded in waking would promise a silence-tap it can't honor.
+				voiceState = 'asleep';
+				voiceAmplitude = 0;
+				break;
+			case 'transcript':
+				break; // rendered by S10
+			default:
+				event satisfies never; // a new S10/S13 event type must be handled, not dropped
+		}
+	}
+
+	// Waking counts as awake: a tap during the permission+token+connect stretch reaches sleep(),
+	// which cancels the pending wake — it is never silently dropped.
+	function toggleVoice() {
+		if (voiceSession.state === 'asleep') void voiceSession.wake();
+		else voiceSession.sleep();
+	}
+
 	// Return type is derived from the action's `type`, so a caller can't request a
 	// mismatched result shape.
 	async function dispatch<T extends GameAction['type']>(
@@ -253,10 +307,13 @@
 		}
 		window.addEventListener('resize', onReposition);
 		window.addEventListener('scroll', onReposition, true);
+		const unsubscribeVoice = voiceSession.subscribe(onVoiceEvent);
 		return () => {
 			window.removeEventListener('resize', onReposition);
 			window.removeEventListener('scroll', onReposition, true);
 			clearTimeout(aiNoteHideTimer); // don't let a scheduled hide fire after teardown
+			unsubscribeVoice();
+			voiceSession.sleep(); // never leave the mic streaming with no UI attached
 		};
 	});
 
@@ -610,64 +667,63 @@
 		</section>
 
 		<aside class="oracle-panel">
-			<!-- Decorative and bottom-anchored — must not compete with the board's card images. -->
-			<img
-				class="skoll-banner"
-				src={skollBanner}
-				width="480"
-				height="700"
-				alt=""
-				aria-hidden="true"
-				decoding="async"
-				fetchpriority="low"
-			/>
-
-			<div class="turn-pill-row">
-				<!-- role=status: turn changes are narrated politely without stealing focus (v1.5 SR pass). -->
-				<div
-					class="turn-pill"
-					class:won={humanWon}
-					class:lost={skollWon}
-					data-testid="turn-pill"
-					role="status"
-				>
-					{turnPill}
-				</div>
-				<span class="ai-note-wrap">
-					<button
-						class="ai-note-btn"
-						type="button"
-						aria-describedby="ai-note"
-						aria-label="About the Gemini AI behind the Oracle and Sköll"
-						bind:this={aiNoteButton}
-						onmouseenter={showAiNote}
-						onmouseleave={scheduleHideAiNote}
-						onfocus={showAiNote}
-						onblur={hideAiNote}
-						onkeydown={(e) => {
-							if (e.key === 'Escape') hideAiNote();
-						}}
-					>
-						i
-					</button>
-					<span
-						id="ai-note"
-						role="tooltip"
-						class="ai-note-pop"
-						popover="manual"
-						bind:this={aiNotePopover}
-						onmouseenter={showAiNote}
-						onmouseleave={scheduleHideAiNote}
-					>
-						The Oracle and Sköll are live Gemini AI driving answers and rival moves. They can
-						misread, misplay, and make mistakes; the rules and rune data are exact.
-					</span>
-				</span>
+			<div class="voice-stack">
+				<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
+				<!-- Always mounted (a live region born with content is skipped by screen readers) and
+				     absolutely positioned: appearing must never reflow the panel under the player. -->
+				<p class="voice-notice" data-testid="voice-notice" role="status">{voiceNotice}</p>
 			</div>
 
 			<hr class="ornate-divider oracle-divider" aria-hidden="true" />
 
-			<h2 class="oracle-title">The Oracle</h2>
+			<!-- One line: the Oracle's name leads, the turn pill + AI note trail it — the old
+			     standalone pill row spent a full row the wolf needed. -->
+			<div class="oracle-header">
+				<h2 class="oracle-title">The Oracle</h2>
+				<div class="turn-pill-row">
+					<!-- role=status: turn changes are narrated politely without stealing focus (v1.5 SR pass). -->
+					<div
+						class="turn-pill"
+						class:won={humanWon}
+						class:lost={skollWon}
+						data-testid="turn-pill"
+						role="status"
+					>
+						{turnPill}
+					</div>
+					<span class="ai-note-wrap">
+						<button
+							class="ai-note-btn"
+							type="button"
+							aria-describedby="ai-note"
+							aria-label="About the Gemini AI behind the Oracle and Sköll"
+							bind:this={aiNoteButton}
+							onmouseenter={showAiNote}
+							onmouseleave={scheduleHideAiNote}
+							onfocus={showAiNote}
+							onblur={hideAiNote}
+							onkeydown={(e) => {
+								if (e.key === 'Escape') hideAiNote();
+							}}
+						>
+							i
+						</button>
+						<span
+							id="ai-note"
+							role="tooltip"
+							class="ai-note-pop"
+							popover="manual"
+							bind:this={aiNotePopover}
+							onmouseenter={showAiNote}
+							onmouseleave={scheduleHideAiNote}
+						>
+							The Oracle and Sköll are live Gemini AI driving answers and rival moves. They can
+							misread, misplay, and make mistakes; the rules and rune data are exact.
+						</span>
+					</span>
+				</div>
+			</div>
+
 			<!-- role=status: every Oracle answer and refusal is narrated as it is voiced. -->
 			<div class="oracle-frame" role="status">
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
@@ -744,8 +800,14 @@
 					bind:value={askValue}
 					disabled={castMode || pending || !canAct}
 				/>
-				<button class="btn btn--primary" type="submit" disabled={castMode || pending || !canAct}>
-					Ask the Oracle
+				<!-- Visible label is the terse "Ask"; the sr-only tail keeps the accessible name as
+				     the full rite phrase without an aria-label that label-queries would double-match. -->
+				<button
+					class="btn btn--primary ask-submit"
+					type="submit"
+					disabled={castMode || pending || !canAct}
+				>
+					Ask<span class="sr-only"> the Oracle</span>
 				</button>
 			</form>
 
@@ -775,6 +837,29 @@
 						Cast the rune
 					</button>
 				{/if}
+			</div>
+
+			<!-- Decorative, in flow: the wolf's nose rides just under the cast controls, and the
+			     moon ghosts up from the banner's top edge behind them. -->
+			<div class="skoll-art" aria-hidden="true">
+				<img
+					class="skoll-moon"
+					src={skollBanner}
+					width="768"
+					height="1376"
+					alt=""
+					decoding="async"
+					fetchpriority="low"
+				/>
+				<img
+					class="skoll-banner"
+					src={skollBanner}
+					width="768"
+					height="1376"
+					alt=""
+					decoding="async"
+					fetchpriority="low"
+				/>
 			</div>
 		</aside>
 	</div>
@@ -1010,10 +1095,8 @@
 	}
 
 	.turn-pill-row {
-		align-self: stretch;
 		display: inline-flex;
 		align-items: center;
-		justify-content: center;
 		gap: 0.45rem;
 		position: relative;
 		z-index: 4;
@@ -1088,35 +1171,106 @@
 		isolation: isolate;
 	}
 
+	/* The panel's own background already dims its top — anything heavier here reads as a dark
+	   box behind the medallion. Only the gold crown halo and a whisper of depth. */
 	.oracle-panel::before {
 		content: '';
 		position: absolute;
 		inset: 0;
 		z-index: 1;
 		background:
-			linear-gradient(
-				180deg,
-				rgba(6, 9, 18, 0.78) 0%,
-				rgba(6, 9, 18, 0.5) 44%,
-				rgba(6, 9, 18, 0.08) 76%,
-				transparent 100%
-			),
+			linear-gradient(180deg, rgba(6, 9, 18, 0.28) 0%, transparent 65%),
 			radial-gradient(circle at 50% 0%, rgba(217, 169, 74, 0.1) 0%, transparent 36%);
 		pointer-events: none;
 	}
 
-	.oracle-panel > :not(.skoll-banner) {
+	/* Bleeds past the panel padding; relative so the moon anchors to the banner, not the panel —
+	   percentage-of-panel positioning put the moon behind the opaque wolf on tall viewports. */
+	.skoll-art {
+		position: relative;
+		width: calc(100% + 2.2rem);
+		margin: 0 -1.1rem;
+	}
+
+	.skoll-moon {
+		position: absolute;
+		bottom: calc(100% - 2rem);
+		left: 0;
+		width: 100%;
+		height: 10rem;
+		object-fit: cover;
+		object-position: 50% 0%;
+		opacity: 0.6;
+		filter: brightness(1.35);
+		mask-image: linear-gradient(180deg, transparent 0%, black 30%, black 80%, transparent 100%);
+		-webkit-mask-image: linear-gradient(
+			180deg,
+			transparent 0%,
+			black 30%,
+			black 80%,
+			transparent 100%
+		);
+		pointer-events: none;
+	}
+
+	.oracle-panel > :not(.skoll-art) {
 		position: relative;
 		z-index: 2;
 	}
 
-	.oracle-panel > .turn-pill-row {
+	.oracle-panel > .oracle-header {
 		z-index: 4;
 	}
 
-	.oracle-title {
-		margin: 0.2rem 0 0.1rem;
+	/* Name left, turn pill + AI note right — one line instead of two stacked rows. Wrap is
+	   the escape hatch for the long end-of-round pill texts, not the everyday case. */
+	.oracle-header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.35rem 0.5rem;
+	}
+
+	/* Tighter type than the standalone titles: name + pill + note share ~325px. */
+	.oracle-header .oracle-title {
+		white-space: nowrap;
+		font-size: 0.95rem;
+		letter-spacing: 0.2em;
+	}
+
+	.voice-stack {
+		position: relative;
+	}
+
+	/* Overlay pill under the disc: legible at body size, opaque backdrop, zero layout impact. */
+	.voice-notice {
+		position: absolute;
+		inset: auto 0.25rem -0.5rem;
+		margin: 0 auto;
+		width: fit-content;
+		max-width: 100%;
+		padding: 0.4rem 0.8rem;
 		text-align: center;
+		font-family: var(--font-story-body);
+		font-size: 0.95rem;
+		line-height: 1.35;
+		color: var(--ink);
+		background: rgba(6, 9, 18, 0.92);
+		border: 1px solid var(--gold-dim);
+		border-radius: 8px;
+		pointer-events: none;
+		z-index: 5;
+	}
+
+	/* Empty = invisible but still in the tree: display:none would re-break SR announcement. */
+	.voice-notice:empty {
+		padding: 0;
+		border: none;
+	}
+
+	.oracle-title {
+		margin: 0;
 		font-family: var(--font-display);
 		font-size: var(--speaker-title-size);
 		letter-spacing: var(--speaker-title-tracking);
@@ -1144,9 +1298,9 @@
 		color: var(--gold-bright);
 	}
 
+	/* Left-aligned to mirror the Oracle's merged header line. */
 	.skoll-title {
 		margin: 0.2rem 0 0.1rem;
-		text-align: center;
 		font-family: var(--font-display);
 		font-size: var(--speaker-title-size);
 		letter-spacing: var(--speaker-title-tracking);
@@ -1189,10 +1343,20 @@
 		cursor: not-allowed;
 	}
 
+	/* One line: the field flexes, the terse Ask button rides beside it. */
 	.ask {
 		display: flex;
-		flex-direction: column;
+		align-items: stretch;
 		gap: 0.45rem;
+	}
+
+	.ask input {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.ask-submit {
+		flex: none;
 	}
 
 	.sr-only {
@@ -1336,19 +1500,23 @@
 	}
 
 	.skoll-banner {
-		position: absolute;
-		inset: auto 0 0;
-		z-index: 0;
 		display: block;
 		width: 100%;
-		height: min(44%, 27rem);
+		/* The bottom band of the art, sized so the wolf's nose tip sits at the top edge —
+		   directly under the cast controls in flow. */
+		height: 28.25rem;
 		object-fit: cover;
-		object-position: 50% 0%;
+		object-position: 50% 100%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
 			contrast(var(--skoll-contrast));
-		transform: scaleX(-1);
-		mask-image: linear-gradient(180deg, transparent 0%, black 18%, black 100%);
-		-webkit-mask-image: linear-gradient(180deg, transparent 0%, black 18%, black 100%);
+		mask-image: linear-gradient(180deg, transparent 0%, black 8%, black 94%, transparent 100%);
+		-webkit-mask-image: linear-gradient(
+			180deg,
+			transparent 0%,
+			black 8%,
+			black 94%,
+			transparent 100%
+		);
 		pointer-events: none;
 	}
 
@@ -1465,7 +1633,7 @@
 		}
 
 		.skoll-banner {
-			height: min(36%, 16rem);
+			height: 16rem;
 		}
 	}
 

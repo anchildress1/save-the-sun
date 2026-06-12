@@ -39,7 +39,7 @@ The game's core loop—Ask, Hex, Scry, Pass, Cast—runs entirely on buttons and
 | Voiced answers | While the session is awake, the Oracle speaks her answers regardless of input path—typed questions get voiced replies |
 | Captions | All spoken content also lands as text (Answer panel for the Oracle, captions for Sköll) |
 | Output mute | One speaker toggle silences both characters; captions carry the content |
-| Silence timeout | 8 seconds of no recognizable speech → mic sleeps silently, UI falls back to buttons until tapped again |
+| Silence timeout | 5 seconds of no recognizable speech → mic sleeps silently, UI falls back to buttons until tapped again |
 | Action safety | Scry and Pass execute immediately; Hex and Cast the Rune require spoken confirmation through the Oracle |
 | Turn parity | Voice intents call the same engine functions as the buttons; buttons never disappear |
 
@@ -99,6 +99,7 @@ A medallion at the top of the Oracle panel is both the voice toggle and the stat
 
 - [ ] Tapping the medallion wakes or sleeps the voice session. It is the only voice control besides the output mute.
 - [ ] **Asleep / mic off**: Sköll's shadow bites into the disc—partial eclipse, small mic glyph etched in. Default state.
+- [ ] **Waking** *(added during S3)*: corona faintly kindling—the stretch between the tap and listening (permission prompt, token, connect). A tap here cancels the wake.
 - [ ] **Listening**: disc unveiled, gold corona glow breathing slowly.
 - [ ] **Hearing speech**: corona flares with the player's voice; rune glyphs around the rim ignite.
 - [ ] **Oracle thinking**: rune ring orbits slowly.
@@ -109,12 +110,12 @@ A medallion at the top of the Oracle panel is both the voice toggle and the stat
 - [ ] Asset: one new eclipse-medallion image in the established pipeline (dark Norse folk-art, aged gold, transparent background). Ring uses existing rune glyph assets via CSS transforms. Add to `ui-image-resources.md`.
 
 **R7 — Silence timeout.**
-- [ ] Given 8 seconds pass with no recognizable speech, then mic audio stops streaming, the session idles, and the medallion returns to the asleep state—silently, no verbal nudge.
-- [ ] The 8-second clock starts only after the Oracle (or Sköll) finishes speaking—their speech never counts as the player's silence.
+- [ ] Given 5 seconds pass with no recognizable speech, then mic audio stops streaming, the session idles, and the medallion returns to the asleep state—silently, no verbal nudge.
+- [ ] The 5-second clock starts only after the Oracle (or Sköll) finishes speaking—their speech never counts as the player's silence.
 - [ ] Tapping the medallion resumes listening.
 
 **R8 — Sköll clip library.**
-A build-time script generates Sköll's audio with Gemini TTS (voice `Algieba`, director's-notes style prompt) from a script file grouped by trigger: player taunt, hex resolved, rune cast, win, lose, idle menace. Two to three variants per trigger.
+A build-time script generates Sköll's audio with Gemini TTS (voice `Algieba`, director's-notes style prompt) from a script file grouped by trigger bucket (working set drafted in `ux-copy.md` §2). One to three variants per trigger.
 
 - [ ] Clips ship as static assets; runtime playback only, zero per-game generation calls.
 - [ ] Given the player taunts the wolf (detected from the Oracle session's input transcripts by a small director module), then a clip from the taunt bucket plays with no perceptible delay.
@@ -155,7 +156,7 @@ Voice is an enhancement layer, never the sole carrier of game information.
 ## Open Questions ❓
 
 - ~~**Gacrux on Live** (engineering)~~ **Resolved 2026-06-11 (S2):** Gacrux verified working on `gemini-3.1-flash-live-preview` against the real API (audio + transcripts returned). No Kore fallback needed; the voice is the single `ORACLE_VOICE` constant in `src/lib/voice/config.ts`.
-- **Sköll script** (Ashley): trigger buckets and line variants need writing before the library can be generated. Blocking for R8.
+- ~~**Sköll script** (Ashley)~~ **Drafted 2026-06-11:** spoken taunt library lives in `ux-copy.md` §2 (trigger buckets + variants), pending approval. R8 generation unblocks on approval.
 - **Taunt detection rules** (engineering): keyword list vs. lightweight intent check on transcripts for routing to the wolf. Resolve during implementation.
 - **Live session limits** (engineering): confirm session duration limits and whether session resumption is needed for long games. Resolve during implementation.
 

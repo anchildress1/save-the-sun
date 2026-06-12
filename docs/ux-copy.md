@@ -2,7 +2,7 @@
 
 Every player-facing string, plus the voice rules that govern them. Diegetic (in-world) voice only—the dev.to submission post is a separate, judge-facing register and is out of scope here. Mechanics in `game-spec.md`, rune data in `rune-board.md`.
 
-Production notes: the Oracle's answers may be templated (engine fills `{trait}`/`{value}`). Sköll's only player-facing line is his templated Ask—taunts and cast lines were cut from v1 (see §2). No emoji anywhere; no exclamation in any diegetic line.
+Production notes: the Oracle's answers may be templated (engine fills `{trait}`/`{value}`). Sköll's only player-facing **text** line is his templated Ask—taunts and cast lines were cut from the v1 board (see §2), but return as the spoken taunt library (§2, draft pending approval). No emoji anywhere; no exclamation in any diegetic line except the single allowlisted one in Sköll's winning-cast bucket.
 
 ---
 
@@ -128,7 +128,81 @@ He asks in **his own voice**—first-person, predatory, sardonic (the Cast Voice
 
 Power is spoken as a word (1–6), not the Oracle's digit grammar—the registers are deliberately distinct so the speaker is unmistakable.
 
-_Cut from the v1 UI (flavor, not inference): the idle/turn taunts, the escalation tier (was P2), and the public cast lines ("I name it. {Rune}." / "The hunt ends. {Rune}.")._
+_Cut from the v1 UI (flavor, not inference): the idle/turn taunts, the escalation tier (was P2), and the public cast lines ("I name it. {Rune}." / "The hunt ends. {Rune}.")._ The cut applies to his on-board **text** surface only—the spoken taunt library below revives these for the voice layer.
+
+### Sköll script—spoken taunt library (draft, pending approval)
+
+Open items:
+
+- **Sköll script** (Ashley): trigger buckets and line variants below are the working draft—they need approval before the prebaked TTS library can be generated. **Blocking for R8.**
+- **Taunt detection rules** (engineering): keyword list vs. lightweight intent check on transcripts for routing player trash-talk to the wolf. Ambiguous utterances default to the Oracle's Ask path—mis-routing a real question to a taunt is the worse failure. Resolve during implementation.
+
+Library rules:
+
+- **Spoken only** (prebaked TTS). His on-board text surface still carries only his templated Ask; nothing here prints to the board or the Rite transcript except the defeat exit line, noted below.
+- One line per trigger, drawn from the bucket; **no line repeats within a night.**
+- Voice holds to the charter: predatory, sardonic, cold—he taunts the play, never the player. "Witch" is his only address. The library's single exclamation lives in the winning-cast bucket and nowhere else.
+- Reaction resolutions stay in the rite's third-person voice (§3); a taunt may follow a resolution, never replace it.
+
+**The night opens (his first turn)**
+
+- "Run the night out if you like, witch. It ends in my jaws."
+- "I have chased her since the world was young. You have had one supper."
+- "Ask your questions. The sun already knows how this ends."
+
+**The witch hesitates (idle on your turn)**
+
+- "You hesitate. I do not."
+- "Count them again, slower. I have all night."
+- "The fire burns down while you stare, witch."
+
+**The hunt, far (his field still wide)**
+
+- "The scent is thin yet. It thickens."
+- "A wide field. I have worn down wider."
+- "Every answer trims the dark — mine as much as yours."
+
+**The hunt, closing**
+
+- "Fewer places for her to hide."
+- "The trail warms underfoot."
+- "I can taste which one it is. Almost."
+
+**The hunt, near (one or two left)**
+
+- "Two left, witch. I only need the one."
+- "Close enough now to hear her burn."
+- "One more answer and the dawn is mine."
+
+**The witch casts wrong**
+
+- "All that careful crossing, and you cast that."
+- "Wrong rune. The night thanks you."
+- "Spend your turns freely. I spend mine on the hunt."
+
+**His Ask is Hexed**
+
+- "Silence the Oracle if it comforts you. My nose still works."
+- "Clever. It will not save you twice."
+- "Kill the question. The trail remains."
+
+**The witch taunts him (routed by detection)**
+
+- "Bold words from prey."
+- "Save your breath for asking. You will want it at dawn."
+- "Louder ones have stood at that fire. The sun set on them all."
+
+**His winning cast**
+
+- "I name it. {Rune}."
+- "The hunt ends. {Rune}."
+- "{Rune}! And the dawn dies with it." _(the library's one exclamation)_
+
+**The witch wins (defeat exit — one line, rare)**
+
+- "Keep your dawn, witch. There is always another year."
+
+_The defeat line plays in the Rite transcript only, after Sól's victory sequence resolves — never over her beats. Her rarity stays the power; his exit is an aside, not a scene._
 
 ## 3. Reactions—Scry & Hex
 
@@ -191,7 +265,7 @@ Sól speaks only at victory—the goddess's rarity is the power.
 ### Core action buttons
 | Action | Label |
 |---|---|
-| Ask | **"Ask the Oracle"** |
+| Ask | **"Ask"** (visible; accessible name stays "Ask the Oracle") |
 | Cast | **"Cast the rune"** |
 | Reactions | **"Scry"** · **"Hex"** (named, never "use reaction") |
 | Confirm a cast | **"Name it"** |
@@ -210,6 +284,29 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 | Night's progress (cosmetic, by elapsed turns—no timer mechanic) | early: **"The night lies deep and unbroken."** → mid: **"Gray bleeds into the dark."** → late: **"Dawn gathers at the edge of the world."** |
 | Round resolved—header tag beside the celestial body (full resolution line lives in the Oracle panel, §4) | human win (moon → risen sun): **"Sól crests the rim of the world."** · Sköll win (moon holds): **"Sköll takes the sun."** |
 | Cast armed (player believes one remains) | **"Cast?"** |
+
+### Eclipse medallion (voice control)
+
+The medallion is a labeled button: its accessible name carries the state plus what a tap does. The announcement column is the polite live-region line for transitions a player must never miss—mic privacy and who holds the fire; hearing/thinking stay quiet (still "listening" to a listener). Visual states live in `v2-voice-requirements.md` R6.
+
+| State | Button label | Announced |
+|---|---|---|
+| Asleep | **"The voice sleeps. Wake the Oracle."** | "The voice sleeps." |
+| Waking (tap → listening: permission, token, connect) | **"The Oracle stirs. Silence the voice."** | "The Oracle stirs." |
+| Listening | **"The Oracle listens. Silence the voice."** | "The Oracle listens." |
+| Hearing speech | **"The Oracle hears you. Silence the voice."** | — |
+| Thinking | **"The Oracle considers. Silence the voice."** | — |
+| Oracle speaking | **"The Oracle speaks. Silence the voice."** | "The Oracle speaks." |
+| Sköll speaking | **"Sköll speaks. Silence the voice."** | "Sköll speaks." |
+
+Voice failure notices (emitted by the session client, shown as one quiet line by the medallion—never in the Oracle's answer frame, which is her voiced surface):
+
+| Failure | Notice |
+|---|---|
+| Token mint | "The fire does not carry your voice tonight. The rite continues by hand." |
+| Mic permission | "The fire cannot hear you. The rite continues by hand." |
+| No mic / dead audio | "No voice reaches the fire. The rite continues by hand." |
+| Socket drop | "The Oracle's voice falters. The rite continues by hand." |
 
 ### Empty & error states (stay at the fire)
 | State | Copy |
