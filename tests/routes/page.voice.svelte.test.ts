@@ -541,7 +541,13 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		await screen.getByRole('button', { name: 'Name it' }).click();
 		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
 
-		// Spoken rune names arrive in whatever case the transcript carried.
+		// Spoken rune names arrive in whatever case the transcript carried. The cast is
+		// destructive, so the voiced path runs through the S8 confirmation exchange first.
+		const question = await executor()({ name: 'cast_rune', args: { rune: 'sowilo' } });
+		expect(question).toBe(
+			'Sowilo, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?'
+		);
+		emit({ type: 'transcript', direction: 'in', text: 'cast it' });
 		const outcome = await executor()({ name: 'cast_rune', args: { rune: 'sowilo' } });
 		expect(outcome).toBe('Sowilo is not the one. The night holds.');
 		const [board, voiced] = actionBodies();
@@ -809,5 +815,239 @@ describe('Save the Sun page — voiced tool guards (S7 review fixes)', () => {
 			)
 		);
 		await expect(first).resolves.toBe('Yes. Sól is reaching for a fire rune.');
+	});
+});
+
+describe('Save the Sun page — destructive confirmation gate (S8)', () => {
+	const executor = () =>
+		voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
+			name: string;
+			args: Record<string, unknown>;
+		}) => Promise<string>;
+
+	const actionBodies = () =>
+		vi
+			.mocked(fetch)
+			.mock.calls.filter(([url]) => String(url) === '/api/action')
+			.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+
+	function mockAction(result: object) {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/action') return new Response(JSON.stringify(result));
+			return new Response('{}');
+		});
+	}
+
+	const CONFIRM_HEX =
+		'His question dies unanswered and the hex is spent. Say it plain: shall I hex him?';
+	const confirmCast = (name: string) =>
+		`${name}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?`;
+	// The player's reply since arming — the only thing that opens the gate.
+	const playerSpeaks = () => emit({ type: 'transcript', direction: 'in', text: 'yes, do it' });
+
+	const reactProps = {
+		...pageProps,
+		data: {
+			...pageProps.data,
+			pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+		}
+	};
+
+	it('a voiced hex arms the gate — the confirmation question returns and nothing dispatches', async () => {
+		render(Page, reactProps);
+		const outcome = await executor()({ name: 'hex', args: {} });
+		expect(outcome).toBe(CONFIRM_HEX);
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('a heard affirmation executes the armed hex — the identical engine action as the button', async () => {
+		mockAction({
+			type: 'React',
+			outcome: { ok: true, choice: 'Hex' },
+			skollReaction: { hexed: true },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, reactProps);
+		await screen.getByRole('button', { name: 'Hex' }).click();
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+		screen.unmount();
+
+		// A fresh window for the voiced path — the button Hex already closed its own.
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		playerSpeaks();
+		const outcome = await executor()({ name: 'hex', args: {} });
+		expect(outcome).toBe(
+			"You close the Oracle's lips. His question dies unanswered — his turn with it."
+		);
+		const [button, voiced] = actionBodies();
+		expect(voiced).toEqual(button);
+		expect(voiced).toEqual({ type: 'React', player: 'Human', reaction: 'Hex' });
+	});
+
+	it('a repeated call with no player speech between re-asks — the model cannot confirm itself', async () => {
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		const outcome = await executor()({ name: 'hex', args: {} });
+		expect(outcome).toBe(CONFIRM_HEX);
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it("the Oracle's own voiced question never opens the gate — only the player's speech counts", async () => {
+		// Drop the direction check and the model self-confirms through its own out-transcript:
+		// call → her speech → call. That is the exact R4 bypass the gate exists to stop.
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		emit({ type: 'transcript', direction: 'out', text: CONFIRM_HEX });
+		const outcome = await executor()({ name: 'hex', args: {} });
+		expect(outcome).toBe(CONFIRM_HEX);
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('the real exchange — question voiced, player affirms, the call lands — executes', async () => {
+		// The production sequence has exactly one Oracle turn between arming and confirming;
+		// an off-by-one in the decline counter would re-ask forever and pass every other test.
+		mockAction({
+			type: 'React',
+			outcome: { ok: true, choice: 'Hex' },
+			skollReaction: { hexed: true },
+			state: HUMAN_TURN
+		});
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		emit({ type: 'speaking' }); // she voices the confirmation question
+		emit({ type: 'listening' });
+		playerSpeaks();
+		const outcome = await executor()({ name: 'hex', args: {} });
+		expect(outcome).toBe(
+			"You close the Oracle's lips. His question dies unanswered — his turn with it."
+		);
+		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Hex' }]);
+	});
+
+	it('a session error clears the armed gate — no stale execution after a reconnect', async () => {
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		playerSpeaks();
+		emit({
+			type: 'error',
+			reason: 'socket',
+			notice: "The Oracle's voice falters. The rite continues by hand."
+		});
+		const outcome = await executor()({ name: 'hex', args: {} });
+		expect(outcome).toBe(CONFIRM_HEX);
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('a guard line between arm and confirm kills the exchange — no stale affirmation', async () => {
+		// Armed for Sowilo, affirmed, but the next call misnames the rune (guard, no gate
+		// consult): the affirmation must die with it, or a later Sowilo call would execute
+		// against a reply the player gave to a different question.
+		render(Page, pageProps);
+		await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
+		playerSpeaks();
+		expect(await executor()({ name: 'cast_rune', args: { rune: 'Excalibur' } })).toBe(
+			'No rune named Excalibur lies on the board.'
+		);
+		const outcome = await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
+		expect(outcome).toBe(confirmCast('Sowilo')); // re-asked from scratch
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('a confirmed cast executes; the confirmation is per rune', async () => {
+		mockAction({
+			type: 'Cast',
+			cast: { ok: true, won: false, turnConsumed: true },
+			state: HUMAN_TURN
+		});
+		render(Page, pageProps);
+		expect(await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } })).toBe(
+			confirmCast('Sowilo')
+		);
+		playerSpeaks();
+		// The affirmation names a DIFFERENT rune: never executes — re-arms for the new target.
+		expect(await executor()({ name: 'cast_rune', args: { rune: 'Algiz' } })).toBe(
+			confirmCast('Algiz')
+		);
+		expect(actionBodies()).toHaveLength(0);
+		playerSpeaks();
+		expect(await executor()({ name: 'cast_rune', args: { rune: 'Algiz' } })).toBe(
+			'Algiz is not the one. The night holds.'
+		);
+		expect(actionBodies()).toEqual([{ type: 'Cast', player: 'Human', runeName: 'Algiz' }]);
+	});
+
+	it('a second Oracle turn without the call disarms — a decline never executes', async () => {
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		playerSpeaks();
+		// Her first turn since arming is the confirmation question itself…
+		emit({ type: 'speaking' });
+		emit({ type: 'listening' });
+		// …her second means the player declined and she acknowledged: the exchange is over.
+		emit({ type: 'speaking' });
+		const outcome = await executor()({ name: 'hex', args: {} });
+		expect(outcome).toBe(CONFIRM_HEX); // re-asked, not executed
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('sleep clears the armed gate — silence through the timeout never executes', async () => {
+		// The R7 silence timeout is a full sleep, so this is also the decline-by-silence path.
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		playerSpeaks();
+		emit({ type: 'asleep' });
+		const outcome = await executor()({ name: 'hex', args: {} });
+		expect(outcome).toBe(CONFIRM_HEX);
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('a different tool call kills the exchange — the reply went elsewhere', async () => {
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		playerSpeaks();
+		// An ask during his hanging question only earns the guard line, yet it still proves the
+		// player's reply was not the affirmation.
+		await executor()({ name: 'ask', args: { question: 'is it gold?' } });
+		const outcome = await executor()({ name: 'hex', args: {} });
+		expect(outcome).toBe(CONFIRM_HEX);
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('a board move kills the exchange — any engine action supersedes the pending confirmation', async () => {
+		mockAction({
+			type: 'Ask',
+			oracle: { ok: true, answer: 'Yes. Sól is reaching for a fire rune.', turnConsumed: true },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, pageProps);
+		expect(await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } })).toBe(
+			confirmCast('Sowilo')
+		);
+		playerSpeaks();
+		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await vi.waitFor(() =>
+			expect(actionBodies().filter((body) => body.type === 'Ask')).toHaveLength(1)
+		);
+		const outcome = await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
+		expect(outcome).toBe(confirmCast('Sowilo')); // re-asked from scratch
+		expect(actionBodies().filter((body) => body.type === 'Cast')).toHaveLength(0);
+	});
+
+	it('arming the gate never blocks the other tools — a scry still executes in the same window', async () => {
+		mockAction({
+			type: 'React',
+			outcome: { ok: true, choice: 'Scry', shareAnswer: true },
+			skollReaction: { hexed: false, scried: { answer: 'Yes. Sól is reaching for a fire rune.' } },
+			state: HUMAN_TURN
+		});
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		const outcome = await executor()({ name: 'scry', args: {} });
+		expect(outcome).toBe(
+			'You lean into the dark and listen. His answer is yours too. Yes. Sól is reaching for a fire rune.'
+		);
+		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Scry' }]);
 	});
 });

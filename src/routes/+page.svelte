@@ -66,7 +66,12 @@
 		wolfAsking: "Sköll's question hangs. Scry, hex, or pass before another move.",
 		noReactionWindow: 'Sköll asks nothing. There is no question to scry, hex, or pass.',
 		riteDone: 'The longest day is decided. Begin another night to play again.',
-		unknownRune: (name: string) => `No rune named ${name} lies on the board.`
+		unknownRune: (name: string) => `No rune named ${name} lies on the board.`,
+		// Spoken-move confirmations (S8): voiced by the Oracle as the tool result when a
+		// destructive call arms the gate — like the guards, never shown in the panel.
+		confirmHex: 'His question dies unanswered and the hex is spent. Say it plain: shall I hex him?',
+		confirmCast: (name: string) =>
+			`${name}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?`
 	};
 
 	let castMode = $state(false);
@@ -193,6 +198,13 @@
 	// Per round, persisted with the view (S6): the invitation speaks once per game, not per tap.
 	let voiceInvited = $state(false);
 
+	// S8: the armed confirmation for a destructive tool call (hex, cast_rune). `heard` flips when
+	// the player speaks after arming — the confirming call is refused without it, so the model can
+	// never execute both phases in one breath. `spoke` counts the Oracle's turns since arming: her
+	// first is the confirmation question itself; a second means the exchange ended without the
+	// call (a decline), so the gate disarms.
+	let voiceConfirm: { name: string; rune?: string; heard: boolean; spoke: boolean } | null = null;
+
 	function onVoiceEvent(event: VoiceEvent) {
 		switch (event.type) {
 			case 'hearing':
@@ -205,6 +217,8 @@
 			case 'eclipsed':
 				voiceState = event.type;
 				voiceAmplitude = 0;
+				// Silence timeout, sleep tap, or the seal: the exchange is over, nothing executes (R4).
+				voiceConfirm = null;
 				break;
 			case 'waking':
 				voiceState = 'waking';
@@ -215,7 +229,15 @@
 				break;
 			case 'listening':
 			case 'thinking':
+				voiceState = event.type;
+				break;
 			case 'speaking':
+				// Guarded by the mirror so only a fresh speaking TURN counts — the session never
+				// re-emits an unchanged state, but the gate must not hang on that subtlety.
+				if (voiceConfirm && voiceState !== 'speaking') {
+					if (voiceConfirm.spoke) voiceConfirm = null;
+					else voiceConfirm.spoke = true;
+				}
 				voiceState = event.type;
 				break;
 			case 'error':
@@ -225,9 +247,13 @@
 				// silence-tap it can't honor.
 				voiceState = 'asleep';
 				voiceAmplitude = 0;
+				voiceConfirm = null;
 				break;
 			case 'transcript':
-				break; // rendered by S10
+				// The player spoke after the confirmation question — the gate may now accept the
+				// confirming call. Rendering belongs to S10.
+				if (event.direction === 'in' && voiceConfirm) voiceConfirm.heard = true;
+				break;
 			default:
 				event satisfies never; // a new S10/S13 event type must be handled, not dropped
 		}
@@ -253,6 +279,9 @@
 	async function dispatch<T extends GameAction['type']>(
 		action: Extract<GameAction, { type: T }>
 	): Promise<ActionResponse<T>> {
+		// Any engine action — typed, clicked, or voiced — supersedes a pending confirmation (S8):
+		// the board moved on, so a stale armed gate must never carry into a later exchange.
+		voiceConfirm = null;
 		const res = await fetch('/api/action', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -633,7 +662,23 @@
 	// (its button disabled or target missing) without touching the panel.
 	const REACTION_TOOLS: Record<string, ReactionChoice> = { scry: 'Scry', hex: 'Hex', pass: 'Pass' };
 
+	// S8 (R4): hex and cast_rune execute only through a spoken confirmation exchange, and the
+	// gate is client-authoritative — the first call only arms it and hands back the question to
+	// voice; nothing the model sends can reach the engine until the player has spoken since
+	// arming. Returns the question while the gate holds, null once confirmed.
+	function gateDestructive(armed: typeof voiceConfirm, name: string, rune?: string): string | null {
+		if (armed && armed.name === name && armed.rune === rune && armed.heard) return null;
+		// Not armed, an unheard double-call, or a different target: (re-)arm and ask again.
+		voiceConfirm = { name, rune, heard: false, spoke: false };
+		return name === 'hex' ? RITE.confirmHex : RITE.confirmCast(rune ?? '');
+	}
+
 	async function executeVoiceTool({ name, args }: VoiceToolCall): Promise<string> {
+		// The armed exchange survives only into its own clean confirming call: any other outcome —
+		// a different tool, a guard line, an unknown rune — means the reply went elsewhere, and a
+		// stale affirmation must never carry over to execute a later call.
+		const armed = voiceConfirm;
+		voiceConfirm = null;
 		if (name === 'ask') {
 			const question = typeof args.question === 'string' ? args.question.trim() : '';
 			if (question === '') return RITE.emptyAsk;
@@ -656,6 +701,11 @@
 		if (Object.hasOwn(REACTION_TOOLS, name)) {
 			if (pending) return RITE.riteMoving;
 			if (!skollAsking) return RITE.noReactionWindow;
+			// Guards first: confirming a move the board doesn't offer would be an empty promise.
+			if (name === 'hex') {
+				const question = gateDestructive(armed, 'hex');
+				if (question) return question;
+			}
 			pending = true;
 			try {
 				return await performReact(REACTION_TOOLS[name]);
@@ -671,6 +721,9 @@
 			if (pending) return RITE.riteMoving;
 			if (skollAsking) return RITE.wolfAsking;
 			if (!canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
+			// Confirmation is per-target: a different rune re-arms and asks again (S8).
+			const question = gateDestructive(armed, 'cast_rune', rune.name);
+			if (question) return question;
 			pending = true;
 			try {
 				return await performCast(rune.name);
