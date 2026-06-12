@@ -667,18 +667,6 @@
 		</section>
 
 		<aside class="oracle-panel">
-			<!-- Decorative and bottom-anchored — must not compete with the board's card images. -->
-			<img
-				class="skoll-banner"
-				src={skollBanner}
-				width="768"
-				height="1376"
-				alt=""
-				aria-hidden="true"
-				decoding="async"
-				fetchpriority="low"
-			/>
-
 			<div class="voice-stack">
 				<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
 				<!-- Always mounted (a live region born with content is skipped by screen readers) and
@@ -850,6 +838,18 @@
 					</button>
 				{/if}
 			</div>
+
+			<!-- Decorative, in flow: the wolf's nose rides just under the cast controls. -->
+			<img
+				class="skoll-banner"
+				src={skollBanner}
+				width="768"
+				height="1376"
+				alt=""
+				aria-hidden="true"
+				decoding="async"
+				fetchpriority="low"
+			/>
 		</aside>
 	</div>
 </main>
@@ -1461,30 +1461,24 @@
 	}
 
 	.skoll-banner {
-		position: absolute;
-		inset: auto 0 0;
-		z-index: 0;
 		display: block;
-		width: 100%;
-		/* Backdrop: the mask ghosts the sky out behind the controls; only the wolf shows fully. */
-		height: min(82%, 62rem);
+		/* Bleed to the panel edges past its side padding. */
+		width: calc(100% + 2.2rem);
+		margin: 0 -1.1rem;
+		/* The bottom band of the art, sized so the wolf's nose tip sits at the top edge —
+		   directly under the cast controls in flow. */
+		height: 28.25rem;
 		object-fit: cover;
 		object-position: 50% 100%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
 			contrast(var(--skoll-contrast));
-		mask-image: linear-gradient(
-			180deg,
-			transparent 0%,
-			rgba(0, 0, 0, 0.18) 32%,
-			black 62%,
-			black 100%
-		);
+		mask-image: linear-gradient(180deg, transparent 0%, black 8%, black 94%, transparent 100%);
 		-webkit-mask-image: linear-gradient(
 			180deg,
 			transparent 0%,
-			rgba(0, 0, 0, 0.18) 32%,
-			black 62%,
-			black 100%
+			black 8%,
+			black 94%,
+			transparent 100%
 		);
 		pointer-events: none;
 	}
@@ -1602,7 +1596,7 @@
 		}
 
 		.skoll-banner {
-			height: min(28%, 12rem);
+			height: 16rem;
 		}
 	}
 
