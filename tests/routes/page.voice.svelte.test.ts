@@ -669,3 +669,71 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		expect(voiceMock.direct).not.toHaveBeenCalled();
 	});
 });
+
+describe('Save the Sun page — voiced tool guards (S7 review fixes)', () => {
+	const executor = () =>
+		voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
+			name: string;
+			args: Record<string, unknown>;
+		}) => Promise<string>;
+
+	const actionBodies = () =>
+		vi
+			.mocked(fetch)
+			.mock.calls.filter(([url]) => String(url) === '/api/action')
+			.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+
+	it('an inherited object key is not a tool — model names only match own reactions', async () => {
+		// With the window open, `in`-based matching would have routed toString into a React
+		// dispatch carrying a function as the reaction.
+		render(Page, {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+			}
+		});
+		await expect(executor()({ name: 'toString', args: {} })).rejects.toThrow(
+			'unknown tool: toString'
+		);
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('a voiced ask holds the board lock until the wolf settles', async () => {
+		const skollTurn: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		let settleAdvance!: (response: Response) => void;
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit | undefined)?.body));
+			if (body.type === 'Ask')
+				return new Response(
+					JSON.stringify({
+						type: 'Ask',
+						oracle: {
+							ok: true,
+							answer: 'Yes. Sól is reaching for a fire rune.',
+							turnConsumed: true
+						},
+						state: skollTurn
+					})
+				);
+			return new Promise<Response>((resolve) => {
+				settleAdvance = resolve;
+			});
+		});
+		const screen = render(Page, pageProps);
+		const outcome = await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		// The tool result returned promptly, but his move is still in flight — the board stays
+		// locked so a "Begin another night" can't interleave a reset under the Advance.
+		expect(outcome).toBe('Yes. Sól is reaching for a fire rune.');
+		const newNight = screen.getByRole('button', { name: 'Begin another night' });
+		await expect.element(newNight).toBeDisabled();
+		settleAdvance(new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN })));
+		await expect.element(newNight).toBeEnabled();
+	});
+});

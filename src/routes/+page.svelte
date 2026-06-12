@@ -642,12 +642,16 @@
 			try {
 				return (await performAsk(question)).line;
 			} finally {
-				pending = false;
 				// Not awaited: the tool result must reach the model now, not after the wolf's move.
-				void advanceSkoll();
+				// pending holds until his move settles — the same lock window the buttons get.
+				void advanceSkoll().finally(() => {
+					pending = false;
+				});
 			}
 		}
-		if (name in REACTION_TOOLS) {
+		// Own-property check: the name is model input, and `in` would let inherited keys
+		// (toString, __proto__) fall through to a garbage React dispatch.
+		if (Object.hasOwn(REACTION_TOOLS, name)) {
 			if (!skollAsking) return RITE.noReactionWindow;
 			pending = true;
 			try {
@@ -667,8 +671,9 @@
 			try {
 				return await performCast(rune.name);
 			} finally {
-				pending = false;
-				void advanceSkoll();
+				void advanceSkoll().finally(() => {
+					pending = false;
+				});
 			}
 		}
 		throw new Error(`unknown tool: ${name}`);
