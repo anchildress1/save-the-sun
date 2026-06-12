@@ -75,8 +75,7 @@ function mockAction(result: object) {
 }
 
 // S8 canon (ux-copy.md §1): the confirmation questions, and the player reply that opens the gate.
-const CONFIRM_HEX =
-	'His question dies unanswered and the hex is spent. Say it plain: shall I hex him?';
+const CONFIRM_HEX = 'Shall I hex him?';
 const confirmCast = (name: string) =>
 	`${name}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?`;
 const playerSpeaks = () => emit({ type: 'transcript', direction: 'in', text: 'yes, do it' });

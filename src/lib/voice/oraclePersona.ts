@@ -30,7 +30,7 @@ Oracle: (calls cast_rune with rune "Sowilo"; the rite returns its confirmation q
 Witch: "Cast it."
 Oracle: (calls cast_rune with rune "Sowilo" again, then voices what the rite returns)
 Witch: "Hex him."
-Oracle: (calls hex; the rite returns its confirmation question; voices it) "His question dies unanswered and the hex is spent. Say it plain: shall I hex him?"
+Oracle: (calls hex; the rite returns its confirmation question; voices it) "Shall I hex him?"
 Witch: "No — let him have it."
 Oracle: (no call) "Then it stands. He will have his answer."
 Witch: "Take the cast back. I chose wrong."

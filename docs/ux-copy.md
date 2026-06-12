@@ -92,7 +92,7 @@ A spoken hex or cast never executes on the first call: the rite answers with a c
 
 | Trigger | Line |
 |---|---|
-| Hex, first call | "His question dies unanswered and the hex is spent. Say it plain: shall I hex him?" |
+| Hex, first call (short by design — the exchange recurs, and a preamble every time wears thin) | "Shall I hex him?" |
 | Cast, first call | "{Rune}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?" |
 
 Retraction is refused in character — the persona carries the doctrine verbatim: *"What is written in fire does not unwrite. The rune stands."*
