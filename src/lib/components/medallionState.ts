@@ -8,7 +8,7 @@ import type { RuneName } from './runeVisuals';
 export type MedallionState = VoiceState | 'skoll-speaking';
 
 // Canonical copy: docs/ux-copy.md §6 (eclipse medallion). State first, then what a tap does.
-// Frozen: mutating these at runtime would silently fork them from the canonical copy.
+// Readonly via `as const` (compile-time): TS-guarded code can't fork them from the canon.
 export const MEDALLION_LABEL = {
 	asleep: 'The voice sleeps. Wake the Oracle.',
 	waking: 'The Oracle stirs. Silence the voice.',

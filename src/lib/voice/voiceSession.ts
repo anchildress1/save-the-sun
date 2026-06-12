@@ -113,8 +113,7 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	function teardown(): void {
-		// First, while the tee can still name the turn: a mid-turn sleep/failure must not
-		// swallow what was already transcribed.
+		// A mid-turn sleep/failure must not swallow what was already transcribed.
 		flushTranscripts();
 		generation++;
 		liveReady = false;
@@ -146,10 +145,12 @@ export function createVoiceSession(): VoiceSession {
 		for (const token of new Set([mintedToken, extraToken])) {
 			if (token) scrubbed = scrubbed.split(token).join('[ephemeral-token]');
 		}
+		// keepalive: the final slept/transcript tees fire during page teardown and must survive it.
 		void fetch('/api/voice/debug', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ level, message: scrubbed })
+			body: JSON.stringify({ level, message: scrubbed }),
+			keepalive: true
 		})
 			.then((response) => {
 				if (!response.ok) console.warn('[voice] debug tee rejected:', response.status, scrubbed);
@@ -186,6 +187,8 @@ export function createVoiceSession(): VoiceSession {
 			if (state === 'thinking') {
 				// Routine for a cough; a PATTERN of these in /debug means real turns are being dropped.
 				teeDebug('info', 'thinking rescue fired — no reply arrived');
+				// Flush what was heard NOW, or it silently rides into the next turn's heard: line.
+				flushTranscripts();
 				toState('listening');
 			}
 		}, THINKING_FALLBACK_MS);
@@ -404,8 +407,13 @@ export function createVoiceSession(): VoiceSession {
 						},
 						onclose: (event) => {
 							// The reason text is where the API explains itself (quota, bad model, 1011 detail).
+							const detail = `close ${event?.code ?? ''} ${event?.reason ?? ''}`.trim();
 							if (generation === myGeneration) {
-								onSocketDown(`close ${event?.code ?? ''} ${event?.reason ?? ''}`.trim());
+								onSocketDown(detail);
+							} else if (event?.reason) {
+								// A close landing after the wake already failed (e.g. setup timeout) carries
+								// the only explanation of WHY — generation-gating must not eat it.
+								teeDebug('info', `stale socket ${detail}`, token);
 							}
 						}
 					}

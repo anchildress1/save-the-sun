@@ -39,7 +39,7 @@ The game's core loop—Ask, Hex, Scry, Pass, Cast—runs entirely on buttons and
 | Voiced answers | While the session is awake, the Oracle speaks her answers regardless of input path—typed questions get voiced replies |
 | Captions | All spoken content also lands as text (Answer panel for the Oracle, captions for Sköll) |
 | Output mute | One speaker toggle silences both characters; captions carry the content |
-| Silence timeout | 8 seconds of no recognizable speech → mic sleeps silently, UI falls back to buttons until tapped again |
+| Silence timeout | 5 seconds of no recognizable speech → mic sleeps silently, UI falls back to buttons until tapped again |
 | Action safety | Scry and Pass execute immediately; Hex and Cast the Rune require spoken confirmation through the Oracle |
 | Turn parity | Voice intents call the same engine functions as the buttons; buttons never disappear |
 
@@ -110,12 +110,12 @@ A medallion at the top of the Oracle panel is both the voice toggle and the stat
 - [ ] Asset: one new eclipse-medallion image in the established pipeline (dark Norse folk-art, aged gold, transparent background). Ring uses existing rune glyph assets via CSS transforms. Add to `ui-image-resources.md`.
 
 **R7 — Silence timeout.**
-- [ ] Given 8 seconds pass with no recognizable speech, then mic audio stops streaming, the session idles, and the medallion returns to the asleep state—silently, no verbal nudge.
-- [ ] The 8-second clock starts only after the Oracle (or Sköll) finishes speaking—their speech never counts as the player's silence.
+- [ ] Given 5 seconds pass with no recognizable speech, then mic audio stops streaming, the session idles, and the medallion returns to the asleep state—silently, no verbal nudge.
+- [ ] The 5-second clock starts only after the Oracle (or Sköll) finishes speaking—their speech never counts as the player's silence.
 - [ ] Tapping the medallion resumes listening.
 
 **R8 — Sköll clip library.**
-A build-time script generates Sköll's audio with Gemini TTS (voice `Algieba`, director's-notes style prompt) from a script file grouped by trigger: player taunt, hex resolved, rune cast, win, lose, idle menace. Two to three variants per trigger.
+A build-time script generates Sköll's audio with Gemini TTS (voice `Algieba`, director's-notes style prompt) from a script file grouped by trigger bucket (working set drafted in `ux-copy.md` §2). One to three variants per trigger.
 
 - [ ] Clips ship as static assets; runtime playback only, zero per-game generation calls.
 - [ ] Given the player taunts the wolf (detected from the Oracle session's input transcripts by a small director module), then a clip from the taunt bucket plays with no perceptible delay.

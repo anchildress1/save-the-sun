@@ -568,6 +568,42 @@ describe('voiceSession failures', () => {
 		expect(teeBodies().join(' ')).toContain('thinking rescue fired');
 	});
 
+	it('the thinking rescue flushes what was heard — the lost turn is named, not merged into the next', async () => {
+		await awaken();
+		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'is it a fire rune' } } });
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		await vi.advanceTimersByTimeAsync(10_000);
+		expect(teeBodies().join(' ')).toContain('heard: is it a fire rune');
+		// And the buffer is clear: a later turn must not re-carry the dropped utterance.
+		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'is it gold' } } });
+		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		const heardLines = teeBodies().filter((body) => body.includes('heard:'));
+		expect(heardLines.at(-1)).toContain('is it gold');
+		expect(heardLines.at(-1)).not.toContain('fire rune');
+	});
+
+	it('a stale close with a reason still tees — the why of a setup timeout must not vanish', async () => {
+		const woke = vs.wake();
+		await vi.advanceTimersByTimeAsync(0);
+		await vi.advanceTimersByTimeAsync(10_000); // setup timeout fails the wake first
+		await woke;
+		callbacks!.onclose({ code: 1011, reason: 'quota exceeded for auth_tokens/t1' });
+		const teed = teeBodies().join(' ');
+		expect(teed).toContain('stale socket close 1011');
+		expect(teed).toContain('[ephemeral-token]');
+		expect(teed).not.toContain('auth_tokens/t1');
+	});
+
+	it('a reasonless stale close after a normal sleep stays out of the tee', async () => {
+		await awaken();
+		vs.sleep();
+		const teesBefore = teeBodies().length;
+		callbacks!.onclose({ code: 1000 });
+		expect(teeBodies().length).toBe(teesBefore);
+	});
+
 	it('connect rejection emits error socket and scrubs the token from the debug tee', async () => {
 		sdk.connect.mockRejectedValueOnce(
 			new Error('rejected at wss://host?access_token=auth_tokens/t1')

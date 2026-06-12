@@ -1171,9 +1171,8 @@
 		isolation: isolate;
 	}
 
-	/* The panel's own background already dims its top; this once stacked a second near-opaque
-	   fade on it (combined ≈0.98 alpha) whose 44→76% stops drew a visible band edge — read as a
-	   dark box behind the medallion. Keep only the gold crown halo and a whisper of depth. */
+	/* The panel's own background already dims its top — anything heavier here reads as a dark
+	   box behind the medallion. Only the gold crown halo and a whisper of depth. */
 	.oracle-panel::before {
 		content: '';
 		position: absolute;

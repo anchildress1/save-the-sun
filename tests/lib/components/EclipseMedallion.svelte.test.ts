@@ -1,7 +1,11 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
 import EclipseMedallion from '$lib/components/EclipseMedallion.svelte';
-import { MEDALLION_LABEL, type MedallionState } from '$lib/components/medallionState';
+import {
+	MEDALLION_LABEL,
+	SPRITE_LEVELS,
+	type MedallionState
+} from '$lib/components/medallionState';
 
 // The browser context runs with reducedMotion: 'reduce' (vite.config.ts), so every assertion
 // here describes the reduced-motion contract: static glow intensities, no pulse/orbit.
@@ -64,8 +68,6 @@ describe('EclipseMedallion — state visuals', () => {
 		const { button } = renderMedallion('asleep');
 		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('1');
 		expect(getComputedStyle(layer(button, '.wolf-eyes')).opacity).toBe('0');
-		// The sprite's eclipsed-sun frame carries the asleep look — no shadow layer on top.
-		expect(button.querySelector('.shadow-bite')).toBeNull();
 	});
 
 	it('kindles the corona while waking — pending, not asleep', () => {
@@ -117,6 +119,32 @@ describe('EclipseMedallion — voice level strip disc', () => {
 	])('points $state (amp $amplitude) at strip level $level', ({ state, amplitude, level }) => {
 		const { button } = renderMedallion(state, amplitude);
 		expect(button.style.getPropertyValue('--sprite-level')).toBe(level);
+	});
+
+	it('derives the strip geometry from SPRITE_LEVELS — the CSS cannot drift from the constant', () => {
+		const { button } = renderMedallion('speaking');
+		const disc = getComputedStyle(layer(button, '.disc'));
+		expect(disc.backgroundSize).toBe(`${SPRITE_LEVELS * 100}% 100%`);
+		// Peak level resolves to the strip's last frame; asleep to its first.
+		expect(disc.backgroundPosition).toBe('100% 0%');
+		const asleep = renderMedallion('asleep');
+		expect(getComputedStyle(layer(asleep.button, '.disc')).backgroundPosition).toBe('0% 0%');
+	});
+
+	it('loads the strip through the setTimeout fallback when requestIdleCallback is missing', async () => {
+		const original = window.requestIdleCallback;
+		// @ts-expect-error -- removing the API entirely; stubbing undefined won't beat `in window`
+		delete window.requestIdleCallback;
+		try {
+			const { button } = renderMedallion('asleep');
+			await vi.waitFor(
+				() =>
+					expect(layer(button, '.disc').style.backgroundImage).toContain('voice-medallion-levels'),
+				{ timeout: 3000 }
+			);
+		} finally {
+			window.requestIdleCallback = original;
+		}
 	});
 
 	it('freezes the playback loop under reduced motion — the static level stands in', () => {

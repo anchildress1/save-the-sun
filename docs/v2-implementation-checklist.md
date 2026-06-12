@@ -1,7 +1,7 @@
 # Save the Sun — v2 Implementation Checklist (Voice Story Order) 🎫
 
 > Implementation units for AI agents. Source of truth: `voice-interaction-spec.md`. Refs = requirement IDs there.
-> Config constants: Oracle voice `Gacrux` (verified on Live 2026-06-11 — `Kore` fallback not needed), Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, silence timeout 8000ms.
+> Config constants: Oracle voice `Gacrux` (verified on Live 2026-06-11 — `Kore` fallback not needed), Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, silence timeout 5000ms.
 
 ---
 

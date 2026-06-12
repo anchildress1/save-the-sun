@@ -79,13 +79,13 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 		expect(order.indexOf('eclipse-medallion')).toBeLessThan(order.indexOf('turn-pill'));
 	});
 
-	it('stacks the medallion above the panel dimming veil — the page selector cannot reach it', async () => {
-		// The panel raises its own children over its ::before overlay, but that page-scoped rule
-		// can't match this component's markup; without its own z-index the art renders dimmed.
+	it('stacks the medallion above the panel dimming veil', async () => {
+		// The page lifts panel children over the ::before overlay; the voice stack (the
+		// medallion's page-scoped parent) must be among them or the art renders dimmed.
 		const screen = render(Page, pageProps);
-		const wrap = screen.container.querySelector('.medallion-wrap')!;
-		expect(getComputedStyle(wrap).position).toBe('relative');
-		expect(Number(getComputedStyle(wrap).zIndex)).toBeGreaterThanOrEqual(2);
+		const stack = screen.container.querySelector('.voice-stack')!;
+		expect(getComputedStyle(stack).position).toBe('relative');
+		expect(Number(getComputedStyle(stack).zIndex)).toBeGreaterThanOrEqual(2);
 	});
 
 	it('wakes the session on a tap while asleep', async () => {
@@ -142,7 +142,11 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 		});
 		const screen = render(Page, pageProps);
 		await screen.getByTestId('eclipse-medallion').click();
-		await expect.element(screen.getByTestId('voice-notice')).toBeInTheDocument();
+		// The notice must survive the session's trailing asleep event — a "reset everything on
+		// asleep" refactor would blank every failure microseconds after it lands.
+		await expect
+			.element(screen.getByTestId('voice-notice'))
+			.toHaveTextContent('The fire does not carry your voice tonight. The rite continues by hand.');
 		await screen.getByTestId('eclipse-medallion').click();
 		expect(voiceMock.wake).toHaveBeenCalledTimes(2);
 		expect(voiceMock.sleep).not.toHaveBeenCalled();

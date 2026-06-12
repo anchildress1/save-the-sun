@@ -4,6 +4,7 @@
 		MEDALLION_ANNOUNCEMENT,
 		MEDALLION_LABEL,
 		RING_RUNES,
+		SPRITE_LEVELS,
 		flareLevel,
 		spriteLevel,
 		type MedallionState
@@ -53,13 +54,15 @@
 		data-testid="eclipse-medallion"
 		data-voice-state={current}
 		aria-label={MEDALLION_LABEL[current]}
-		style="--flare: {flare}; --ring-step: {360 / RING_RUNES.length}deg; --sprite-level: {level}"
+		style="--flare: {flare}; --ring-step: {360 /
+			RING_RUNES.length}deg; --sprite-level: {level}; --sprite-size: {SPRITE_LEVELS *
+			100}%; --sprite-peak: {SPRITE_LEVELS - 1}"
 		onclick={onToggle}
 	>
 		<span class="visual" aria-hidden="true">
 			<span class="corona"></span>
 			<span class="clip">
-				<!-- The disc renders the 6-level volume strip (docs/ui-image-resources.md): static
+				<!-- The disc renders the 12-level volume strip (docs/ui-image-resources.md): static
 				     level per state, flare-indexed on hearing, ping-pong loop while a voice plays. -->
 				<span class="disc" style={stripUrl ? `background-image: url(${stripUrl})` : ''}></span>
 				<span class="rune-ring">
@@ -92,12 +95,7 @@
 </div>
 
 <style>
-	/* The Oracle panel dims its own top with a ::before overlay (z-index 1) and raises its
-	   children above it — but that page-scoped selector can't reach this component's markup,
-	   so the medallion must claim its own place above the veil or it renders under it. */
 	.medallion-wrap {
-		position: relative;
-		z-index: 2;
 		display: flex;
 		justify-content: center;
 	}
@@ -157,16 +155,16 @@
 		overflow: hidden;
 	}
 
-	/* The 6-level volume strip, sized so exactly one frame fills the disc. The position
-	   fraction divides by (levels - 1) because N background-position stops span 0–100% in
-	   N-1 steps. Inline --sprite-level picks the static frame; the looping states' animations
-	   below override it (animations outrank inline styles in the cascade). */
+	/* Strip geometry rides the inline vars derived from SPRITE_LEVELS — one source of truth.
+	   The position fraction divides by the peak because N background-position stops span
+	   0–100% in N-1 steps. The looping states' animations below override the static frame
+	   (animations outrank inline styles in the cascade). */
 	.disc {
 		position: absolute;
 		inset: 0;
 		border-radius: 50%;
-		background-size: 1200% 100%;
-		background-position: calc(var(--sprite-level) * 100% / 11) 0%;
+		background-size: var(--sprite-size) 100%;
+		background-position: calc(var(--sprite-level) * 100% / var(--sprite-peak)) 0%;
 	}
 
 	/* The strip is a monotonic 0→11 intensity ramp, so alternate plays it as a breath:
@@ -349,7 +347,7 @@
 	@media (prefers-reduced-motion: reduce) {
 		/* Selector specificity must match the per-state rules above, or their animation
 		   shorthand would win and the pulse/orbit would survive reduced motion. The disc
-		   freezes on its inline static frame (spriteFrame's reduced-motion fallback). */
+		   freezes on its inline static frame (spriteLevel's reduced-motion fallback). */
 		.medallion[data-voice-state] .corona,
 		.medallion[data-voice-state] .rune-ring,
 		.medallion[data-voice-state] .disc {
