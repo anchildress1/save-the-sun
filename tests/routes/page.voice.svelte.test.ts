@@ -79,6 +79,15 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 		expect(order.indexOf('eclipse-medallion')).toBeLessThan(order.indexOf('turn-pill'));
 	});
 
+	it('stacks the medallion above the panel dimming veil — the page selector cannot reach it', async () => {
+		// The panel raises its own children over its ::before overlay, but that page-scoped rule
+		// can't match this component's markup; without its own z-index the art renders dimmed.
+		const screen = render(Page, pageProps);
+		const wrap = screen.container.querySelector('.medallion-wrap')!;
+		expect(getComputedStyle(wrap).position).toBe('relative');
+		expect(Number(getComputedStyle(wrap).zIndex)).toBeGreaterThanOrEqual(2);
+	});
+
 	it('wakes the session on a tap while asleep', async () => {
 		const screen = render(Page, pageProps);
 		await screen.getByTestId('eclipse-medallion').click();

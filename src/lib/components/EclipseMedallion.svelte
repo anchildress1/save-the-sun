@@ -86,7 +86,12 @@
 </div>
 
 <style>
+	/* The Oracle panel dims its own top with a ::before overlay (z-index 1) and raises its
+	   children above it — but that page-scoped selector can't reach this component's markup,
+	   so the medallion must claim its own place above the veil or it renders under it. */
 	.medallion-wrap {
+		position: relative;
+		z-index: 2;
 		display: flex;
 		justify-content: center;
 	}
