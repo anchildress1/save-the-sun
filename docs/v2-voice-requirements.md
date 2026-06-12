@@ -84,9 +84,9 @@ Ask, Hex, Scry, Pass, and Cast the Rune are exposed to the Oracle session as fun
 **R4 — Confirmation for destructive actions.**
 Hex and Cast the Rune require a spoken confirmation exchange before the engine executes.
 
-- [ ] Given the player says "cast Sowilo," then the Oracle asks for confirmation and executes only on an affirmative reply.
-- [ ] Given the player declines or stays silent through the timeout, then nothing executes.
-- [ ] Given a rune is cast, when the player attempts to retract it by voice, then the Oracle refuses in character—the cast is committed and irreversible. Her system instruction covers this ("the rune is cast; what is written in fire does not unwrite").
+- [x] Given the player says "cast Sowilo," then the Oracle asks for confirmation and executes only on an affirmative reply.
+- [x] Given the player declines or stays silent through the timeout, then nothing executes.
+- [x] Given a rune is cast, when the player attempts to retract it by voice, then the Oracle refuses in character—the cast is committed and irreversible. Her system instruction covers this ("the rune is cast; what is written in fire does not unwrite").
 
 **R5 — Cast is uninterruptible.**
 Per game rules, Hex targets an Ask and a Cast cannot be interrupted.

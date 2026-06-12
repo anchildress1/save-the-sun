@@ -83,6 +83,17 @@ A voiced action calls the same engine function as its button, and the Oracle voi
 | Any move after the round resolves | "The longest day is decided. Begin another night to play again." |
 | Cast of a rune not on the board | "No rune named {name} lies on the board." |
 
+### Destructive confirmation (voice, S8)
+
+A spoken hex or cast never executes on the first call: the rite answers with a confirmation question instead (the tool result, voiced in her register — never shown in the panel), and only the player's spoken affirmation lets the second call through. Decline or silence lets it lie. The cast question is per rune; naming a different rune asks again.
+
+| Trigger | Line |
+|---|---|
+| Hex, first call | "His question dies unanswered and the hex is spent. Say it plain: shall I hex him?" |
+| Cast, first call | "{Rune}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?" |
+
+Retraction is refused in character — the persona carries the doctrine verbatim: *"What is written in fire does not unwrite. The rune stands."*
+
 ### Interpretation echo (public, before the answer)
 Pattern: **`You ask after {paraphrase}.`**—then a held beat, then the answer.
 

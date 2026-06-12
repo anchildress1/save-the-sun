@@ -73,10 +73,10 @@ Declare five functions on the Live session: `ask`, `hex`, `scry`, `pass`, `cast_
 
 ### S8 — Destructive action confirmation (R4)
 
-- [ ] `hex` and `cast_rune` tool calls gate behind spoken confirmation exchange; execute only on affirmative
-- [ ] Decline or silence through timeout → no execution
-- [ ] Post-cast retraction attempts → Oracle refuses in character; system instruction includes irreversibility doctrine ("the rune is cast; what is written in fire does not unwrite")
-- [ ] Client-side gate is authoritative—model cannot execute unconfirmed destructive calls even if it tries
+- [x] `hex` and `cast_rune` tool calls gate behind spoken confirmation exchange; execute only on affirmative — two-phase gate in the page executor: the first call arms it and returns the confirmation question as the tool result (lines in `ux-copy.md` §1); the matching second call executes. Cast confirmation is per rune — naming a different rune re-arms
+- [x] Decline or silence through timeout → no execution — the gate disarms when her second turn passes without the call (decline), on any tool call that isn't the clean matching confirm (other tools, guard lines, unknown runes), on any board move, and whenever the session sleeps (silence timeout is a full sleep, S5)
+- [x] Post-cast retraction attempts → Oracle refuses in character; system instruction includes irreversibility doctrine ("the rune is cast; what is written in fire does not unwrite")
+- [x] Client-side gate is authoritative—model cannot execute unconfirmed destructive calls even if it tries — the confirming call is refused unless an input transcript arrived since arming, so a double-call in one breath only re-asks
 - Depends: S7
 
 ### S9 — Cast lockout (R5)
