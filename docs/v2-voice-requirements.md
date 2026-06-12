@@ -91,8 +91,8 @@ Hex and Cast the Rune require a spoken confirmation exchange before the engine e
 **R5 — Cast is uninterruptible.**
 Per game rules, Hex targets an Ask and a Cast cannot be interrupted.
 
-- [ ] Given a Cast is executing, when voice commands arrive, then they are rejected with an in-character Oracle line; the Cast completes regardless.
-- [ ] Barge-in interrupts the Oracle's speech only—never a committed engine action.
+- [x] Given a Cast is executing, when voice commands arrive, then they are rejected with an in-character Oracle line; the Cast completes regardless.
+- [x] Barge-in interrupts the Oracle's speech only—never a committed engine action.
 
 **R6 — Eclipse medallion: control + indicator.**
 A medallion at the top of the Oracle panel is both the voice toggle and the state display. Static art, animated light: the artwork never deforms; only glow layers animate.

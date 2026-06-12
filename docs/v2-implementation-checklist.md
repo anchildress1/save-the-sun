@@ -81,8 +81,8 @@ Declare five functions on the Live session: `ask`, `hex`, `scry`, `pass`, `cast_
 
 ### S9 — Cast lockout (R5)
 
-- [ ] During Cast execution: voice commands rejected with in-character Oracle line; Cast completes regardless
-- [ ] Barge-in stops Oracle audio only—never cancels a committed engine action
+- [x] During Cast execution: voice commands rejected with in-character Oracle line; Cast completes regardless — a `casting` flag wraps the cast's engine round-trip (board- and voice-made alike); the executor answers every voiced command in that window with the lockout line (`ux-copy.md` §1, "The cast is sacred. Hold."), checked ahead of every guard and the S8 gate, and nothing can abort the dispatch
+- [x] Barge-in stops Oracle audio only—never cancels a committed engine action — landed with S7 at the session (`interrupted` only stops the speaker; `toolCallCancellation` drops the answer, never the action); S9 pins it at the page too: barge-in events mid-cast leave the round-trip to complete
 - Depends: S7
 
 ### S10 — Transcripts to text (R10)

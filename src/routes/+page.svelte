@@ -67,6 +67,9 @@
 		noReactionWindow: 'Sköll asks nothing. There is no question to scry, hex, or pass.',
 		riteDone: 'The longest day is decided. Begin another night to play again.',
 		unknownRune: (name: string) => `No rune named ${name} lies on the board.`,
+		// Cast lockout (S9, R5): while a cast's engine round-trip is in flight, every voiced
+		// command answers with this and dispatches nothing — the cast completes regardless.
+		castSacred: 'The cast is sacred. Hold.',
 		// Spoken-move confirmations (S8): voiced by the Oracle as the tool result when a
 		// destructive call arms the gate — like the guards, never shown in the panel.
 		confirmHex: 'His question dies unanswered and the hex is spent. Say it plain: shall I hex him?',
@@ -204,6 +207,11 @@
 	// arming (the confirmation question itself); a second turn while it is set means the exchange
 	// ended without the call (a decline), so the gate disarms.
 	let voiceConfirm: { name: string; rune?: string; heard: boolean; spoke: boolean } | null = null;
+
+	// S9 (R5): true only while a cast's engine round-trip is in flight — board- or voice-made.
+	// The executor rejects every voiced command for this window; nothing can cancel the cast
+	// itself (barge-in only stops her audio, and the session never aborts a running executor).
+	let casting = false;
 
 	function onVoiceEvent(event: VoiceEvent) {
 		switch (event.type) {
@@ -626,6 +634,7 @@
 
 	// Never throws — see performAsk.
 	async function performCast(runeName: string): Promise<string> {
+		casting = true;
 		try {
 			const { cast, state } = await dispatch({
 				type: 'Cast',
@@ -647,6 +656,9 @@
 			answer = RITE.castFalters;
 			return RITE.castFalters;
 		} finally {
+			// Released here, not in the callers: the lockout covers exactly the cast dispatch.
+			// The wolf's follow-on move falls under the ordinary pending guard.
+			casting = false;
 			cancelCast();
 		}
 	}
@@ -685,6 +697,9 @@
 		// stale affirmation must never carry over to execute a later call.
 		const armed = voiceConfirm;
 		voiceConfirm = null;
+		// S9 (R5): the cast lockout outranks every guard and the gate — checked after the
+		// capture above so the armed exchange still dies, but before anything else can answer.
+		if (casting) return RITE.castSacred;
 		if (name === 'ask') {
 			const question = typeof args.question === 'string' ? args.question.trim() : '';
 			if (question === '') return RITE.emptyAsk;
