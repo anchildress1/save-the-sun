@@ -42,9 +42,9 @@ Medallion at top of Oracle panel = voice toggle + state display. Static art, ani
 
 ### S4 — Permission + device failure (R1)
 
-- [ ] Mic permission denied → medallion enters permanent inert eclipsed state, one quiet notice, never re-prompts that session
-- [ ] No mic device → same path
-- [ ] Button game fully unaffected in both cases
+- [x] Mic permission denied → medallion enters permanent inert eclipsed state, one quiet notice, never re-prompts that session
+- [x] No mic device → same path
+- [x] Button game fully unaffected in both cases
 - Depends: S2, S3
 
 ### S5 — Silence timeout (R7)
