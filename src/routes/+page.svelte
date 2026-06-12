@@ -667,17 +667,6 @@
 		</section>
 
 		<aside class="oracle-panel">
-			<!-- The moon from the same art, ghosted behind the controls. -->
-			<img
-				class="skoll-moon"
-				src={skollBanner}
-				width="768"
-				height="1376"
-				alt=""
-				aria-hidden="true"
-				decoding="async"
-				fetchpriority="low"
-			/>
 			<div class="voice-stack">
 				<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
 				<!-- Always mounted (a live region born with content is skipped by screen readers) and
@@ -850,17 +839,28 @@
 				{/if}
 			</div>
 
-			<!-- Decorative, in flow: the wolf's nose rides just under the cast controls. -->
-			<img
-				class="skoll-banner"
-				src={skollBanner}
-				width="768"
-				height="1376"
-				alt=""
-				aria-hidden="true"
-				decoding="async"
-				fetchpriority="low"
-			/>
+			<!-- Decorative, in flow: the wolf's nose rides just under the cast controls, and the
+			     moon ghosts up from the banner's top edge behind them. -->
+			<div class="skoll-art" aria-hidden="true">
+				<img
+					class="skoll-moon"
+					src={skollBanner}
+					width="768"
+					height="1376"
+					alt=""
+					decoding="async"
+					fetchpriority="low"
+				/>
+				<img
+					class="skoll-banner"
+					src={skollBanner}
+					width="768"
+					height="1376"
+					alt=""
+					decoding="async"
+					fetchpriority="low"
+				/>
+			</div>
 		</aside>
 	</div>
 </main>
@@ -1185,29 +1185,36 @@
 		pointer-events: none;
 	}
 
+	/* Bleeds past the panel padding; relative so the moon anchors to the banner, not the panel —
+	   percentage-of-panel positioning put the moon behind the opaque wolf on tall viewports. */
+	.skoll-art {
+		position: relative;
+		width: calc(100% + 2.2rem);
+		margin: 0 -1.1rem;
+	}
+
 	.skoll-moon {
 		position: absolute;
-		top: 47%;
+		bottom: calc(100% - 2rem);
 		left: 0;
-		z-index: 0;
 		width: 100%;
-		height: 42%;
+		height: 10rem;
 		object-fit: cover;
 		object-position: 50% 0%;
 		opacity: 0.6;
 		filter: brightness(1.35);
-		mask-image: linear-gradient(180deg, transparent 0%, black 8%, black 58%, transparent 92%);
+		mask-image: linear-gradient(180deg, transparent 0%, black 30%, black 80%, transparent 100%);
 		-webkit-mask-image: linear-gradient(
 			180deg,
 			transparent 0%,
-			black 8%,
-			black 58%,
-			transparent 92%
+			black 30%,
+			black 80%,
+			transparent 100%
 		);
 		pointer-events: none;
 	}
 
-	.oracle-panel > :not(.skoll-banner):not(.skoll-moon) {
+	.oracle-panel > :not(.skoll-art) {
 		position: relative;
 		z-index: 2;
 	}
@@ -1495,9 +1502,7 @@
 
 	.skoll-banner {
 		display: block;
-		/* Bleed to the panel edges past its side padding. */
-		width: calc(100% + 2.2rem);
-		margin: 0 -1.1rem;
+		width: 100%;
 		/* The bottom band of the art, sized so the wolf's nose tip sits at the top edge —
 		   directly under the cast controls in flow. */
 		height: 28.25rem;
