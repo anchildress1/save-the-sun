@@ -200,9 +200,9 @@
 
 	// S8: the armed confirmation for a destructive tool call (hex, cast_rune). `heard` flips when
 	// the player speaks after arming — the confirming call is refused without it, so the model can
-	// never execute both phases in one breath. `spoke` counts the Oracle's turns since arming: her
-	// first is the confirmation question itself; a second means the exchange ended without the
-	// call (a decline), so the gate disarms.
+	// never execute both phases in one breath. `spoke` flips on the Oracle's first turn since
+	// arming (the confirmation question itself); a second turn while it is set means the exchange
+	// ended without the call (a decline), so the gate disarms.
 	let voiceConfirm: { name: string; rune?: string; heard: boolean; spoke: boolean } | null = null;
 
 	function onVoiceEvent(event: VoiceEvent) {

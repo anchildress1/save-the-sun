@@ -9,5 +9,5 @@
 - [ ] Fine-tune Sköll prompt to allow for wins between 7.5-9 turns with randomizer. Keep metrics output as corpus.
 - [ ] Add session scoping to the /debug screen
 - [ ] Add architecture diagrams
-- [ ] Fix reload bug where page resets and interrupts state of the wolfs turn. we never get the update, so what happens?
+- [ ] Fix reload bug where page resets and interrupts state of the wolf's turn. We never get the update, so what happens?
 - [ ] Change "Your Move" pill color on opponent turn
