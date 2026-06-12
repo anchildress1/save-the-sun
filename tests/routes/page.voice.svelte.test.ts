@@ -344,6 +344,7 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
 		expect(consoleError).not.toHaveBeenCalled();
+		consoleError.mockRestore(); // resetAllMocks never uninstalls a spy — don't leak it
 	});
 
 	it('ignores an event type it does not know — a newer session must not crash an older page', async () => {
@@ -1176,6 +1177,7 @@ describe('Save the Sun page — cast lockout (S9)', () => {
 		const outcome = await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
 		expect(outcome).toBe(askAnswer);
 		expect(consoleError).toHaveBeenCalled();
+		consoleError.mockRestore(); // resetAllMocks never uninstalls a spy — don't leak it
 	});
 
 	it('no stale affirmation survives the cast — the post-cast call re-asks, never executes', async () => {
