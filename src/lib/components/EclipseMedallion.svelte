@@ -239,7 +239,7 @@
 		width: 1.6rem;
 		height: 1.6rem;
 		transform: translate(-50%, -50%);
-		stroke: rgba(233, 200, 119, 0.55);
+		stroke: rgba(233, 200, 119, 0.9);
 		fill: none;
 		stroke-width: 1.6;
 		stroke-linecap: round;
