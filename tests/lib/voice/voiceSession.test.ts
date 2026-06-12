@@ -13,11 +13,20 @@ const sdk = vi.hoisted(() => {
 	});
 	return { connect, GoogleGenAI };
 });
-vi.mock('@google/genai', () => ({ GoogleGenAI: sdk.GoogleGenAI, Modality: { AUDIO: 'AUDIO' } }));
+vi.mock('@google/genai', () => ({
+	GoogleGenAI: sdk.GoogleGenAI,
+	Modality: { AUDIO: 'AUDIO' },
+	// oraclePersona builds its tool declarations from the enum — the mock must carry it.
+	Type: { OBJECT: 'OBJECT', STRING: 'STRING' }
+}));
 
 import { createVoiceSession, type VoiceEvent, type VoiceSession } from '$lib/voice/voiceSession';
 import { LIVE_MODEL, ORACLE_VOICE } from '$lib/voice/config';
-import { ORACLE_INVITATION_TRIGGER, ORACLE_SYSTEM_INSTRUCTION } from '$lib/voice/oraclePersona';
+import {
+	ORACLE_INVITATION_TRIGGER,
+	ORACLE_SYSTEM_INSTRUCTION,
+	ORACLE_TOOL_DECLARATIONS
+} from '$lib/voice/oraclePersona';
 
 interface Callbacks {
 	onmessage: (message: unknown) => void;
@@ -43,6 +52,7 @@ let callbacks: Callbacks | undefined;
 let liveSession: {
 	sendRealtimeInput: ReturnType<typeof vi.fn>;
 	sendClientContent: ReturnType<typeof vi.fn>;
+	sendToolResponse: ReturnType<typeof vi.fn>;
 	close: ReturnType<typeof vi.fn>;
 };
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -87,7 +97,12 @@ beforeEach(() => {
 		drain: undefined
 	};
 	audio.createSpeaker.mockReturnValue(speaker);
-	liveSession = { sendRealtimeInput: vi.fn(), sendClientContent: vi.fn(), close: vi.fn() };
+	liveSession = {
+		sendRealtimeInput: vi.fn(),
+		sendClientContent: vi.fn(),
+		sendToolResponse: vi.fn(),
+		close: vi.fn()
+	};
 	sdk.connect.mockImplementation(async ({ callbacks: registered }: { callbacks: Callbacks }) => {
 		callbacks = registered;
 		return liveSession;
@@ -1493,5 +1508,220 @@ describe('voiceSession failures', () => {
 		});
 		vs.sleep();
 		expect(vs.state).toBe('asleep');
+	});
+});
+
+describe('voiceSession engine tools (S7)', () => {
+	it('declares the five engine tools on connect — the same actions the buttons answer to', async () => {
+		await awaken();
+		expect(sdk.connect.mock.calls[0][0].config.tools).toEqual([
+			{ functionDeclarations: ORACLE_TOOL_DECLARATIONS }
+		]);
+		expect(ORACLE_TOOL_DECLARATIONS.map((d) => d.name)).toEqual([
+			'ask',
+			'scry',
+			'hex',
+			'pass',
+			'cast_rune'
+		]);
+	});
+
+	it('carries a tool call to the executor and answers with its outcome', async () => {
+		await awaken();
+		const executor = vi.fn(async () => 'Yes. Sól is reaching for a fire rune.');
+		vs.setToolExecutor(executor);
+		callbacks!.onmessage({
+			toolCall: { functionCalls: [{ id: 'c1', name: 'ask', args: { question: 'is it fire?' } }] }
+		});
+		// The engine round-trip waits in thinking: the silence clock is paused, the medallion orbits.
+		expect(vs.state).toBe('thinking');
+		await vi.advanceTimersByTimeAsync(0);
+		expect(executor).toHaveBeenCalledExactlyOnceWith({
+			name: 'ask',
+			args: { question: 'is it fire?' }
+		});
+		expect(liveSession.sendToolResponse).toHaveBeenCalledExactlyOnceWith({
+			functionResponses: [
+				{ id: 'c1', name: 'ask', response: { output: 'Yes. Sól is reaching for a fire rune.' } }
+			]
+		});
+		// The voiced outcome is still owed — the turn stays with the model.
+		expect(vs.state).toBe('thinking');
+	});
+
+	it('answers each call of a batch independently', async () => {
+		await awaken();
+		vs.setToolExecutor(async ({ name }) => `${name} done`);
+		callbacks!.onmessage({
+			toolCall: {
+				functionCalls: [
+					{ id: 'c1', name: 'pass', args: {} },
+					{ id: 'c2', name: 'scry', args: {} }
+				]
+			}
+		});
+		await vi.advanceTimersByTimeAsync(0);
+		expect(liveSession.sendToolResponse).toHaveBeenCalledTimes(2);
+		expect(liveSession.sendToolResponse).toHaveBeenCalledWith({
+			functionResponses: [{ id: 'c1', name: 'pass', response: { output: 'pass done' } }]
+		});
+		expect(liveSession.sendToolResponse).toHaveBeenCalledWith({
+			functionResponses: [{ id: 'c2', name: 'scry', response: { output: 'scry done' } }]
+		});
+	});
+
+	it('answers a throwing executor with the error — the model voices the failure, never hangs', async () => {
+		await awaken();
+		vs.setToolExecutor(async () => {
+			throw new Error('the engine declined');
+		});
+		callbacks!.onmessage({ toolCall: { functionCalls: [{ id: 'c1', name: 'hex', args: {} }] } });
+		await vi.advanceTimersByTimeAsync(0);
+		expect(liveSession.sendToolResponse).toHaveBeenCalledExactlyOnceWith({
+			functionResponses: [{ id: 'c1', name: 'hex', response: { error: 'the engine declined' } }]
+		});
+	});
+
+	it('answers with an error when no executor is registered', async () => {
+		await awaken();
+		callbacks!.onmessage({ toolCall: { functionCalls: [{ id: 'c1', name: 'pass', args: {} }] } });
+		await vi.advanceTimersByTimeAsync(0);
+		expect(liveSession.sendToolResponse).toHaveBeenCalledExactlyOnceWith({
+			functionResponses: [
+				{ id: 'c1', name: 'pass', response: { error: 'no tool executor registered' } }
+			]
+		});
+	});
+
+	it('drops the result when sleep lands mid-execution — never answers on a dead socket', async () => {
+		await awaken();
+		let settle!: (line: string) => void;
+		vs.setToolExecutor(
+			() =>
+				new Promise<string>((resolve) => {
+					settle = resolve;
+				})
+		);
+		callbacks!.onmessage({ toolCall: { functionCalls: [{ id: 'c1', name: 'pass', args: {} }] } });
+		vs.sleep();
+		settle('held');
+		await vi.advanceTimersByTimeAsync(0);
+		expect(liveSession.sendToolResponse).not.toHaveBeenCalled();
+	});
+
+	it('drops a result the model cancelled — the engine effect stands, only the answer dies', async () => {
+		await awaken();
+		let settle!: (line: string) => void;
+		vs.setToolExecutor(
+			() =>
+				new Promise<string>((resolve) => {
+					settle = resolve;
+				})
+		);
+		callbacks!.onmessage({
+			toolCall: { functionCalls: [{ id: 'c1', name: 'cast_rune', args: { rune: 'Sowilo' } }] }
+		});
+		callbacks!.onmessage({ toolCallCancellation: { ids: ['c1'] } });
+		settle('The rune is true.');
+		await vi.advanceTimersByTimeAsync(0);
+		expect(liveSession.sendToolResponse).not.toHaveBeenCalled();
+		expect(teeBodies().join(' ')).toContain('cancelled');
+	});
+
+	it('a throwing tool response send fails the session as a socket loss', async () => {
+		await awaken();
+		vs.setToolExecutor(async () => 'done');
+		liveSession.sendToolResponse.mockImplementation(() => {
+			throw new Error('socket is closed');
+		});
+		callbacks!.onmessage({ toolCall: { functionCalls: [{ id: 'c1', name: 'pass', args: {} }] } });
+		await vi.advanceTimersByTimeAsync(0);
+		expect(vs.state).toBe('asleep');
+		expect(events).toContainEqual({
+			type: 'error',
+			reason: 'socket',
+			notice: "The Oracle's voice falters. The rite continues by hand."
+		});
+	});
+
+	it('a tool call disarms the thinking rescue — the engine round-trip is the reply', async () => {
+		await awaken();
+		// Speech settles into thinking, arming the 10s rescue…
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
+		let settle!: (line: string) => void;
+		vs.setToolExecutor(
+			() =>
+				new Promise<string>((resolve) => {
+					settle = resolve;
+				})
+		);
+		callbacks!.onmessage({ toolCall: { functionCalls: [{ id: 'c1', name: 'pass', args: {} }] } });
+		// …but a slow engine must not be rescued out from under its own pending result.
+		await vi.advanceTimersByTimeAsync(15_000);
+		expect(vs.state).toBe('thinking');
+		settle('held');
+		await vi.advanceTimersByTimeAsync(0);
+		expect(liveSession.sendToolResponse).toHaveBeenCalledTimes(1);
+	});
+
+	it('re-arms the rescue after the result is sent — a dropped voicing settles to listening', async () => {
+		await awaken();
+		vs.setToolExecutor(async () => 'done');
+		callbacks!.onmessage({ toolCall: { functionCalls: [{ id: 'c1', name: 'pass', args: {} }] } });
+		await vi.advanceTimersByTimeAsync(0);
+		expect(vs.state).toBe('thinking');
+		await vi.advanceTimersByTimeAsync(10_000);
+		expect(vs.state).toBe('listening');
+	});
+});
+
+describe('voiceSession direct (S7)', () => {
+	const DIRECTION =
+		'(Stage direction: speak exactly this: "Yes. Sól is reaching for a fire rune.")';
+
+	it('sends the direction as one user turn and waits in thinking with the rescue armed', async () => {
+		await awaken();
+		vs.direct(DIRECTION);
+		expect(liveSession.sendClientContent).toHaveBeenCalledExactlyOnceWith({
+			turns: [{ role: 'user', parts: [{ text: DIRECTION }] }],
+			turnComplete: true
+		});
+		expect(vs.state).toBe('thinking');
+		await vi.advanceTimersByTimeAsync(10_000);
+		expect(vs.state).toBe('listening');
+	});
+
+	it('is a no-op while asleep', () => {
+		vs.direct(DIRECTION);
+		expect(liveSession.sendClientContent).not.toHaveBeenCalled();
+		expect(vs.state).toBe('asleep');
+	});
+
+	it('drops the direction while the Oracle is mid-turn — never talks over a turn in flight', async () => {
+		await awaken();
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
+		vs.direct(DIRECTION);
+		expect(liveSession.sendClientContent).not.toHaveBeenCalled();
+		expect(teeBodies().join(' ')).toContain('direction dropped');
+	});
+
+	it('a throwing send fails the session as a socket loss', async () => {
+		await awaken();
+		liveSession.sendClientContent.mockImplementation(() => {
+			throw new Error('socket is closed');
+		});
+		vs.direct(DIRECTION);
+		expect(vs.state).toBe('asleep');
+		expect(events).toContainEqual({
+			type: 'error',
+			reason: 'socket',
+			notice: "The Oracle's voice falters. The rite continues by hand."
+		});
 	});
 });

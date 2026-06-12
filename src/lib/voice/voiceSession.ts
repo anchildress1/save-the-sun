@@ -6,12 +6,17 @@
 import {
 	GoogleGenAI,
 	Modality,
+	type FunctionCall,
 	type LiveServerMessage,
 	type Part,
 	type Session
 } from '@google/genai';
 import { LIVE_MODEL, MIC_SAMPLE_RATE, ORACLE_VOICE } from '$lib/voice/config';
-import { ORACLE_INVITATION_TRIGGER, ORACLE_SYSTEM_INSTRUCTION } from '$lib/voice/oraclePersona';
+import {
+	ORACLE_INVITATION_TRIGGER,
+	ORACLE_SYSTEM_INSTRUCTION,
+	ORACLE_TOOL_DECLARATIONS
+} from '$lib/voice/oraclePersona';
 import {
 	createSpeaker,
 	openMic,
@@ -44,6 +49,14 @@ export type VoiceEvent =
 
 export type VoiceListener = (event: VoiceEvent) => void;
 
+export interface VoiceToolCall {
+	name: string;
+	args: Record<string, unknown>;
+}
+
+/** Executes one model tool call against the game; resolves to the outcome line the model voices. */
+export type VoiceToolExecutor = (call: VoiceToolCall) => Promise<string>;
+
 export interface VoiceSession {
 	/** Open the Live session: mic, token, socket. Resolves once listening — or thinking, when
 	 * the wake carries the round's first-wake invitation (S6) — or after the wake fails or is
@@ -52,6 +65,15 @@ export interface VoiceSession {
 	wake(options?: { invitation?: boolean }): Promise<void>;
 	/** Close everything and return to asleep. Safe in any state; eclipsed stays sealed. */
 	sleep(): void;
+	/** Register the executor behind the session's declared tools (S7). The session only carries
+	 * calls over and outcomes back; the game lives with the registrant. While unset, calls
+	 * answer with an error so the model never hangs on a missing result. */
+	setToolExecutor(executor: VoiceToolExecutor | null): void;
+	/** Have the Oracle speak a board-made line: sends `text` as one stage-direction turn and
+	 * waits in thinking. A no-op unless idle (listening/hearing) — mid-thought or mid-speech a
+	 * second queued turn would talk over the one in flight, and the panel already carries the
+	 * line. A throwing send means the socket is dead — fails the session. */
+	direct(text: string): void;
 	readonly state: VoiceState;
 	readonly notice: string | null;
 	subscribe(listener: VoiceListener): () => void;
@@ -99,6 +121,9 @@ export function createVoiceSession(): VoiceSession {
 	let mintedToken = '';
 	let transcriptIn = '';
 	let transcriptOut = '';
+	let toolExecutor: VoiceToolExecutor | null = null;
+	// Calls the model cancelled (barge-in) while their engine round-trip was still in flight.
+	const cancelledToolIds = new Set<string>();
 	const listeners = new Set<VoiceListener>();
 
 	function emit(event: VoiceEvent): void {
@@ -160,6 +185,7 @@ export function createVoiceSession(): VoiceSession {
 		lastAmplitude = 0;
 		clearTimers();
 		sendFailureTeed = false;
+		cancelledToolIds.clear();
 		setupResolver?.(false);
 		setupResolver = null;
 		mic?.stop();
@@ -276,6 +302,11 @@ export function createVoiceSession(): VoiceSession {
 			setupResolver = null;
 			return;
 		}
+		if (message.toolCall?.functionCalls?.length) onToolCall(message.toolCall.functionCalls);
+		if (message.toolCallCancellation?.ids?.length) {
+			for (const id of message.toolCallCancellation.ids) cancelledToolIds.add(id);
+			teeDebug('info', `tool calls cancelled: ${message.toolCallCancellation.ids.join(', ')}`);
+		}
 		const content = message.serverContent;
 		if (!content) return;
 		if (content.interrupted) {
@@ -344,6 +375,70 @@ export function createVoiceSession(): VoiceSession {
 		if (!awaitingDrain) return;
 		awaitingDrain = false;
 		if (state === 'speaking') toState('listening');
+	}
+
+	// The tool call IS the model's reply — disarm the rescue and hold thinking (clock paused)
+	// through the engine round-trip; it re-arms once the result is sent and she owes speech again.
+	// Calls answer independently, so one slow action never holds another's result.
+	function onToolCall(calls: FunctionCall[]): void {
+		if (thinkingRescueTimer) clearTimeout(thinkingRescueTimer);
+		thinkingRescueTimer = null;
+		toState('thinking');
+		for (const call of calls) void runToolCall(call, generation);
+	}
+
+	async function runToolCall(call: FunctionCall, myGeneration: number): Promise<void> {
+		const name = call.name ?? '';
+		teeDebug('info', `tool call: ${name}(${JSON.stringify(call.args ?? {})})`);
+		let response: Record<string, unknown>;
+		try {
+			if (!toolExecutor) throw new Error('no tool executor registered');
+			response = { output: await toolExecutor({ name, args: call.args ?? {} }) };
+		} catch (err) {
+			// The model voices the failure in character; the truth is "the move did not land."
+			response = { error: err instanceof Error ? err.message : String(err) };
+		}
+		// Slept or failed while the engine worked: the action stands (committed server-side),
+		// but this socket is gone — there is nothing left to answer.
+		if (generation !== myGeneration || !session) return;
+		if (call.id && cancelledToolIds.delete(call.id)) {
+			// Barge-in cancelled the call. The engine effect stands (a committed action is never
+			// rolled back); only the answer is dropped — the model has already moved on.
+			teeDebug('info', `tool result dropped — ${name} was cancelled`);
+			return;
+		}
+		try {
+			session.sendToolResponse({
+				functionResponses: [{ ...(call.id && { id: call.id }), name, response }]
+			});
+		} catch (err) {
+			fail(
+				'socket',
+				`tool response send failed: ${err instanceof Error ? err.message : String(err)}`
+			);
+			return;
+		}
+		teeDebug('info', `tool result: ${name} → ${JSON.stringify(response)}`);
+		if (state === 'thinking') armThinkingRescue();
+	}
+
+	function direct(text: string): void {
+		if (!liveReady || !session) return;
+		if (state !== 'listening' && state !== 'hearing') {
+			teeDebug('info', `direction dropped while ${state}`);
+			return;
+		}
+		try {
+			session.sendClientContent({
+				turns: [{ role: 'user', parts: [{ text }] }],
+				turnComplete: true
+			});
+		} catch (err) {
+			fail('socket', `direction send failed: ${err instanceof Error ? err.message : String(err)}`);
+			return;
+		}
+		toState('thinking');
+		armThinkingRescue();
 	}
 
 	// Mic first: the permission prompt lands right after the tap, and a denial never burns
@@ -452,6 +547,7 @@ export function createVoiceSession(): VoiceSession {
 						responseModalities: [Modality.AUDIO],
 						speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: ORACLE_VOICE } } },
 						systemInstruction: ORACLE_SYSTEM_INSTRUCTION,
+						tools: [{ functionDeclarations: ORACLE_TOOL_DECLARATIONS }],
 						inputAudioTranscription: {},
 						outputAudioTranscription: {}
 					},
@@ -572,6 +668,10 @@ export function createVoiceSession(): VoiceSession {
 	return {
 		wake,
 		sleep,
+		setToolExecutor(executor: VoiceToolExecutor | null) {
+			toolExecutor = executor;
+		},
+		direct,
 		get state() {
 			return state;
 		},
