@@ -99,9 +99,12 @@ describe('EclipseMedallion — state visuals', () => {
 });
 
 describe('EclipseMedallion — voice sprite disc', () => {
-	it('renders the sprite sheet as the disc art', () => {
+	it('renders the sprite sheet as the disc art once the page goes idle', async () => {
 		const { button } = renderMedallion('asleep');
-		expect(layer(button, '.disc').style.backgroundImage).toContain('voice-medallion-sprite');
+		// Deferred off the critical path (perf gate) — it must still arrive.
+		await vi.waitFor(() =>
+			expect(layer(button, '.disc').style.backgroundImage).toContain('voice-medallion-sprite')
+		);
 	});
 
 	it.each([

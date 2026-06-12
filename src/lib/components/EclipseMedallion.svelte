@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import {
 		MEDALLION_ANNOUNCEMENT,
 		MEDALLION_LABEL,
@@ -29,6 +30,15 @@
 	let spriteCol = $derived(frame % SPRITE_COLS);
 	let spriteRow = $derived(Math.floor(frame / SPRITE_COLS));
 
+	// The sheet loads at idle, never against the LCP fetch — the perf gate holds the line.
+	// Until it lands the glow layers carry the medallion alone.
+	let sheetUrl = $state('');
+	onMount(() => {
+		const load = () => (sheetUrl = spriteSheet);
+		if ('requestIdleCallback' in window) requestIdleCallback(load);
+		else setTimeout(load, 500);
+	});
+
 	// Sticky: states mapped to null announce nothing, so the last meaningful line holds and the
 	// region only re-announces when its content actually changes (no listening↔hearing chatter).
 	let announced = $state('');
@@ -54,7 +64,7 @@
 			<span class="clip">
 				<!-- The disc renders the voice sprite sheet (docs/ui-image-resources.md): static
 				     frame per state, flare-indexed on hearing, stepped loop while a voice plays. -->
-				<span class="disc" style="background-image: url({spriteSheet})"></span>
+				<span class="disc" style={sheetUrl ? `background-image: url(${sheetUrl})` : ''}></span>
 				<span class="rune-ring">
 					{#each RING_RUNES as name, i (name)}
 						<img
