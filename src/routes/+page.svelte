@@ -679,10 +679,12 @@
 				fetchpriority="low"
 			/>
 
-			<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
-			<!-- Rendered unconditionally: a live region mounted with its content already inside is
-			     skipped by most screen readers — it must exist first, then change. -->
-			<p class="voice-notice" data-testid="voice-notice" role="status">{voiceNotice}</p>
+			<div class="voice-stack">
+				<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
+				<!-- Always mounted (a live region born with content is skipped by screen readers) and
+				     absolutely positioned: appearing must never reflow the panel under the player. -->
+				<p class="voice-notice" data-testid="voice-notice" role="status">{voiceNotice}</p>
+			</div>
 
 			<hr class="ornate-divider oracle-divider" aria-hidden="true" />
 
@@ -1198,18 +1200,34 @@
 		letter-spacing: 0.2em;
 	}
 
-	.voice-notice {
-		margin: -0.35rem 0 0;
-		text-align: center;
-		font-family: var(--font-story-body);
-		font-size: 0.85rem;
-		font-style: italic;
-		color: var(--ink-muted);
+	.voice-stack {
+		position: relative;
 	}
 
-	/* The region stays mounted while empty (live-region rule); don't let it leave a gap. */
+	/* Overlay pill under the disc: legible at body size, opaque backdrop, zero layout impact. */
+	.voice-notice {
+		position: absolute;
+		inset: auto 0.25rem -0.5rem;
+		margin: 0 auto;
+		width: fit-content;
+		max-width: 100%;
+		padding: 0.4rem 0.8rem;
+		text-align: center;
+		font-family: var(--font-story-body);
+		font-size: 0.95rem;
+		line-height: 1.35;
+		color: var(--ink);
+		background: rgba(6, 9, 18, 0.92);
+		border: 1px solid var(--gold-dim);
+		border-radius: 8px;
+		pointer-events: none;
+		z-index: 5;
+	}
+
+	/* Empty = invisible but still in the tree: display:none would re-break SR announcement. */
 	.voice-notice:empty {
-		margin: 0;
+		padding: 0;
+		border: none;
 	}
 
 	.oracle-title {
@@ -1448,18 +1466,26 @@
 		z-index: 0;
 		display: block;
 		width: 100%;
-		/* Tall on purpose: the art's high moon rides the band behind the ask/cast controls
-		   while the howling wolf lands alone in the clear space beneath them. The horizontal
-		   flip is baked into the asset. */
-		height: min(52%, 29rem);
+		/* Backdrop: the mask ghosts the sky out behind the controls; only the wolf shows fully. */
+		height: min(82%, 62rem);
 		object-fit: cover;
-		object-position: 50% 0%;
+		object-position: 50% 100%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
 			contrast(var(--skoll-contrast));
-		/* Short fade: the moon sits just under the banner's top edge and must glow through
-		   behind the controls, not vanish into the blend. */
-		mask-image: linear-gradient(180deg, transparent 0%, black 7%, black 100%);
-		-webkit-mask-image: linear-gradient(180deg, transparent 0%, black 7%, black 100%);
+		mask-image: linear-gradient(
+			180deg,
+			transparent 0%,
+			rgba(0, 0, 0, 0.18) 32%,
+			black 62%,
+			black 100%
+		);
+		-webkit-mask-image: linear-gradient(
+			180deg,
+			transparent 0%,
+			rgba(0, 0, 0, 0.18) 32%,
+			black 62%,
+			black 100%
+		);
 		pointer-events: none;
 	}
 
