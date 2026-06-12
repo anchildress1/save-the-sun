@@ -141,8 +141,11 @@ export function createVoiceSession(): VoiceSession {
 	// socket kills the tee in the same instant, and the diagnostics must not die with it.
 	// Scrubbing lives here, the single sink: SDK error and close strings can embed the session's
 	// ephemeral token in a URL, and the /debug stream is public.
-	function teeDebug(level: 'info' | 'error', message: string): void {
-		const scrubbed = mintedToken ? message.split(mintedToken).join('[ephemeral-token]') : message;
+	function teeDebug(level: 'info' | 'error', message: string, extraToken = ''): void {
+		let scrubbed = message;
+		for (const token of new Set([mintedToken, extraToken])) {
+			if (token) scrubbed = scrubbed.split(token).join('[ephemeral-token]');
+		}
 		void fetch('/api/voice/debug', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -343,7 +346,7 @@ export function createVoiceSession(): VoiceSession {
 	// A connect that resolves after losing the race must die here, or its socket leaks — and a
 	// late settle of either kind must reach /debug, or the timeout line is the only diagnostic
 	// left when the endpoint was merely slow.
-	function raceConnectTimeout(attempt: Promise<Session>): Promise<Session> {
+	function raceConnectTimeout(attempt: Promise<Session>, attemptToken: string): Promise<Session> {
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		let timedOut = false;
 		const timeout = new Promise<never>((_, reject) => {
@@ -367,7 +370,7 @@ export function createVoiceSession(): VoiceSession {
 				clearTimeout(timer);
 				if (timedOut) {
 					const detail = err instanceof Error ? err.message : String(err);
-					teeDebug('error', `late connect rejection after timeout: ${detail}`);
+					teeDebug('error', `late connect rejection after timeout: ${detail}`, attemptToken);
 				}
 			}
 		);
@@ -406,7 +409,8 @@ export function createVoiceSession(): VoiceSession {
 							}
 						}
 					}
-				})
+				}),
+				token
 			);
 		} catch (err) {
 			if (!stale()) fail('socket', err instanceof Error ? err.message : String(err));

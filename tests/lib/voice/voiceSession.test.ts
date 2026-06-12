@@ -649,6 +649,48 @@ describe('voiceSession failures', () => {
 		expect(teed).not.toContain('auth_tokens/t1');
 	});
 
+	it('a stale late connect rejection scrubs its old token after a later wake mints a new one', async () => {
+		let tokenMints = 0;
+		fetchMock.mockImplementation(async (url: string) => {
+			if (url !== '/api/voice/token') return { ok: true, status: 204 };
+			tokenMints++;
+			return tokenResponse({
+				token: tokenMints === 1 ? 'auth_tokens/stale' : 'auth_tokens/active'
+			});
+		});
+		let connectAttempts = 0;
+		let failStaleConnect!: (err: Error) => void;
+		sdk.connect.mockImplementation(({ callbacks: registered }: { callbacks: Callbacks }) => {
+			connectAttempts++;
+			if (connectAttempts === 1) {
+				return new Promise((_, reject) => {
+					failStaleConnect = reject;
+				});
+			}
+			callbacks = registered;
+			return Promise.resolve(liveSession);
+		});
+
+		const staleWake = vs.wake();
+		await vi.advanceTimersByTimeAsync(0);
+		await vi.advanceTimersByTimeAsync(10_000);
+		await staleWake;
+
+		const activeWake = vs.wake();
+		await vi.advanceTimersByTimeAsync(0);
+		callbacks!.onmessage({ setupComplete: {} });
+		await activeWake;
+
+		failStaleConnect(new Error('quota refused for auth_tokens/stale and auth_tokens/active'));
+		await vi.advanceTimersByTimeAsync(0);
+
+		const teed = teeBodies().join(' ');
+		expect(teed).toContain('late connect rejection after timeout');
+		expect(teed).toContain('[ephemeral-token]');
+		expect(teed).not.toContain('auth_tokens/stale');
+		expect(teed).not.toContain('auth_tokens/active');
+	});
+
 	it('a socket that closes during setup fails the wake exactly once', async () => {
 		const woke = vs.wake();
 		await vi.advanceTimersByTimeAsync(0);
