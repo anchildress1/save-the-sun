@@ -130,6 +130,14 @@ describe('EclipseMedallion — reduced motion (R6)', () => {
 		expect(loudCorona.opacity).toBe(quietCorona.opacity);
 		expect(loudCorona.transform).toBe('none');
 	});
+
+	it('ignites the rim runes on hearing — brighter than their listening rest', () => {
+		const hearing = renderMedallion('hearing', 0.2);
+		const listening = renderMedallion('listening');
+		const ignited = Number(getComputedStyle(layer(hearing.button, '.ring-rune')).opacity);
+		const resting = Number(getComputedStyle(layer(listening.button, '.ring-rune')).opacity);
+		expect(ignited).toBeGreaterThan(resting);
+	});
 });
 
 describe('EclipseMedallion — state announcements', () => {
