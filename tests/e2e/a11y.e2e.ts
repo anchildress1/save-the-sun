@@ -250,6 +250,18 @@ test.describe('a11y — the whole round is keyboard-operable with a visible focu
 		await ask.focus();
 		const askShadow = await ask.evaluate((el) => getComputedStyle(el).boxShadow);
 		expect(askShadow).not.toBe('none');
+
+		// The eclipse medallion is the only voice control — it must carry the same gold outline.
+		// (Activation semantics live in the component suite; here the full theme CSS is loaded,
+		// so a missing --gold-bright would silently void the ring and this assertion catches it.)
+		const medallion = page.getByRole('button', { name: 'The voice sleeps. Wake the Oracle.' });
+		await medallion.focus();
+		const medallionOutline = await medallion.evaluate((el) => {
+			const s = getComputedStyle(el);
+			return { width: s.outlineWidth, style: s.outlineStyle };
+		});
+		expect(parseFloat(medallionOutline.width)).toBeGreaterThanOrEqual(2);
+		expect(medallionOutline.style).not.toBe('none');
 	});
 
 	test('Tab traverses the board in order — focus is never trapped on the grid', async ({

@@ -1,4 +1,5 @@
 import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 import { describe, it, expect, vi } from 'vitest';
 import EclipseMedallion from '$lib/components/EclipseMedallion.svelte';
 import {
@@ -52,6 +53,24 @@ describe('EclipseMedallion — labeled button (R6)', () => {
 		const { screen, onToggle } = renderMedallion('asleep');
 		await screen.getByTestId('eclipse-medallion').click();
 		expect(onToggle).toHaveBeenCalledOnce();
+	});
+
+	it.each([
+		{ key: 'Enter', press: '{Enter}' },
+		{ key: 'Space', press: ' ' }
+	])('wakes from the keyboard — $key fires onToggle like a tap', async ({ press }) => {
+		const { button, onToggle } = renderMedallion('asleep');
+		button.focus();
+		await userEvent.keyboard(press);
+		expect(onToggle).toHaveBeenCalledOnce();
+	});
+
+	it('swallows keyboard activation while eclipsed — the seal holds without a pointer too (S4)', async () => {
+		const { button, onToggle } = renderMedallion('eclipsed');
+		button.focus();
+		await userEvent.keyboard('{Enter}');
+		await userEvent.keyboard(' ');
+		expect(onToggle).not.toHaveBeenCalled();
 	});
 
 	it('swallows the tap while eclipsed — the seal is inert whatever the page wires in (S4)', async () => {
