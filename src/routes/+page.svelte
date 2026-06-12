@@ -671,8 +671,8 @@
 			<img
 				class="skoll-banner"
 				src={skollBanner}
-				width="480"
-				height="700"
+				width="768"
+				height="1376"
 				alt=""
 				aria-hidden="true"
 				decoding="async"
@@ -1448,17 +1448,18 @@
 		z-index: 0;
 		display: block;
 		width: 100%;
-		/* Sized to the space left under the cast controls: the art's moon + howling head live
-		   in the image's top band, and a taller banner buried exactly that band behind the
-		   controls — only his chest showed. */
-		height: min(40%, 23rem);
+		/* Tall on purpose: the art's high moon rides the band behind the ask/cast controls
+		   while the howling wolf lands alone in the clear space beneath them. The horizontal
+		   flip is baked into the asset. */
+		height: min(52%, 29rem);
 		object-fit: cover;
 		object-position: 50% 0%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
 			contrast(var(--skoll-contrast));
-		transform: scaleX(-1);
-		mask-image: linear-gradient(180deg, transparent 0%, black 18%, black 100%);
-		-webkit-mask-image: linear-gradient(180deg, transparent 0%, black 18%, black 100%);
+		/* Short fade: the moon sits just under the banner's top edge and must glow through
+		   behind the controls, not vanish into the blend. */
+		mask-image: linear-gradient(180deg, transparent 0%, black 7%, black 100%);
+		-webkit-mask-image: linear-gradient(180deg, transparent 0%, black 7%, black 100%);
 		pointer-events: none;
 	}
 
