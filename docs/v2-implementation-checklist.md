@@ -50,7 +50,7 @@ Medallion at top of Oracle panel = voice toggle + state display. Static art, ani
 ### S5 — Silence timeout (R7)
 
 - [x] 5000ms of no recognizable player speech → stop mic streaming, session idles, medallion → asleep; no audio nudge ("recognizable" = server input transcripts, never local RMS — a fan or a cough must not hold the session awake)
-- [x] Clock starts only after Oracle/Sköll playback ends; their speech never counts toward it (clock pauses through thinking + speaking, restarts when playback drains; Sköll's clip playback rides the same rule via the S13 director)
+- [x] Clock starts only after Oracle playback ends; her speech never counts toward it (clock pauses through thinking + speaking, restarts when playback drains)
 - [x] Medallion tap resumes (a fresh `wake()` — silence-idle is a full sleep, so each resume mints a new rate-limited token by design)
 - Depends: S2, S3
 
