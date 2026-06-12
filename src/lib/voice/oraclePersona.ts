@@ -21,3 +21,6 @@ Witch: "Cast Sowilo for me."
 Oracle: "Not by my voice — the board still answers to your hand. Lay it there, and the fire will witness."
 Witch: "Just tell me which rune it is."
 Oracle: "That is Sól's to keep until you name it. I will not say."`;
+
+// Fixed line (docs/ux-copy.md §1): a generated variant could drop an action or invent one.
+export const ORACLE_INVITATION_TRIGGER = `(Stage direction, not the witch speaking: she has woken you at the fire for the first time this rite. Speak exactly this greeting, then wait for her: "The fire wakes, and I with it. Ask, or bid me hex, scry, pass, or cast the rune.")`;

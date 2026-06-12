@@ -167,7 +167,7 @@
 		// Skip while Sköll is stalled: that's a transient error line whose companion `skollStalled`
 		// (and its retry button) isn't persisted, and onMount re-drives his move anyway — so keep the
 		// last good line in storage instead of resuming a dead-end error the engine has moved past.
-		const snapshot = { crossings: [...crossings], answer };
+		const snapshot = { crossings: [...crossings], answer, voiceInvited };
 		if (restored && !skollStalled) writeViewState(roundId, snapshot);
 	});
 
@@ -182,6 +182,8 @@
 	let voiceState = $state<MedallionState>('asleep');
 	let voiceAmplitude = $state(0);
 	let voiceNotice = $state('');
+	// Per round, persisted with the view (S6): the invitation speaks once per game, not per tap.
+	let voiceInvited = $state(false);
 
 	function onVoiceEvent(event: VoiceEvent) {
 		switch (event.type) {
@@ -225,9 +227,17 @@
 
 	// Waking counts as awake: a tap during the permission+token+connect stretch reaches sleep(),
 	// which cancels the pending wake — it is never silently dropped.
-	function toggleVoice() {
-		if (voiceSession.state === 'asleep') void voiceSession.wake();
-		else voiceSession.sleep();
+	async function toggleVoice() {
+		if (voiceSession.state !== 'asleep') {
+			voiceSession.sleep();
+			return;
+		}
+		const invitation = !voiceInvited;
+		await voiceSession.wake({ invitation });
+		// Marked only after the wake lands: a failed or canceled first wake re-invites next tap.
+		if (invitation && voiceSession.state !== 'asleep' && voiceSession.state !== 'eclipsed') {
+			voiceInvited = true;
+		}
 	}
 
 	// Return type is derived from the action's `type`, so a caller can't request a
@@ -297,6 +307,7 @@
 			restoreCrossed = saved.crossings;
 			crossings = saved.crossings;
 			if (saved.answer) answer = saved.answer;
+			voiceInvited = saved.voiceInvited;
 		}
 		restored = true;
 		// Storage can throw (private mode) — first-run is the safe default, so show it then.
@@ -517,6 +528,9 @@
 			skollAsking = false;
 			heldScry = true;
 			heldHex = true;
+			voiceInvited = false; // a new round re-arms the Oracle's wake invitation
+			// Also cancels an in-flight wake, so a slow first wake can't mark the fresh round invited.
+			voiceSession.sleep();
 			applyState(state);
 			cancelCast();
 			return true;

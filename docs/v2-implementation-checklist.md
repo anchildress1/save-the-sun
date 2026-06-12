@@ -56,8 +56,8 @@ Medallion at top of Oracle panel = voice toggle + state display. Static art, ani
 
 ### S6 — Wake invitation (R1)
 
-- [ ] First wake per game: Oracle speaks in-character invitation naming speakable actions (ask, hex, scry, pass, cast the rune)
-- [ ] Subsequent wakes: silent resume to listening
+- [x] First wake per game: Oracle speaks in-character invitation naming speakable actions (ask, hex, scry, pass, cast the rune) — fixed line (`ux-copy.md` §1) sent as one stage-direction turn on `wake({ invitation: true })`; the wake waits in thinking, so the S5 clock stays paused until her playback drains
+- [x] Subsequent wakes: silent resume to listening — delivery persists per round in the client view state (`voiceInvited`), so a mid-round reload never re-invites; a new game re-arms it
 - Depends: S2
 
 ## Phase 2 — Oracle acts ⚡

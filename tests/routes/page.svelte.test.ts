@@ -758,7 +758,7 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		// Sowilo is rune id 1 — seed it crossed under the round the load will report.
 		localStorage.setItem(
 			VIEW_KEY,
-			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: '' })
+			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: '', voiceInvited: false })
 		);
 		const screen = render(Page, pageProps);
 		await expect
@@ -772,7 +772,8 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 			JSON.stringify({
 				roundId: 'test-round',
 				crossings: [],
-				answer: 'No. Sól is not reaching for a fire rune.'
+				answer: 'No. Sól is not reaching for a fire rune.',
+				voiceInvited: false
 			})
 		);
 		const screen = render(Page, pageProps);
@@ -786,7 +787,7 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		// win was never voiced client-side before the reload) must not blank it back out.
 		localStorage.setItem(
 			VIEW_KEY,
-			JSON.stringify({ roundId: 'test-round', crossings: [], answer: '' })
+			JSON.stringify({ roundId: 'test-round', crossings: [], answer: '', voiceInvited: false })
 		);
 		const screen = render(Page, propsWith(HUMAN_WON));
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rune is true.');
@@ -796,7 +797,12 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		// Stored under another round's token: the resumed round must open clean, not wear stale marks.
 		localStorage.setItem(
 			VIEW_KEY,
-			JSON.stringify({ roundId: 'a-stale-round', crossings: [1], answer: 'stale line' })
+			JSON.stringify({
+				roundId: 'a-stale-round',
+				crossings: [1],
+				answer: 'stale line',
+				voiceInvited: false
+			})
 		);
 		const screen = render(Page, pageProps);
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('');
@@ -821,7 +827,7 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		// A stale record from the prior round, plus a new-game response that mints a new token.
 		localStorage.setItem(
 			VIEW_KEY,
-			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: 'old' })
+			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: 'old', voiceInvited: false })
 		);
 		stubFetch(async (url) => {
 			if (url.includes('/api/new-game'))

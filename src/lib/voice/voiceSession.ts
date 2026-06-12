@@ -11,7 +11,7 @@ import {
 	type Session
 } from '@google/genai';
 import { LIVE_MODEL, MIC_SAMPLE_RATE, ORACLE_VOICE } from '$lib/voice/config';
-import { ORACLE_SYSTEM_INSTRUCTION } from '$lib/voice/oraclePersona';
+import { ORACLE_INVITATION_TRIGGER, ORACLE_SYSTEM_INSTRUCTION } from '$lib/voice/oraclePersona';
 import {
 	createSpeaker,
 	openMic,
@@ -45,10 +45,11 @@ export type VoiceEvent =
 export type VoiceListener = (event: VoiceEvent) => void;
 
 export interface VoiceSession {
-	/** Open the Live session: mic, token, socket. Resolves once listening, or after the wake
-	 * fails or is canceled by sleep(). Never rejects. A no-op once eclipsed — the player who
-	 * denied the mic (or has none) is never re-prompted this session. */
-	wake(): Promise<void>;
+	/** Open the Live session: mic, token, socket. Resolves once listening — or thinking, when
+	 * the wake carries the round's first-wake invitation (S6) — or after the wake fails or is
+	 * canceled by sleep(). Never rejects. A no-op once eclipsed — the player who denied the
+	 * mic (or has none) is never re-prompted this session. */
+	wake(options?: { invitation?: boolean }): Promise<void>;
 	/** Close everything and return to asleep. Safe in any state; eclipsed stays sealed. */
 	sleep(): void;
 	readonly state: VoiceState;
@@ -435,11 +436,12 @@ export function createVoiceSession(): VoiceSession {
 		return Promise.race([attempt, timeout]);
 	}
 
+	// Returns the socket so the caller never needs an unreachable null re-check on `session`.
 	async function connectSession(
 		token: string,
 		myGeneration: number,
 		stale: () => boolean
-	): Promise<boolean> {
+	): Promise<Session | null> {
 		let connected: Session;
 		try {
 			const client = new GoogleGenAI({ apiKey: token, httpOptions: { apiVersion: 'v1alpha' } });
@@ -477,7 +479,7 @@ export function createVoiceSession(): VoiceSession {
 			);
 		} catch (err) {
 			if (!stale()) fail('socket', err instanceof Error ? err.message : String(err));
-			return false;
+			return null;
 		}
 		if (stale()) {
 			// Slept while connecting: teardown already ran, so this socket must die here or leak.
@@ -486,10 +488,10 @@ export function createVoiceSession(): VoiceSession {
 			} catch {
 				// Already closed.
 			}
-			return false;
+			return null;
 		}
 		session = connected;
-		return true;
+		return connected;
 	}
 
 	async function awaitSetup(stale: () => boolean): Promise<boolean> {
@@ -510,7 +512,24 @@ export function createVoiceSession(): VoiceSession {
 		return true;
 	}
 
-	async function wake(): Promise<void> {
+	// Waits in thinking (clock paused, rescue armed). A send that throws means the socket is
+	// already dead or dying — fail the wake so the next tap retries with the invitation intact.
+	function beginInvitation(live: Session): void {
+		try {
+			live.sendClientContent({
+				turns: [{ role: 'user', parts: [{ text: ORACLE_INVITATION_TRIGGER }] }],
+				turnComplete: true
+			});
+		} catch (err) {
+			fail('socket', `invitation send failed: ${err instanceof Error ? err.message : String(err)}`);
+			return;
+		}
+		teeDebug('info', 'voice invitation sent');
+		toState('thinking');
+		armThinkingRescue();
+	}
+
+	async function wake(options?: { invitation?: boolean }): Promise<void> {
 		if (state === 'eclipsed') return;
 		if (state !== 'asleep') {
 			// info, not error: a double-tap race lands here routinely — and 'warn' isn't a level
@@ -530,12 +549,14 @@ export function createVoiceSession(): VoiceSession {
 		const token = await acquireToken(stale);
 		if (token === null) return;
 		if (!openSpeaker()) return;
-		if (!(await connectSession(token, myGeneration, stale))) return;
+		const connected = await connectSession(token, myGeneration, stale);
+		if (!connected) return;
 		if (!(await awaitSetup(stale))) return;
 
 		liveReady = true;
 		teeDebug('info', 'voice session awake');
-		toState('listening');
+		if (options?.invitation) beginInvitation(connected);
+		else toState('listening');
 	}
 
 	function sleep(): void {
