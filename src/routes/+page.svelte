@@ -735,6 +735,31 @@
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
+			<!-- The Ask lives with the Oracle: question below, her answer directly above it. -->
+			<form
+				class="ask"
+				data-coach="ask"
+				onsubmit={(e) => {
+					e.preventDefault();
+					submitAsk();
+				}}
+			>
+				<!-- The howto (which axes to ask about) lives in the onboarding popovers, not on the
+				     board. Label kept for the field's accessible name only. -->
+				<label class="sr-only" for="oracle-ask">Ask the Oracle</label>
+				<input
+					id="oracle-ask"
+					type="text"
+					placeholder="Type your question…"
+					autocomplete="off"
+					bind:value={askValue}
+					disabled={castMode || pending || !canAct}
+				/>
+				<button class="btn btn--primary" type="submit" disabled={castMode || pending || !canAct}>
+					Ask the Oracle
+				</button>
+			</form>
+
 			<h2 class="skoll-title" data-testid="skoll-title">Sköll</h2>
 			<!-- role=status: Sköll's Ask is narrated when it lands — it opens the reaction window,
 			     so a screen-reader player must hear it without hunting for the frame. -->
@@ -786,30 +811,6 @@
 					Rouse the wolf
 				</button>
 			{/if}
-
-			<form
-				class="ask"
-				data-coach="ask"
-				onsubmit={(e) => {
-					e.preventDefault();
-					submitAsk();
-				}}
-			>
-				<!-- The howto (which axes to ask about) lives in the onboarding popovers, not on the
-				     board. Label kept for the field's accessible name only. -->
-				<label class="sr-only" for="oracle-ask">Ask the Oracle</label>
-				<input
-					id="oracle-ask"
-					type="text"
-					placeholder="Type your question…"
-					autocomplete="off"
-					bind:value={askValue}
-					disabled={castMode || pending || !canAct}
-				/>
-				<button class="btn btn--primary" type="submit" disabled={castMode || pending || !canAct}>
-					Ask the Oracle
-				</button>
-			</form>
 
 			<div class="cast" data-coach="cast">
 				{#if castMode}
@@ -1414,7 +1415,10 @@
 		z-index: 0;
 		display: block;
 		width: 100%;
-		height: min(44%, 27rem);
+		/* Sized to the space left under the cast controls: the art's moon + howling head live
+		   in the image's top band, and a taller banner buried exactly that band behind the
+		   controls — only his chest showed. */
+		height: min(34%, 19rem);
 		object-fit: cover;
 		object-position: 50% 0%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
@@ -1538,7 +1542,7 @@
 		}
 
 		.skoll-banner {
-			height: min(36%, 16rem);
+			height: min(28%, 12rem);
 		}
 	}
 
