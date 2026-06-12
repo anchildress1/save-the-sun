@@ -265,7 +265,7 @@ Sól speaks only at victory—the goddess's rarity is the power.
 ### Core action buttons
 | Action | Label |
 |---|---|
-| Ask | **"Ask the Oracle"** |
+| Ask | **"Ask"** (visible; accessible name stays "Ask the Oracle") |
 | Cast | **"Cast the rune"** |
 | Reactions | **"Scry"** · **"Hex"** (named, never "use reaction") |
 | Confirm a cast | **"Name it"** |

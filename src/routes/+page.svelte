@@ -684,81 +684,60 @@
 			     skipped by most screen readers — it must exist first, then change. -->
 			<p class="voice-notice" data-testid="voice-notice" role="status">{voiceNotice}</p>
 
-			<div class="turn-pill-row">
-				<!-- role=status: turn changes are narrated politely without stealing focus (v1.5 SR pass). -->
-				<div
-					class="turn-pill"
-					class:won={humanWon}
-					class:lost={skollWon}
-					data-testid="turn-pill"
-					role="status"
-				>
-					{turnPill}
-				</div>
-				<span class="ai-note-wrap">
-					<button
-						class="ai-note-btn"
-						type="button"
-						aria-describedby="ai-note"
-						aria-label="About the Gemini AI behind the Oracle and Sköll"
-						bind:this={aiNoteButton}
-						onmouseenter={showAiNote}
-						onmouseleave={scheduleHideAiNote}
-						onfocus={showAiNote}
-						onblur={hideAiNote}
-						onkeydown={(e) => {
-							if (e.key === 'Escape') hideAiNote();
-						}}
-					>
-						i
-					</button>
-					<span
-						id="ai-note"
-						role="tooltip"
-						class="ai-note-pop"
-						popover="manual"
-						bind:this={aiNotePopover}
-						onmouseenter={showAiNote}
-						onmouseleave={scheduleHideAiNote}
-					>
-						The Oracle and Sköll are live Gemini AI driving answers and rival moves. They can
-						misread, misplay, and make mistakes; the rules and rune data are exact.
-					</span>
-				</span>
-			</div>
-
 			<hr class="ornate-divider oracle-divider" aria-hidden="true" />
 
-			<h2 class="oracle-title">The Oracle</h2>
+			<!-- One line: the Oracle's name leads, the turn pill + AI note trail it — the old
+			     standalone pill row spent a full row the wolf needed. -->
+			<div class="oracle-header">
+				<h2 class="oracle-title">The Oracle</h2>
+				<div class="turn-pill-row">
+					<!-- role=status: turn changes are narrated politely without stealing focus (v1.5 SR pass). -->
+					<div
+						class="turn-pill"
+						class:won={humanWon}
+						class:lost={skollWon}
+						data-testid="turn-pill"
+						role="status"
+					>
+						{turnPill}
+					</div>
+					<span class="ai-note-wrap">
+						<button
+							class="ai-note-btn"
+							type="button"
+							aria-describedby="ai-note"
+							aria-label="About the Gemini AI behind the Oracle and Sköll"
+							bind:this={aiNoteButton}
+							onmouseenter={showAiNote}
+							onmouseleave={scheduleHideAiNote}
+							onfocus={showAiNote}
+							onblur={hideAiNote}
+							onkeydown={(e) => {
+								if (e.key === 'Escape') hideAiNote();
+							}}
+						>
+							i
+						</button>
+						<span
+							id="ai-note"
+							role="tooltip"
+							class="ai-note-pop"
+							popover="manual"
+							bind:this={aiNotePopover}
+							onmouseenter={showAiNote}
+							onmouseleave={scheduleHideAiNote}
+						>
+							The Oracle and Sköll are live Gemini AI driving answers and rival moves. They can
+							misread, misplay, and make mistakes; the rules and rune data are exact.
+						</span>
+					</span>
+				</div>
+			</div>
+
 			<!-- role=status: every Oracle answer and refusal is narrated as it is voiced. -->
 			<div class="oracle-frame" role="status">
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
-
-			<!-- The Ask lives with the Oracle: question below, her answer directly above it. -->
-			<form
-				class="ask"
-				data-coach="ask"
-				onsubmit={(e) => {
-					e.preventDefault();
-					submitAsk();
-				}}
-			>
-				<!-- The howto (which axes to ask about) lives in the onboarding popovers, not on the
-				     board. Label kept for the field's accessible name only. -->
-				<label class="sr-only" for="oracle-ask">Ask the Oracle</label>
-				<input
-					id="oracle-ask"
-					type="text"
-					placeholder="Type your question…"
-					autocomplete="off"
-					bind:value={askValue}
-					disabled={castMode || pending || !canAct}
-				/>
-				<button class="btn btn--primary" type="submit" disabled={castMode || pending || !canAct}>
-					Ask the Oracle
-				</button>
-			</form>
 
 			<h2 class="skoll-title" data-testid="skoll-title">Sköll</h2>
 			<!-- role=status: Sköll's Ask is narrated when it lands — it opens the reaction window,
@@ -811,6 +790,36 @@
 					Rouse the wolf
 				</button>
 			{/if}
+
+			<form
+				class="ask"
+				data-coach="ask"
+				onsubmit={(e) => {
+					e.preventDefault();
+					submitAsk();
+				}}
+			>
+				<!-- The howto (which axes to ask about) lives in the onboarding popovers, not on the
+				     board. Label kept for the field's accessible name only. -->
+				<label class="sr-only" for="oracle-ask">Ask the Oracle</label>
+				<input
+					id="oracle-ask"
+					type="text"
+					placeholder="Type your question…"
+					autocomplete="off"
+					bind:value={askValue}
+					disabled={castMode || pending || !canAct}
+				/>
+				<!-- Visible label is the terse "Ask"; the sr-only tail keeps the accessible name as
+				     the full rite phrase without an aria-label that label-queries would double-match. -->
+				<button
+					class="btn btn--primary ask-submit"
+					type="submit"
+					disabled={castMode || pending || !canAct}
+				>
+					Ask<span class="sr-only"> the Oracle</span>
+				</button>
+			</form>
 
 			<div class="cast" data-coach="cast">
 				{#if castMode}
@@ -1073,10 +1082,8 @@
 	}
 
 	.turn-pill-row {
-		align-self: stretch;
 		display: inline-flex;
 		align-items: center;
-		justify-content: center;
 		gap: 0.45rem;
 		position: relative;
 		z-index: 4;
@@ -1170,8 +1177,25 @@
 		z-index: 2;
 	}
 
-	.oracle-panel > .turn-pill-row {
+	.oracle-panel > .oracle-header {
 		z-index: 4;
+	}
+
+	/* Name left, turn pill + AI note right — one line instead of two stacked rows. Wrap is
+	   the escape hatch for the long end-of-round pill texts, not the everyday case. */
+	.oracle-header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.35rem 0.5rem;
+	}
+
+	/* Tighter type than the standalone titles: name + pill + note share ~325px. */
+	.oracle-header .oracle-title {
+		white-space: nowrap;
+		font-size: 0.95rem;
+		letter-spacing: 0.2em;
 	}
 
 	.voice-notice {
@@ -1189,8 +1213,7 @@
 	}
 
 	.oracle-title {
-		margin: 0.2rem 0 0.1rem;
-		text-align: center;
+		margin: 0;
 		font-family: var(--font-display);
 		font-size: var(--speaker-title-size);
 		letter-spacing: var(--speaker-title-tracking);
@@ -1218,9 +1241,9 @@
 		color: var(--gold-bright);
 	}
 
+	/* Left-aligned to mirror the Oracle's merged header line. */
 	.skoll-title {
 		margin: 0.2rem 0 0.1rem;
-		text-align: center;
 		font-family: var(--font-display);
 		font-size: var(--speaker-title-size);
 		letter-spacing: var(--speaker-title-tracking);
@@ -1263,10 +1286,20 @@
 		cursor: not-allowed;
 	}
 
+	/* One line: the field flexes, the terse Ask button rides beside it. */
 	.ask {
 		display: flex;
-		flex-direction: column;
+		align-items: stretch;
 		gap: 0.45rem;
+	}
+
+	.ask input {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.ask-submit {
+		flex: none;
 	}
 
 	.sr-only {
@@ -1418,7 +1451,7 @@
 		/* Sized to the space left under the cast controls: the art's moon + howling head live
 		   in the image's top band, and a taller banner buried exactly that band behind the
 		   controls — only his chest showed. */
-		height: min(34%, 19rem);
+		height: min(40%, 23rem);
 		object-fit: cover;
 		object-position: 50% 0%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
