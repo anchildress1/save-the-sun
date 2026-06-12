@@ -46,6 +46,7 @@ vi.mock('$lib/voice/voiceSession', () => ({
 const emit = (event: VoiceEvent) => voiceMock.emit(event);
 
 const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
+const RITE_MOVING = 'The rite is moving. Hold.';
 const pageProps = {
 	data: { boardSeed: 0, roundId: 'test-round', state: HUMAN_TURN, pendingReaction: null },
 	params: {},
@@ -735,5 +736,78 @@ describe('Save the Sun page — voiced tool guards (S7 review fixes)', () => {
 		await expect.element(newNight).toBeDisabled();
 		settleAdvance(new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN })));
 		await expect.element(newNight).toBeEnabled();
+	});
+
+	it('voice tools cannot dispatch while a typed Ask is pending', async () => {
+		let settleAsk!: (response: Response) => void;
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			return new Promise<Response>((resolve) => {
+				settleAsk = resolve;
+			});
+		});
+		const screen = render(Page, pageProps);
+		const input = screen.getByLabelText('Ask the Oracle').element() as HTMLInputElement;
+		input.value = 'is it a fire rune?';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		(screen.getByRole('button', { name: 'Ask the Oracle' }).element() as HTMLButtonElement).click();
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+
+		const outcome = await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
+		expect(outcome).toBe(RITE_MOVING);
+		expect(actionBodies()).toEqual([
+			{ type: 'Ask', player: 'Human', question: 'is it a fire rune?' }
+		]);
+
+		settleAsk(
+			new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'Yes. Sól is reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: HUMAN_TURN
+				})
+			)
+		);
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Yes. Sól is reaching for a fire rune.');
+	});
+
+	it('a second model tool call in the same batch gets the pending guard, not a second action', async () => {
+		let settleAsk!: (response: Response) => void;
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			return new Promise<Response>((resolve) => {
+				settleAsk = resolve;
+			});
+		});
+		render(Page, pageProps);
+		const first = executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+
+		const second = await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
+		expect(second).toBe(RITE_MOVING);
+		expect(actionBodies()).toEqual([
+			{ type: 'Ask', player: 'Human', question: 'is it a fire rune?' }
+		]);
+
+		settleAsk(
+			new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'Yes. Sól is reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: HUMAN_TURN
+				})
+			)
+		);
+		await expect(first).resolves.toBe('Yes. Sól is reaching for a fire rune.');
 	});
 });

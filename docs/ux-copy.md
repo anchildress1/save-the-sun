@@ -76,6 +76,7 @@ A voiced action calls the same engine function as its button, and the Oracle voi
 
 | Trigger | Line |
 |---|---|
+| Any move while another move is resolving | "The rite is moving. Hold." |
 | Ask or Cast while Sköll's question hangs | "Sköll's question hangs. Scry, hex, or pass before another move." |
 | Ask or Cast on Sköll's turn | "The wolf is moving. Hold." |
 | Scry / Hex / Pass with no hanging question | "Sköll asks nothing. There is no question to scry, hex, or pass." |

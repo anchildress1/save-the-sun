@@ -38,6 +38,7 @@
 	const RITE = {
 		emptyAsk: 'Speak your question, witch.',
 		wolfMoving: 'The wolf is moving. Hold.',
+		riteMoving: 'The rite is moving. Hold.',
 		oracleSilent: "The Oracle falls silent — the rite can't reach Sól. Draw breath, and ask again.",
 		castFalters: 'The rite falters. The rune slips away.',
 		wrongCast: (name: string) => `${name} is not the one. The night holds.`,
@@ -636,6 +637,7 @@
 		if (name === 'ask') {
 			const question = typeof args.question === 'string' ? args.question.trim() : '';
 			if (question === '') return RITE.emptyAsk;
+			if (pending) return RITE.riteMoving;
 			if (skollAsking) return RITE.wolfAsking;
 			if (!canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
 			pending = true;
@@ -652,6 +654,7 @@
 		// Own-property check: the name is model input, and `in` would let inherited keys
 		// (toString, __proto__) fall through to a garbage React dispatch.
 		if (Object.hasOwn(REACTION_TOOLS, name)) {
+			if (pending) return RITE.riteMoving;
 			if (!skollAsking) return RITE.noReactionWindow;
 			pending = true;
 			try {
@@ -665,6 +668,7 @@
 			if (spoken === '') return RITE.chooseTarget;
 			const rune = runes.find((r) => r.name.toLowerCase() === spoken.toLowerCase());
 			if (!rune) return RITE.unknownRune(spoken);
+			if (pending) return RITE.riteMoving;
 			if (skollAsking) return RITE.wolfAsking;
 			if (!canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
 			pending = true;
