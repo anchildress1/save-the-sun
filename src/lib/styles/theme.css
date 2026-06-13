@@ -135,7 +135,9 @@
 	border-image-width: 10px 14px;
 	border-image-repeat: stretch;
 	border-radius: 12px;
-	opacity: 0.82;
+	/* Hidden at rest — the button's own border is the resting outline; this ornate frame is the
+	   hover/focus treatment only, so the two never stack into a double border. */
+	opacity: 0;
 	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.42));
 	transition:
 		filter 0.18s ease,
@@ -195,11 +197,6 @@
 	transform: none;
 	box-shadow: none;
 	filter: saturate(0.55) brightness(0.94);
-}
-
-.btn:disabled::before {
-	opacity: 0.38;
-	filter: none;
 }
 
 .btn--secondary:disabled {
