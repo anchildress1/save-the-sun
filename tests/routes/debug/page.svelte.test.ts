@@ -174,9 +174,11 @@ describe('/debug view', () => {
 				return new Response(JSON.stringify({ sessionId: 'watched', events: [] }));
 			})
 		);
-		renderWith([verdict], 'watched');
+		// Unmount stops the onMount interval so polling can't leak into later tests under real timers.
+		const { unmount } = renderWith([verdict], 'watched');
 		await expect.poll(() => calls.length, { timeout: 3000 }).toBeGreaterThan(0);
 		expect(calls[0]).toBe('/api/debug?session=watched');
+		unmount();
 	});
 
 	it('polls /api/debug and replaces the stream on each tick', async () => {
@@ -198,10 +200,25 @@ describe('/debug view', () => {
 			'fetch',
 			vi.fn(async () => new Response(JSON.stringify(next)))
 		);
-		const { container } = renderWith([verdict]); // first paint: seq 1
+		const { container, unmount } = renderWith([verdict]); // first paint: seq 1
 		await expect
 			.poll(() => container.querySelector('.msg')?.textContent, { timeout: 3000 })
 			.toContain('Human asks: "fresh"');
+		unmount();
+	});
+
+	it('updates the displayed session id from the poll response (server canonicalization)', async () => {
+		vi.useRealTimers();
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response(JSON.stringify({ sessionId: 'canon-id', events: [] })))
+		);
+		const { container, unmount } = renderWith([verdict], 'requested-id');
+		expect(container.querySelector('.session code')?.textContent).toBe('requested-id'); // SSR id
+		await expect
+			.poll(() => container.querySelector('.session code')?.textContent, { timeout: 3000 })
+			.toBe('canon-id');
+		unmount();
 	});
 
 	it('wraps long raw I/O instead of overflowing the page horizontally', async () => {
