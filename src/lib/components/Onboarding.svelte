@@ -358,8 +358,11 @@
 		background:
 			linear-gradient(180deg, rgba(4, 8, 16, 0.38) 0%, rgba(6, 9, 18, 0.97) 40%),
 			var(--modal-bg) top center / auto 45% no-repeat;
-		border: 1px solid var(--gold-dim);
-		border-radius: 12px;
+		border: 14px solid transparent;
+		border-image-source: var(--button-border);
+		border-image-slice: 44 56;
+		border-image-width: 14px 18px;
+		border-image-repeat: stretch;
 		box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
 	}
 
