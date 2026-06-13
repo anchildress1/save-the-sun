@@ -97,9 +97,9 @@ function mockAction(result: object) {
 }
 
 // S8 canon (ux-copy.md §1): the confirmation questions, and the player reply that opens the gate.
-const CONFIRM_SCRY = 'Shall I scry him?';
-const CONFIRM_HEX = 'Shall I hex him?';
-const confirmCast = (name: string) => `Shall I cast ${name}?`;
+const CONFIRM_SCRY = 'Lean into the dark?';
+const CONFIRM_HEX = 'Seal his lips?';
+const confirmCast = (name: string) => `Stake the round on ${name}?`;
 const playerSpeaks = () => emit({ type: 'transcript', direction: 'in', text: 'yes, do it' });
 
 beforeEach(() => {
@@ -600,9 +600,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		expect(await executor()({ name: 'scry', args: {} })).toBe(CONFIRM_SCRY);
 		emit({ type: 'transcript', direction: 'in', text: 'scry him' });
 		const outcome = await executor()({ name: 'scry', args: {} });
-		expect(outcome).toBe(
-			`You lean into the dark and listen. His answer is yours too. ${askAnswer}`
-		);
+		expect(outcome).toBe(`You lean into the dark; his answer is yours. ${askAnswer}`);
 		const [button, voiced] = actionBodies();
 		expect(voiced).toEqual(button);
 		expect(voiced).toEqual({ type: 'React', player: 'Human', reaction: 'Scry' });
@@ -611,7 +609,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 	it('a voiced reaction with no hanging question dispatches nothing', async () => {
 		render(Page, pageProps);
 		const outcome = await executor()({ name: 'hex', args: {} });
-		expect(outcome).toBe('Sköll asks nothing. There is no question to scry, hex, or pass.');
+		expect(outcome).toBe('Sköll asks nothing to scry, hex, or pass.');
 		expect(actionBodies()).toHaveLength(0);
 	});
 
@@ -677,9 +675,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		render(Page, reactProps);
 
 		const outcome = await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
-		expect(outcome).toBe(
-			"The Oracle falls silent — the rite can't reach Sól. Draw breath, and ask again."
-		);
+		expect(outcome).toBe("The Oracle falls silent — the rite can't reach Sól.");
 		// Only the failed pass hit the wire — never the ask.
 		expect(actionBodies().filter((body) => body.type === 'Ask')).toHaveLength(0);
 		consoleError.mockRestore(); // resetAllMocks never uninstalls a spy — don't leak it
@@ -803,7 +799,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		const won: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 6 };
 		render(Page, { ...pageProps, data: { ...pageProps.data, state: won } });
 		const outcome = await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
-		expect(outcome).toBe('The longest day is decided. Begin another night to play again.');
+		expect(outcome).toBe('The longest day is decided — begin anew.');
 		expect(actionBodies()).toHaveLength(0);
 	});
 
@@ -864,7 +860,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent("Sköll closes the Oracle's lips. Your question dies in the dark.");
+			.toHaveTextContent('Sköll silences the Oracle; your question dies.');
 		expect(voiceMock.direct).not.toHaveBeenCalled();
 	});
 });
@@ -1031,9 +1027,7 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		await executor()({ name: 'hex', args: {} });
 		playerSpeaks();
 		const outcome = await executor()({ name: 'hex', args: {} });
-		expect(outcome).toBe(
-			"You close the Oracle's lips. His question dies unanswered — his turn with it."
-		);
+		expect(outcome).toBe("You close the Oracle's lips; his turn dies with the question.");
 		const [button, voiced] = actionBodies();
 		expect(voiced).toEqual(button);
 		expect(voiced).toEqual({ type: 'React', player: 'Human', reaction: 'Hex' });
@@ -1073,9 +1067,7 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		emit({ type: 'listening' });
 		playerSpeaks();
 		const outcome = await executor()({ name: 'hex', args: {} });
-		expect(outcome).toBe(
-			"You close the Oracle's lips. His question dies unanswered — his turn with it."
-		);
+		expect(outcome).toBe("You close the Oracle's lips; his turn dies with the question.");
 		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Hex' }]);
 	});
 
@@ -1200,7 +1192,7 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		// to seize: the gate never executes a stale affirmation.
 		await executor()({ name: 'ask', args: { question: 'is it gold?' } });
 		const outcome = await executor()({ name: 'hex', args: {} });
-		expect(outcome).toBe('Sköll asks nothing. There is no question to scry, hex, or pass.');
+		expect(outcome).toBe('Sköll asks nothing to scry, hex, or pass.');
 		// No hex reached the wire — only the auto-pass the ask triggered.
 		expect(actionBodies().filter((body) => body.reaction === 'Hex')).toHaveLength(0);
 	});
@@ -1237,7 +1229,7 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		render(Page, reactProps);
 		await executor()({ name: 'hex', args: {} });
 		const outcome = await executor()({ name: 'pass', args: {} });
-		expect(outcome).toBe('You hold your hand. Let him have his answer.');
+		expect(outcome).toBe('You hold your hand; let him answer.');
 		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Pass' }]);
 	});
 
@@ -1257,9 +1249,87 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		playerSpeaks();
 		const outcome = await executor()({ name: 'scry', args: {} });
 		expect(outcome).toBe(
-			'You lean into the dark and listen. His answer is yours too. Yes. Sól is reaching for a fire rune.'
+			'You lean into the dark; his answer is yours. Yes. Sól is reaching for a fire rune.'
 		);
 		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Scry' }]);
+	});
+
+	// Confidence skip: when the model is sure it read her words right, the gate steps aside and the
+	// move lands on the first call — no confirmation echo to repeat her back to her.
+	it('a confident hex executes on the first call — no confirmation, no spoken word needed', async () => {
+		mockAction({
+			type: 'React',
+			outcome: { ok: true, choice: 'Hex' },
+			skollReaction: { hexed: true },
+			state: HUMAN_TURN
+		});
+		render(Page, reactProps);
+		const outcome = await executor()({ name: 'hex', args: { confidence: 0.95 } });
+		expect(outcome).toBe("You close the Oracle's lips; his turn dies with the question.");
+		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Hex' }]);
+	});
+
+	it('a confident cast executes on the first call — no confirmation question', async () => {
+		mockAction({
+			type: 'Cast',
+			cast: { ok: true, won: false, turnConsumed: true },
+			state: HUMAN_TURN
+		});
+		render(Page, pageProps);
+		const outcome = await executor()({
+			name: 'cast_rune',
+			args: { rune: 'Sowilo', confidence: 0.9 }
+		});
+		expect(outcome).toBe('Sowilo is not the one. The night holds.');
+		expect(actionBodies()).toEqual([{ type: 'Cast', player: 'Human', runeName: 'Sowilo' }]);
+	});
+
+	it('confidence at the floor still gates — the skip is strictly above half', async () => {
+		render(Page, reactProps);
+		const outcome = await executor()({ name: 'scry', args: { confidence: 0.5 } });
+		expect(outcome).toBe(CONFIRM_SCRY);
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	// Model-supplied input: a malformed confidence must never buy a free skip of the safety gate.
+	it.each([Infinity, 5, -1, NaN])(
+		'an out-of-range confidence (%s) is distrusted — the gate still holds',
+		async (confidence) => {
+			render(Page, reactProps);
+			const outcome = await executor()({ name: 'scry', args: { confidence } });
+			expect(outcome).toBe(CONFIRM_SCRY);
+			expect(actionBodies()).toHaveLength(0);
+		}
+	);
+
+	// The Live client batches calls, so a confident call must not jump a confirmation that was
+	// armed in the same breath and never heard — else the model self-confirms (R4 bypass).
+	it('a confident call cannot jump an armed, unheard confirmation', async () => {
+		render(Page, pageProps);
+		// Low confidence arms the gate.
+		expect(await executor()({ name: 'cast_rune', args: { rune: 'Sowilo', confidence: 0.2 } })).toBe(
+			confirmCast('Sowilo')
+		);
+		// A high-confidence second call before the player speaks still asks — it never stakes the round.
+		expect(
+			await executor()({ name: 'cast_rune', args: { rune: 'Sowilo', confidence: 0.99 } })
+		).toBe(confirmCast('Sowilo'));
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	// A spent charge is no move — the server resolves a chargeless Scry/Hex as a Pass. A confident
+	// reading must not silently let his question stand; the voice path refuses, like the button.
+	it('a voiced scry when the charge is spent is refused, not silently passed', async () => {
+		render(Page, {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: false, Hex: true } }
+			}
+		});
+		const outcome = await executor()({ name: 'scry', args: { confidence: 0.99 } });
+		expect(outcome).toBe('Your scrying is spent for the night.');
+		expect(actionBodies()).toHaveLength(0);
 	});
 });
 
@@ -1575,6 +1645,29 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 			.toHaveTextContent('The fire holds your answer.');
 	});
 
+	it('the final flush restores the whole line when a mid-stream settle truncated the fragments', async () => {
+		// The streamed fragments stop short and the turn settles to listening (caption closed)
+		// before the tail lands — the page copy is now truncated. The final fragment carries the
+		// whole assembled line and flushes the complete text back into the panel.
+		const screen = render(Page, pageProps);
+		emit({ type: 'thinking' });
+		emit({ type: 'transcript', direction: 'out', text: 'I wake' });
+		emit({ type: 'speaking' });
+		emit({ type: 'listening' }); // turn settles before the tail fragment arrives
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('I wake');
+		emit({ type: 'transcript', direction: 'out', text: 'I wake with the fire.', final: true });
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('I wake with the fire.');
+	});
+
+	it('a final fragment closes the caption — the next turn replaces, never appends to it', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'transcript', direction: 'out', text: 'First answer.', final: true });
+		emit({ type: 'thinking' });
+		emit({ type: 'transcript', direction: 'out', text: 'Second answer.' });
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('Second answer.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain('First');
+	});
+
 	it('input speech through a confirmation exchange opens the S8 gate (debug-only transcript, no UI line)', async () => {
 		mockAction({
 			type: 'React',
@@ -1594,9 +1687,7 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 		emit({ type: 'transcript', direction: 'in', text: 'yes, hex him' });
 		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
 		const outcome = await executor()({ name: 'hex', args: {} });
-		expect(outcome).toBe(
-			"You close the Oracle's lips. His question dies unanswered — his turn with it."
-		);
+		expect(outcome).toBe("You close the Oracle's lips; his turn dies with the question.");
 	});
 
 	it('the caption persists with the round view — a reload resumes her last spoken line', async () => {

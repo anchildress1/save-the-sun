@@ -62,7 +62,7 @@ The game's core loop—Ask, Hex, Scry, Pass, Cast—runs entirely on buttons and
 The client opens a Gemini Live API session (audio in, audio out, voice `Gacrux`) when the player taps the medallion.
 
 - [x] Given the medallion is tapped from asleep, when the session opens, then the medallion enters the listening state and mic audio streams to the session.
-- [x] On first wake of a game, the Oracle speaks an in-character invitation that names the speakable actions ("Ask, or bid me hex, scry, pass, or cast the rune")—this is the voice tutorial; no UI chrome teaches it.
+- [x] On first wake of a game, the Oracle speaks a short in-character greeting ("I wake with the fire.")—kept brief so the open mic can't trip a barge-in on her own audio mid-line.
 - [x] Given the Oracle is speaking, when the player speaks over her, then her audio stops (barge-in) and the new utterance is processed.
 - [x] Given the session drops (network), then the UI falls back to button mode with a non-blocking notice—the game never stalls on voice failure.
 - [x] Given mic permission is denied or no mic device exists, then the medallion settles into a permanently eclipsed, inert state (or hides), a single quiet notice explains voice is unavailable, and the button game is untouched. No repeated permission prompts.

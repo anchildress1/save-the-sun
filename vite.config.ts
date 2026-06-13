@@ -33,10 +33,10 @@ export default defineConfig({
 				branches: 80,
 				functions: 85,
 				statements: 85,
-				'src/lib/server/engine/engine.ts': { lines: 100, branches: 95 },
-				'src/lib/server/engine/queries.ts': { lines: 100, branches: 95 },
-				'src/lib/server/engine/actions.ts': { lines: 90, branches: 85 },
-				'src/lib/server/engine/reactions.ts': { lines: 95, branches: 90 },
+				'src/lib/server/engine/engine.ts': { lines: 100, branches: 100 },
+				'src/lib/server/engine/queries.ts': { lines: 100, branches: 100 },
+				'src/lib/server/engine/actions.ts': { lines: 100, branches: 100 },
+				'src/lib/server/engine/reactions.ts': { lines: 100, branches: 100 },
 				// S6 fallback-policy floor: the deterministic floor is the demo's safety net, held to
 				// the engine-adjacent bar; the orchestration carries the dev-only debug branches.
 				'src/lib/server/skoll/floor.ts': { lines: 97, branches: 100 },

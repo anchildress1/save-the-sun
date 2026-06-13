@@ -442,6 +442,25 @@ describe('voiceSession oracle speech', () => {
 		expect(tees.join(' ')).toContain('spoke: It is cast.');
 	});
 
+	it('flushes the whole assembled out line as a final fragment on turnComplete', () => {
+		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'It is ' } } });
+		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'cast.' } } });
+		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		// The streamed fragments, then one authoritative final carrying the complete line — the
+		// caption flush the UI needs when the turn settles before the tail fragments land.
+		expect(events).toContainEqual({
+			type: 'transcript',
+			direction: 'out',
+			text: 'It is cast.',
+			final: true
+		});
+	});
+
+	it('a silent turnComplete emits no final out fragment', () => {
+		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		expect(events.filter((e) => e.type === 'transcript')).toEqual([]);
+	});
+
 	it('a silent turnComplete tees no transcript lines', () => {
 		callbacks!.onmessage({ serverContent: { turnComplete: true } });
 		const teed = teeBodies().join(' ');
@@ -459,6 +478,16 @@ describe('voiceSession oracle speech', () => {
 		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'is it a fire rune' } } });
 		vs.sleep();
 		expect(teeBodies().join(' ')).toContain('heard: is it a fire rune');
+	});
+
+	it('sleep mid-line tees the partial but emits no UI final — never bleeds into the next round', () => {
+		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'The night holds' } } });
+		events = [];
+		vs.sleep();
+		// Teed for /debug…
+		expect(teeBodies().join(' ')).toContain('spoke: The night holds');
+		// …but never delivered as a caption the page would paint over a freshly cleared new round.
+		expect(events.filter((e) => e.type === 'transcript')).toEqual([]);
 	});
 });
 

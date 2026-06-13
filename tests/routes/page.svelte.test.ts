@@ -201,7 +201,7 @@ describe('Save the Sun page', () => {
 			ok: false,
 			reason: 'refusal',
 			refusal: 'mixed-type',
-			line: 'I read one sign at a time. Ask of element, or power, or light, or hue — not two at once.',
+			line: 'I read one sign at a time, not two.',
 			turnConsumed: false
 		});
 		const screen = render(Page, pageProps);
@@ -419,6 +419,31 @@ describe('Save the Sun page', () => {
 		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
 	});
 
+	it('the live Ask field carries no hover hint', async () => {
+		const screen = render(Page, pageProps);
+		const input = screen.getByLabelText(/ask the oracle/i);
+		await expect.element(input).toBeEnabled();
+		expect(input.element().getAttribute('title')).toBe('');
+	});
+
+	it("a shut Ask field during Sköll's hanging question explains itself — disabled with a react-first hint", async () => {
+		const screen = render(
+			Page,
+			props(
+				{ activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 },
+				{
+					echo: 'I scent a fire rune on her.',
+					held: { Scry: true, Hex: true }
+				}
+			)
+		);
+		const input = screen.getByLabelText(/ask the oracle/i);
+		await expect.element(input).toBeDisabled();
+		expect(input.element().getAttribute('title')).toBe(
+			'Answer Sköll first — Scry, Hex, or Pass — then ask.'
+		);
+	});
+
 	it('opens a resumed won round on its win state — no phantom "Your move."', async () => {
 		const screen = render(Page, propsWith(HUMAN_WON));
 		// Hydrated from the load: the pill and panel agree, and play is locked until replay.
@@ -541,7 +566,7 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Hex' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('His question dies unanswered');
+			.toHaveTextContent('his turn dies with the question');
 	});
 
 	it('leaves his box blank on a Cast — no flavor line, just the engine outcome', async () => {
@@ -574,7 +599,7 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Pass' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('You hold your hand. Let him have his answer.');
+			.toHaveTextContent('You hold your hand; let him answer.');
 		// Prompt gone, the static reactions row is back.
 		expect(screen.container.querySelector('[data-testid="reaction-prompt"]')).toBeNull();
 	});
@@ -611,7 +636,7 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Pass' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('You hold your hand. Let him have his answer.');
+			.toHaveTextContent('You hold your hand; let him answer.');
 		// Window closed: the prompt is gone, but a Pass button still exists (the disabled placeholder).
 		expect(screen.container.querySelector('[data-testid="reaction-prompt"]')).toBeNull();
 		const stillThere = [
@@ -636,7 +661,7 @@ describe('Save the Sun page', () => {
 		await expect
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent(
-				'You lean into the dark and listen. His answer is yours too. Yes. Sól is reaching for a gold rune.'
+				'You lean into the dark; his answer is yours. Yes. Sól is reaching for a gold rune.'
 			);
 	});
 
@@ -651,9 +676,7 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
 		await screen.getByRole('button', { name: 'Scry' }).click();
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('His answer is yours too.');
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('his answer is yours.');
 
 		await humanAsks(screen);
 		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
@@ -674,7 +697,7 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Hex' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('His question dies unanswered');
+			.toHaveTextContent('his turn dies with the question');
 		// No stale second line stacked beneath — the outcome is the single panel line.
 		expect(screen.container.querySelector('[data-testid="skoll-voice"]')).toBeNull();
 	});
@@ -688,7 +711,7 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Hex' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('You hold your hand. Let him have his answer.');
+			.toHaveTextContent('You hold your hand; let him answer.');
 	});
 
 	it('voices the Hex in the Oracle text when Sköll silences the human Ask', async () => {
@@ -702,7 +725,7 @@ describe('Save the Sun page', () => {
 		// The Oracle text names Sköll in the rite's voice — NOT his first-person gloat.
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent("Sköll closes the Oracle's lips. Your question dies in the dark.");
+			.toHaveTextContent('Sköll silences the Oracle; your question dies.');
 		expect(screen.getByTestId('answer').element().textContent).not.toContain('My doing');
 	});
 
@@ -946,9 +969,7 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
 		// The stall line shows live, with its retry affordance...
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('The wolf stalls in the dark');
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The wolf stalls');
 		await expect.element(screen.getByTestId('rouse-wolf')).toBeInTheDocument();
 		// ...but storage holds the last good line, not the transient error — a reload (which re-drives
 		// his move) resumes a coherent view instead of a dead end with no rouse button.

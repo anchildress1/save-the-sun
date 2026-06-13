@@ -44,8 +44,10 @@ export type VoiceEvent =
 	| { type: 'asleep' }
 	| { type: 'eclipsed' }
 	| { type: 'error'; reason: VoiceErrorReason; notice: string }
-	// Text arrives as incremental fragments; turn boundaries ride the state events.
-	| { type: 'transcript'; direction: 'in' | 'out'; text: string };
+	// Text arrives as incremental fragments; turn boundaries ride the state events. The turn's
+	// end carries one `final` out fragment — the whole assembled line — so the caption can flush
+	// to the complete text even when audio drains (and the turn settles) before the tail fragments.
+	| { type: 'transcript'; direction: 'in' | 'out'; text: string; final?: boolean };
 
 export type VoiceListener = (event: VoiceEvent) => void;
 
@@ -177,8 +179,9 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	function teardown(): void {
-		// A mid-turn sleep/failure must not swallow what was already transcribed.
-		flushTranscripts();
+		// A mid-turn sleep/failure must not swallow what was already transcribed — but tee only,
+		// never as a UI `final`: the page may have cleared the panel and switched rounds already.
+		flushTranscripts(false);
 		generation++;
 		liveReady = false;
 		awaitingDrain = false;
@@ -338,10 +341,18 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	// Transcripts reach the UI as live fragments (S10's surface); the /debug stream gets one
-	// assembled line per side per turn instead of a fragment flood.
-	function flushTranscripts(): void {
+	// assembled line per side per turn instead of a fragment flood. On a real turn boundary the out
+	// side also re-emits as one `final` fragment: the streamed fragments can truncate in the UI when
+	// the turn settles mid-stream, so the whole line is replayed once the turn is done. A teardown
+	// (sleep/new round/failure) tees only — `emitFinal: false` — or the prior round's line would land
+	// on the page after it has cleared the panel and switched rounds, persisting a stale caption.
+	function flushTranscripts(emitFinal = true): void {
 		if (transcriptIn) teeDebug('info', `heard: ${transcriptIn}`);
-		if (transcriptOut) teeDebug('info', `spoke: ${transcriptOut}`);
+		if (transcriptOut) {
+			teeDebug('info', `spoke: ${transcriptOut}`);
+			if (emitFinal)
+				emit({ type: 'transcript', direction: 'out', text: transcriptOut, final: true });
+		}
 		transcriptIn = '';
 		transcriptOut = '';
 	}

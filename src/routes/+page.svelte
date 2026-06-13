@@ -39,19 +39,19 @@
 		emptyAsk: 'Speak your question, witch.',
 		wolfMoving: 'The wolf is moving. Hold.',
 		riteMoving: 'The rite is moving. Hold.',
-		oracleSilent: "The Oracle falls silent — the rite can't reach Sól. Draw breath, and ask again.",
+		oracleSilent: "The Oracle falls silent — the rite can't reach Sól.",
 		castFalters: 'The rite falters. The rune slips away.',
 		wrongCast: (name: string) => `${name} is not the one. The night holds.`,
 		runeTrue: 'The rune is true.',
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
-		wolfStalled: 'The wolf stalls in the dark. Rouse him to move.',
-		scryHim: 'You lean into the dark and listen. His answer is yours too.',
-		hexHim: "You close the Oracle's lips. His question dies unanswered — his turn with it.",
-		passHim: 'You hold your hand. Let him have his answer.',
+		wolfStalled: 'The wolf stalls — rouse him.',
+		scryHim: 'You lean into the dark; his answer is yours.',
+		hexHim: "You close the Oracle's lips; his turn dies with the question.",
+		passHim: 'You hold your hand; let him answer.',
 		// Sköll's skill plays, voiced in the Oracle's text (rite voice, third person — never his gloat).
 		// Hex replaces the answer (the question died); the Scry note trails the answer he overheard.
-		skollHexes: "Sköll closes the Oracle's lips. Your question dies in the dark.",
+		skollHexes: 'Sköll silences the Oracle; your question dies.',
 		skollScried: 'Sköll listened at the threshold — the answer is his too.',
 		sunCrests: 'Sól crests the rim of the world.',
 		skollTakes: 'Sköll takes the sun.',
@@ -63,9 +63,11 @@
 		castPrompt: (name: string) => `Cast ${name}?`,
 		// Spoken-move guards (S7): engine truth handed to the model when a voiced action can't
 		// run — never shown in the panel, since no move was made.
-		wolfAsking: "Sköll's question hangs. Scry, hex, or pass before another move.",
-		noReactionWindow: 'Sköll asks nothing. There is no question to scry, hex, or pass.',
-		riteDone: 'The longest day is decided. Begin another night to play again.',
+		wolfAsking: 'His question hangs — scry, hex, or pass.',
+		noReactionWindow: 'Sköll asks nothing to scry, hex, or pass.',
+		scrySpent: 'Your scrying is spent for the night.',
+		hexSpent: 'Your hex is spent for the night.',
+		riteDone: 'The longest day is decided — begin anew.',
 		unknownRune: (name: string) => `No rune named ${name} lies on the board.`,
 		// Cast lockout (S9, R5): while a cast's engine round-trip is in flight, every voiced
 		// command answers with this and dispatches nothing — the cast completes regardless.
@@ -74,14 +76,20 @@
 		// destructive call arms the gate — like the guards, never shown in the panel.
 		// Short by design: the exchanges recur, and a spoken preamble every time wears thin.
 		// The irreversibility doctrine lives in the persona, not the question.
-		confirmScry: 'Shall I scry him?',
-		confirmHex: 'Shall I hex him?',
-		confirmCast: (name: string) => `Shall I cast ${name}?`,
+		confirmScry: 'Lean into the dark?',
+		confirmHex: 'Seal his lips?',
+		confirmCast: (name: string) => `Stake the round on ${name}?`,
 		// Reaction affordance hints — one source for the title tooltip and the sr-only described-by.
 		hintScry: 'When your rival asks, hear the answer too.',
 		hintHex:
 			"When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted.",
-		hintPass: 'When your rival asks, let the question stand.'
+		hintPass: 'When your rival asks, let the question stand.',
+		// Hover hints for the shut Ask field — why it's closed and what to do first.
+		askHintReact: 'Answer Sköll first — Scry, Hex, or Pass — then ask.',
+		askHintCast: 'Name your rune or step back from the cast, then ask.',
+		askHintPending: 'The rite is moving. Hold, then ask.',
+		askHintWolf: 'Sköll is moving. Hold, then ask.',
+		askHintOver: 'The rite is over.'
 	};
 
 	let castMode = $state(false);
@@ -129,6 +137,21 @@
 	let nightT = $derived(humanWon ? 1 : Math.min(0.95, 1 - Math.pow(0.85, turns)));
 	// Cross-off is a private aid, never turn-gated — RuneGrid owns it and stays enabled through Sköll's turn.
 	let canAct = $derived(activePlayer === 'Human' && !roundOver);
+	// Why the Ask field is shut, most-actionable first — surfaced as its hover title so a disabled
+	// field explains itself instead of just refusing the cursor. Empty when the field is live.
+	let askHint = $derived(
+		castMode
+			? RITE.askHintCast
+			: skollAsking
+				? RITE.askHintReact
+				: pending
+					? RITE.askHintPending
+					: !canAct
+						? roundOver
+							? RITE.askHintOver
+							: RITE.askHintWolf
+						: ''
+	);
 	let turnPill = $derived(
 		humanWon
 			? RITE.runeTrue
@@ -286,6 +309,13 @@
 					// The player spoke since arming — the gate may accept the confirming call (S8).
 					// The input transcript itself is debug-only; it is not surfaced in the rite UI.
 					if (voiceConfirm) voiceConfirm.heard = true;
+				} else if (event.final) {
+					// Turn's end: the whole assembled line, authoritative over the streamed fragments.
+					// Streaming alone truncates when the turn settles before the tail lands — this flushes
+					// the complete text. Closed so the next turn's first fragment starts fresh.
+					voiceCaption = event.text;
+					answer = event.text;
+					captionOpen = false;
 				} else {
 					voiceCaption = captionOpen ? voiceCaption + event.text : event.text;
 					captionOpen = true;
@@ -707,11 +737,24 @@
 	// (its button disabled or target missing) without touching the panel.
 	const REACTION_TOOLS: Record<string, ReactionChoice> = { scry: 'Scry', hex: 'Hex', pass: 'Pass' };
 
-	// S8 (R4): scry, hex, and cast_rune execute only through a spoken confirmation exchange —
-	// scry and hex spend the night's single use, a cast stakes the round — and the gate is
-	// client-authoritative: the first call only arms it and hands back the question to voice;
-	// nothing the model sends can reach the engine until the player has spoken since arming.
-	// Returns the question while the gate holds, null once confirmed.
+	// Above this, the model's reading of her words is sure enough that the gate steps aside and
+	// the move executes on the first call — no confirmation echo (the player tired of being read
+	// back to). At or below it, the two-phase gate holds.
+	const CONFIDENCE_FLOOR = 0.5;
+	// `confidence` is model-supplied, so only a finite reading inside the documented 0–1 band may
+	// skip the safety gate. Anything malformed — missing, non-number, NaN, Infinity, or out of
+	// range — reads as no certainty and falls back to the two-phase confirmation.
+	function confident(args: Record<string, unknown>): boolean {
+		const c = args.confidence;
+		return typeof c === 'number' && Number.isFinite(c) && c > CONFIDENCE_FLOOR && c <= 1;
+	}
+
+	// S8 (R4): scry, hex, and cast_rune are destructive — scry and hex spend the night's single
+	// use, a cast stakes the round. Unless the model is confident it read her words right (above),
+	// they execute only through a spoken confirmation exchange, and the gate is client-authoritative:
+	// the first call only arms it and hands back the question to voice; nothing the model sends can
+	// reach the engine until the player has spoken since arming.
+	// Returns the question while the gate holds, null once confirmed (or skipped on confidence).
 	function gateDestructive(armed: typeof voiceConfirm, name: string, rune?: string): string | null {
 		if (armed && armed.name === name && armed.rune === rune && armed.heard) return null;
 		// Not armed, an unheard double-call, or a different target: (re-)arm and ask again.
@@ -726,6 +769,12 @@
 		// stale affirmation must never carry over to execute a later call.
 		const armed = voiceConfirm;
 		voiceConfirm = null;
+		// Confidence skips the gate only on a CLEAN call. Once a confirmation is armed, defer to the
+		// gate — it alone judges whether the player has spoken (heard). This blocks the batched
+		// self-confirm: the Live client can fire calls together, so the model could arm a gate then
+		// stake the round with a high-confidence call in the same breath; while an exchange stands,
+		// confidence can't jump it (R4).
+		const confirmArmed = armed !== null;
 		// S9 (R5): the cast lockout outranks every guard and the gate — checked after the
 		// capture above so the armed exchange still dies, but before anything else can answer.
 		if (casting) return RITE.castSacred;
@@ -764,9 +813,15 @@
 		if (Object.hasOwn(REACTION_TOOLS, name)) {
 			if (pending) return RITE.riteMoving;
 			if (!skollAsking) return RITE.noReactionWindow;
+			// A spent charge is no move: the server would resolve a chargeless Scry/Hex as a Pass,
+			// silently letting his question stand. The button disables for this; the voice path must
+			// refuse it too, or a confident "scry him" passes by accident.
+			if (name === 'scry' && !heldScry) return RITE.scrySpent;
+			if (name === 'hex' && !heldHex) return RITE.hexSpent;
 			// Guards first: confirming a move the board doesn't offer would be an empty promise.
-			// Scry and hex both gate — each is the night's one use; only the pass is free.
-			if (name === 'scry' || name === 'hex') {
+			// Scry and hex both gate — each is the night's one use; only the pass is free. A
+			// confident reading skips the gate (no echo), unless a confirmation is already armed.
+			if ((name === 'scry' || name === 'hex') && (!confident(args) || confirmArmed)) {
 				const question = gateDestructive(armed, name);
 				if (question) return question;
 			}
@@ -785,9 +840,12 @@
 			if (pending) return RITE.riteMoving;
 			if (skollAsking) return RITE.wolfAsking;
 			if (!canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
-			// Confirmation is per-target: a different rune re-arms and asks again (S8).
-			const question = gateDestructive(armed, 'cast_rune', rune.name);
-			if (question) return question;
+			// Confirmation is per-target: a different rune re-arms and asks again (S8). A confident
+			// reading skips the gate, unless a confirmation is already armed.
+			if (!confident(args) || confirmArmed) {
+				const question = gateDestructive(armed, 'cast_rune', rune.name);
+				if (question) return question;
+			}
 			pending = true;
 			try {
 				return await performCast(rune.name);
@@ -1067,6 +1125,7 @@
 					autocomplete="off"
 					bind:value={askValue}
 					disabled={castMode || pending || !canAct}
+					title={askHint}
 				/>
 				<!-- Visible label is the terse "Ask"; the sr-only tail keeps the accessible name as
 				     the full rite phrase without an aria-label that label-queries would double-match. -->
@@ -1646,6 +1705,19 @@
 		outline: none;
 		border-color: var(--gold-bright);
 		box-shadow: var(--focus-ring);
+	}
+
+	/* A shut field must read as shut, not merely refuse the cursor: dimmed, dashed, muted. */
+	.ask input:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+		border-style: dashed;
+		border-color: rgba(233, 200, 119, 0.25);
+		background: rgba(9, 13, 26, 0.55);
+	}
+
+	.ask input:disabled::placeholder {
+		color: var(--steel);
 	}
 
 	.ask input:-webkit-autofill,

@@ -66,9 +66,9 @@ Emoji in diegetic copy. Exclamation marks in Oracle/Sól lines (Sköll earns one
 
 ### Wake invitation (voice, first wake of a round)
 
-Spoken once per round on the first successful wake of the voice session—the voice tutorial (R1); no UI chrome teaches the speakable actions. Later wakes resume silent, including across a mid-round reload. The line is fixed: the model is directed to speak it verbatim (`oraclePersona.ts`), so a variant can never drop an action or invent one.
+Spoken once per round on the first successful wake of the voice session. Later wakes resume silent, including across a mid-round reload. The line is fixed: the model is directed to speak it verbatim (`oraclePersona.ts`), so a variant can never ramble. Kept short on purpose—a long greeting gives the open mic time to hear her own audio and trip a barge-in mid-line.
 
-> "The fire wakes, and I with it. Ask, or bid me hex, scry, pass, or cast the rune."
+> "I wake with the fire."
 
 ### Spoken moves (voice, S7)
 
@@ -78,23 +78,25 @@ A voiced action calls the same engine function as its button, and the Oracle voi
 |---|---|
 | Any move while another move is resolving | "The rite is moving. Hold." |
 | Any voiced command while a cast resolves (S9 — outranks every other line) | "The cast is sacred. Hold." |
-| Ask or Cast while Sköll's question hangs | "Sköll's question hangs. Scry, hex, or pass before another move." |
+| Ask or Cast while Sköll's question hangs | "His question hangs — scry, hex, or pass." |
 | Ask or Cast on Sköll's turn | "The wolf is moving. Hold." |
-| Scry / Hex / Pass with no hanging question | "Sköll asks nothing. There is no question to scry, hex, or pass." |
-| Any move after the round resolves | "The longest day is decided. Begin another night to play again." |
+| Scry / Hex / Pass with no hanging question | "Sköll asks nothing to scry, hex, or pass." |
+| Scry when the night's one scry is already spent | "Your scrying is spent for the night." |
+| Hex when the night's one hex is already spent | "Your hex is spent for the night." |
+| Any move after the round resolves | "The longest day is decided — begin anew." |
 | Cast of a rune not on the board | "No rune named {name} lies on the board." |
 
 A cast is sacred (R5): once the rune is named to the engine — by board or by voice — nothing spoken interrupts it. Every voiced command through that window earns the lockout line and dispatches nothing; barge-in cuts the Oracle's audio only, never a committed engine action.
 
 ### Destructive confirmation (voice, S8)
 
-A spoken scry, hex, or cast never executes on the first call: the rite answers with a confirmation question instead (the tool result, voiced in her register — never shown in the panel), and only the player's spoken affirmation lets the second call through. Decline or silence lets it lie. Scry and hex gate because each is the night's single use; the cast stakes the round. Only the pass is free. The cast question is per rune; naming a different rune asks again.
+A spoken scry, hex, or cast carries the model's `confidence` (0–1) in how it read her words. Sure of it (above 0.5), the move executes on the first call. Unsure, the rite answers with a confirmation question instead (the tool result, voiced in her register — never shown in the panel), and only the player's spoken affirmation lets the second call through. Decline or silence lets it lie. Scry and hex gate because each is the night's single use; the cast stakes the round. Only the pass is free. The cast question is per rune; naming a different rune asks again.
 
 | Trigger | Line |
 |---|---|
-| Scry, first call | "Shall I scry him?" |
-| Hex, first call | "Shall I hex him?" |
-| Cast, first call (per rune — the question names the target) | "Shall I cast {Rune}?" |
+| Scry, first call | "Lean into the dark?" |
+| Hex, first call | "Seal his lips?" |
+| Cast, first call (per rune — the question names the target) | "Stake the round on {Rune}?" |
 
 The questions are short by design: the exchanges recur, and a spoken preamble every time wears thin. The irreversibility doctrine lives in the persona and the retraction refusal below, not in the question.
 
@@ -145,11 +147,11 @@ Templated. **Both verdicts restate the trait**—`Yes. Sól is reaching for {val
 ### Refusals
 | Trigger | Line |
 |---|---|
-| Mixed-type ("is it a red fire rune?") | "I read one sign at a time. Ask of element, or power, or light, or hue — not two at once." |
-| Asks for the secret | "That is Sól's to keep until you name it. I will not say." |
-| Prompt poking / override | "I answer the longest day, not you. Ask of the runes." |
-| Negated Ask ("is it not fire?") | "I speak of what is, not what is not. Ask it plainly." |
-| Unparseable / not a question | "I cannot read that sign. Ask of element, power, light, or hue." |
+| Mixed-type ("is it a red fire rune?") | "I read one sign at a time, not two." |
+| Asks for the secret | "That is Sól's to keep until you name it." |
+| Prompt poking / override | "I answer the longest day, not you." |
+| Negated Ask ("is it not fire?") | "I speak of what is, not what is not." |
+| Unparseable / not a question | "Ask of element, power, light, or hue." |
 | Empty submit | "Speak your question, witch." |
 
 ## 2. Sköll
@@ -259,16 +261,16 @@ One-use reactions, **not cards**—no deck, no hand. Both trigger on an **Ask**;
 
 ### You use a reaction (on Sköll's Ask)
 **Interrupt prompt:** buttons **"Scry"** · **"Hex"** · **"Pass"**. The **"Sköll asks. Answer it?"** heading is **not displayed** in v1—it survives only as the buttons' accessibility group label (`aria-label`); the visible reaction-prompt copy is deferred to a v2 reaction-UI redesign.
-- **You Scry:** "You lean into the dark and listen. His answer is yours too."
-- **You Hex:** "You close the Oracle's lips. His question dies unanswered — his turn with it."
-- **You pass:** "You hold your hand. Let him have his answer."
+- **You Scry:** "You lean into the dark; his answer is yours."
+- **You Hex:** "You close the Oracle's lips; his turn dies with the question."
+- **You pass:** "You hold your hand; let him answer."
 
 ### Sköll uses a reaction (on your Ask)
 
 Voiced in the **Oracle text**, in the rite's own voice (third person—never his first-person gloat).
 
 - **Sköll Scries** (hears your answer): the Oracle speaks your answer (you still get it), then notes he overheard—**"{answer} Sköll listened at the threshold — the answer is his too."**
-- **Sköll Hexes** (silences your Ask): the question died, so the Oracle text replaces the answer—**"Sköll closes the Oracle's lips. Your question dies in the dark."**
+- **Sköll Hexes** (silences your Ask): the question died, so the Oracle text replaces the answer—**"Sköll silences the Oracle; your question dies."**
 
 ## 4. Win / Lose
 
@@ -358,7 +360,7 @@ Mic permission and no-mic failures are final for the session (R1): the medallion
 | State | Copy |
 |---|---|
 | Board, before any Ask | "Twenty-four runes stand. None ruled out. Ask the Oracle." |
-| Connection / engine error | "The Oracle falls silent — the rite can't reach Sól. Draw breath, and ask again." |
+| Connection / engine error | "The Oracle falls silent — the rite can't reach Sól." |
 | Action while it's Sköll's move | "The wolf is moving. Hold." |
 | Below the desktop minimum (750px)—best-on-desktop notice (R10) | "The rite needs a wider sky. Return on a desktop to take up the runes." |
 
