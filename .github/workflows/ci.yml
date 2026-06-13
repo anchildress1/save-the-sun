@@ -22,7 +22,8 @@ jobs:
   build_and_test:
     name: Build & Test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 20 not 15: the SonarCloud quality-gate wait adds blocking time on top of build + e2e.
+    timeout-minutes: 20
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 
     steps:
@@ -76,7 +77,11 @@ jobs:
           SONAR_HOST_URL: https://sonarcloud.io
         with:
           # Block until the Compute Engine finishes so the issue count below is final, not stale.
-          args: -Dsonar.qualitygate.wait=true
+          # Bounded wait so a slow Sonar queue fails this step deterministically instead of via the
+          # GitHub job timeout (which would read as an infra flake, not a gate failure).
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=600
 
       - name: Enforce zero Sonar issues
         # The default quality gate tolerates low-severity issues; we don't. Fail CI on ANY
@@ -93,12 +98,21 @@ jobs:
           else
             scope="branch=main"
           fi
-          api="https://sonarcloud.io/api/issues/search?componentKeys=anchildress1_save-the-sun&${scope}&resolved=false"
-          result=$(curl -sfSL -u "${SONAR_TOKEN}:" "${api}&ps=100")
-          count=$(echo "$result" | jq -r '.total')
+          api="https://sonarcloud.io/api/issues/search?componentKeys=anchildress1_save-the-sun&${scope}&resolved=false&ps=500"
+          first=$(curl -sfSL -u "${SONAR_TOKEN}:" "${api}&p=1")
+          count=$(echo "$first" | jq -r '.total')
           echo "Unresolved Sonar issues for ${scope}: ${count}"
-          if [ "${count}" != "0" ]; then
-            echo "$result" | jq -r '.issues[] | "::error::[\(.severity)] \(.component | sub("^[^:]+:";"")):\(.textRange.startLine // 0) \(.rule) — \(.message)"'
-            echo "::error::SonarCloud reports ${count} unresolved issue(s); CI fails on any severity."
-            exit 1
-          fi
+          [ "${count}" = "0" ] && exit 0
+          # Page through ALL issues (ps=500 max) so the failure output annotates every offending
+          # issue, not just the first page — debuggability when clearing a backlog.
+          pages=$(( (count + 499) / 500 ))
+          for p in $(seq 1 "${pages}"); do
+            if [ "${p}" = "1" ]; then
+              page="$first"
+            else
+              page=$(curl -sfSL -u "${SONAR_TOKEN}:" "${api}&p=${p}")
+            fi
+            echo "$page" | jq -r '.issues[] | "::error::[\(.severity)] \(.component | sub("^[^:]+:";"")):\(.textRange.startLine // 0) \(.rule) — \(.message)"'
+          done
+          echo "::error::SonarCloud reports ${count} unresolved issue(s); CI fails on any severity."
+          exit 1
