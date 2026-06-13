@@ -90,7 +90,7 @@ registerHooks({
 	}
 });
 
-const { simulateFloor, playFloorGame, median, BOARD_SIZE } = await import(
+const { simulateFloor, playFloorGame, median, skollSeedFor, BOARD_SIZE } = await import(
 	pathToFileURL(path.join(LIB, 'server', 'skoll', 'sim.ts')).href
 );
 
@@ -168,10 +168,13 @@ async function runLive(games) {
 		// this is a decision count, not a raw network-call count). A decision that throws or returns an
 		// illegal move floors inside takeSkollTurn — r.floorMoves catches that so a degraded run can't
 		// masquerade as live evidence.
+		// Engine seed = `seed` (so the secret + per-run label stay reproducible); Sköll gets an
+		// independent decorrelated seed, mirroring production's two separate randomSeed() calls so the
+		// opening hunch handed to Gemini isn't coupled to selectSecret(seed).
 		const r = await playFloorGame(
 			seed,
 			new GameEngine(seed),
-			freshSkollState(seed),
+			freshSkollState(skollSeedFor(seed)),
 			decideSkollMove
 		);
 		const decisions = r.turns;

@@ -36,6 +36,14 @@ export interface SimResult {
 // sim measures the floor through the real orchestration without a network or a key.
 const FLOOR_ONLY: SkollDecide = () => Promise.reject(new Error('sim: floor-only'));
 
+// Production seeds the engine and Sköll from two INDEPENDENT randomSeed() calls (create vs getSkoll),
+// so Sköll's opening hunch — the one fact handed to Gemini — is uncorrelated with the secret. Reusing
+// one seed for both would couple the hunch/move stream to selectSecret(seed) and measure a synthetic
+// setup. Derive a decorrelated-but-deterministic Sköll seed (Knuth multiplicative hash) to mirror prod.
+export function skollSeedFor(seed: number): number {
+	return Math.imul(seed, 2654435761) >>> 0;
+}
+
 export interface SimMetrics {
 	games: number;
 	wins: number;
@@ -59,14 +67,14 @@ const MAX_MOVES = 100;
  * @param engine engine override, for tests that need to force the harness-invariant guards; defaults
  *   to a fresh engine on the same seed.
  * @param state Sköll-state override, for tests that need to pre-collapse the live set; defaults to a
- *   fresh seeded state (the production path).
+ *   fresh state on an independent (decorrelated) seed, mirroring production's separate randomSeed().
  * @param decide move decider; defaults to the floor-only rejector. The live runner passes the real
  *   `decideSkollMove` to play a live Gemini game through this exact loop.
  */
 export async function playFloorGame(
 	seed: number,
 	engine: GameEngine = new GameEngine(seed),
-	state: SkollState = freshSkollState(seed),
+	state: SkollState = freshSkollState(skollSeedFor(seed)),
 	decide: SkollDecide = FLOOR_ONLY
 ): Promise<SimResult> {
 	const secret = selectSecret(seed);

@@ -18,9 +18,9 @@ competent human can beat him, fast enough that he's a real threat.
 | games (seeds) | 1000 |
 | board size | 24 runes |
 | win rate | 100.0% |
-| mean turns-to-win | **8.37** |
+| mean turns-to-win | **8.26** |
 | median turns-to-win | 8 |
-| min / max turns | 2 / 20 |
+| min / max turns | 2 / 19 |
 | target window | 7.5–9 |
 | within window | yes ✅ |
 
@@ -28,24 +28,24 @@ competent human can beat him, fast enough that he's a real threat.
 
 | turns | games | share | |
 | --- | --- | --- | --- |
-| 2 | 23 | 2.3% | ██████ |
-| 3 | 34 | 3.4% | █████████ |
-| 4 | 73 | 7.3% | ███████████████████ |
-| 5 | 92 | 9.2% | ████████████████████████ |
-| 6 | 101 | 10.1% | ██████████████████████████ |
-| 7 | 117 | 11.7% | ██████████████████████████████ |
-| 8 | 100 | 10.0% | ██████████████████████████ |
-| 9 | 110 | 11.0% | ████████████████████████████ |
-| 10 | 79 | 7.9% | ████████████████████ |
-| 11 | 70 | 7.0% | ██████████████████ |
-| 12 | 67 | 6.7% | █████████████████ |
-| 13 | 62 | 6.2% | ████████████████ |
-| 14 | 30 | 3.0% | ████████ |
-| 15 | 19 | 1.9% | █████ |
-| 16 | 16 | 1.6% | ████ |
-| 17 | 4 | 0.4% | █ |
-| 19 | 2 | 0.2% | █ |
-| 20 | 1 | 0.1% | █ |
+| 2 | 26 | 2.6% | ███████ |
+| 3 | 45 | 4.5% | ████████████ |
+| 4 | 74 | 7.4% | ███████████████████ |
+| 5 | 91 | 9.1% | ████████████████████████ |
+| 6 | 104 | 10.4% | ███████████████████████████ |
+| 7 | 115 | 11.5% | ██████████████████████████████ |
+| 8 | 99 | 9.9% | ██████████████████████████ |
+| 9 | 91 | 9.1% | ████████████████████████ |
+| 10 | 95 | 9.5% | █████████████████████████ |
+| 11 | 72 | 7.2% | ███████████████████ |
+| 12 | 66 | 6.6% | █████████████████ |
+| 13 | 46 | 4.6% | ████████████ |
+| 14 | 37 | 3.7% | ██████████ |
+| 15 | 13 | 1.3% | ███ |
+| 16 | 13 | 1.3% | ███ |
+| 17 | 7 | 0.7% | ██ |
+| 18 | 5 | 0.5% | █ |
+| 19 | 1 | 0.1% | █ |
 
 <!-- LIVE:START -->
 ## Live wolf testing (local, real Gemini)
@@ -54,6 +54,10 @@ The deterministic floor above is the CI proxy. This section is the **real thing*
 (`gemini-3.5-flash`, the actual `decideSkollMove` brain) driven through the *same* engine loop as the
 floor, one Gemini decision per move. Run locally with a `GEMINI_API_KEY` — never in CI, which has no key.
 Regenerate with `node scripts/skoll-sim.mjs --live [games]`.
+
+> ⚠️ **Recorded before the seed-decoupling fix.** This run reused one seed for the engine and Sköll; the
+> runner now seeds Sköll independently (mirroring production), so these turns/decisions will change on the
+> next `--live` regeneration. The per-seed secrets are unaffected (`selectSecret(seed)`).
 
 **How it was tested.** For each seed 1–10: a fresh `GameEngine` and `freshSkollState` (production
 path), the human seat passes, and Sköll plays every move via `decideSkollMove` against the live API. The
