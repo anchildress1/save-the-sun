@@ -132,6 +132,9 @@ git clone git@github.com:anchildress1/save-the-sun.git
 cd save-the-sun
 make install                 # pnpm install + playwright browsers
 cp .env.example .env         # then add your GEMINI_API_KEY
+# Heads up: saving a server-side file restarts the SSR module (Vite HMR), which clears the
+# in-memory game state — the round's secret re-rolls and /debug resets. Restart for a clean
+# round, or just reload, after a server edit. Client-only edits hot-reload normally.
 make dev                     # vite dev server
 ```
 

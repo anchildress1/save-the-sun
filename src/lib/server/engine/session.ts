@@ -9,36 +9,17 @@ import { resetLog, logEvent } from '$lib/server/debug/log';
 // first key the least-recently-used; every access re-inserts to the end. 1000 is far above any
 // plausible jam load.
 export const MAX_SESSIONS = 1000;
-
-// Vite re-evaluates this module on every server-file save in dev (HMR), which would wipe the
-// in-memory registry — silently re-rolling each live session's secret and flooding /debug with
-// fresh "new round" lines mid-playtest. Anchoring the maps on globalThis lets them survive module
-// re-eval, so a round (and its secret) outlives an edit. In prod the module evaluates once, so
-// this is a one-time assignment with no effect.
-interface Registry {
-	engines: Map<string, GameEngine>;
-	// Sköll's per-round memory, lifecycle-linked to the engine so the two can never drift.
-	skolls: Map<string, SkollState>;
-	// A per-round opaque token for the client's view-state storage key — minted on demand,
-	// dropped on a new round/eviction so it changes exactly when the secret does. It is NOT
-	// derived from the seed (which would let the client brute-force the secret), so exposing it
-	// can never leak the answer.
-	roundIds: Map<string, string>;
-	// The public display seed for the on-screen board order, held for the round's lifetime so a
-	// reload does not reshuffle. Independent of the secret seed — exposing it can't leak the answer.
-	boardSeeds: Map<string, number>;
-	// Per-session single-flight tail (see withSessionLock).
-	locks: Map<string, Promise<unknown>>;
-}
-const globalForRegistry = globalThis as typeof globalThis & { __stsRegistry?: Registry };
-const registry: Registry = (globalForRegistry.__stsRegistry ??= {
-	engines: new Map(),
-	skolls: new Map(),
-	roundIds: new Map(),
-	boardSeeds: new Map(),
-	locks: new Map()
-});
-const { engines, skolls, roundIds, boardSeeds, locks } = registry;
+const engines = new Map<string, GameEngine>();
+// Sköll's per-round memory, lifecycle-linked to the engine so the two can never drift.
+const skolls = new Map<string, SkollState>();
+// A per-round opaque token for the client's view-state storage key — minted on demand,
+// dropped on a new round/eviction so it changes exactly when the secret does. It is NOT
+// derived from the seed (which would let the client brute-force the secret), so exposing it
+// can never leak the answer.
+const roundIds = new Map<string, string>();
+// The public display seed for the on-screen board order, held for the round's lifetime so a
+// reload does not reshuffle. Independent of the secret seed — exposing it can't leak the answer.
+const boardSeeds = new Map<string, number>();
 
 function randomSeed(): number {
 	return crypto.getRandomValues(new Uint32Array(1))[0];
@@ -150,7 +131,7 @@ export function sessionCount(): number {
 
 // Per-session single-flight: an action yields mid-flight (takeSkollTurn awaits Gemini) on shared
 // state, so without this a duplicate tab / retry / direct POST could interleave and corrupt it.
-// `locks` lives on the HMR-surviving registry (above) for the same reason the engines do.
+const locks = new Map<string, Promise<unknown>>();
 
 /** Run `fn` after any in-flight action for this session settles — serializing per-session mutation. */
 export function withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {

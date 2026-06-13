@@ -184,15 +184,3 @@ describe('raw Gemini sink (per session)', () => {
 		delete mock.env.GEMINI_API_KEY;
 	});
 });
-
-// The log is anchored on globalThis so a dev HMR re-eval doesn't wipe it out from under the live
-// engine (session.ts persists the engine the same way) — otherwise /debug would name a secret the
-// engine no longer holds. Last in the file: it resets the module registry.
-describe('debug log survives module re-evaluation (dev HMR)', () => {
-	it('keeps a session log across a module reload', async () => {
-		logEvent('hmr-log', ev({ message: 'before reload' }));
-		vi.resetModules();
-		const reimported = await import('$lib/server/debug/log');
-		expect(reimported.getEvents('hmr-log').map((e) => e.message)).toContain('before reload');
-	});
-});
