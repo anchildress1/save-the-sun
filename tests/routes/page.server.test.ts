@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { load } from '$routes/+page.server';
 import { getEngine, getSkoll, resetEngine } from '$lib/server/engine/session';
 import { selectSecret } from '$lib/server/engine/engine';
+import { runes } from '$lib/board';
 import type { GameState } from '$lib/server/engine/actions';
 
 type PendingReaction = { echo: string; held: { Scry: boolean; Hex: boolean } } | null;
@@ -127,5 +128,50 @@ describe('+page.server load — engine lifetime', () => {
 		expect(getEngine('keep-a').cast('Human', selectSecret(SEED).name)).toMatchObject({
 			won: true
 		});
+	});
+});
+
+// A reload mid-rite loses the in-flight Advance response — so the wolf's move is only ever honest
+// on resume from the engine, which mutated server-side before the response was dropped. These prove
+// the load reports engine truth for each shape his turn can be in on resume: handed back after a
+// wrong cast, won after a true one, or still unplayed (the reload beat the Advance) for the client
+// to re-drive. (The parked-Ask shape is covered by 'rehydrates Sköll's parked Ask' above.)
+describe('+page.server load — Sköll turn reload reconcile', () => {
+	// Any rune that isn't the seed's secret — its cast is wrong, never a win.
+	const secretName = selectSecret(SEED).name;
+	const wrong = runes.find((r) => r.name !== secretName);
+	if (wrong === undefined) throw new Error(`no non-secret rune for seed ${SEED} (${secretName})`);
+	const wrongRune = wrong.name;
+
+	it('reports the human active after a Sköll wrong-cast resolved server-side, nothing parked', () => {
+		resetEngine('reload-handback', SEED);
+		const engine = getEngine('reload-handback');
+		engine.ask('Human', { axis: 'color', value: 'Gold' }); // her turn → Sköll
+		engine.cast('Sköll', wrongRune); // his wrong cast → back to her
+		// The lost Advance response is irrelevant: the load reports the engine's truth on resume.
+		const { state, pendingReaction } = runLoad('reload-handback');
+		expect(state).toMatchObject({ activePlayer: 'Human', status: 'active', winner: null });
+		expect(pendingReaction).toBeNull(); // a resolved cast leaves no interrupt to restore
+	});
+
+	it('reports a Sköll win after his cast took the round server-side', () => {
+		resetEngine('reload-skoll-won', SEED);
+		const engine = getEngine('reload-skoll-won');
+		engine.ask('Human', { axis: 'color', value: 'Gold' }); // her turn → Sköll
+		engine.cast('Sköll', selectSecret(SEED).name); // his winning cast
+		expect(runLoad('reload-skoll-won').state).toMatchObject({
+			status: 'won',
+			winner: 'Sköll'
+		});
+	});
+
+	it('reports Sköll still active when the reload beat his unplayed turn — the client re-drives it', () => {
+		resetEngine('reload-unplayed', SEED);
+		const engine = getEngine('reload-unplayed');
+		engine.ask('Human', { axis: 'color', value: 'Gold' }); // her turn → Sköll, his move not yet run
+		const { state, pendingReaction } = runLoad('reload-unplayed');
+		// His turn, nothing parked: the page must drive Advance — the load can't fabricate his move.
+		expect(state).toMatchObject({ activePlayer: 'Sköll', status: 'active' });
+		expect(pendingReaction).toBeNull();
 	});
 });

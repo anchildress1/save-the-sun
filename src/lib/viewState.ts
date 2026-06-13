@@ -7,7 +7,9 @@
 // land on a fresh secret. Every access is guarded: storage throws in private mode, and a
 // failure degrades to the prior reset-on-reload behavior, never to broken play.
 
-const KEY = 'save-the-sun:view';
+/** The single localStorage key holding the per-round view (crossings + voiced line). Exported so
+ *  tests key against the same string the module reads/writes, never a drifting literal. */
+export const VIEW_STATE_KEY = 'save-the-sun:view';
 
 export interface ViewState {
 	/** Crossed-off rune ids — keyed by id, not board position, so they survive the reshuffle. */
@@ -34,7 +36,7 @@ function isViewRecord(value: unknown): value is ViewState & { roundId: string } 
 export function readViewState(roundId: string): ViewState | null {
 	if (!roundId) return null;
 	try {
-		const raw = localStorage.getItem(KEY);
+		const raw = localStorage.getItem(VIEW_STATE_KEY);
 		if (raw === null) return null;
 		const parsed: unknown = JSON.parse(raw);
 		if (!isViewRecord(parsed) || parsed.roundId !== roundId) return null;
@@ -55,7 +57,7 @@ export function readViewState(roundId: string): ViewState | null {
 export function writeViewState(roundId: string, state: ViewState): void {
 	if (!roundId) return;
 	try {
-		localStorage.setItem(KEY, JSON.stringify({ roundId, ...state }));
+		localStorage.setItem(VIEW_STATE_KEY, JSON.stringify({ roundId, ...state }));
 	} catch {
 		/* storage unavailable (private mode) — non-fatal, the view just won't resume */
 	}

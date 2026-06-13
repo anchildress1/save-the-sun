@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Page from '$routes/+page.svelte';
+import { VIEW_STATE_KEY } from '$lib/viewState';
 import type { GameState } from '$lib/server/engine/actions';
 
 const ONBOARDED_KEY = 'save-the-sun:onboarded';
@@ -771,7 +772,7 @@ describe('Save the Sun page — first-run onboarding (S7)', () => {
 // Oracle line) is otherwise thrown away. These prove it is restored from storage, scoped to the
 // round, and degrades safely when storage is unavailable.
 describe('Save the Sun page — view resume on reload (S8.5)', () => {
-	const VIEW_KEY = 'save-the-sun:view';
+	const VIEW_KEY = VIEW_STATE_KEY;
 
 	beforeEach(() => {
 		localStorage.setItem(ONBOARDED_KEY, '1'); // past the title; resume is the subject here
@@ -936,6 +937,89 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('');
 		expect(screen.container.querySelectorAll('.rune-card')).toHaveLength(24);
+	});
+});
+
+// A reload mid-rite interrupts Sköll's turn: the in-flight Advance response is lost, so his move
+// presentation can never arrive that way. The engine resumes server-side, so the load is the only
+// honest source of his last move on resume. These prove a reload landing on his turn reconciles to
+// engine truth — interrupt restored, cast outcome reflected, turn handed back — never opens stuck.
+describe('Save the Sun page — Sköll turn reload reconcile', () => {
+	beforeEach(() => {
+		localStorage.setItem(ONBOARDED_KEY, '1'); // past the title; the resume is the subject here
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+		localStorage.clear();
+	});
+
+	it('restores the interrupt when a reload lands on Sköll’s parked Ask — no Advance fired', async () => {
+		// The load carries the parked Ask (the server-side reaction window); the page must show the
+		// prompt straight from it and NOT re-drive Advance (the human owes a reaction first).
+		const spy = respond({});
+		const screen = render(
+			Page,
+			props(SKOLL_TURN, { echo: 'A gold rune. Mine.', held: { Scry: true, Hex: true } })
+		);
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('A gold rune. Mine.');
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll moves.');
+		expect(spy).not.toHaveBeenCalled();
+	});
+
+	it('reflects a Sköll win when a reload lands after his cast took the round — end screen, not stuck', async () => {
+		// His winning cast resolved server-side; the lost Advance response never mattered. The load
+		// reports the won round, so the resume opens on defeat — never frozen on "Sköll moves."
+		const spy = respond({});
+		const screen = render(Page, propsWith(SKOLL_WON));
+		await expect.element(screen.getByTestId('end-screen')).toBeInTheDocument();
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll takes the sun.');
+		await expect
+			.element(screen.getByTestId('outcome-line'))
+			.toHaveTextContent('Sköll takes the sun.');
+		// Round resolved server-side: no phantom Advance to re-drive his already-spent turn.
+		expect(spy).not.toHaveBeenCalled();
+	});
+
+	it('renders the human turn when a reload lands after Sköll’s wrong cast handed play back', async () => {
+		// His wrong cast resolved server-side and returned the turn; the load reports the human active.
+		// Advance no-ops (not his turn), so the page opens live on her move — the saved line holds.
+		localStorage.setItem(
+			VIEW_STATE_KEY,
+			JSON.stringify({
+				roundId: 'test-round',
+				crossings: [],
+				answer: 'No. Sól is not reaching for a fire rune.',
+				voiceInvited: false
+			})
+		);
+		const spy = respond({});
+		const screen = render(Page, pageProps); // HUMAN_TURN: play handed back
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Your move.');
+		await expect.element(screen.getByRole('button', { name: 'Ask the Oracle' })).toBeEnabled();
+		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
+		// The last good line survives the reload; his wrong cast carries no panel line by design.
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
+		expect(screen.container.querySelector('[data-testid="skoll-echo"]')).toBeNull();
+		// His turn is over — the page must not re-drive a stale Advance against the human's clock.
+		expect(spy).not.toHaveBeenCalled();
+	});
+
+	it('drives Sköll and surfaces his Ask when a reload lands on his unplayed turn', async () => {
+		// The harder case: the human's Ask landed server-side (turn → Sköll) but the reload beat the
+		// Advance. The engine never ran his move, so the load reports his turn with nothing parked —
+		// the page MUST re-drive Advance and surface whatever he does (here, an Ask → the interrupt).
+		const spy = gameStub({ advance: advanceAsk() });
+		const screen = render(Page, propsWith(SKOLL_TURN));
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('A gold rune. Mine.');
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
+		// Exactly one request — the Advance re-drive (gameStub returns advanceAsk only for Advance;
+		// the rendered interrupt proves it was that branch, not a stray player action).
+		expect(spy).toHaveBeenCalledTimes(1);
 	});
 });
 
