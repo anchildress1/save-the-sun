@@ -229,7 +229,7 @@ test.describe('a11y — the whole round is keyboard-operable with a visible focu
 		const prompt = page.getByTestId('reaction-prompt');
 		await expect(prompt).toBeVisible();
 		await prompt.getByRole('button', { name: 'Hex' }).press('Enter');
-		await expect(page.getByTestId('answer')).toContainText('His question dies unanswered');
+		await expect(page.getByTestId('answer')).toContainText('his turn dies with the question');
 	});
 
 	test('shows a visible focus indicator on the rune cards and the controls', async ({ page }) => {
