@@ -89,7 +89,7 @@ Declare five functions on the Live session: `ask`, `hex`, `scry`, `pass`, `cast_
 
 - [x] Oracle output transcript renders in existing Answer panel as she speaks — fragments accumulate per turn into `answer` (so her last spoken line persists with the round view like any voiced line); turn boundaries ride the state events, and a barge-in starts a fresh caption — with no truncation signal, a cut caption may hold words never spoken, so it must never be extended
 - [x] Input transcript (what she heard) visible to player — quiet line under the Answer frame ("The fire hears: …", `ux-copy.md` §1), replaced per utterance, cleared whenever the session sleeps (the mic is off; a lingering heard line would promise listening)
-- [x] Works with output muted (S11) — by construction: both surfaces render from the session's `transcript` events, which ride the socket and never the speaker; S11's GainNode mute has nothing here to break
+- [ ] Verify with output muted once S11 lands — S10's text surfaces render from the session's `transcript` events, not speaker playback, but the mute control does not exist yet
 - Depends: S2
 
 ### S11 — Output mute (R11)
