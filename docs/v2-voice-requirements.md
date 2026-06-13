@@ -82,9 +82,10 @@ Ask, Hex, Scry, Pass, and Cast the Rune are exposed to the Oracle session as fun
 - [x] Voice-initiated and button-initiated actions produce identical engine state. No action exists in voice that lacks a button equivalent.
 
 **R4 — Confirmation for destructive actions.**
-Hex and Cast the Rune require a spoken confirmation exchange before the engine executes.
+Scry, Hex, and Cast the Rune require a spoken confirmation exchange before the engine executes. *(Scry joined the gate 2026-06-12: it spends the night's single use, same stake as the hex.)*
 
 - [x] Given the player says "cast Sowilo," then the Oracle asks for confirmation and executes only on an affirmative reply.
+- [x] Given the player says "scry his question," then the Oracle asks for confirmation and executes only on an affirmative reply — scry and hex are each one of one for the night.
 - [x] Given the player declines or stays silent through the timeout, then nothing executes.
 - [x] Given a rune is cast, when the player attempts to retract it by voice, then the Oracle refuses in character—the cast is committed and irreversible. Her system instruction covers this ("the rune is cast; what is written in fire does not unwrite").
 

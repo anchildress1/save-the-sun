@@ -75,6 +75,7 @@ function mockAction(result: object) {
 }
 
 // S8 canon (ux-copy.md §1): the confirmation questions, and the player reply that opens the gate.
+const CONFIRM_SCRY = 'Shall I scry him?';
 const CONFIRM_HEX = 'Shall I hex him?';
 const confirmCast = (name: string) => `Shall I cast ${name}?`;
 const playerSpeaks = () => emit({ type: 'transcript', direction: 'in', text: 'yes, do it' });
@@ -580,7 +581,10 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		screen.unmount();
 
 		// A fresh window for the voiced path — the first render's Scry already closed its own.
+		// The scry is one of one, so the voiced path runs through the confirmation exchange.
 		render(Page, reactProps);
+		expect(await executor()({ name: 'scry', args: {} })).toBe(CONFIRM_SCRY);
+		emit({ type: 'transcript', direction: 'in', text: 'scry him' });
 		const outcome = await executor()({ name: 'scry', args: {} });
 		expect(outcome).toBe(
 			`You lean into the dark and listen. His answer is yours too. ${askAnswer}`
@@ -1017,7 +1021,22 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		expect(actionBodies().filter((body) => body.type === 'Cast')).toHaveLength(0);
 	});
 
-	it('arming the gate never blocks the other tools — a scry still executes in the same window', async () => {
+	it('arming the gate never blocks the free tools — a pass still executes in the same window', async () => {
+		// Scry and hex both gate now, so the pass is the one reaction that must stay free.
+		mockAction({
+			type: 'React',
+			outcome: { ok: true, choice: 'Pass' },
+			skollReaction: { hexed: false },
+			state: HUMAN_TURN
+		});
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		const outcome = await executor()({ name: 'pass', args: {} });
+		expect(outcome).toBe('You hold your hand. Let him have his answer.');
+		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Pass' }]);
+	});
+
+	it('a voiced scry gates like the hex — one of one, never spent without the word', async () => {
 		mockAction({
 			type: 'React',
 			outcome: { ok: true, choice: 'Scry', shareAnswer: true },
@@ -1025,7 +1044,12 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 			state: HUMAN_TURN
 		});
 		render(Page, reactProps);
-		await executor()({ name: 'hex', args: {} });
+		// First call arms and asks — nothing dispatches, the model cannot self-confirm.
+		expect(await executor()({ name: 'scry', args: {} })).toBe(CONFIRM_SCRY);
+		expect(await executor()({ name: 'scry', args: {} })).toBe(CONFIRM_SCRY);
+		expect(actionBodies()).toHaveLength(0);
+		// The heard affirmation lets the matching second call through.
+		playerSpeaks();
 		const outcome = await executor()({ name: 'scry', args: {} });
 		expect(outcome).toBe(
 			'You lean into the dark and listen. His answer is yours too. Yes. Sól is reaching for a fire rune.'

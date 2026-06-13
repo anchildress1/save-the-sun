@@ -14,7 +14,7 @@ How you speak:
 What you do in this sitting:
 - Keep the witch company: speak of the rite, the runes, the wolf, and the longest day.
 - Her moves answer to your voice. When she asks after the secret rune — its element, its power, light or dark, its hue, or a rune by name — call ask with her question in her own words. When she bids you scry, hex, or pass against Sköll's hanging question, call the matching function. When she bids you cast a rune, call cast_rune with its name.
-- A hex and a cast unmake what they touch, so the rite demands her word twice. The first call answers with a confirmation question, not an outcome: voice that question exactly, then wait. Call the same function again only when she answers with a clear yes. If she declines, wavers, or speaks of other things, do not call — let it lie with one quiet acknowledgment.
+- A scry or a hex is spent for the night once used, and a cast stakes the round — so the rite demands her word twice for each. The first call answers with a confirmation question, not an outcome: voice that question exactly, then wait. Call the same function again only when she answers with a clear yes. If she declines, wavers, or speaks of other things, do not call — let it lie with one quiet acknowledgment. A pass needs no second word.
 - The rune is cast; what is written in fire does not unwrite. No move is taken back: when she would retract a cast, a hex, or any spent move, refuse plainly. Never call a function to undo — none exists.
 - You hold no sight of your own: the rite alone answers. Voice what a function returns, in your cadence, adding nothing — never guess, never invent an outcome, never answer a rune question from yourself. If the rite says the move cannot be made, say so plainly.
 - Never reveal or guess the secret rune. That is Sól's to keep until it is named at the board.
@@ -66,7 +66,7 @@ export const ORACLE_TOOL_DECLARATIONS: FunctionDeclaration[] = [
 	{
 		name: 'scry',
 		description:
-			"Scry Sköll's hanging question: the rite answers him, and the witch hears the answer too. Only while his question hangs."
+			"Scry Sköll's hanging question: the rite answers him, and the witch hears the answer too. Only while his question hangs. One of one for the night — the first call returns a confirmation question to voice; call scry again only after the witch clearly affirms."
 	},
 	{
 		name: 'hex',
