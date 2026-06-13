@@ -25,14 +25,21 @@ function resolveAlias(rest) {
 	return base;
 }
 
+// SvelteKit virtual modules the sim's dependency chain touches (skoll.ts/oracle.ts read `dev`). Vite
+// supplies these; plain Node needs a stub. The sim never runs in a browser or reads a real env.
+const SHIMS = {
+	'$app/environment': 'export const dev = false; export const browser = false;\n'
+};
+
 registerHooks({
 	resolve(specifier, context, nextResolve) {
+		if (specifier in SHIMS) return { url: `shim:${specifier}`, shortCircuit: true };
 		if (specifier === '$lib' || specifier.startsWith('$lib/')) {
 			const rest = specifier === '$lib' ? '' : specifier.slice('$lib/'.length);
 			return nextResolve(pathToFileURL(resolveAlias(rest)).href, context);
 		}
 		// Relative TS imports are written extensionless (Vite resolves them); add the .ts Node needs.
-		if (specifier.startsWith('.') && context.parentURL) {
+		if (specifier.startsWith('.') && context.parentURL && !context.parentURL.startsWith('shim:')) {
 			const target = new URL(specifier, context.parentURL);
 			if (!existsSync(fileURLToPath(target))) {
 				for (const ext of ['.ts', '/index.ts']) {
@@ -45,6 +52,8 @@ registerHooks({
 		return nextResolve(specifier, context);
 	},
 	load(url, context, nextLoad) {
+		if (url.startsWith('shim:'))
+			return { format: 'module', shortCircuit: true, source: SHIMS[url.slice('shim:'.length)] };
 		// board.ts imports runes.json without an attribute — Vite injects it; Node needs it explicit.
 		if (url.endsWith('.json')) context.importAttributes = { type: 'json' };
 		return nextLoad(url, context);
@@ -70,7 +79,7 @@ function parseGames(arg) {
 	}
 	return n;
 }
-const metrics = simulateFloor(games);
+const metrics = await simulateFloor(games);
 const inWindow = metrics.meanTurns >= TARGET.lo && metrics.meanTurns <= TARGET.hi;
 
 console.log(`Sköll floor self-play — ${games} seeded games over a ${BOARD_SIZE}-rune board\n`);
@@ -130,15 +139,16 @@ ${rows}
 
 The deterministic floor above is the CI-measurable proxy. The numbers below come from driving the
 **live Gemini wolf** (\`gemini-3.5-flash\`, the real \`decideSkollMove\` brain) through the same engine
-loop, run locally with a \`GEMINI_API_KEY\` — never in CI, which has no key. Recorded 2026-06-13:
+loop, run locally with a \`GEMINI_API_KEY\` — never in CI, which has no key. Recorded 2026-06-13 (with
+the wrong-cast memory fix, so a missed cast is never repeated):
 
 | metric | value |
 | --- | --- |
 | games (seeds 1–30) | 30 |
-| win rate | 96.7% (29/30; one game ran past the move cap) |
-| mean turns-to-win | **7.79** |
+| win rate | 100% (30/30) |
+| mean turns-to-win | **8.17** |
 | median turns-to-win | 8 |
-| min / max turns | 4 / 12 |
+| min / max turns | 5 / 14 |
 | within 7.5–9 window | yes ✅ |
 
 The live wolf and the deterministic floor land in the same window — the persona pacing holds whether

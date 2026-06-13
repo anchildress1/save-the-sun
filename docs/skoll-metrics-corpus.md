@@ -17,7 +17,7 @@ beat him, fast enough that he's a real threat.
 | games (seeds) | 1000 |
 | board size | 24 runes |
 | win rate | 100.0% |
-| mean turns-to-win | **7.93** |
+| mean turns-to-win | **8.37** |
 | median turns-to-win | 8 |
 | min / max turns | 2 / 20 |
 | target window | 7.5–9 |
@@ -27,39 +27,39 @@ beat him, fast enough that he's a real threat.
 
 | turns | games | share | |
 | --- | --- | --- | --- |
-| 2 | 65 | 6.5% | ██████████████████ |
-| 3 | 46 | 4.6% | █████████████ |
-| 4 | 67 | 6.7% | ██████████████████ |
-| 5 | 98 | 9.8% | ███████████████████████████ |
-| 6 | 109 | 10.9% | ██████████████████████████████ |
-| 7 | 92 | 9.2% | █████████████████████████ |
-| 8 | 96 | 9.6% | ██████████████████████████ |
-| 9 | 94 | 9.4% | ██████████████████████████ |
-| 10 | 91 | 9.1% | █████████████████████████ |
-| 11 | 82 | 8.2% | ███████████████████████ |
-| 12 | 53 | 5.3% | ███████████████ |
-| 13 | 39 | 3.9% | ███████████ |
-| 14 | 31 | 3.1% | █████████ |
-| 15 | 14 | 1.4% | ████ |
-| 16 | 7 | 0.7% | ██ |
-| 17 | 10 | 1.0% | ███ |
-| 18 | 2 | 0.2% | █ |
-| 19 | 3 | 0.3% | █ |
+| 2 | 23 | 2.3% | ██████ |
+| 3 | 34 | 3.4% | █████████ |
+| 4 | 73 | 7.3% | ███████████████████ |
+| 5 | 92 | 9.2% | ████████████████████████ |
+| 6 | 101 | 10.1% | ██████████████████████████ |
+| 7 | 117 | 11.7% | ██████████████████████████████ |
+| 8 | 100 | 10.0% | ██████████████████████████ |
+| 9 | 110 | 11.0% | ████████████████████████████ |
+| 10 | 79 | 7.9% | ████████████████████ |
+| 11 | 70 | 7.0% | ██████████████████ |
+| 12 | 67 | 6.7% | █████████████████ |
+| 13 | 62 | 6.2% | ████████████████ |
+| 14 | 30 | 3.0% | ████████ |
+| 15 | 19 | 1.9% | █████ |
+| 16 | 16 | 1.6% | ████ |
+| 17 | 4 | 0.4% | █ |
+| 19 | 2 | 0.2% | █ |
 | 20 | 1 | 0.1% | █ |
 
 ## Live wolf validation (local, requires a key)
 
 The deterministic floor above is the CI-measurable proxy. The numbers below come from driving the
 **live Gemini wolf** (`gemini-3.5-flash`, the real `decideSkollMove` brain) through the same engine
-loop, run locally with a `GEMINI_API_KEY` — never in CI, which has no key. Recorded 2026-06-13:
+loop, run locally with a `GEMINI_API_KEY` — never in CI, which has no key. Recorded 2026-06-13 (with
+the wrong-cast memory fix, so a missed cast is never repeated):
 
 | metric | value |
 | --- | --- |
 | games (seeds 1–30) | 30 |
-| win rate | 96.7% (29/30; one game ran past the move cap) |
-| mean turns-to-win | **7.79** |
+| win rate | 100% (30/30) |
+| mean turns-to-win | **8.17** |
 | median turns-to-win | 8 |
-| min / max turns | 4 / 12 |
+| min / max turns | 5 / 14 |
 | within 7.5–9 window | yes ✅ |
 
 The live wolf and the deterministic floor land in the same window — the persona pacing holds whether

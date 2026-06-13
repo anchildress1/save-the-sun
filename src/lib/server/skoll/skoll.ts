@@ -236,6 +236,10 @@ export async function takeSkollTurn(
 
 	if (move.kind === 'cast') {
 		const result = engine.cast('Sköll', move.runeName);
+		// A legal but wrong cast must be remembered: record it as a ruled-out fact (and cross it off) so
+		// his next floor move can't re-pick the same dead rune. Without this he can burn turn after turn
+		// re-casting one of the same two survivors.
+		if (result.ok && !result.won) ruleOutRune(state, move.runeName);
 		if (dev)
 			console.debug(`[skoll] cast ${move.runeName} via ${source} → won=${result.ok && result.won}`);
 		return { kind: 'cast', source, reasoning, runeName: move.runeName, result };
@@ -279,6 +283,13 @@ async function planMove(
 /** Already-asked queries — the answers he holds; the floor excludes them as redundant. */
 function asked(state: SkollState): Query[] {
 	return state.facts.map((f) => f.query);
+}
+
+/** Remember a missed cast: a `rune is-not X` fact (so the floor drops it from live) plus a cross-off. */
+function ruleOutRune(state: SkollState, runeName: string): void {
+	state.facts.push({ query: { axis: 'rune', value: runeName }, answer: false });
+	const rune = runes.find((r) => r.name === runeName);
+	if (rune) state.crossed.add(rune.id);
 }
 
 /**
