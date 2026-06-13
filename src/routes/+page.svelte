@@ -74,9 +74,9 @@
 		// destructive call arms the gate — like the guards, never shown in the panel.
 		// Short by design: the exchanges recur, and a spoken preamble every time wears thin.
 		// The irreversibility doctrine lives in the persona, not the question.
-		confirmScry: 'Shall I scry him?',
-		confirmHex: 'Shall I hex him?',
-		confirmCast: (name: string) => `Shall I cast ${name}?`,
+		confirmScry: 'Lean into the dark?',
+		confirmHex: 'Seal his lips?',
+		confirmCast: (name: string) => `Stake the round on ${name}?`,
 		// Reaction affordance hints — one source for the title tooltip and the sr-only described-by.
 		hintScry: 'When your rival asks, hear the answer too.',
 		hintHex:

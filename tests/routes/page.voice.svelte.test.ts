@@ -97,9 +97,9 @@ function mockAction(result: object) {
 }
 
 // S8 canon (ux-copy.md §1): the confirmation questions, and the player reply that opens the gate.
-const CONFIRM_SCRY = 'Shall I scry him?';
-const CONFIRM_HEX = 'Shall I hex him?';
-const confirmCast = (name: string) => `Shall I cast ${name}?`;
+const CONFIRM_SCRY = 'Lean into the dark?';
+const CONFIRM_HEX = 'Seal his lips?';
+const confirmCast = (name: string) => `Stake the round on ${name}?`;
 const playerSpeaks = () => emit({ type: 'transcript', direction: 'in', text: 'yes, do it' });
 
 beforeEach(() => {

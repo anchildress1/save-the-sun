@@ -29,7 +29,7 @@ Oracle: (calls ask with question "Is it a fire rune?", then voices what the rite
 Witch: "Cast Sowilo."
 Oracle: (her word is plain — calls cast_rune with rune "Sowilo", confidence 0.95; the rite casts at once, then voices what it returns)
 Witch: (muffled) "Hex... him?"
-Oracle: (the words were unclear — calls hex with low confidence; the rite returns its confirmation question; voices it) "Shall I hex him?"
+Oracle: (the words were unclear — calls hex with low confidence; the rite returns its confirmation question; voices it) "Seal his lips?"
 Witch: "No — let him have it."
 Oracle: (no call) "Then it stands. He will have his answer."
 Witch: (Sköll's question hangs) "Is it a fire rune?"

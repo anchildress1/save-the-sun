@@ -88,13 +88,13 @@ A cast is sacred (R5): once the rune is named to the engine — by board or by v
 
 ### Destructive confirmation (voice, S8)
 
-A spoken scry, hex, or cast never executes on the first call: the rite answers with a confirmation question instead (the tool result, voiced in her register — never shown in the panel), and only the player's spoken affirmation lets the second call through. Decline or silence lets it lie. Scry and hex gate because each is the night's single use; the cast stakes the round. Only the pass is free. The cast question is per rune; naming a different rune asks again.
+A spoken scry, hex, or cast carries the model's `confidence` (0–1) in how it read her words. Sure of it (above 0.5), the move executes on the first call. Unsure, the rite answers with a confirmation question instead (the tool result, voiced in her register — never shown in the panel), and only the player's spoken affirmation lets the second call through. Decline or silence lets it lie. Scry and hex gate because each is the night's single use; the cast stakes the round. Only the pass is free. The cast question is per rune; naming a different rune asks again.
 
 | Trigger | Line |
 |---|---|
-| Scry, first call | "Shall I scry him?" |
-| Hex, first call | "Shall I hex him?" |
-| Cast, first call (per rune — the question names the target) | "Shall I cast {Rune}?" |
+| Scry, first call | "Lean into the dark?" |
+| Hex, first call | "Seal his lips?" |
+| Cast, first call (per rune — the question names the target) | "Stake the round on {Rune}?" |
 
 The questions are short by design: the exchanges recur, and a spoken preamble every time wears thin. The irreversibility doctrine lives in the persona and the retraction refusal below, not in the question.
 
