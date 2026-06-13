@@ -159,12 +159,12 @@ describe('/debug view', () => {
 		await expect.element(screen.getByText(/No events yet/)).toBeInTheDocument();
 	});
 
-	it('surfaces the resolved session id so a second screen can copy it', () => {
+	it('surfaces the session id so it can be copied onto a watching screen', () => {
 		const { container } = renderWith([verdict], 'abc-123');
 		expect(container.querySelector('.session code')?.textContent).toBe('abc-123');
 	});
 
-	it('scopes the poll fetch to the viewed session, not the cookie', async () => {
+	it('polls /api/debug for the browser’s own cookie session', async () => {
 		vi.useRealTimers();
 		const calls: string[] = [];
 		vi.stubGlobal(
@@ -177,7 +177,7 @@ describe('/debug view', () => {
 		// Unmount stops the onMount interval so polling can't leak into later tests under real timers.
 		const { unmount } = renderWith([verdict], 'watched');
 		await expect.poll(() => calls.length, { timeout: 3000 }).toBeGreaterThan(0);
-		expect(calls[0]).toBe('/api/debug?session=watched');
+		expect(calls[0]).toBe('/api/debug');
 		unmount();
 	});
 
@@ -204,20 +204,6 @@ describe('/debug view', () => {
 		await expect
 			.poll(() => container.querySelector('.msg')?.textContent, { timeout: 3000 })
 			.toContain('Human asks: "fresh"');
-		unmount();
-	});
-
-	it('updates the displayed session id from the poll response (server canonicalization)', async () => {
-		vi.useRealTimers();
-		vi.stubGlobal(
-			'fetch',
-			vi.fn(async () => new Response(JSON.stringify({ sessionId: 'canon-id', events: [] })))
-		);
-		const { container, unmount } = renderWith([verdict], 'requested-id');
-		expect(container.querySelector('.session code')?.textContent).toBe('requested-id'); // SSR id
-		await expect
-			.poll(() => container.querySelector('.session code')?.textContent, { timeout: 3000 })
-			.toBe('canon-id');
 		unmount();
 	});
 

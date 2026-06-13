@@ -97,15 +97,13 @@ describe('session hook', () => {
 		expect(resolve).toHaveBeenCalledOnce();
 	});
 
-	// Read-only paths (the debug view + its poll) must scope to a session without ever minting one —
-	// a second-screen viewer should never spawn a junk game session just by opening the log.
 	it.each([...READONLY_SESSION_PATHS])(
 		'does not mint a session for %s (no cookie)',
 		async (path) => {
 			const { event, set, locals } = fakeEvent(undefined, path);
 			await handle({ event, resolve } as never);
 			expect(set).not.toHaveBeenCalled();
-			expect(locals.sessionId).toBe(''); // empty id → empty log; ?session= still overrides downstream
+			expect(locals.sessionId).toBe('');
 		}
 	);
 
@@ -116,6 +114,16 @@ describe('session hook', () => {
 			await handle({ event, resolve } as never);
 			expect(locals.sessionId).toBe('known-session');
 			expect(set).not.toHaveBeenCalled();
+		}
+	);
+
+	it.each([...READONLY_SESSION_PATHS].map((p) => `${p}/`))(
+		'does not mint a session for the trailing-slash variant %s',
+		async (path) => {
+			const { event, set, locals } = fakeEvent(undefined, path);
+			await handle({ event, resolve } as never);
+			expect(set).not.toHaveBeenCalled();
+			expect(locals.sessionId).toBe('');
 		}
 	);
 });

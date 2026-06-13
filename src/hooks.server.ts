@@ -13,18 +13,19 @@ export const SESSIONLESS_PATHS = new Set([
 	'/site.webmanifest'
 ]);
 
-// /debug and its poll READ the session to scope the log, but must never MINT one. Viewing a log is
-// read-only: a second-screen viewer (laptop watching a phone) would otherwise be handed a brand-new
-// empty session — a junk round that shows nothing. With no cookie they get an empty id (empty log);
-// with a cookie, same-browser viewing still works; `?session=<id>` still scopes to any session.
+// /debug reads the session cookie to scope its log but must never mint one — viewing the log must
+// not spawn a junk game session. No cookie → empty id, and getEvents('') is just an empty log.
 export const READONLY_SESSION_PATHS = new Set(['/debug', '/api/debug']);
 
 export const handle: Handle = async ({ event, resolve }) => {
-	if (SESSIONLESS_PATHS.has(event.url.pathname)) return resolve(event);
+	// Trim a trailing slash so /debug/ can't slip past the read-only check and mint a junk session.
+	const pathname = event.url.pathname.replace(/(.)\/$/, '$1');
+	if (SESSIONLESS_PATHS.has(pathname)) return resolve(event);
 
-	// `!sessionId` not `=== undefined`: an empty-string cookie is junk, regenerate it.
+	// `!sessionId` not `=== undefined`: an empty-string cookie counts as absent. Minted below, but
+	// only off the read-only paths — /debug never mints.
 	let sessionId = event.cookies.get(COOKIE);
-	if (!sessionId && !READONLY_SESSION_PATHS.has(event.url.pathname)) {
+	if (!sessionId && !READONLY_SESSION_PATHS.has(pathname)) {
 		sessionId = crypto.randomUUID();
 		// httpOnly: server bookkeeping, no client code reads it. secure outside dev so the
 		// session id never rides plain HTTP (dev runs on http://localhost).
@@ -36,8 +37,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		});
 		if (dev) console.debug(`[session] created ${sessionId}`);
 	}
-	// Empty string on a read-only path with no cookie: getEvents('') is just an empty log, and
-	// resolveSessionId still lets ?session= override. Game paths always minted above, so they're set.
+	// '' on an un-minted read-only path; getEvents('') is an empty log. Game paths always minted above.
 	event.locals.sessionId = sessionId ?? '';
 	const response = await resolve(event);
 
