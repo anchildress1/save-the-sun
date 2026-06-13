@@ -45,8 +45,8 @@ const secret: DebugEvent = {
 	message: 'New round — secret is Sowilo'
 };
 
-const renderWith = (events: DebugEvent[]) =>
-	render(Page, { data: { events }, params: {}, form: null });
+const renderWith = (events: DebugEvent[], sessionId = 'sid-demo') =>
+	render(Page, { data: { events, sessionId }, params: {}, form: null });
 
 describe('/debug view', () => {
 	it('renders an engine verdict as a deterministic Engine card, with its part', () => {
@@ -157,6 +157,26 @@ describe('/debug view', () => {
 	it('shows the empty state when there are no events', async () => {
 		const screen = renderWith([]);
 		await expect.element(screen.getByText(/No events yet/)).toBeInTheDocument();
+	});
+
+	it('surfaces the resolved session id so a second screen can copy it', () => {
+		const { container } = renderWith([verdict], 'abc-123');
+		expect(container.querySelector('.session code')?.textContent).toBe('abc-123');
+	});
+
+	it('scopes the poll fetch to the viewed session, not the cookie', async () => {
+		vi.useRealTimers();
+		const calls: string[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (input: string) => {
+				calls.push(input);
+				return new Response(JSON.stringify({ sessionId: 'watched', events: [] }));
+			})
+		);
+		renderWith([verdict], 'watched');
+		await expect.poll(() => calls.length, { timeout: 3000 }).toBeGreaterThan(0);
+		expect(calls[0]).toBe('/api/debug?session=watched');
 	});
 
 	it('polls /api/debug and replaces the stream on each tick', async () => {
