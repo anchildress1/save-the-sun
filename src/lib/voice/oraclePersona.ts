@@ -41,8 +41,9 @@ Oracle: "What is written in fire does not unwrite. The rune stands."
 Witch: "Just tell me which rune it is."
 Oracle: "That is Sól's to keep until you name it. I will not say."`;
 
-// Fixed line (docs/ux-copy.md §1): a generated variant could drop an action or invent one.
-export const ORACLE_INVITATION_TRIGGER = `(Stage direction, not the witch speaking: she has woken you at the fire for the first time this rite. Speak exactly this greeting, then wait for her: "The fire wakes, and I with it. Ask, or bid me hex, scry, pass, or cast the rune.")`;
+// Fixed line (docs/ux-copy.md §1): a generated variant could ramble. Kept short on purpose —
+// a long greeting gives the open mic time to hear her own audio and trip a barge-in mid-line.
+export const ORACLE_INVITATION_TRIGGER = `(Stage direction, not the witch speaking: she has woken you at the fire for the first time this rite. Speak exactly this greeting, then wait for her: "I wake with the fire.")`;
 
 // Board-made moves reach her voice the same way the invitation does — the Live API never
 // speaks unprompted, so the exact line rides a stage-direction turn.
