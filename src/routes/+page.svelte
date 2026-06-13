@@ -930,6 +930,7 @@
 						class="turn-pill"
 						class:won={humanWon}
 						class:lost={skollWon}
+						class:opponent={activePlayer === 'Sköll' && !roundOver}
 						data-testid="turn-pill"
 						role="status"
 					>
@@ -1361,6 +1362,14 @@
 		border-radius: 999px;
 		padding: 0.45rem 1.1rem;
 		font-size: 0.85rem;
+	}
+
+	/* Sköll's live turn wears his cold steel accent — reads at a glance as "not yours" without
+	   stealing the terminal win/lost styling, which only paints once the round is over. */
+	.turn-pill.opponent {
+		color: var(--steel);
+		background: var(--steel-glow);
+		border-color: var(--steel-line);
 	}
 
 	.turn-pill.won {

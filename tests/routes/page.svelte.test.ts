@@ -469,6 +469,36 @@ describe('Save the Sun page', () => {
 		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
 	});
 
+	it('leaves the pill in gold on the human’s turn — no opponent tint', async () => {
+		const screen = render(Page, pageProps);
+		expect(screen.getByTestId('turn-pill').element().classList.contains('opponent')).toBe(false);
+	});
+
+	it('paints the pill in Sköll’s steel on his live turn — opponent on, terminal classes off', async () => {
+		askResult(
+			{ ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+			SKOLL_TURN
+		);
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect.element(screen.getByTestId('turn-pill')).toHaveTextContent('Sköll moves.');
+		const pill = screen.getByTestId('turn-pill').element();
+		expect(pill.classList.contains('opponent')).toBe(true);
+		expect(pill.classList.contains('won')).toBe(false);
+		expect(pill.classList.contains('lost')).toBe(false);
+	});
+
+	it('never tints a finished round — opponent stays off on a loss (Sköll still active on the won state)', async () => {
+		const screen = render(Page, propsWith(SKOLL_WON));
+		expect(screen.getByTestId('turn-pill').element().classList.contains('opponent')).toBe(false);
+	});
+
+	it('never tints a finished round — opponent stays off on a win', async () => {
+		const screen = render(Page, propsWith(HUMAN_WON));
+		expect(screen.getByTestId('turn-pill').element().classList.contains('opponent')).toBe(false);
+	});
+
 	it('keeps cross-off live during Sköll’s turn — the reading is always yours', async () => {
 		askResult(
 			{ ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
