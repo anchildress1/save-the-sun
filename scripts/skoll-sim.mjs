@@ -81,7 +81,7 @@ registerHooks({
 	}
 });
 
-const { simulateFloor, playFloorGame, BOARD_SIZE } = await import(
+const { simulateFloor, playFloorGame, median, BOARD_SIZE } = await import(
 	pathToFileURL(path.join(LIB, 'server', 'skoll', 'sim.ts')).href
 );
 
@@ -149,34 +149,58 @@ async function runLive(games) {
 	);
 
 	console.log(
-		`Live Gemini wolf — ${games} real games (seeds 1–${games}); every move is an API call\n`
+		`Live Gemini wolf — ${games} real games (seeds 1–${games}); every move is one Gemini decision\n`
 	);
 	const runs = [];
-	let totalCalls = 0;
+	let totalDecisions = 0;
+	let totalFloored = 0;
 	for (let seed = 1; seed <= games; seed++) {
-		let calls = 0;
-		const counted = (payload) => {
-			calls += 1;
-			return decideSkollMove(payload);
-		};
-		const r = await playFloorGame(seed, new GameEngine(seed), freshSkollState(seed), counted);
-		totalCalls += calls;
-		runs.push({ ...r, calls });
-		console.log(
-			`  seed ${String(seed).padStart(2)} → ${r.won ? 'win ' : 'LOSS'} in ${String(r.turns).padStart(2)} turns (${calls} calls)  [secret: ${r.secret}]`
+		// One decideSkollMove invocation per Sköll move (the SDK may retry a decision internally, so
+		// this is a decision count, not a raw network-call count). A decision that throws or returns an
+		// illegal move floors inside takeSkollTurn — r.floorMoves catches that so a degraded run can't
+		// masquerade as live evidence.
+		const r = await playFloorGame(
+			seed,
+			new GameEngine(seed),
+			freshSkollState(seed),
+			decideSkollMove
 		);
+		const decisions = r.turns;
+		totalDecisions += decisions;
+		totalFloored += r.floorMoves;
+		runs.push({ ...r, decisions });
+		console.log(
+			`  seed ${String(seed).padStart(2)} → ${r.won ? 'win ' : 'LOSS'} in ${String(r.turns).padStart(2)} turns (${decisions} decisions${r.floorMoves ? `, ${r.floorMoves} floored` : ''})  [secret: ${r.secret}]`
+		);
+	}
+
+	// The live section's whole claim is "real Gemini, every move." A move that fell back to the floor
+	// (API down, quota, malformed/illegal output) breaks that claim, so refuse to record it as proof.
+	if (totalFloored > 0) {
+		console.error(
+			`\n--live floored ${totalFloored} move(s): Gemini failed or returned an illegal move. ` +
+				`Refusing to record floor play as live evidence — re-run when the API is healthy.`
+		);
+		process.exit(1);
 	}
 
 	const wins = runs.filter((r) => r.won);
 	const turns = wins.map((r) => r.turns).sort((a, b) => a - b);
 	const mean = turns.length ? turns.reduce((a, t) => a + t, 0) / turns.length : 0;
-	const median = turns.length ? turns[Math.floor(turns.length / 2)] : 0;
 	const inWindow = mean >= TARGET.lo && mean <= TARGET.hi;
 	console.log(
-		`\n  live: ${wins.length}/${games} wins, mean ${mean.toFixed(2)} turns, ${totalCalls} total calls — ${inWindow ? 'WITHIN' : 'OUT OF'} window\n`
+		`\n  live: ${wins.length}/${games} wins, mean ${mean.toFixed(2)} turns, ${totalDecisions} Gemini decisions — ${inWindow ? 'WITHIN' : 'OUT OF'} window\n`
 	);
 
-	return renderLive({ runs, games, wins: wins.length, mean, median, totalCalls, inWindow });
+	return renderLive({
+		runs,
+		games,
+		wins: wins.length,
+		mean,
+		median: median(turns),
+		totalDecisions,
+		inWindow
+	});
 }
 
 // Reuse the existing recorded live section on a floor-only run so re-running the floor never erases
@@ -191,27 +215,29 @@ function preserveLiveSection() {
 	return '## Live wolf testing\n\n_No live run recorded yet. Run `node scripts/skoll-sim.mjs --live` locally (needs a key)._';
 }
 
-function renderLive({ runs, games, wins, mean, median, totalCalls, inWindow }) {
+function renderLive({ runs, games, wins, mean, median, totalDecisions, inWindow }) {
 	const rows = runs
 		.map(
 			(r) =>
-				`| ${r.seed} | ${r.secret} | ${r.turns} | ${r.won ? 'win ✅' : 'loss ❌'} | ${r.calls} |`
+				`| ${r.seed} | ${r.secret} | ${r.turns} | ${r.won ? 'win ✅' : 'loss ❌'} | ${r.decisions} |`
 		)
 		.join('\n');
 	const turnsList = runs.filter((r) => r.won).map((r) => r.turns);
 	const min = turnsList.length ? Math.min(...turnsList) : 0;
 	const max = turnsList.length ? Math.max(...turnsList) : 0;
-	return `## Live wolf testing (local, real Gemini calls)
+	return `## Live wolf testing (local, real Gemini)
 
 The deterministic floor above is the CI proxy. This section is the **real thing**: the live Gemini wolf
 (\`gemini-3.5-flash\`, the actual \`decideSkollMove\` brain) driven through the *same* engine loop as the
-floor, one real API call per move. Run locally with a \`GEMINI_API_KEY\` — never in CI, which has no key.
+floor, one Gemini decision per move. Run locally with a \`GEMINI_API_KEY\` — never in CI, which has no key.
 Regenerate with \`node scripts/skoll-sim.mjs --live [games]\`.
 
 **How it was tested.** For each seed 1–${games}: a fresh \`GameEngine\` and \`freshSkollState\` (production
-path), the human seat passes, and Sköll plays every move via \`decideSkollMove\` against the live API
-(falling back to the floor only if a call throws). The engine resolves each Ask/Cast truthfully and
-reports the win. **Every Sköll move is one Gemini call**, counted per run below.
+path), the human seat passes, and Sköll plays every move via \`decideSkollMove\` against the live API. The
+engine resolves each Ask/Cast truthfully and reports the win. **Every Sköll move is one Gemini decision**
+(the SDK may retry a decision internally, so this counts decisions, not raw network calls). A decision
+that throws or returns an illegal move would fall back to the floor — the run is **rejected** if any move
+floors, so every move recorded here is a real Gemini decision.
 
 **The bar.** A run is a *win* only when Sköll casts the true rune (the engine's verdict, never the
 model's claim). Pacing target: **mean turns-to-win in ${TARGET.lo}–${TARGET.hi}** — beatable by a
@@ -221,8 +247,8 @@ competent human, still a real threat. Turns-to-win counts Sköll's own moves (As
 | --- | --- |
 | live games (seeds 1–${games}) | ${games} |
 | wins | ${wins}/${games} (${((wins / games) * 100).toFixed(1)}%) |
-| **total live Gemini calls** | **${totalCalls}** |
-| mean calls / game | ${(totalCalls / games).toFixed(1)} |
+| **total Gemini decisions** | **${totalDecisions}** |
+| mean decisions / game | ${(totalDecisions / games).toFixed(1)} |
 | mean turns-to-win | **${mean.toFixed(2)}** |
 | median turns-to-win | ${median} |
 | min / max turns | ${min} / ${max} |
@@ -230,7 +256,7 @@ competent human, still a real threat. Turns-to-win counts Sköll's own moves (As
 
 ### Per-run results (proof)
 
-| seed | secret | turns-to-win | result | gemini calls |
+| seed | secret | turns-to-win | result | gemini decisions |
 | --- | --- | --- | --- | --- |
 ${rows}`;
 }

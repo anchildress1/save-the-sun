@@ -27,6 +27,9 @@ export interface SimResult {
 	secret: string;
 	turns: number;
 	won: boolean;
+	/** Moves that fell back to the floor (decider threw or returned an illegal move). The floor-only
+	 *  sweep expects this to equal `turns`; a live run uses it to reject floor-contaminated proof. */
+	floorMoves: number;
 }
 
 // A decider that always rejects, so planMove always drops to the deterministic floor. This is how the
@@ -68,6 +71,7 @@ export async function playFloorGame(
 ): Promise<SimResult> {
 	const secret = selectSecret(seed);
 	let turns = 0;
+	let floorMoves = 0;
 
 	for (let move = 0; move < MAX_MOVES; move++) {
 		// The human seat takes no action in self-play — hand the turn straight to Sköll.
@@ -77,12 +81,13 @@ export async function playFloorGame(
 		// Gemini brain (decideSkollMove) to drive a live game through this same production loop.
 		const out = await takeSkollTurn(engine, state, decide, state.rng);
 		turns += 1;
+		if (out.source === 'floor') floorMoves += 1;
 
 		if (out.kind === 'cast') {
 			// An illegal cast (unknown rune, out of turn, round over) is a harness regression, not play.
 			if (!out.result.ok)
 				throw new Error(`harness: illegal cast (${out.result.reason}) on seed ${seed}`);
-			if (out.result.won) return { seed, secret: secret.name, turns, won: true };
+			if (out.result.won) return { seed, secret: secret.name, turns, won: true, floorMoves };
 			// A legal-but-wrong cast is real self-play slack; takeSkollTurn already ruled the rune out.
 			continue;
 		}
@@ -93,7 +98,7 @@ export async function playFloorGame(
 
 	// Unreachable from truthful play (a wrong cast can't recur, so the trait space bounds the loop);
 	// the cap only guards against a logic regression turning into a hang.
-	return { seed, secret: secret.name, turns, won: false };
+	return { seed, secret: secret.name, turns, won: false, floorMoves };
 }
 
 /** Aggregate self-play metrics across a contiguous seed sweep `[startSeed, startSeed + games)`. */
@@ -117,7 +122,7 @@ export async function simulateFloor(games: number, startSeed = 1): Promise<SimMe
 		wins: winning.length,
 		winRate: winning.length / games,
 		meanTurns: turns.length ? sum / turns.length : 0,
-		medianTurns: turns.length ? turns[Math.floor(turns.length / 2)] : 0,
+		medianTurns: median(turns),
 		minTurns: turns.length ? turns[0] : 0,
 		maxTurns: turns.length ? (turns.at(-1) as number) : 0,
 		distribution: [...counts.entries()]
@@ -137,6 +142,13 @@ async function withQuietConsole<T>(fn: () => Promise<T>): Promise<T> {
 		console.error = error;
 		console.warn = warn;
 	}
+}
+
+/** Median of an ascending-sorted list — averages the two middle values on an even count. */
+export function median(sorted: number[]): number {
+	if (!sorted.length) return 0;
+	const mid = Math.floor(sorted.length / 2);
+	return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 /** Total rune count — surfaced so the corpus header can note the board size without re-importing. */

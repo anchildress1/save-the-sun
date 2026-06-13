@@ -48,17 +48,19 @@ competent human can beat him, fast enough that he's a real threat.
 | 20 | 1 | 0.1% | █ |
 
 <!-- LIVE:START -->
-## Live wolf testing (local, real Gemini calls)
+## Live wolf testing (local, real Gemini)
 
 The deterministic floor above is the CI proxy. This section is the **real thing**: the live Gemini wolf
 (`gemini-3.5-flash`, the actual `decideSkollMove` brain) driven through the *same* engine loop as the
-floor, one real API call per move. Run locally with a `GEMINI_API_KEY` — never in CI, which has no key.
+floor, one Gemini decision per move. Run locally with a `GEMINI_API_KEY` — never in CI, which has no key.
 Regenerate with `node scripts/skoll-sim.mjs --live [games]`.
 
 **How it was tested.** For each seed 1–10: a fresh `GameEngine` and `freshSkollState` (production
-path), the human seat passes, and Sköll plays every move via `decideSkollMove` against the live API
-(falling back to the floor only if a call throws). The engine resolves each Ask/Cast truthfully and
-reports the win. **Every Sköll move is one Gemini call**, counted per run below.
+path), the human seat passes, and Sköll plays every move via `decideSkollMove` against the live API. The
+engine resolves each Ask/Cast truthfully and reports the win. **Every Sköll move is one Gemini decision**
+(the SDK may retry a decision internally, so this counts decisions, not raw network calls). A decision
+that throws or returns an illegal move would fall back to the floor — the run is **rejected** if any move
+floors, so every move recorded here is a real Gemini decision.
 
 **The bar.** A run is a *win* only when Sköll casts the true rune (the engine's verdict, never the
 model's claim). Pacing target: **mean turns-to-win in 7.5–9** — beatable by a
@@ -68,16 +70,16 @@ competent human, still a real threat. Turns-to-win counts Sköll's own moves (As
 | --- | --- |
 | live games (seeds 1–10) | 10 |
 | wins | 10/10 (100.0%) |
-| **total live Gemini calls** | **77** |
-| mean calls / game | 7.7 |
+| **total Gemini decisions** | **77** |
+| mean decisions / game | 7.7 |
 | mean turns-to-win | **7.70** |
-| median turns-to-win | 7 |
+| median turns-to-win | 6.5 |
 | min / max turns | 5 / 12 |
 | within 7.5–9 window | yes ✅ |
 
 ### Per-run results (proof)
 
-| seed | secret | turns-to-win | result | gemini calls |
+| seed | secret | turns-to-win | result | gemini decisions |
 | --- | --- | --- | --- | --- |
 | 1 | Mannaz | 11 | win ✅ | 11 |
 | 2 | Isa | 12 | win ✅ | 12 |
