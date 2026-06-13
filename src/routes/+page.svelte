@@ -1765,23 +1765,11 @@
 		object-position: 50% 100%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
 			contrast(var(--skoll-contrast));
-		/* The controls sit over the top ~third; fade the sky/moon there to a whisper so it reads as
-		   atmosphere, not a bright disc punching through the buttons. The wolf (lower half) stays full. */
-		mask-image: linear-gradient(
-			180deg,
-			transparent 0%,
-			rgba(0, 0, 0, 0.1) 20%,
-			rgba(0, 0, 0, 0.5) 38%,
-			black 48%,
-			black 94%,
-			transparent 100%
-		);
+		mask-image: linear-gradient(180deg, transparent 0%, black 8%, black 94%, transparent 100%);
 		-webkit-mask-image: linear-gradient(
 			180deg,
 			transparent 0%,
-			rgba(0, 0, 0, 0.1) 20%,
-			rgba(0, 0, 0, 0.5) 38%,
-			black 48%,
+			black 8%,
 			black 94%,
 			transparent 100%
 		);
