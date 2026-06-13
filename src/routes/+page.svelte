@@ -279,8 +279,10 @@
 				// player already answered the confirmation and no matching tool call landed, it
 				// was a decline or drift — do not leave the destructive gate armed.
 				if (voiceConfirm?.spoke && voiceConfirm.heard) voiceConfirm = null;
-				captionOpen = false;
 				voiceState = event.type;
+				// Trailing unordered chunks arrive between final and listening (not after).
+				// listening is the true inter-turn boundary — reset so the next turn starts fresh.
+				captionOpen = false;
 				break;
 			case 'thinking':
 				voiceState = event.type;
@@ -310,12 +312,11 @@
 					// The input transcript itself is debug-only; it is not surfaced in the rite UI.
 					if (voiceConfirm) voiceConfirm.heard = true;
 				} else if (event.final) {
-					// Turn's end: the whole assembled line, authoritative over the streamed fragments.
-					// Streaming alone truncates when the turn settles before the tail lands — this flushes
-					// the complete text. Closed so the next turn's first fragment starts fresh.
+					// Catch-up flush from voiceSession: the assembled line to date. Trailing chunks
+					// (transcript is unordered vs turnComplete per SDK) still arrive as non-final after
+					// this — captionOpen stays true so they append rather than restart.
 					voiceCaption = event.text;
 					answer = event.text;
-					captionOpen = false;
 				} else {
 					voiceCaption = captionOpen ? voiceCaption + event.text : event.text;
 					captionOpen = true;
