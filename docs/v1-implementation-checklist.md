@@ -328,12 +328,12 @@ Legend for test tags matches `test-checklist.md`: [U] unit · [I] integration ·
 
 **v2 (immersion build), in order:**
 
-1. Night→dawn mood — continuous tide + event stingers, Sköll and Sól embodied; degrades per the contract, nothing essential depends on it
-2. Ambient audio bed — looped, crossfading, pausable, muted by default, ambient only
-3. Voice interaction with Gemini — speak the Ask, hear the Oracle/Sköll (TTS)
-4. Wrong-cast penalty — cap ≈2 wrong casts per player (threshold on the v1 counter; alternation unaffected)
-5. ~~Small-desktop support down to 750px — compact embedded board at 750px+, best-on-desktop notice below that floor~~
-6. Asset delivery pipeline — generate AVIF/WebP fallbacks for large stone, banner, chalk, and rune assets; ship responsive variants where the UI has multiple display sizes; keep a checked bundle-size budget so deploy cost and first-load weight do not creep back up
+- [ ] Night→dawn mood — continuous tide + event stingers, Sköll and Sól embodied; degrades per the contract, nothing essential depends on it
+- [ ] Ambient audio bed — looped, crossfading, pausable, muted by default, ambient only
+- [x] Voice interaction with Gemini — speak the Ask, hear the Oracle/Sköll (TTS)
+- [ ] Wrong-cast penalty — cap ≈2 wrong casts per player (threshold on the v1 counter; alternation unaffected)
+- [ ] ~~Small-desktop support down to 750px — compact embedded board at 750px+, best-on-desktop notice below that floor~~
+- [ ] Asset delivery pipeline — generate AVIF/WebP fallbacks for large stone, banner, chalk, and rune assets; ship responsive variants where the UI has multiple display sizes; keep a checked bundle-size budget so deploy cost and first-load weight do not creep back up
    - [ ] Cleanup: align all generated image assets to one stable stylized art direction before adding more format variants
    - [ ] Generate AVIF/WebP fallbacks for large stone, banner, chalk, rune, element, color, and fill assets
    - [ ] Ship responsive image variants anywhere the same art renders at materially different sizes
