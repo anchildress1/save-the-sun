@@ -84,9 +84,12 @@ jobs:
             -Dsonar.qualitygate.timeout=600
 
       - name: Enforce zero Sonar issues
-        # The default quality gate tolerates low-severity issues; we don't. Fail CI on ANY
-        # unresolved issue of ANY severity. Runs after the scan's qualitygate.wait, so the
-        # analysis is fully computed and the issue count is authoritative.
+        # Why this exists instead of a quality-gate condition: the free SonarCloud plan only allows
+        # the built-in "Sonar way" gate (no custom gate can be created or assigned), and that gate
+        # is rating-based — a MINOR issue keeps the maintainability rating at A, so it passes with
+        # issues present. We want zero issues of ANY severity, so we assert it here from the issues
+        # API. Runs after the scan's qualitygate.wait, so the analysis is computed and the count is
+        # authoritative. Replace with a gate condition (new_violations > 0) if the plan is upgraded.
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           EVENT_NAME: ${{ github.event_name }}
