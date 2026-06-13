@@ -135,9 +135,9 @@
 	border-image-width: 10px 14px;
 	border-image-repeat: stretch;
 	border-radius: 12px;
-	/* Hidden at rest — the button's own border is the resting outline; this ornate frame is the
-	   hover/focus treatment only, so the two never stack into a double border. */
-	opacity: 0;
+	/* The resting outline IS this ornate frame — the buttons carry no plain border, so there's no
+	   double. Hover/focus just brightens it. */
+	opacity: 0.82;
 	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.42));
 	transition:
 		filter 0.18s ease,
@@ -148,6 +148,11 @@
 .btn:focus-visible::before {
 	opacity: 1;
 	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 6px rgba(217, 169, 74, 0.22));
+}
+
+.btn:disabled::before {
+	opacity: 0.38;
+	filter: none;
 }
 
 .btn--primary {
@@ -161,7 +166,6 @@
 .btn--secondary {
 	color: var(--gold-bright);
 	background: rgba(9, 13, 26, 0.86);
-	border-color: rgba(233, 200, 119, 0.32);
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
@@ -181,7 +185,6 @@
 }
 
 .btn--secondary:hover:not(:disabled) {
-	border-color: rgba(233, 200, 119, 0.6);
 	background: rgba(233, 200, 119, 0.1);
 }
 
@@ -201,7 +204,6 @@
 
 .btn--secondary:disabled {
 	color: var(--ink-muted);
-	border-color: var(--gold-faint);
 }
 
 body {
