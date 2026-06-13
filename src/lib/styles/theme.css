@@ -125,8 +125,8 @@
 .btn::before {
 	content: '';
 	position: absolute;
-	/* Concentric with the button box so the hover/focus frame isn't offset from it. */
-	inset: -0.3rem;
+	/* Asymmetric: proportional to border-image-width (10px t/b, 14px l/r) so corner brackets align. */
+	inset: -0.2rem -0.3rem;
 	z-index: 0;
 	pointer-events: none;
 	border: 10px solid transparent;
