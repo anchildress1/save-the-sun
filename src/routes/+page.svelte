@@ -1107,18 +1107,9 @@
 				{/if}
 			</div>
 
-			<!-- Decorative, in flow: the wolf's nose rides just under the cast controls, and the
-			     moon ghosts up from the banner's top edge behind them. -->
+			<!-- Decorative: the wolf banner rises behind the controls; its own sky and moon show
+			     through. (The old separate moon-ghost layer is gone — it double-imaged the moon.) -->
 			<div class="skoll-art" aria-hidden="true">
-				<img
-					class="skoll-moon"
-					src={skollBanner}
-					width="768"
-					height="1376"
-					alt=""
-					decoding="async"
-					fetchpriority="low"
-				/>
 				<img
 					class="skoll-banner"
 					src={skollBanner}
@@ -1475,27 +1466,6 @@
 		right: -1.1rem;
 		bottom: 0;
 		z-index: 0;
-		pointer-events: none;
-	}
-
-	.skoll-moon {
-		position: absolute;
-		bottom: calc(100% - 2rem);
-		left: 0;
-		width: 100%;
-		height: 10rem;
-		object-fit: cover;
-		object-position: 50% 0%;
-		opacity: 0.6;
-		filter: brightness(1.35);
-		mask-image: linear-gradient(180deg, transparent 0%, black 30%, black 80%, transparent 100%);
-		-webkit-mask-image: linear-gradient(
-			180deg,
-			transparent 0%,
-			black 30%,
-			black 80%,
-			transparent 100%
-		);
 		pointer-events: none;
 	}
 
