@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	chooseFloorMove,
+	hunchWeight,
 	liveCandidates,
 	splitScore,
 	type EarnedFact
@@ -52,11 +53,46 @@ describe('splitScore', () => {
 	});
 });
 
+describe('hunchWeight', () => {
+	it('favors the narrow question over the clean 50/50 split', () => {
+		// fill:Light is the perfect splitter (12/12); element:Sun is the hunch (4/24). The persona
+		// reaches for the hunch, so its weight must outrank the optimizer's even split.
+		const split = hunchWeight({ axis: 'fill', value: 'Light' }, runes);
+		const hunch = hunchWeight({ axis: 'element', value: 'Sun' }, runes);
+		expect(split).not.toBeNull();
+		expect(hunch).not.toBeNull();
+		expect(hunch!).toBeGreaterThan(split!);
+	});
+
+	it('is null for a non-splitting query (all-yes or all-no)', () => {
+		const sun = runes.filter((r) => r.element === 'Sun');
+		expect(hunchWeight({ axis: 'element', value: 'Sun' }, sun)).toBeNull();
+		expect(hunchWeight({ axis: 'element', value: 'Fire' }, sun)).toBeNull();
+	});
+});
+
 describe('chooseFloorMove', () => {
 	it('casts the lone survivor when one candidate remains', () => {
 		const facts: EarnedFact[] = [{ query: { axis: 'rune', value: 'Sowilo' }, answer: true }];
 		const move = chooseFloorMove(facts, [], mulberry32(1));
 		expect(move).toEqual({ kind: 'cast', runeName: 'Sowilo' });
+	});
+
+	it('casts once narrowed to two runes — names one of the surviving pair', () => {
+		// Two Sun-Light runes survive; the floor casts at <=2 (persona: name one of the final pair),
+		// picking from within that live set rather than asking the field down to one.
+		const facts: EarnedFact[] = [
+			{ query: { axis: 'element', value: 'Sun' }, answer: true },
+			lightFact(true)
+		];
+		const live = liveCandidates(facts);
+		expect(live).toHaveLength(2);
+		const names = new Set(live.map((r) => r.name));
+		for (let seed = 0; seed < 50; seed++) {
+			const move = chooseFloorMove(facts, [], mulberry32(seed));
+			expect(move.kind).toBe('cast');
+			if (move.kind === 'cast') expect(names.has(move.runeName)).toBe(true);
+		}
 	});
 
 	it('asks a splitting question while the field is open', () => {
@@ -89,19 +125,19 @@ describe('chooseFloorMove', () => {
 		expect(a).toEqual(b);
 	});
 
-	it('casts the best remaining candidate when no splitter is left', () => {
-		// Narrow to two Sun-Light runes, then mark every other axis already asked so no
-		// well-formed query can split them apart — the floor must cast, not stall.
-		const facts: EarnedFact[] = [
-			{ query: { axis: 'element', value: 'Sun' }, answer: true },
-			lightFact(true)
-		];
-		const live = liveCandidates(facts);
-		expect(live.length).toBeGreaterThan(1);
-		// Every query that still splits this live pair, marked as already asked.
+	it('casts the first candidate when no splitter is left (3+ live, all asked)', () => {
+		// Pin the live set to exactly three runes (above the cast-at-2 line) by ruling out the other 21,
+		// then mark every query that could split them as already asked — no splitter remains, so the
+		// floor must cast, not stall. Falls to the first survivor in fixed board order.
+		const survivors = runes.slice(0, 3);
+		const pinned: EarnedFact[] = runes
+			.slice(3)
+			.map((r) => ({ query: { axis: 'rune', value: r.name }, answer: false }));
+		const live = liveCandidates(pinned);
+		expect(live).toHaveLength(3);
 		const asked = allSplittingQueries(live);
-		const move = chooseFloorMove(facts, asked, mulberry32(1));
-		expect(move).toEqual({ kind: 'cast', runeName: live[0].name });
+		const move = chooseFloorMove(pinned, asked, mulberry32(1));
+		expect(move).toEqual({ kind: 'cast', runeName: survivors[0].name });
 	});
 
 	it('never crashes on contradictory facts (zero live) — casts a real rune', () => {
@@ -115,12 +151,13 @@ describe('chooseFloorMove', () => {
 	});
 
 	// The non-negotiable gate (test-checklist high-risk): the floor must be weighted-random,
-	// never argmax. A max-score query dominates, but a low-score splitter still gets chosen,
-	// and the field shows real variety — none of which holds for an argmax picker.
-	it('[S] samples weighted-random, NOT argmax', () => {
+	// never argmax. The persona favors the HUNCH (a narrow, specific question) over the clean split,
+	// so the hunch is picked more — but the clean splitter is never shut out, and the field shows real
+	// variety. None of that holds for an argmax picker (which would lock onto one fixed question).
+	it('[S] samples weighted-random toward hunches, NOT argmax', () => {
 		const RUNS = 5000;
-		const best = key({ axis: 'fill', value: 'Light' }); // score 1
-		const weak = key({ axis: 'element', value: 'Sun' }); // score 1/9
+		const hunch = key({ axis: 'element', value: 'Sun' }); // narrow (4/24) — the favored hunch
+		const split = key({ axis: 'fill', value: 'Light' }); // perfect 50/50 — the optimizer's pick
 		const counts = new Map<string, number>();
 		const distinct = new Set<string>();
 
@@ -134,13 +171,13 @@ describe('chooseFloorMove', () => {
 			}
 		}
 
-		const bestCount = counts.get(best) ?? 0;
-		const weakCount = counts.get(weak) ?? 0;
-		// Weighting: the perfect splitter is picked far more than the lopsided one...
-		expect(bestCount).toBeGreaterThan(weakCount);
-		// ...but the weak splitter is NOT shut out — argmax would never pick it.
-		expect(weakCount).toBeGreaterThan(0);
-		// And the floor ranges across many questions, not one fixed best.
+		const hunchCount = counts.get(hunch) ?? 0;
+		const splitCount = counts.get(split) ?? 0;
+		// Persona weighting: a narrow hunch outweighs the perfect split...
+		expect(hunchCount).toBeGreaterThan(splitCount);
+		// ...but the clean splitter is NOT shut out — it still gets picked.
+		expect(splitCount).toBeGreaterThan(0);
+		// And the floor ranges across many questions, not one fixed pick.
 		expect(distinct.size).toBeGreaterThan(10);
 	});
 });
