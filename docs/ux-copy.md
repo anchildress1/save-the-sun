@@ -77,20 +77,26 @@ A voiced action calls the same engine function as its button, and the Oracle voi
 | Trigger | Line |
 |---|---|
 | Any move while another move is resolving | "The rite is moving. Hold." |
+| Any voiced command while a cast resolves (S9 — outranks every other line) | "The cast is sacred. Hold." |
 | Ask or Cast while Sköll's question hangs | "Sköll's question hangs. Scry, hex, or pass before another move." |
 | Ask or Cast on Sköll's turn | "The wolf is moving. Hold." |
 | Scry / Hex / Pass with no hanging question | "Sköll asks nothing. There is no question to scry, hex, or pass." |
 | Any move after the round resolves | "The longest day is decided. Begin another night to play again." |
 | Cast of a rune not on the board | "No rune named {name} lies on the board." |
 
+A cast is sacred (R5): once the rune is named to the engine — by board or by voice — nothing spoken interrupts it. Every voiced command through that window earns the lockout line and dispatches nothing; barge-in cuts the Oracle's audio only, never a committed engine action.
+
 ### Destructive confirmation (voice, S8)
 
-A spoken hex or cast never executes on the first call: the rite answers with a confirmation question instead (the tool result, voiced in her register — never shown in the panel), and only the player's spoken affirmation lets the second call through. Decline or silence lets it lie. The cast question is per rune; naming a different rune asks again.
+A spoken scry, hex, or cast never executes on the first call: the rite answers with a confirmation question instead (the tool result, voiced in her register — never shown in the panel), and only the player's spoken affirmation lets the second call through. Decline or silence lets it lie. Scry and hex gate because each is the night's single use; the cast stakes the round. Only the pass is free. The cast question is per rune; naming a different rune asks again.
 
 | Trigger | Line |
 |---|---|
-| Hex, first call | "His question dies unanswered and the hex is spent. Say it plain: shall I hex him?" |
-| Cast, first call | "{Rune}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?" |
+| Scry, first call | "Shall I scry him?" |
+| Hex, first call | "Shall I hex him?" |
+| Cast, first call (per rune — the question names the target) | "Shall I cast {Rune}?" |
+
+The questions are short by design: the exchanges recur, and a spoken preamble every time wears thin. The irreversibility doctrine lives in the persona and the retraction refusal below, not in the question.
 
 Retraction is refused in character — the persona carries the doctrine verbatim: *"What is written in fire does not unwrite. The rune stands."*
 

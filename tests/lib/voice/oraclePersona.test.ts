@@ -13,16 +13,14 @@ describe('Oracle persona — destructive confirmation (S8)', () => {
 		expect(ORACLE_SYSTEM_INSTRUCTION).toContain('demands her word twice');
 	});
 
-	it.each(['hex', 'cast_rune'])('declares %s as confirmation-gated', (name) => {
+	// Scry joined the gate (2026-06-12): it spends the night's single use, same stake as the hex.
+	it.each(['scry', 'hex', 'cast_rune'])('declares %s as confirmation-gated', (name) => {
 		const declaration = ORACLE_TOOL_DECLARATIONS.find((d) => d.name === name);
 		expect(declaration?.description).toContain('confirmation question');
 	});
 
-	it.each(['ask', 'scry', 'pass'])(
-		'leaves %s unconfirmed — only destructive moves gate',
-		(name) => {
-			const declaration = ORACLE_TOOL_DECLARATIONS.find((d) => d.name === name);
-			expect(declaration?.description).not.toContain('confirmation');
-		}
-	);
+	it.each(['ask', 'pass'])('leaves %s unconfirmed — free moves never gate', (name) => {
+		const declaration = ORACLE_TOOL_DECLARATIONS.find((d) => d.name === name);
+		expect(declaration?.description).not.toContain('confirmation');
+	});
 });

@@ -67,11 +67,16 @@
 		noReactionWindow: 'Sköll asks nothing. There is no question to scry, hex, or pass.',
 		riteDone: 'The longest day is decided. Begin another night to play again.',
 		unknownRune: (name: string) => `No rune named ${name} lies on the board.`,
+		// Cast lockout (S9, R5): while a cast's engine round-trip is in flight, every voiced
+		// command answers with this and dispatches nothing — the cast completes regardless.
+		castSacred: 'The cast is sacred. Hold.',
 		// Spoken-move confirmations (S8): voiced by the Oracle as the tool result when a
 		// destructive call arms the gate — like the guards, never shown in the panel.
-		confirmHex: 'His question dies unanswered and the hex is spent. Say it plain: shall I hex him?',
-		confirmCast: (name: string) =>
-			`${name}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?`
+		// Short by design: the exchanges recur, and a spoken preamble every time wears thin.
+		// The irreversibility doctrine lives in the persona, not the question.
+		confirmScry: 'Shall I scry him?',
+		confirmHex: 'Shall I hex him?',
+		confirmCast: (name: string) => `Shall I cast ${name}?`
 	};
 
 	let castMode = $state(false);
@@ -198,12 +203,17 @@
 	// Per round, persisted with the view (S6): the invitation speaks once per game, not per tap.
 	let voiceInvited = $state(false);
 
-	// S8: the armed confirmation for a destructive tool call (hex, cast_rune). `heard` flips when
+	// S8: the armed confirmation for a gated tool call (scry, hex, cast_rune). `heard` flips when
 	// the player speaks after arming — the confirming call is refused without it, so the model can
 	// never execute both phases in one breath. `spoke` flips on the Oracle's first turn since
 	// arming (the confirmation question itself); a second turn while it is set means the exchange
 	// ended without the call (a decline), so the gate disarms.
 	let voiceConfirm: { name: string; rune?: string; heard: boolean; spoke: boolean } | null = null;
+
+	// S9 (R5): true only while a cast's engine round-trip is in flight — board- or voice-made.
+	// The executor rejects every voiced command for this window; nothing can cancel the cast
+	// itself (barge-in only stops her audio, and the session never aborts a running executor).
+	let casting = false;
 
 	function onVoiceEvent(event: VoiceEvent) {
 		switch (event.type) {
@@ -626,6 +636,7 @@
 
 	// Never throws — see performAsk.
 	async function performCast(runeName: string): Promise<string> {
+		casting = true;
 		try {
 			const { cast, state } = await dispatch({
 				type: 'Cast',
@@ -647,6 +658,9 @@
 			answer = RITE.castFalters;
 			return RITE.castFalters;
 		} finally {
+			// Released here, not in the callers: the lockout covers exactly the cast dispatch.
+			// The wolf's follow-on move falls under the ordinary pending guard.
+			casting = false;
 			cancelCast();
 		}
 	}
@@ -668,14 +682,16 @@
 	// (its button disabled or target missing) without touching the panel.
 	const REACTION_TOOLS: Record<string, ReactionChoice> = { scry: 'Scry', hex: 'Hex', pass: 'Pass' };
 
-	// S8 (R4): hex and cast_rune execute only through a spoken confirmation exchange, and the
-	// gate is client-authoritative — the first call only arms it and hands back the question to
-	// voice; nothing the model sends can reach the engine until the player has spoken since
-	// arming. Returns the question while the gate holds, null once confirmed.
+	// S8 (R4): scry, hex, and cast_rune execute only through a spoken confirmation exchange —
+	// scry and hex spend the night's single use, a cast stakes the round — and the gate is
+	// client-authoritative: the first call only arms it and hands back the question to voice;
+	// nothing the model sends can reach the engine until the player has spoken since arming.
+	// Returns the question while the gate holds, null once confirmed.
 	function gateDestructive(armed: typeof voiceConfirm, name: string, rune?: string): string | null {
 		if (armed && armed.name === name && armed.rune === rune && armed.heard) return null;
 		// Not armed, an unheard double-call, or a different target: (re-)arm and ask again.
 		voiceConfirm = { name, rune, heard: false, spoke: false };
+		if (name === 'scry') return RITE.confirmScry;
 		return name === 'hex' ? RITE.confirmHex : RITE.confirmCast(rune ?? '');
 	}
 
@@ -685,6 +701,9 @@
 		// stale affirmation must never carry over to execute a later call.
 		const armed = voiceConfirm;
 		voiceConfirm = null;
+		// S9 (R5): the cast lockout outranks every guard and the gate — checked after the
+		// capture above so the armed exchange still dies, but before anything else can answer.
+		if (casting) return RITE.castSacred;
 		if (name === 'ask') {
 			const question = typeof args.question === 'string' ? args.question.trim() : '';
 			if (question === '') return RITE.emptyAsk;
@@ -708,8 +727,9 @@
 			if (pending) return RITE.riteMoving;
 			if (!skollAsking) return RITE.noReactionWindow;
 			// Guards first: confirming a move the board doesn't offer would be an empty promise.
-			if (name === 'hex') {
-				const question = gateDestructive(armed, 'hex');
+			// Scry and hex both gate — each is the night's one use; only the pass is free.
+			if (name === 'scry' || name === 'hex') {
+				const question = gateDestructive(armed, name);
 				if (question) return question;
 			}
 			pending = true;

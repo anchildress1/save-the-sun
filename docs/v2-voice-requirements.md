@@ -82,17 +82,18 @@ Ask, Hex, Scry, Pass, and Cast the Rune are exposed to the Oracle session as fun
 - [x] Voice-initiated and button-initiated actions produce identical engine state. No action exists in voice that lacks a button equivalent.
 
 **R4 — Confirmation for destructive actions.**
-Hex and Cast the Rune require a spoken confirmation exchange before the engine executes.
+Scry, Hex, and Cast the Rune require a spoken confirmation exchange before the engine executes. *(Scry joined the gate 2026-06-12: it spends the night's single use, same stake as the hex.)*
 
 - [x] Given the player says "cast Sowilo," then the Oracle asks for confirmation and executes only on an affirmative reply.
+- [x] Given the player says "scry his question," then the Oracle asks for confirmation and executes only on an affirmative reply — scry and hex are each one of one for the night.
 - [x] Given the player declines or stays silent through the timeout, then nothing executes.
 - [x] Given a rune is cast, when the player attempts to retract it by voice, then the Oracle refuses in character—the cast is committed and irreversible. Her system instruction covers this ("the rune is cast; what is written in fire does not unwrite").
 
 **R5 — Cast is uninterruptible.**
 Per game rules, Hex targets an Ask and a Cast cannot be interrupted.
 
-- [ ] Given a Cast is executing, when voice commands arrive, then they are rejected with an in-character Oracle line; the Cast completes regardless.
-- [ ] Barge-in interrupts the Oracle's speech only—never a committed engine action.
+- [x] Given a Cast is executing, when voice commands arrive, then they are rejected with an in-character Oracle line; the Cast completes regardless.
+- [x] Barge-in interrupts the Oracle's speech only—never a committed engine action.
 
 **R6 — Eclipse medallion: control + indicator.**
 A medallion at the top of the Oracle panel is both the voice toggle and the state display. Static art, animated light: the artwork never deforms; only glow layers animate.

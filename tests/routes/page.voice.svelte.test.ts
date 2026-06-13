@@ -53,6 +53,33 @@ const pageProps = {
 	form: null
 };
 
+// The page-registered executor, exactly as the session would invoke it (S7+).
+const executor = () =>
+	voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
+		name: string;
+		args: Record<string, unknown>;
+	}) => Promise<string>;
+
+// Every action body that reached the engine, in dispatch order.
+const actionBodies = () =>
+	vi
+		.mocked(fetch)
+		.mock.calls.filter(([url]) => String(url) === '/api/action')
+		.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+
+function mockAction(result: object) {
+	vi.mocked(fetch).mockImplementation(async (input) => {
+		if (String(input) === '/api/action') return new Response(JSON.stringify(result));
+		return new Response('{}');
+	});
+}
+
+// S8 canon (ux-copy.md §1): the confirmation questions, and the player reply that opens the gate.
+const CONFIRM_SCRY = 'Shall I scry him?';
+const CONFIRM_HEX = 'Shall I hex him?';
+const confirmCast = (name: string) => `Shall I cast ${name}?`;
+const playerSpeaks = () => emit({ type: 'transcript', direction: 'in', text: 'yes, do it' });
+
 beforeEach(() => {
 	// Reset here, not in afterEach: the previous test's component cleanup calls sleep() on
 	// unmount, and that teardown ordering must never leak into this test's call counts. Reset
@@ -316,6 +343,7 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('No. Sól is not reaching for a fire rune.');
 		expect(consoleError).not.toHaveBeenCalled();
+		consoleError.mockRestore(); // resetAllMocks never uninstalls a spy — don't leak it
 	});
 
 	it('ignores an event type it does not know — a newer session must not crash an older page', async () => {
@@ -479,27 +507,7 @@ describe('Save the Sun page — wake invitation (S6)', () => {
 });
 
 describe('Save the Sun page — engine tool calls (S7)', () => {
-	// The page-registered executor, exactly as the session would invoke it.
-	const executor = () =>
-		voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
-			name: string;
-			args: Record<string, unknown>;
-		}) => Promise<string>;
-
-	const actionBodies = () =>
-		vi
-			.mocked(fetch)
-			.mock.calls.filter(([url]) => String(url) === '/api/action')
-			.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
-
 	const askAnswer = 'Yes. Sól is reaching for a fire rune.';
-
-	function mockAction(result: object) {
-		vi.mocked(fetch).mockImplementation(async (input) => {
-			if (String(input) === '/api/action') return new Response(JSON.stringify(result));
-			return new Response('{}');
-		});
-	}
 
 	it('registers the executor at mount and unregisters at unmount', async () => {
 		const screen = render(Page, pageProps);
@@ -544,9 +552,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		// Spoken rune names arrive in whatever case the transcript carried. The cast is
 		// destructive, so the voiced path runs through the S8 confirmation exchange first.
 		const question = await executor()({ name: 'cast_rune', args: { rune: 'sowilo' } });
-		expect(question).toBe(
-			'Sowilo, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?'
-		);
+		expect(question).toBe(confirmCast('Sowilo'));
 		emit({ type: 'transcript', direction: 'in', text: 'cast it' });
 		const outcome = await executor()({ name: 'cast_rune', args: { rune: 'sowilo' } });
 		expect(outcome).toBe('Sowilo is not the one. The night holds.');
@@ -575,7 +581,10 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		screen.unmount();
 
 		// A fresh window for the voiced path — the first render's Scry already closed its own.
+		// The scry is one of one, so the voiced path runs through the confirmation exchange.
 		render(Page, reactProps);
+		expect(await executor()({ name: 'scry', args: {} })).toBe(CONFIRM_SCRY);
+		emit({ type: 'transcript', direction: 'in', text: 'scry him' });
 		const outcome = await executor()({ name: 'scry', args: {} });
 		expect(outcome).toBe(
 			`You lean into the dark and listen. His answer is yours too. ${askAnswer}`
@@ -678,18 +687,6 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 });
 
 describe('Save the Sun page — voiced tool guards (S7 review fixes)', () => {
-	const executor = () =>
-		voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
-			name: string;
-			args: Record<string, unknown>;
-		}) => Promise<string>;
-
-	const actionBodies = () =>
-		vi
-			.mocked(fetch)
-			.mock.calls.filter(([url]) => String(url) === '/api/action')
-			.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
-
 	it('an inherited object key is not a tool — model names only match own reactions', async () => {
 		// With the window open, `in`-based matching would have routed toString into a React
 		// dispatch carrying a function as the reaction.
@@ -819,32 +816,6 @@ describe('Save the Sun page — voiced tool guards (S7 review fixes)', () => {
 });
 
 describe('Save the Sun page — destructive confirmation gate (S8)', () => {
-	const executor = () =>
-		voiceMock.setToolExecutor.mock.lastCall![0] as (call: {
-			name: string;
-			args: Record<string, unknown>;
-		}) => Promise<string>;
-
-	const actionBodies = () =>
-		vi
-			.mocked(fetch)
-			.mock.calls.filter(([url]) => String(url) === '/api/action')
-			.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
-
-	function mockAction(result: object) {
-		vi.mocked(fetch).mockImplementation(async (input) => {
-			if (String(input) === '/api/action') return new Response(JSON.stringify(result));
-			return new Response('{}');
-		});
-	}
-
-	const CONFIRM_HEX =
-		'His question dies unanswered and the hex is spent. Say it plain: shall I hex him?';
-	const confirmCast = (name: string) =>
-		`${name}, staked on the longest day — a cast does not unwrite. Say it plain: shall I cast it?`;
-	// The player's reply since arming — the only thing that opens the gate.
-	const playerSpeaks = () => emit({ type: 'transcript', direction: 'in', text: 'yes, do it' });
-
 	const reactProps = {
 		...pageProps,
 		data: {
@@ -1050,7 +1021,22 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		expect(actionBodies().filter((body) => body.type === 'Cast')).toHaveLength(0);
 	});
 
-	it('arming the gate never blocks the other tools — a scry still executes in the same window', async () => {
+	it('arming the gate never blocks the free tools — a pass still executes in the same window', async () => {
+		// Scry and hex both gate now, so the pass is the one reaction that must stay free.
+		mockAction({
+			type: 'React',
+			outcome: { ok: true, choice: 'Pass' },
+			skollReaction: { hexed: false },
+			state: HUMAN_TURN
+		});
+		render(Page, reactProps);
+		await executor()({ name: 'hex', args: {} });
+		const outcome = await executor()({ name: 'pass', args: {} });
+		expect(outcome).toBe('You hold your hand. Let him have his answer.');
+		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Pass' }]);
+	});
+
+	it('a voiced scry gates like the hex — one of one, never spent without the word', async () => {
 		mockAction({
 			type: 'React',
 			outcome: { ok: true, choice: 'Scry', shareAnswer: true },
@@ -1058,11 +1044,244 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 			state: HUMAN_TURN
 		});
 		render(Page, reactProps);
-		await executor()({ name: 'hex', args: {} });
+		// First call arms and asks — nothing dispatches, the model cannot self-confirm.
+		expect(await executor()({ name: 'scry', args: {} })).toBe(CONFIRM_SCRY);
+		expect(await executor()({ name: 'scry', args: {} })).toBe(CONFIRM_SCRY);
+		expect(actionBodies()).toHaveLength(0);
+		// The heard affirmation lets the matching second call through.
+		playerSpeaks();
 		const outcome = await executor()({ name: 'scry', args: {} });
 		expect(outcome).toBe(
 			'You lean into the dark and listen. His answer is yours too. Yes. Sól is reaching for a fire rune.'
 		);
 		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Scry' }]);
+	});
+});
+
+describe('Save the Sun page — cast lockout (S9)', () => {
+	const CAST_SACRED = 'The cast is sacred. Hold.';
+	const wrongCast = { type: 'Cast', cast: { ok: true, won: false, turnConsumed: true } };
+
+	// Holds the Cast round-trip open under the test's control; every other action answers at once.
+	function mockHeldCast(other: object = {}) {
+		let settle!: (response: Response) => void;
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit | undefined)?.body));
+			if (body.type === 'Cast')
+				return new Promise<Response>((resolve) => {
+					settle = resolve;
+				});
+			return new Response(JSON.stringify({ state: HUMAN_TURN, ...other }));
+		});
+		return {
+			settle: () => settle(new Response(JSON.stringify({ ...wrongCast, state: HUMAN_TURN })))
+		};
+	}
+
+	async function startBoardCast(screen: ReturnType<typeof render>) {
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await screen.getByRole('button', { name: 'Name it' }).click();
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+	}
+
+	it('rejects every voiced command while a board cast resolves — and the cast completes regardless', async () => {
+		const held = mockHeldCast();
+		const screen = render(Page, pageProps);
+		await startBoardCast(screen);
+
+		// The lockout line outranks the generic pending guard and every other answer —
+		// including a cast the page would otherwise refuse by name, and even a tool the
+		// page does not know (the unknown-tool error waits outside the window).
+		expect(await executor()({ name: 'ask', args: { question: 'is it gold?' } })).toBe(CAST_SACRED);
+		expect(await executor()({ name: 'scry', args: {} })).toBe(CAST_SACRED);
+		expect(await executor()({ name: 'cast_rune', args: { rune: 'Excalibur' } })).toBe(CAST_SACRED);
+		expect(await executor()({ name: 'summon_wolf', args: {} })).toBe(CAST_SACRED);
+
+		// Nothing the voice said dispatched — the Cast is alone on the wire and still completes.
+		expect(actionBodies()).toEqual([{ type: 'Cast', player: 'Human', runeName: 'Sowilo' }]);
+		held.settle();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Sowilo is not the one. The night holds.');
+	});
+
+	it("a voiced cast's own round-trip locks the rite the same way", async () => {
+		const held = mockHeldCast();
+		render(Page, pageProps);
+		expect(await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } })).toBe(
+			confirmCast('Sowilo')
+		);
+		playerSpeaks();
+		const confirmed = executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+
+		expect(await executor()({ name: 'ask', args: { question: 'is it gold?' } })).toBe(CAST_SACRED);
+
+		held.settle();
+		await expect(confirmed).resolves.toBe('Sowilo is not the one. The night holds.');
+		expect(actionBodies()).toEqual([{ type: 'Cast', player: 'Human', runeName: 'Sowilo' }]);
+	});
+
+	it('barge-in mid-cast stops her audio only — the committed cast is never cancelled', async () => {
+		// The page-side face of a barge-in is the session's hearing/transcript events (the
+		// session already stopped her audio). None of it may abort the engine round-trip.
+		const held = mockHeldCast();
+		const screen = render(Page, pageProps);
+		await startBoardCast(screen);
+
+		emit({ type: 'hearing', amplitude: 0.2 });
+		emit({ type: 'transcript', direction: 'in', text: 'wait, stop, take it back' });
+		expect(await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } })).toBe(CAST_SACRED);
+
+		held.settle();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Sowilo is not the one. The night holds.');
+		expect(actionBodies()).toEqual([{ type: 'Cast', player: 'Human', runeName: 'Sowilo' }]);
+	});
+
+	it('the lockout lifts once the cast settles — the next voiced move dispatches again', async () => {
+		const askAnswer = 'Yes. Sól is reaching for a fire rune.';
+		const held = mockHeldCast({
+			type: 'Ask',
+			oracle: { ok: true, answer: askAnswer, turnConsumed: true }
+		});
+		const screen = render(Page, pageProps);
+		await startBoardCast(screen);
+		expect(await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } })).toBe(
+			CAST_SACRED
+		);
+		held.settle();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Sowilo is not the one. The night holds.');
+		// The answer paints before the board lock releases — wait for the release itself.
+		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
+
+		const outcome = await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		expect(outcome).toBe(askAnswer);
+		expect(actionBodies().filter((body) => body.type === 'Ask')).toHaveLength(1);
+	});
+
+	it('a failed cast dispatch still releases the lockout — the rite never seals shut', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const askAnswer = 'Yes. Sól is reaching for a fire rune.';
+		let failCast!: (reason: Error) => void;
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit | undefined)?.body));
+			if (body.type === 'Cast')
+				return new Promise<Response>((_, reject) => {
+					failCast = reject;
+				});
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: { ok: true, answer: askAnswer, turnConsumed: true },
+					state: HUMAN_TURN
+				})
+			);
+		});
+		const screen = render(Page, pageProps);
+		await executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
+		playerSpeaks();
+		const confirmed = executor()({ name: 'cast_rune', args: { rune: 'Sowilo' } });
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+		failCast(new Error('network down'));
+		await expect(confirmed).resolves.toBe('The rite falters. The rune slips away.');
+		// The tool result returns before the board lock releases — wait for the release itself.
+		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
+
+		const outcome = await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		expect(outcome).toBe(askAnswer);
+		expect(consoleError).toHaveBeenCalled();
+		consoleError.mockRestore(); // resetAllMocks never uninstalls a spy — don't leak it
+	});
+
+	it('no stale affirmation survives the cast — the post-cast call re-asks, never executes', async () => {
+		// Armed hex + affirmation, then a board cast races in: the cast's dispatch and the
+		// lockout's capture both kill the exchange — either alone must be enough.
+		const held = mockHeldCast();
+		const reactScreen = render(Page, {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+			}
+		});
+		await executor()({ name: 'hex', args: {} });
+		playerSpeaks();
+		await startBoardCast(reactScreen);
+		expect(await executor()({ name: 'hex', args: {} })).toBe(CAST_SACRED);
+		held.settle();
+		await expect
+			.element(reactScreen.getByTestId('answer'))
+			.toHaveTextContent('Sowilo is not the one. The night holds.');
+		// The answer paints before the board lock releases — wait for the release itself.
+		await expect.element(reactScreen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
+		expect(await executor()({ name: 'hex', args: {} })).toBe(CONFIRM_HEX);
+		expect(actionBodies().filter((body) => body.type === 'React')).toHaveLength(0);
+	});
+
+	it('a mid-cast arm attempt plus a mid-cast reply opens nothing — the lockout never arms the gate', async () => {
+		// The reverse direction of the stale-affirmation case: the hex is first attempted DURING
+		// the cast (it must not arm), and the player's reply lands inside the same window. If a
+		// refactor let the gate arm before the lockout answered, that reply would confirm it and
+		// the post-cast call would execute a destructive action with no genuine exchange.
+		const held = mockHeldCast();
+		const screen = render(Page, {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+			}
+		});
+		await startBoardCast(screen);
+		expect(await executor()({ name: 'hex', args: {} })).toBe(CAST_SACRED);
+		playerSpeaks(); // lands inside the lockout window
+		held.settle();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Sowilo is not the one. The night holds.');
+		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
+		expect(await executor()({ name: 'hex', args: {} })).toBe(CONFIRM_HEX);
+		expect(actionBodies().filter((body) => body.type === 'React')).toHaveLength(0);
+	});
+
+	it("the wolf's follow-on move falls to the ordinary pending guard — no gap after the lockout lifts", async () => {
+		// A wrong cast often hands the turn to Sköll. Between the cast settling (lockout lifted)
+		// and his Advance settling, the board lock still holds: a voiced move in that window gets
+		// the moving line, never a dispatch — and never the cast line, which would be a lie.
+		const skollTurn: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		let settleCast!: (response: Response) => void;
+		let settleAdvance!: (response: Response) => void;
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit | undefined)?.body));
+			return new Promise<Response>((resolve) => {
+				if (body.type === 'Cast') settleCast = resolve;
+				else settleAdvance = resolve;
+			});
+		});
+		const screen = render(Page, pageProps);
+		await startBoardCast(screen);
+		expect(await executor()({ name: 'ask', args: { question: 'is it gold?' } })).toBe(CAST_SACRED);
+
+		settleCast(new Response(JSON.stringify({ ...wrongCast, state: skollTurn })));
+		await vi.waitFor(() =>
+			expect(actionBodies().filter((body) => body.type === 'Advance')).toHaveLength(1)
+		);
+		expect(await executor()({ name: 'ask', args: { question: 'is it gold?' } })).toBe(RITE_MOVING);
+
+		settleAdvance(new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN })));
+		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
+		expect(actionBodies().map((body) => body.type)).toEqual(['Cast', 'Advance']);
 	});
 });
