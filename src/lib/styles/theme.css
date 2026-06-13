@@ -125,7 +125,8 @@
 .btn::before {
 	content: '';
 	position: absolute;
-	inset: -0.2rem -0.3rem;
+	/* Concentric with the button box so the hover/focus frame isn't offset from it. */
+	inset: -0.3rem;
 	z-index: 0;
 	pointer-events: none;
 	border: 10px solid transparent;
@@ -134,6 +135,8 @@
 	border-image-width: 10px 14px;
 	border-image-repeat: stretch;
 	border-radius: 12px;
+	/* The resting outline IS this ornate frame — the buttons carry no plain border, so there's no
+	   double. Hover/focus just brightens it. */
 	opacity: 0.82;
 	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.42));
 	transition:
@@ -147,6 +150,11 @@
 	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 6px rgba(217, 169, 74, 0.22));
 }
 
+.btn:disabled::before {
+	opacity: 0.38;
+	filter: none;
+}
+
 .btn--primary {
 	color: #1d1606;
 	background: linear-gradient(180deg, #e7bd63, #d4a23f);
@@ -158,7 +166,6 @@
 .btn--secondary {
 	color: var(--gold-bright);
 	background: rgba(9, 13, 26, 0.86);
-	border-color: rgba(233, 200, 119, 0.32);
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
@@ -178,7 +185,6 @@
 }
 
 .btn--secondary:hover:not(:disabled) {
-	border-color: rgba(233, 200, 119, 0.6);
 	background: rgba(233, 200, 119, 0.1);
 }
 
@@ -196,14 +202,8 @@
 	filter: saturate(0.55) brightness(0.94);
 }
 
-.btn:disabled::before {
-	opacity: 0.38;
-	filter: none;
-}
-
 .btn--secondary:disabled {
 	color: var(--ink-muted);
-	border-color: var(--gold-faint);
 }
 
 body {

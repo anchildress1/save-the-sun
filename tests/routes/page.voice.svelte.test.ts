@@ -60,12 +60,34 @@ const executor = () =>
 		args: Record<string, unknown>;
 	}) => Promise<string>;
 
+// The JSON body a fetch mock received, typed as the string it always is in these tests (avoids
+// coercing a possibly-object BodyInit through String()).
+const readBody = (init: RequestInit | undefined): Record<string, unknown> =>
+	JSON.parse((init?.body ?? '') as string);
+
 // Every action body that reached the engine, in dispatch order.
 const actionBodies = () =>
 	vi
 		.mocked(fetch)
 		.mock.calls.filter(([url]) => String(url) === '/api/action')
-		.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+		.map(([, init]) => readBody(init as RequestInit | undefined));
+
+// Make the next wake resolve straight to thinking (the invitation path). Module-scope: it touches
+// only the module mocks, no test-local state.
+function wakeSucceeds() {
+	voiceMock.wake.mockImplementation(async () => {
+		voiceMock.state = 'thinking';
+		emit({ type: 'thinking' });
+	});
+}
+
+// Arm and commit a board cast through the UI, then wait for the dispatch to land.
+async function startBoardCast(screen: ReturnType<typeof render>) {
+	await screen.getByRole('button', { name: 'Cast the rune' }).click();
+	await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+	await screen.getByRole('button', { name: 'Name it' }).click();
+	await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
+}
 
 function mockAction(result: object) {
 	vi.mocked(fetch).mockImplementation(async (input) => {
@@ -110,8 +132,8 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 		);
 		// First interactive element of the panel: the medallion sits above the turn pill.
 		const panel = screen.container.querySelector('.oracle-panel')!;
-		const order = [...panel.querySelectorAll('[data-testid]')].map((el) =>
-			el.getAttribute('data-testid')
+		const order = [...panel.querySelectorAll('[data-testid]')].map(
+			(el) => (el as HTMLElement).dataset.testid
 		);
 		expect(order.indexOf('eclipse-medallion')).toBeLessThan(order.indexOf('turn-pill'));
 	});
@@ -377,13 +399,6 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 describe('Save the Sun page — wake invitation (S6)', () => {
 	const VIEW_KEY = 'save-the-sun:view';
 
-	function wakeSucceeds() {
-		voiceMock.wake.mockImplementation(async () => {
-			voiceMock.state = 'thinking';
-			emit({ type: 'thinking' });
-		});
-	}
-
 	it('first tap carries the invitation; the next wake resumes silent', async () => {
 		wakeSucceeds();
 		const screen = render(Page, pageProps);
@@ -612,7 +627,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		// the React (auto-pass) and the Ask answer come back from the one round.
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
-			const body = JSON.parse(String((init as RequestInit).body));
+			const body = readBody(init as RequestInit);
 			if (body.type === 'React')
 				return new Response(
 					JSON.stringify({
@@ -655,7 +670,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		// The implicit pass (React) fails; the ask must NOT proceed once his question still hangs.
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
-			const body = JSON.parse(String((init as RequestInit).body));
+			const body = readBody(init as RequestInit);
 			if (body.type === 'React') throw new Error('network down');
 			return new Response('{}');
 		});
@@ -683,7 +698,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		let settlePass!: (response: Response) => void;
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
-			const body = JSON.parse(String((init as RequestInit).body));
+			const body = readBody(init as RequestInit);
 			if (body.type === 'React')
 				return new Promise<Response>((resolve) => {
 					settlePass = resolve;
@@ -729,7 +744,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		let settlePass!: (response: Response) => void;
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
-			const body = JSON.parse(String((init as RequestInit).body));
+			const body = readBody(init as RequestInit);
 			if (body.type === 'React')
 				return new Promise<Response>((resolve) => {
 					settlePass = resolve;
@@ -881,7 +896,7 @@ describe('Save the Sun page — voiced tool guards (S7 review fixes)', () => {
 		let settleAdvance!: (response: Response) => void;
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
-			const body = JSON.parse(String((init as RequestInit | undefined)?.body));
+			const body = readBody(init as RequestInit | undefined);
 			if (body.type === 'Ask')
 				return new Response(
 					JSON.stringify({
@@ -1160,7 +1175,7 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		// Keyed mock: the ask auto-passes his question (React Pass) then answers hers (Ask).
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
-			const body = JSON.parse(String((init as RequestInit).body));
+			const body = readBody(init as RequestInit);
 			if (body.type === 'React')
 				return new Response(
 					JSON.stringify({
@@ -1257,7 +1272,7 @@ describe('Save the Sun page — cast lockout (S9)', () => {
 		let settle!: (response: Response) => void;
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
-			const body = JSON.parse(String((init as RequestInit | undefined)?.body));
+			const body = readBody(init as RequestInit | undefined);
 			if (body.type === 'Cast')
 				return new Promise<Response>((resolve) => {
 					settle = resolve;
@@ -1267,13 +1282,6 @@ describe('Save the Sun page — cast lockout (S9)', () => {
 		return {
 			settle: () => settle(new Response(JSON.stringify({ ...wrongCast, state: HUMAN_TURN })))
 		};
-	}
-
-	async function startBoardCast(screen: ReturnType<typeof render>) {
-		await screen.getByRole('button', { name: 'Cast the rune' }).click();
-		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
-		await screen.getByRole('button', { name: 'Name it' }).click();
-		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
 	}
 
 	it('rejects every voiced command while a board cast resolves — and the cast completes regardless', async () => {
@@ -1361,7 +1369,7 @@ describe('Save the Sun page — cast lockout (S9)', () => {
 		let failCast!: (reason: Error) => void;
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
-			const body = JSON.parse(String((init as RequestInit | undefined)?.body));
+			const body = readBody(init as RequestInit | undefined);
 			if (body.type === 'Cast')
 				return new Promise<Response>((_, reject) => {
 					failCast = reject;
@@ -1454,7 +1462,7 @@ describe('Save the Sun page — cast lockout (S9)', () => {
 		let settleAdvance!: (response: Response) => void;
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
-			const body = JSON.parse(String((init as RequestInit | undefined)?.body));
+			const body = readBody(init as RequestInit | undefined);
 			return new Promise<Response>((resolve) => {
 				if (body.type === 'Cast') settleCast = resolve;
 				else settleAdvance = resolve;
@@ -1567,17 +1575,7 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 			.toHaveTextContent('The fire holds your answer.');
 	});
 
-	it('fragments straddling the hearing flares stay one utterance', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'is it ' });
-		emit({ type: 'hearing', amplitude: 0.2 });
-		emit({ type: 'transcript', direction: 'in', text: 'a fire rune' });
-		await expect
-			.element(screen.getByTestId('voice-heard'))
-			.toHaveTextContent('The fire hears: “is it a fire rune”');
-	});
-
-	it('the heard line renders through a confirmation exchange — the same speech opens the gate', async () => {
+	it('input speech through a confirmation exchange opens the S8 gate (debug-only transcript, no UI line)', async () => {
 		mockAction({
 			type: 'React',
 			outcome: { ok: true, choice: 'Hex' },
@@ -1592,21 +1590,13 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 			}
 		});
 		expect(await executor()({ name: 'hex', args: {} })).toBe(CONFIRM_HEX);
+		// The input transcript opens the gate but is NOT shown in the rite UI (it lives in /debug).
 		emit({ type: 'transcript', direction: 'in', text: 'yes, hex him' });
-		await expect
-			.element(screen.getByTestId('voice-heard'))
-			.toHaveTextContent('The fire hears: “yes, hex him”');
+		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
 		const outcome = await executor()({ name: 'hex', args: {} });
 		expect(outcome).toBe(
 			"You close the Oracle's lips. His question dies unanswered — his turn with it."
 		);
-	});
-
-	it('the eclipse seal clears the heard line too', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
-		emit({ type: 'eclipsed' });
-		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
 	});
 
 	it('the caption persists with the round view — a reload resumes her last spoken line', async () => {
@@ -1617,56 +1607,10 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 		});
 	});
 
-	it('shows what she heard, fragment by fragment', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'is it ' });
-		emit({ type: 'transcript', direction: 'in', text: 'a fire rune' });
-		await expect
-			.element(screen.getByTestId('voice-heard'))
-			.toHaveTextContent('The fire hears: “is it a fire rune”');
-	});
-
-	it('a new utterance after her reply replaces the heard line', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
-		emit({ type: 'transcript', direction: 'out', text: 'No.' });
-		emit({ type: 'transcript', direction: 'in', text: 'is it dark' });
-		await expect
-			.element(screen.getByTestId('voice-heard'))
-			.toHaveTextContent('The fire hears: “is it dark”');
-		expect(screen.getByTestId('voice-heard').element().textContent).not.toContain('gold');
-	});
-
-	it('a turn that settles without a reply also closes the utterance', async () => {
-		// The thinking-rescue path: listening arrives with no out-fragment between.
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'first try' });
-		emit({ type: 'thinking' });
-		emit({ type: 'listening' });
-		emit({ type: 'transcript', direction: 'in', text: 'second try' });
-		await expect
-			.element(screen.getByTestId('voice-heard'))
-			.toHaveTextContent('The fire hears: “second try”');
-		expect(screen.getByTestId('voice-heard').element().textContent).not.toContain('first');
-	});
-
-	it('the heard line leaves with the session — the caption stays', async () => {
+	it('the Oracle caption survives the session sleeping', async () => {
 		const screen = render(Page, pageProps);
 		emit({ type: 'transcript', direction: 'out', text: 'The night holds.' });
-		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
 		emit({ type: 'asleep' });
-		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The night holds.');
-	});
-
-	it('a session error clears the heard line with the mic', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
-		emit({
-			type: 'error',
-			reason: 'socket',
-			notice: "The Oracle's voice falters. The rite continues by hand."
-		});
-		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
 	});
 });

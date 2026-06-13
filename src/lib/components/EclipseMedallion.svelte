@@ -140,13 +140,14 @@
 
 	.corona {
 		position: absolute;
-		inset: -12%;
+		/* Reach + pulse (below) capped so the glow stays inside the panel's clipped top border. */
+		inset: -10%;
 		border-radius: 50%;
 		background: radial-gradient(
 			circle,
 			rgba(var(--corona-rgb), 0.85) 0%,
-			rgba(var(--corona-rgb), 0.3) 46%,
-			transparent 72%
+			rgba(var(--corona-rgb), 0.3) 48%,
+			transparent 78%
 		);
 		opacity: 0.08;
 		transition: opacity 0.25s ease;
@@ -276,6 +277,8 @@
 	/* Hearing: corona flares with the player's voice; rim runes ignite. */
 	.medallion[data-voice-state='hearing'] .corona {
 		opacity: calc(0.34 + var(--flare) * 0.56);
+		/* Full mic-amplitude flare — the player must see the medallion react to their voice. The
+		   oracle-speaking glow is contained by its own pulse cap; the mic flare must not be clamped. */
 		transform: scale(calc(1 + var(--flare) * 0.07));
 		transition:
 			opacity 0.12s linear,
@@ -354,7 +357,7 @@
 		}
 		50% {
 			opacity: 0.82;
-			transform: scale(1.05);
+			transform: scale(1.03);
 		}
 	}
 

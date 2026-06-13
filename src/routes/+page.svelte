@@ -76,7 +76,12 @@
 		// The irreversibility doctrine lives in the persona, not the question.
 		confirmScry: 'Shall I scry him?',
 		confirmHex: 'Shall I hex him?',
-		confirmCast: (name: string) => `Shall I cast ${name}?`
+		confirmCast: (name: string) => `Shall I cast ${name}?`,
+		// Reaction affordance hints — one source for the title tooltip and the sr-only described-by.
+		hintScry: 'When your rival asks, hear the answer too.',
+		hintHex:
+			"When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted.",
+		hintPass: 'When your rival asks, let the question stand.'
 	};
 
 	let castMode = $state(false);
@@ -204,11 +209,10 @@
 	let voiceInvited = $state(false);
 
 	// S10: fragments carry no turn marker (boundaries ride state events), and `voiceCaption`
-	// stays apart from `answer` so a fragment never extends a board-made line.
-	let voiceHeard = $state('');
+	// stays apart from `answer` so a fragment never extends a board-made line. The input transcript
+	// is debug-only — it is teed to /debug, never shown in the rite UI.
 	let voiceCaption = '';
 	let captionOpen = false;
-	let heardOpen = false;
 
 	// S8: the armed confirmation for a gated tool call (scry, hex, cast_rune). `heard` flips when
 	// the player speaks after arming — the confirming call is refused without it, so the model can
@@ -238,9 +242,6 @@
 				voiceAmplitude = 0;
 				// Silence timeout, sleep tap, or the seal: the exchange is over, nothing executes (R4).
 				voiceConfirm = null;
-				// Mic off — a lingering heard line would promise listening; her caption stays.
-				voiceHeard = '';
-				heardOpen = false;
 				captionOpen = false;
 				break;
 			case 'waking':
@@ -256,7 +257,6 @@
 				// was a decline or drift — do not leave the destructive gate armed.
 				if (voiceConfirm?.spoke && voiceConfirm.heard) voiceConfirm = null;
 				captionOpen = false;
-				heardOpen = false;
 				voiceState = event.type;
 				break;
 			case 'thinking':
@@ -279,22 +279,17 @@
 				voiceState = 'asleep';
 				voiceAmplitude = 0;
 				voiceConfirm = null;
-				voiceHeard = '';
-				heardOpen = false;
 				captionOpen = false;
 				break;
 			case 'transcript':
 				if (event.direction === 'in') {
 					// The player spoke since arming — the gate may accept the confirming call (S8).
+					// The input transcript itself is debug-only; it is not surfaced in the rite UI.
 					if (voiceConfirm) voiceConfirm.heard = true;
-					voiceHeard = heardOpen ? voiceHeard + event.text : event.text;
-					heardOpen = true;
 				} else {
 					voiceCaption = captionOpen ? voiceCaption + event.text : event.text;
 					captionOpen = true;
 					answer = voiceCaption;
-					// Her reply began — the utterance is complete; a barge-in starts a new heard line.
-					heardOpen = false;
 				}
 				break;
 			default:
@@ -990,11 +985,6 @@
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
-			{#if voiceHeard}
-				<!-- No live region: the player just said it; her voiced reply re-announces any drift. -->
-				<p class="voice-heard" data-testid="voice-heard">The fire hears: “{voiceHeard}”</p>
-			{/if}
-
 			<h2 class="skoll-title" data-testid="skoll-title">Sköll</h2>
 			<!-- role=status: Sköll's Ask is narrated when it lands — it opens the reaction window,
 			     so a screen-reader player must hear it without hunting for the frame. -->
@@ -1015,7 +1005,7 @@
 					<button
 						class="btn btn--secondary reaction-btn"
 						type="button"
-						title="When your rival asks, hear the answer too."
+						title={RITE.hintScry}
 						aria-describedby="scry-hint"
 						disabled
 					>
@@ -1024,18 +1014,26 @@
 					<button
 						class="btn btn--secondary reaction-btn"
 						type="button"
-						title="When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted."
+						title={RITE.hintHex}
 						aria-describedby="hex-hint"
 						disabled
 					>
 						Hex
 					</button>
-					<!-- title alone is unreliable for AT and disabled buttons aren't focusable; expose the
-					     same guidance to assistive tech through described-by text. -->
-					<span id="scry-hint" class="sr-only">When your rival asks, hear the answer too.</span>
-					<span id="hex-hint" class="sr-only"
-						>When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted.</span
+					<!-- Pass keeps its slot here so it doesn't vanish when the window closes. -->
+					<button
+						class="btn btn--secondary reaction-btn"
+						type="button"
+						title={RITE.hintPass}
+						aria-describedby="pass-hint"
+						disabled
 					>
+						Pass
+					</button>
+					<!-- Disabled buttons aren't focusable; mirror the title into described-by for AT. -->
+					<span id="scry-hint" class="sr-only">{RITE.hintScry}</span>
+					<span id="hex-hint" class="sr-only">{RITE.hintHex}</span>
+					<span id="pass-hint" class="sr-only">{RITE.hintPass}</span>
 				</div>
 			{/if}
 
@@ -1109,18 +1107,9 @@
 				{/if}
 			</div>
 
-			<!-- Decorative, in flow: the wolf's nose rides just under the cast controls, and the
-			     moon ghosts up from the banner's top edge behind them. -->
+			<!-- Decorative: the wolf banner rises behind the controls; its own sky and moon show
+			     through. (The old separate moon-ghost layer is gone — it double-imaged the moon.) -->
 			<div class="skoll-art" aria-hidden="true">
-				<img
-					class="skoll-moon"
-					src={skollBanner}
-					width="768"
-					height="1376"
-					alt=""
-					decoding="async"
-					fetchpriority="low"
-				/>
 				<img
 					class="skoll-banner"
 					src={skollBanner}
@@ -1289,7 +1278,10 @@
 		font-weight: 400;
 		letter-spacing: 0.04em;
 		color: var(--gold-bright);
-		text-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
+		/* Dark offset for legibility over the moon art; tight gold glow for the gilt edge. */
+		text-shadow:
+			0 1px 1px rgba(6, 9, 18, 0.85),
+			0 0 8px rgba(217, 169, 74, 0.45);
 	}
 
 	/* The wordmark doubles as the home affordance — back to the intro splash. Inherits the h1 look so it
@@ -1412,13 +1404,14 @@
 		gap: 1.5rem;
 		flex: 1;
 		min-height: 0;
-		margin-top: 0.4rem;
 	}
 
 	.board-section {
 		display: flex;
 		flex-direction: column;
-		justify-content: center;
+		/* Top-align so the first rune row meets the oracle panel's top edge. Centering left the
+		   board floating in its column's slack — a phantom top margin the sidebar never had. */
+		justify-content: flex-start;
 	}
 
 	.oracle-panel {
@@ -1465,29 +1458,14 @@
 	/* Bleeds past the panel padding; relative so the moon anchors to the banner, not the panel —
 	   percentage-of-panel positioning put the moon behind the opaque wolf on tall viewports. */
 	.skoll-art {
-		position: relative;
-		width: calc(100% + 2.2rem);
-		margin: 0 -1.1rem;
-	}
-
-	.skoll-moon {
+		/* Pinned to the panel floor and stacked BEHIND the controls (z-index 2). The image rises
+		   up behind the buttons — sky and moon ghost through the gaps — while the wolf, anchored to
+		   the image bottom, stays fully clear below them. Bleeds the panel padding on both sides. */
 		position: absolute;
-		bottom: calc(100% - 2rem);
-		left: 0;
-		width: 100%;
-		height: 10rem;
-		object-fit: cover;
-		object-position: 50% 0%;
-		opacity: 0.6;
-		filter: brightness(1.35);
-		mask-image: linear-gradient(180deg, transparent 0%, black 30%, black 80%, transparent 100%);
-		-webkit-mask-image: linear-gradient(
-			180deg,
-			transparent 0%,
-			black 30%,
-			black 80%,
-			transparent 100%
-		);
+		left: -1.1rem;
+		right: -1.1rem;
+		bottom: 0;
+		z-index: 0;
 		pointer-events: none;
 	}
 
@@ -1574,17 +1552,6 @@
 
 	.frame-text.answer {
 		color: var(--gold-bright);
-	}
-
-	/* Tucked under the answer frame, quieter than her gold — input echo, not an answer. */
-	.voice-heard {
-		margin: -0.55rem 0 0;
-		font-family: var(--font-story-body);
-		font-style: italic;
-		font-size: 0.85rem;
-		line-height: 1.4;
-		color: var(--ink-muted);
-		overflow-wrap: anywhere;
 	}
 
 	/* Left-aligned to mirror the Oracle's merged header line. */
@@ -1791,9 +1758,9 @@
 	.skoll-banner {
 		display: block;
 		width: 100%;
-		/* The bottom band of the art, sized so the wolf's nose tip sits at the top edge —
-		   directly under the cast controls in flow. */
-		height: 28.25rem;
+		/* Tall enough that the wolf sits at the panel floor while the sky/moon above it rises far up
+		   behind the controls — as much of the picture as possible shows, the wolf never clipped. */
+		height: 40rem;
 		object-fit: cover;
 		object-position: 50% 100%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
