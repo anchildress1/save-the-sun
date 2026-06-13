@@ -257,6 +257,7 @@ One-use reactions, **not cards**—no deck, no hand. Both trigger on an **Ask**;
 |---|---|
 | **Scry** | "When your rival asks, hear the answer too." |
 | **Hex** | "When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted." |
+| **Pass** | "When your rival asks, let the question stand." |
 
 ### You use a reaction (on Sköll's Ask)
 **Interrupt prompt:** buttons **"Scry"** · **"Hex"** · **"Pass"**. The **"Sköll asks. Answer it?"** heading is **not displayed** in v1—it survives only as the buttons' accessibility group label (`aria-label`); the visible reaction-prompt copy is deferred to a v2 reaction-UI redesign.

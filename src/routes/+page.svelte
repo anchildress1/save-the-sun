@@ -76,7 +76,12 @@
 		// The irreversibility doctrine lives in the persona, not the question.
 		confirmScry: 'Shall I scry him?',
 		confirmHex: 'Shall I hex him?',
-		confirmCast: (name: string) => `Shall I cast ${name}?`
+		confirmCast: (name: string) => `Shall I cast ${name}?`,
+		// Reaction affordance hints — one source for the title tooltip and the sr-only described-by.
+		hintScry: 'When your rival asks, hear the answer too.',
+		hintHex:
+			"When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted.",
+		hintPass: 'When your rival asks, let the question stand.'
 	};
 
 	let castMode = $state(false);
@@ -1015,7 +1020,7 @@
 					<button
 						class="btn btn--secondary reaction-btn"
 						type="button"
-						title="When your rival asks, hear the answer too."
+						title={RITE.hintScry}
 						aria-describedby="scry-hint"
 						disabled
 					>
@@ -1024,30 +1029,26 @@
 					<button
 						class="btn btn--secondary reaction-btn"
 						type="button"
-						title="When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted."
+						title={RITE.hintHex}
 						aria-describedby="hex-hint"
 						disabled
 					>
 						Hex
 					</button>
-					<!-- Pass holds its slot here too: without it the button vanished from the DOM every time
-					     the reaction window closed, so it read as "Pass disappears" while Scry/Hex stayed put. -->
+					<!-- Pass keeps its slot here so it doesn't vanish when the window closes. -->
 					<button
 						class="btn btn--secondary reaction-btn"
 						type="button"
-						title="When your rival asks, let the question stand."
+						title={RITE.hintPass}
 						aria-describedby="pass-hint"
 						disabled
 					>
 						Pass
 					</button>
-					<!-- title alone is unreliable for AT and disabled buttons aren't focusable; expose the
-					     same guidance to assistive tech through described-by text. -->
-					<span id="scry-hint" class="sr-only">When your rival asks, hear the answer too.</span>
-					<span id="pass-hint" class="sr-only">When your rival asks, let the question stand.</span>
-					<span id="hex-hint" class="sr-only"
-						>When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted.</span
-					>
+					<!-- Disabled buttons aren't focusable; mirror the title into described-by for AT. -->
+					<span id="scry-hint" class="sr-only">{RITE.hintScry}</span>
+					<span id="hex-hint" class="sr-only">{RITE.hintHex}</span>
+					<span id="pass-hint" class="sr-only">{RITE.hintPass}</span>
 				</div>
 			{/if}
 
@@ -1301,8 +1302,7 @@
 		font-weight: 400;
 		letter-spacing: 0.04em;
 		color: var(--gold-bright);
-		/* Grounded then gilded: a tight dark offset keeps the wordmark legible over the moon art,
-		   a close gold glow reads as carved metal — the single diffuse 18px blur muddied both. */
+		/* Dark offset for legibility over the moon art; tight gold glow for the gilt edge. */
 		text-shadow:
 			0 1px 1px rgba(6, 9, 18, 0.85),
 			0 0 8px rgba(217, 169, 74, 0.45);
@@ -1428,8 +1428,6 @@
 		gap: 1.5rem;
 		flex: 1;
 		min-height: 0;
-		/* No margin-top: main's flex `gap` already owns the header→layout rhythm. The extra margin
-		   stacked on top of the gap, so this seam ran wider than every other section break. */
 	}
 
 	.board-section {

@@ -583,8 +583,8 @@ describe('Save the Sun page', () => {
 	// on every window close while Scry/Hex stayed (their disabled placeholders held). It read as
 	// "Pass disappears at random." Pass must hold a disabled slot whenever the window is closed.
 	it('keeps a disabled Pass in the static row when no reaction window is open', async () => {
-		render(Page, pageProps);
-		const reactions = document.querySelector('.reactions');
+		const screen = render(Page, pageProps);
+		const reactions = screen.container.querySelector('.reactions');
 		expect(reactions).not.toBeNull();
 		const labels = [...reactions!.querySelectorAll('.reaction-btn')].map((b) =>
 			b.textContent?.trim()
