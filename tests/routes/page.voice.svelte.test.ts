@@ -600,6 +600,170 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		expect(actionBodies()).toHaveLength(0);
 	});
 
+	it('a voiced ask while his question hangs auto-passes his, then answers hers (TTD 14)', async () => {
+		const reactProps = {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+			}
+		};
+		// His Pass hands the turn back to her; her Ask then lands — keyed on action type so both
+		// the React (auto-pass) and the Ask answer come back from the one round.
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit).body));
+			if (body.type === 'React')
+				return new Response(
+					JSON.stringify({
+						type: 'React',
+						outcome: { ok: true, choice: 'Pass' },
+						state: HUMAN_TURN
+					})
+				);
+			if (body.type === 'Ask')
+				return new Response(
+					JSON.stringify({
+						type: 'Ask',
+						oracle: { ok: true, answer: askAnswer, turnConsumed: true },
+						state: HUMAN_TURN
+					})
+				);
+			return new Response('{}');
+		});
+		render(Page, reactProps);
+
+		const outcome = await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		// She gets her answer — not the wolf-asking guard line.
+		expect(outcome).toBe(askAnswer);
+		// The wire carries the implicit pass first, then her ask, in that order.
+		expect(actionBodies()).toEqual([
+			{ type: 'React', player: 'Human', reaction: 'Pass' },
+			{ type: 'Ask', player: 'Human', question: 'is it a fire rune?' }
+		]);
+	});
+
+	it('an ask whose implicit pass fails returns the pass-failure line, never the ask', async () => {
+		const reactProps = {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+			}
+		};
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		// The implicit pass (React) fails; the ask must NOT proceed once his question still hangs.
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit).body));
+			if (body.type === 'React') throw new Error('network down');
+			return new Response('{}');
+		});
+		render(Page, reactProps);
+
+		const outcome = await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		expect(outcome).toBe(
+			"The Oracle falls silent — the rite can't reach Sól. Draw breath, and ask again."
+		);
+		// Only the failed pass hit the wire — never the ask.
+		expect(actionBodies().filter((body) => body.type === 'Ask')).toHaveLength(0);
+		consoleError.mockRestore(); // resetAllMocks never uninstalls a spy — don't leak it
+	});
+
+	it('holds the single-action lock across the implicit pass — no second move interleaves', async () => {
+		const reactProps = {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+			}
+		};
+		// Hold the implicit pass (React) open under the test's control so a second tool call lands
+		// while it is in flight — the pending guard must already be set, before the pass resolves.
+		let settlePass!: (response: Response) => void;
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit).body));
+			if (body.type === 'React')
+				return new Promise<Response>((resolve) => {
+					settlePass = resolve;
+				});
+			if (body.type === 'Ask')
+				return new Response(
+					JSON.stringify({
+						type: 'Ask',
+						oracle: { ok: true, answer: askAnswer, turnConsumed: true },
+						state: HUMAN_TURN
+					})
+				);
+			return new Response('{}');
+		});
+		render(Page, reactProps);
+
+		const first = executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1)); // the implicit pass is in flight
+
+		// A second move arrives mid round-trip: the lock taken before the pass turns it away.
+		const second = await executor()({ name: 'pass', args: {} });
+		expect(second).toBe(RITE_MOVING);
+		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Pass' }]);
+
+		settlePass(
+			new Response(
+				JSON.stringify({ type: 'React', outcome: { ok: true, choice: 'Pass' }, state: HUMAN_TURN })
+			)
+		);
+		expect(await first).toBe(askAnswer);
+	});
+
+	it('disables the clicked reaction buttons during the implicit auto-pass', async () => {
+		const reactProps = {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+			}
+		};
+		// Hold the implicit pass open: while it is in flight the prompt buttons must be disabled, so
+		// a click can't land a second React that beats the auto-pass to the session lock.
+		let settlePass!: (response: Response) => void;
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit).body));
+			if (body.type === 'React')
+				return new Promise<Response>((resolve) => {
+					settlePass = resolve;
+				});
+			if (body.type === 'Ask')
+				return new Response(
+					JSON.stringify({
+						type: 'Ask',
+						oracle: { ok: true, answer: askAnswer, turnConsumed: true },
+						state: HUMAN_TURN
+					})
+				);
+			return new Response('{}');
+		});
+		const screen = render(Page, reactProps);
+		const scry = screen.getByRole('button', { name: 'Scry' });
+		await expect.element(scry).toBeEnabled(); // live before the move
+
+		const first = executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1)); // the implicit pass is in flight
+
+		// All three reaction choices are sealed while the auto-pass holds the lock.
+		await expect.element(scry).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Hex' })).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Pass' })).toBeDisabled();
+
+		settlePass(
+			new Response(
+				JSON.stringify({ type: 'React', outcome: { ok: true, choice: 'Pass' }, state: HUMAN_TURN })
+			)
+		);
+		expect(await first).toBe(askAnswer);
+	});
+
 	it("a voiced ask during Sköll's move dispatches nothing", async () => {
 		const skollTurn: GameState = {
 			activePlayer: 'Sköll',
@@ -609,10 +773,15 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		};
 		mockAction({ type: 'Advance', state: skollTurn });
 		render(Page, { ...pageProps, data: { ...pageProps.data, state: skollTurn } });
+		await vi.waitFor(() =>
+			expect(actionBodies().filter((body) => body.type === 'Advance')).toHaveLength(1)
+		);
 		const outcome = await executor()({ name: 'ask', args: { question: 'is it gold?' } });
 		expect(outcome).toBe('The wolf is moving. Hold.');
-		// Only the mount-driven Advance reached the wire — never an Ask.
+		// Never an Ask — and the rejected ask drives NO Advance: only the mount-driven one stands,
+		// so a refused command never retries or duplicates Sköll's turn.
 		expect(actionBodies().filter((body) => body.type === 'Ask')).toHaveLength(0);
+		expect(actionBodies().filter((body) => body.type === 'Advance')).toHaveLength(1);
 	});
 
 	it('a voiced move after the round resolves dispatches nothing', async () => {
@@ -988,15 +1157,37 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 	});
 
 	it('a different tool call kills the exchange — the reply went elsewhere', async () => {
+		// Keyed mock: the ask auto-passes his question (React Pass) then answers hers (Ask).
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit).body));
+			if (body.type === 'React')
+				return new Response(
+					JSON.stringify({
+						type: 'React',
+						outcome: { ok: true, choice: 'Pass' },
+						state: HUMAN_TURN
+					})
+				);
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: { ok: true, answer: 'No.', turnConsumed: true },
+					state: HUMAN_TURN
+				})
+			);
+		});
 		render(Page, reactProps);
 		await executor()({ name: 'hex', args: {} });
 		playerSpeaks();
-		// An ask during his hanging question only earns the guard line, yet it still proves the
-		// player's reply was not the affirmation.
+		// An ask during his hanging question auto-passes his and answers hers (TTD 14) — the armed
+		// hex affirmation dies with it. His question is now resolved, so a follow-up hex has nothing
+		// to seize: the gate never executes a stale affirmation.
 		await executor()({ name: 'ask', args: { question: 'is it gold?' } });
 		const outcome = await executor()({ name: 'hex', args: {} });
-		expect(outcome).toBe(CONFIRM_HEX);
-		expect(actionBodies()).toHaveLength(0);
+		expect(outcome).toBe('Sköll asks nothing. There is no question to scry, hex, or pass.');
+		// No hex reached the wire — only the auto-pass the ask triggered.
+		expect(actionBodies().filter((body) => body.reaction === 'Hex')).toHaveLength(0);
 	});
 
 	it('a board move kills the exchange — any engine action supersedes the pending confirmation', async () => {

@@ -4,12 +4,16 @@
 
 	// The human-side interrupt prompt: shown when Sköll Asks, so the witch can overhear (Scry) or
 	// silence (Hex) the question — or pass. Spent reactions stay visible but disabled.
+	// busy seals every choice while the rite is mid-move — a clicked reaction must not race a
+	// voiced ask's implicit auto-pass for the session lock.
 	let {
 		held,
-		onReact
+		onReact,
+		busy = false
 	}: {
 		held: Record<Reaction, boolean>;
 		onReact: (choice: ReactionChoice) => void;
+		busy?: boolean;
 	} = $props();
 </script>
 
@@ -25,7 +29,7 @@
 			class:reaction-choice--spent={!held.Scry}
 			type="button"
 			title="When your rival asks, hear the answer too."
-			disabled={!held.Scry}
+			disabled={busy || !held.Scry}
 			onclick={() => onReact('Scry')}
 		>
 			Scry
@@ -35,12 +39,14 @@
 			class:reaction-choice--spent={!held.Hex}
 			type="button"
 			title="When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted."
-			disabled={!held.Hex}
+			disabled={busy || !held.Hex}
 			onclick={() => onReact('Hex')}
 		>
 			Hex
 		</button>
-		<button class="btn btn--secondary" type="button" onclick={() => onReact('Pass')}>Pass</button>
+		<button class="btn btn--secondary" type="button" disabled={busy} onclick={() => onReact('Pass')}
+			>Pass</button
+		>
 	</div>
 </div>
 
