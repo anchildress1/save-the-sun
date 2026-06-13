@@ -39,19 +39,19 @@
 		emptyAsk: 'Speak your question, witch.',
 		wolfMoving: 'The wolf is moving. Hold.',
 		riteMoving: 'The rite is moving. Hold.',
-		oracleSilent: "The Oracle falls silent — the rite can't reach Sól. Draw breath, and ask again.",
+		oracleSilent: "The Oracle falls silent — the rite can't reach Sól.",
 		castFalters: 'The rite falters. The rune slips away.',
 		wrongCast: (name: string) => `${name} is not the one. The night holds.`,
 		runeTrue: 'The rune is true.',
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
-		wolfStalled: 'The wolf stalls in the dark. Rouse him to move.',
-		scryHim: 'You lean into the dark and listen. His answer is yours too.',
-		hexHim: "You close the Oracle's lips. His question dies unanswered — his turn with it.",
-		passHim: 'You hold your hand. Let him have his answer.',
+		wolfStalled: 'The wolf stalls — rouse him.',
+		scryHim: 'You lean into the dark; his answer is yours.',
+		hexHim: "You close the Oracle's lips; his turn dies with the question.",
+		passHim: 'You hold your hand; let him answer.',
 		// Sköll's skill plays, voiced in the Oracle's text (rite voice, third person — never his gloat).
 		// Hex replaces the answer (the question died); the Scry note trails the answer he overheard.
-		skollHexes: "Sköll closes the Oracle's lips. Your question dies in the dark.",
+		skollHexes: 'Sköll silences the Oracle; your question dies.',
 		skollScried: 'Sköll listened at the threshold — the answer is his too.',
 		sunCrests: 'Sól crests the rim of the world.',
 		skollTakes: 'Sköll takes the sun.',
@@ -63,9 +63,9 @@
 		castPrompt: (name: string) => `Cast ${name}?`,
 		// Spoken-move guards (S7): engine truth handed to the model when a voiced action can't
 		// run — never shown in the panel, since no move was made.
-		wolfAsking: "Sköll's question hangs. Scry, hex, or pass before another move.",
-		noReactionWindow: 'Sköll asks nothing. There is no question to scry, hex, or pass.',
-		riteDone: 'The longest day is decided. Begin another night to play again.',
+		wolfAsking: 'His question hangs — scry, hex, or pass.',
+		noReactionWindow: 'Sköll asks nothing to scry, hex, or pass.',
+		riteDone: 'The longest day is decided — begin anew.',
 		unknownRune: (name: string) => `No rune named ${name} lies on the board.`,
 		// Cast lockout (S9, R5): while a cast's engine round-trip is in flight, every voiced
 		// command answers with this and dispatches nothing — the cast completes regardless.

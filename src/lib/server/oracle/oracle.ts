@@ -7,14 +7,13 @@ import type { Player } from '$lib/server/engine/actions';
 import type { Interpret, Interpretation, OracleResult, RefusalClass } from './types';
 
 const REFUSAL_LINES: Record<RefusalClass, string> = {
-	'mixed-type':
-		'I read one sign at a time. Ask of element, or power, or light, or hue — not two at once.',
-	'secret-seeking': "That is Sól's to keep until you name it. I will not say.",
-	'prompt-injection': 'I answer the longest day, not you. Ask of the runes.',
-	negation: 'I speak of what is, not what is not. Ask it plainly.',
-	unparseable: 'I cannot read that sign. Ask of element, power, light, or hue.',
+	'mixed-type': 'I read one sign at a time, not two.',
+	'secret-seeking': "That is Sól's to keep until you name it.",
+	'prompt-injection': 'I answer the longest day, not you.',
+	negation: 'I speak of what is, not what is not.',
+	unparseable: 'Ask of element, power, light, or hue.',
 	empty: 'Speak your question, witch.',
-	'engine-error': "The Oracle falls silent — the rite can't reach Sól. Draw breath, and ask again."
+	'engine-error': "The Oracle falls silent — the rite can't reach Sól."
 };
 
 /** The exact refusal line for a class (`ux-copy.md` §1 Refusals). */
