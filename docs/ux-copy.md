@@ -102,11 +102,9 @@ Retraction is refused in character — the persona carries the doctrine verbatim
 
 ### Transcripts (voice, S10)
 
-Everything spoken is also written (R10). Her speech captions live into the Answer panel — the caption is whatever she actually says, so confirmations and guard answers reach the player in text through her voice even though the page prints no panel line for them. What she heard renders as a quiet line under the frame, so a mishear is caught before it matters; it is replaced by each utterance and leaves when the voice sleeps:
+Everything spoken is also written (R10). Her speech captions live into the Answer panel — the caption is whatever she actually says, so confirmations and guard answers reach the player in text through her voice even though the page prints no panel line for them.
 
-> The fire hears: “{input transcript}”
-
-The label keeps the fire metaphor the medallion's notices already own ("The fire cannot hear you").
+The **input** transcript (what the mic heard) is **not** shown in the rite UI — it read as stray debug text under the Answer frame. It belongs in `/debug` instead; routing it there is tracked in `ttd.md`.
 
 ### Interpretation echo (public, before the answer)
 Pattern: **`You ask after {paraphrase}.`**—then a held beat, then the answer.

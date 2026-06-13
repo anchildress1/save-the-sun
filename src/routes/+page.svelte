@@ -209,11 +209,10 @@
 	let voiceInvited = $state(false);
 
 	// S10: fragments carry no turn marker (boundaries ride state events), and `voiceCaption`
-	// stays apart from `answer` so a fragment never extends a board-made line.
-	let voiceHeard = $state('');
+	// stays apart from `answer` so a fragment never extends a board-made line. The input transcript
+	// is debug-only — it is teed to /debug, never shown in the rite UI.
 	let voiceCaption = '';
 	let captionOpen = false;
-	let heardOpen = false;
 
 	// S8: the armed confirmation for a gated tool call (scry, hex, cast_rune). `heard` flips when
 	// the player speaks after arming — the confirming call is refused without it, so the model can
@@ -243,9 +242,6 @@
 				voiceAmplitude = 0;
 				// Silence timeout, sleep tap, or the seal: the exchange is over, nothing executes (R4).
 				voiceConfirm = null;
-				// Mic off — a lingering heard line would promise listening; her caption stays.
-				voiceHeard = '';
-				heardOpen = false;
 				captionOpen = false;
 				break;
 			case 'waking':
@@ -261,7 +257,6 @@
 				// was a decline or drift — do not leave the destructive gate armed.
 				if (voiceConfirm?.spoke && voiceConfirm.heard) voiceConfirm = null;
 				captionOpen = false;
-				heardOpen = false;
 				voiceState = event.type;
 				break;
 			case 'thinking':
@@ -284,22 +279,17 @@
 				voiceState = 'asleep';
 				voiceAmplitude = 0;
 				voiceConfirm = null;
-				voiceHeard = '';
-				heardOpen = false;
 				captionOpen = false;
 				break;
 			case 'transcript':
 				if (event.direction === 'in') {
 					// The player spoke since arming — the gate may accept the confirming call (S8).
+					// The input transcript itself is debug-only; it is not surfaced in the rite UI.
 					if (voiceConfirm) voiceConfirm.heard = true;
-					voiceHeard = heardOpen ? voiceHeard + event.text : event.text;
-					heardOpen = true;
 				} else {
 					voiceCaption = captionOpen ? voiceCaption + event.text : event.text;
 					captionOpen = true;
 					answer = voiceCaption;
-					// Her reply began — the utterance is complete; a barge-in starts a new heard line.
-					heardOpen = false;
 				}
 				break;
 			default:
@@ -995,11 +985,6 @@
 				<p class="frame-text answer" data-testid="answer">{answer}</p>
 			</div>
 
-			{#if voiceHeard}
-				<!-- No live region: the player just said it; her voiced reply re-announces any drift. -->
-				<p class="voice-heard" data-testid="voice-heard">The fire hears: “{voiceHeard}”</p>
-			{/if}
-
 			<h2 class="skoll-title" data-testid="skoll-title">Sköll</h2>
 			<!-- role=status: Sköll's Ask is narrated when it lands — it opens the reaction window,
 			     so a screen-reader player must hear it without hunting for the frame. -->
@@ -1597,17 +1582,6 @@
 
 	.frame-text.answer {
 		color: var(--gold-bright);
-	}
-
-	/* Tucked under the answer frame, quieter than her gold — input echo, not an answer. */
-	.voice-heard {
-		margin: -0.55rem 0 0;
-		font-family: var(--font-story-body);
-		font-style: italic;
-		font-size: 0.85rem;
-		line-height: 1.4;
-		color: var(--ink-muted);
-		overflow-wrap: anywhere;
 	}
 
 	/* Left-aligned to mirror the Oracle's merged header line. */

@@ -1567,17 +1567,7 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 			.toHaveTextContent('The fire holds your answer.');
 	});
 
-	it('fragments straddling the hearing flares stay one utterance', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'is it ' });
-		emit({ type: 'hearing', amplitude: 0.2 });
-		emit({ type: 'transcript', direction: 'in', text: 'a fire rune' });
-		await expect
-			.element(screen.getByTestId('voice-heard'))
-			.toHaveTextContent('The fire hears: “is it a fire rune”');
-	});
-
-	it('the heard line renders through a confirmation exchange — the same speech opens the gate', async () => {
+	it('input speech through a confirmation exchange opens the S8 gate (debug-only transcript, no UI line)', async () => {
 		mockAction({
 			type: 'React',
 			outcome: { ok: true, choice: 'Hex' },
@@ -1592,21 +1582,13 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 			}
 		});
 		expect(await executor()({ name: 'hex', args: {} })).toBe(CONFIRM_HEX);
+		// The input transcript opens the gate but is NOT shown in the rite UI (it lives in /debug).
 		emit({ type: 'transcript', direction: 'in', text: 'yes, hex him' });
-		await expect
-			.element(screen.getByTestId('voice-heard'))
-			.toHaveTextContent('The fire hears: “yes, hex him”');
+		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
 		const outcome = await executor()({ name: 'hex', args: {} });
 		expect(outcome).toBe(
 			"You close the Oracle's lips. His question dies unanswered — his turn with it."
 		);
-	});
-
-	it('the eclipse seal clears the heard line too', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
-		emit({ type: 'eclipsed' });
-		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
 	});
 
 	it('the caption persists with the round view — a reload resumes her last spoken line', async () => {
@@ -1617,56 +1599,10 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 		});
 	});
 
-	it('shows what she heard, fragment by fragment', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'is it ' });
-		emit({ type: 'transcript', direction: 'in', text: 'a fire rune' });
-		await expect
-			.element(screen.getByTestId('voice-heard'))
-			.toHaveTextContent('The fire hears: “is it a fire rune”');
-	});
-
-	it('a new utterance after her reply replaces the heard line', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
-		emit({ type: 'transcript', direction: 'out', text: 'No.' });
-		emit({ type: 'transcript', direction: 'in', text: 'is it dark' });
-		await expect
-			.element(screen.getByTestId('voice-heard'))
-			.toHaveTextContent('The fire hears: “is it dark”');
-		expect(screen.getByTestId('voice-heard').element().textContent).not.toContain('gold');
-	});
-
-	it('a turn that settles without a reply also closes the utterance', async () => {
-		// The thinking-rescue path: listening arrives with no out-fragment between.
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'first try' });
-		emit({ type: 'thinking' });
-		emit({ type: 'listening' });
-		emit({ type: 'transcript', direction: 'in', text: 'second try' });
-		await expect
-			.element(screen.getByTestId('voice-heard'))
-			.toHaveTextContent('The fire hears: “second try”');
-		expect(screen.getByTestId('voice-heard').element().textContent).not.toContain('first');
-	});
-
-	it('the heard line leaves with the session — the caption stays', async () => {
+	it('the Oracle caption survives the session sleeping', async () => {
 		const screen = render(Page, pageProps);
 		emit({ type: 'transcript', direction: 'out', text: 'The night holds.' });
-		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
 		emit({ type: 'asleep' });
-		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The night holds.');
-	});
-
-	it('a session error clears the heard line with the mic', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
-		emit({
-			type: 'error',
-			reason: 'socket',
-			notice: "The Oracle's voice falters. The rite continues by hand."
-		});
-		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
 	});
 });
