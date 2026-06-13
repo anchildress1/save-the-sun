@@ -15,7 +15,7 @@ The browser drives three surfaces (the board page, the voice session, the medall
 ```mermaid
 flowchart TB
     accTitle: Save the Sun system overview
-    accDescr: The browser talks to SvelteKit routes, which call the in-memory server core and the Gemini API. The engine referees the round; Gemini interprets Asks, plays Skoll, and voices the Oracle.
+    accDescr: The browser talks to SvelteKit routes, which call the in-memory server core and the Gemini API. The engine referees the round; Gemini interprets Asks, plays Sköll, and voices the Oracle.
 
     subgraph Browser["Browser"]
         Page["+page.svelte<br/>board, controls, view-state"]
@@ -34,7 +34,7 @@ flowchart TB
 
     subgraph Core["Server core (in memory, per session)"]
         Engine["engine/ — engine + session + actions<br/>secret, board seed, round id, lock"]
-        Skoll["skoll/ — floor + gemini<br/>the wolf's move"]
+        Skoll["Sköll — skoll/ floor + gemini<br/>the wolf's move"]
         Oracle["oracle/ — interpret the Ask"]
         Log["debug/log.ts<br/>per-session event stream"]
     end
@@ -78,13 +78,13 @@ A human Ask is one POST. Sköll's own move is a **separate** `Advance` POST the 
 ```mermaid
 sequenceDiagram
     accTitle: Turn and Advance flow
-    accDescr: A human Ask is one POST that the Oracle interprets and Skoll reacts to under a per-session lock. Skoll's own move is a separate Advance POST the client fires afterward.
+    accDescr: A human Ask is one POST that the Oracle interprets and Sköll reacts to under a per-session lock. Sköll's own move is a separate Advance POST the client fires afterward.
 
     participant Page as +page.svelte
     participant Action as POST /api/action
     participant Lock as withSessionLock
     participant Oracle as oracle (interpret)
-    participant Skoll as skoll (react / move)
+    participant Skoll as Sköll (react / move)
     participant Engine as engine (referee)
 
     Note over Page,Engine: 1 — the human's Ask
@@ -94,11 +94,11 @@ sequenceDiagram
     Oracle-->>Lock: query or refusal
     Lock->>Skoll: react to the Ask (Scry / Hex / Pass)
     Skoll-->>Lock: reaction
-    Lock->>Engine: answer truthfully, hand turn to Skoll
-    Engine-->>Action: state (turn now Skoll's)
+    Lock->>Engine: answer truthfully, hand turn to Sköll
+    Engine-->>Action: state (turn now Sköll's)
     Action-->>Page: { oracle, skollVsYou, state }
 
-    Note over Page,Engine: 2 — Skoll's turn is its own request
+    Note over Page,Engine: 2 — Sköll's turn is its own request
     Page->>Action: POST { type: Advance }
     Action->>Lock: serialize this session
     Lock->>Skoll: takeSkollTurn (Gemini, floor on failure)
@@ -169,13 +169,13 @@ sequenceDiagram
 ```mermaid
 flowchart TB
     accTitle: Session and state lifecycle
-    accDescr: A session cookie set by hooks.server.ts keys an LRU-capped per-session registry holding the engine, Skoll memory, round id, board seed, and debug log. New-game resets them; the client persists view-state keyed by round id.
+    accDescr: A session cookie set by hooks.server.ts keys an LRU-capped per-session registry holding the engine, Sköll memory, round id, board seed, and debug log. New-game resets them; the client persists view-state keyed by round id.
 
     Cookie["sts_session cookie<br/>set by hooks.server.ts (httpOnly)"]
 
     subgraph Registry["Per-session registry — session.ts (LRU, MAX_SESSIONS)"]
         Engine["GameEngine<br/>secret seed"]
-        SkollMem["Skoll memory<br/>facts, crossed, pendingAsk"]
+        SkollMem["Sköll memory<br/>facts, crossed, pendingAsk"]
         RoundId["roundId<br/>opaque, per round"]
         BoardSeed["boardSeed<br/>public board order"]
         DLog["debug log<br/>per-session events"]
