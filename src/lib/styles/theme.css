@@ -89,7 +89,7 @@
 	/* Ornate UI assets */
 	--ui-divider: url('../assets-webp/ui/divider.webp?no-inline');
 	--button-border: url('../assets-webp/ui/button-border.webp?no-inline');
-	--modal-bg: url('../assets-webp/banners/modal-background.webp?no-inline');
+	--modal-bg: url('../assets-webp/banners/moon-splash-header.webp?no-inline');
 }
 
 /* The app's two — and only two — buttons. Both read on a bright dawn splash AND a dark panel:
