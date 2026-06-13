@@ -737,11 +737,14 @@
 
 	// Above this, the model's reading of her words is sure enough that the gate steps aside and
 	// the move executes on the first call — no confirmation echo (the player tired of being read
-	// back to). At or below it, the two-phase gate holds. A missing/non-number confidence reads as
-	// no certainty, so it gates.
+	// back to). At or below it, the two-phase gate holds.
 	const CONFIDENCE_FLOOR = 0.5;
+	// `confidence` is model-supplied, so only a finite reading inside the documented 0–1 band may
+	// skip the safety gate. Anything malformed — missing, non-number, NaN, Infinity, or out of
+	// range — reads as no certainty and falls back to the two-phase confirmation.
 	function confident(args: Record<string, unknown>): boolean {
-		return typeof args.confidence === 'number' && args.confidence > CONFIDENCE_FLOOR;
+		const c = args.confidence;
+		return typeof c === 'number' && Number.isFinite(c) && c > CONFIDENCE_FLOOR && c <= 1;
 	}
 
 	// S8 (R4): scry, hex, and cast_rune are destructive — scry and hex spend the night's single

@@ -1290,6 +1290,17 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		expect(outcome).toBe(CONFIRM_SCRY);
 		expect(actionBodies()).toHaveLength(0);
 	});
+
+	// Model-supplied input: a malformed confidence must never buy a free skip of the safety gate.
+	it.each([Infinity, 5, -1, NaN])(
+		'an out-of-range confidence (%s) is distrusted — the gate still holds',
+		async (confidence) => {
+			render(Page, reactProps);
+			const outcome = await executor()({ name: 'scry', args: { confidence } });
+			expect(outcome).toBe(CONFIRM_SCRY);
+			expect(actionBodies()).toHaveLength(0);
+		}
+	);
 });
 
 describe('Save the Sun page — cast lockout (S9)', () => {
