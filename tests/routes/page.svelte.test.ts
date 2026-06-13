@@ -108,7 +108,7 @@ describe('Save the Sun page', () => {
 	it('narrates the rite — turn pill, Oracle frame, and Sköll frame are polite status regions', async () => {
 		const screen = render(Page, pageProps);
 		const regions = screen.getByRole('status').elements();
-		const ids = regions.map((el) => el.getAttribute('data-testid'));
+		const ids = regions.map((el) => (el as HTMLElement).dataset.testid);
 		expect(ids).toContain('turn-pill');
 		expect(ids).toContain('skoll-frame');
 		// The Oracle frame carries no testid of its own; the voiced answer lives inside it.
@@ -1089,7 +1089,7 @@ describe('Save the Sun page — end screen + replay (S9)', () => {
 	it('opens the victory rite on a resumed human win — Sól speaks, and it owns the only replay', async () => {
 		const screen = render(Page, propsWith(HUMAN_WON));
 		const end = screen.getByTestId('end-screen').element();
-		expect(end.getAttribute('data-outcome')).toBe('win');
+		expect((end as HTMLElement).dataset.outcome).toBe('win');
 		await expect
 			.element(
 				screen.getByText(
@@ -1111,7 +1111,7 @@ describe('Save the Sun page — end screen + replay (S9)', () => {
 	it('opens the defeat rite on a Sköll win — "Stand against him again"', async () => {
 		const screen = render(Page, propsWith(SKOLL_WON));
 		const end = screen.getByTestId('end-screen').element();
-		expect(end.getAttribute('data-outcome')).toBe('lose');
+		expect((end as HTMLElement).dataset.outcome).toBe('lose');
 		// Scope to the end screen's own lead + coda — the panel behind holds its own last line.
 		expect(end.querySelector('.lead')?.textContent?.trim()).toBe('Sköll takes the sun.');
 		expect(end.querySelector('.coda')?.textContent?.trim()).toBe(
