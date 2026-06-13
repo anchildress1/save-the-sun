@@ -81,7 +81,13 @@
 		hintScry: 'When your rival asks, hear the answer too.',
 		hintHex:
 			"When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted.",
-		hintPass: 'When your rival asks, let the question stand.'
+		hintPass: 'When your rival asks, let the question stand.',
+		// Hover hints for the shut Ask field — why it's closed and what to do first.
+		askHintReact: 'Answer Sköll first — Scry, Hex, or Pass — then ask.',
+		askHintCast: 'Name your rune or step back from the cast, then ask.',
+		askHintPending: 'The rite is moving. Hold, then ask.',
+		askHintWolf: 'Sköll is moving. Hold, then ask.',
+		askHintOver: 'The rite is over.'
 	};
 
 	let castMode = $state(false);
@@ -129,6 +135,21 @@
 	let nightT = $derived(humanWon ? 1 : Math.min(0.95, 1 - Math.pow(0.85, turns)));
 	// Cross-off is a private aid, never turn-gated — RuneGrid owns it and stays enabled through Sköll's turn.
 	let canAct = $derived(activePlayer === 'Human' && !roundOver);
+	// Why the Ask field is shut, most-actionable first — surfaced as its hover title so a disabled
+	// field explains itself instead of just refusing the cursor. Empty when the field is live.
+	let askHint = $derived(
+		castMode
+			? RITE.askHintCast
+			: skollAsking
+				? RITE.askHintReact
+				: pending
+					? RITE.askHintPending
+					: !canAct
+						? roundOver
+							? RITE.askHintOver
+							: RITE.askHintWolf
+						: ''
+	);
 	let turnPill = $derived(
 		humanWon
 			? RITE.runeTrue
@@ -1088,6 +1109,7 @@
 					autocomplete="off"
 					bind:value={askValue}
 					disabled={castMode || pending || !canAct}
+					title={askHint}
 				/>
 				<!-- Visible label is the terse "Ask"; the sr-only tail keeps the accessible name as
 				     the full rite phrase without an aria-label that label-queries would double-match. -->
@@ -1667,6 +1689,19 @@
 		outline: none;
 		border-color: var(--gold-bright);
 		box-shadow: var(--focus-ring);
+	}
+
+	/* A shut field must read as shut, not merely refuse the cursor: dimmed, dashed, muted. */
+	.ask input:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+		border-style: dashed;
+		border-color: rgba(233, 200, 119, 0.25);
+		background: rgba(9, 13, 26, 0.55);
+	}
+
+	.ask input:disabled::placeholder {
+		color: var(--steel);
 	}
 
 	.ask input:-webkit-autofill,

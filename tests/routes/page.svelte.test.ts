@@ -419,6 +419,31 @@ describe('Save the Sun page', () => {
 		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
 	});
 
+	it('the live Ask field carries no hover hint', async () => {
+		const screen = render(Page, pageProps);
+		const input = screen.getByLabelText(/ask the oracle/i);
+		await expect.element(input).toBeEnabled();
+		expect(input.element().getAttribute('title')).toBe('');
+	});
+
+	it("a shut Ask field during Sköll's hanging question explains itself — disabled with a react-first hint", async () => {
+		const screen = render(
+			Page,
+			props(
+				{ activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 },
+				{
+					echo: 'I scent a fire rune on her.',
+					held: { Scry: true, Hex: true }
+				}
+			)
+		);
+		const input = screen.getByLabelText(/ask the oracle/i);
+		await expect.element(input).toBeDisabled();
+		expect(input.element().getAttribute('title')).toBe(
+			'Answer Sköll first — Scry, Hex, or Pass — then ask.'
+		);
+	});
+
 	it('opens a resumed won round on its win state — no phantom "Your move."', async () => {
 		const screen = render(Page, propsWith(HUMAN_WON));
 		// Hydrated from the load: the pill and panel agree, and play is locked until replay.
