@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Page from '$routes/+page.svelte';
+import { VIEW_STATE_KEY } from '$lib/viewState';
 import type { GameState } from '$lib/server/engine/actions';
 
 const ONBOARDED_KEY = 'save-the-sun:onboarded';
@@ -741,7 +742,7 @@ describe('Save the Sun page — first-run onboarding (S7)', () => {
 // Oracle line) is otherwise thrown away. These prove it is restored from storage, scoped to the
 // round, and degrades safely when storage is unavailable.
 describe('Save the Sun page — view resume on reload (S8.5)', () => {
-	const VIEW_KEY = 'save-the-sun:view';
+	const VIEW_KEY = VIEW_STATE_KEY;
 
 	beforeEach(() => {
 		localStorage.setItem(ONBOARDED_KEY, '1'); // past the title; resume is the subject here
@@ -956,7 +957,7 @@ describe('Save the Sun page — Sköll turn reload reconcile', () => {
 		// His wrong cast resolved server-side and returned the turn; the load reports the human active.
 		// Advance no-ops (not his turn), so the page opens live on her move — the saved line holds.
 		localStorage.setItem(
-			'save-the-sun:view',
+			VIEW_STATE_KEY,
 			JSON.stringify({
 				roundId: 'test-round',
 				crossings: [],

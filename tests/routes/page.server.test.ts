@@ -133,9 +133,15 @@ describe('+page.server load — engine lifetime', () => {
 
 // A reload mid-rite loses the in-flight Advance response — so the wolf's move is only ever honest
 // on resume from the engine, which mutated server-side before the response was dropped. These prove
-// the load reconciles each shape of his completed turn (handed back, won, parked) to engine truth.
+// the load reports engine truth for each shape his turn can be in on resume: handed back after a
+// wrong cast, won after a true one, or still unplayed (the reload beat the Advance) for the client
+// to re-drive. (The parked-Ask shape is covered by 'rehydrates Sköll's parked Ask' above.)
 describe('+page.server load — Sköll turn reload reconcile', () => {
-	const wrongRune = runes.find((r) => r.name !== selectSecret(SEED).name)!.name;
+	// Any rune that isn't the seed's secret — its cast is wrong, never a win.
+	const secretName = selectSecret(SEED).name;
+	const wrong = runes.find((r) => r.name !== secretName);
+	if (wrong === undefined) throw new Error(`no non-secret rune for seed ${SEED} (${secretName})`);
+	const wrongRune = wrong.name;
 
 	it('reports the human active after a Sköll wrong-cast resolved server-side, nothing parked', () => {
 		resetEngine('reload-handback', SEED);
