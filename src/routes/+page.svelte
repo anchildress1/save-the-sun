@@ -585,6 +585,9 @@
 	}
 
 	async function submitReact(choice: ReactionChoice) {
+		// A clicked reaction must lose to an in-flight move (e.g. a voiced ask's implicit auto-pass)
+		// rather than fire a second React behind it — the prompt is disabled, this is the backstop.
+		if (pending) return;
 		pending = true;
 		try {
 			await performReact(choice);
@@ -735,10 +738,23 @@
 			const question = typeof args.question === 'string' ? args.question.trim() : '';
 			if (question === '') return RITE.emptyAsk;
 			if (pending) return RITE.riteMoving;
-			if (skollAsking) return RITE.wolfAsking;
-			if (!canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
+			// Rejection guards run BEFORE the lock+finally: a refused ask must dispatch nothing —
+			// not even the trailing Advance. Only when his question hangs (the implicit pass) or it
+			// is plainly her turn do we enter the sequence that posts Sköll's follow-on move.
+			if (!skollAsking && !canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
+			// Lock before the implicit pass: the Live dispatcher fires batched calls without
+			// awaiting and the reaction prompt stays live until skollAsking clears, so the whole
+			// pass→ask→advance sequence must hold the single-action guard or a second move races it.
 			pending = true;
 			try {
+				// Asking a new question while his question hangs IS the pass: let his stand (React Pass
+				// hands the turn back to her), then her ask lands. She never has to say "pass". A failed
+				// pass leaves skollAsking set and the turn with him — bail with its line, not the ask,
+				// so the spoken result matches the panel instead of misreporting "the wolf is moving".
+				if (skollAsking) {
+					await performReact('Pass');
+					if (skollAsking) return RITE.oracleSilent;
+				}
 				return (await performAsk(question)).line;
 			} finally {
 				// Not awaited: the tool result must reach the model now, not after the wolf's move.
@@ -989,7 +1005,11 @@
 			</div>
 
 			{#if skollAsking}
-				<ReactionPrompt held={{ Scry: heldScry, Hex: heldHex }} onReact={submitReact} />
+				<ReactionPrompt
+					held={{ Scry: heldScry, Hex: heldHex }}
+					onReact={submitReact}
+					busy={pending}
+				/>
 			{:else}
 				<div class="reactions" data-coach="reactions">
 					<button

@@ -46,6 +46,17 @@ describe('ReactionPrompt — the human-side interrupt on Sköll’s Ask (S5)', (
 		expect(pass.disabled).toBe(false);
 	});
 
+	it('seals every choice while busy — a clicked reaction never races an in-flight move', async () => {
+		const onReact = vi.fn();
+		const screen = render(ReactionPrompt, { held: bothHeld, onReact, busy: true });
+		const scry = screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement;
+		const hex = screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement;
+		const pass = screen.getByRole('button', { name: 'Pass' }).element() as HTMLButtonElement;
+		expect(scry.disabled).toBe(true);
+		expect(hex.disabled).toBe(true);
+		expect(pass.disabled).toBe(true);
+	});
+
 	it('keeps Pass available when both Scry and Hex are spent', async () => {
 		const onReact = vi.fn();
 		const screen = render(ReactionPrompt, {

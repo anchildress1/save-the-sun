@@ -11,4 +11,4 @@
 - [x] Add architecture diagrams _(`docs/architecture.md` — system, turn/Advance, voice tool-call loop, session lifecycle; linked from README + AGENTS)_
 - [ ] Fix reload bug where page resets and interrupts state of the wolf's turn. We never get the update, so what happens?
 - [ ] Change "Your Move" pill color on opponent turn
-- [ ] Asking a new question auto-passes the turn.
+- [x] Asking a new question while Sköll's question hangs auto-passes his question and answers the new one _(no need to say "pass" — the ask path resolves his hanging question as a Pass, then dispatches her new Ask; scry/hex still need her word twice)_
