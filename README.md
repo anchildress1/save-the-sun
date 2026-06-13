@@ -13,7 +13,6 @@
   <br/>
   <img alt="Sonar Quality Gate" src="https://img.shields.io/sonar/quality_gate/anchildress1_save-the-sun?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge" />
   <img alt="Sonar Coverage" src="https://img.shields.io/sonar/coverage/anchildress1_save-the-sun?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&color=limegreen" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-658%20passing-limegreen?style=for-the-badge&logo=vitest&logoColor=white" />
 </p>
 
 <p align="center">

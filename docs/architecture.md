@@ -39,7 +39,7 @@ flowchart TB
         Log["debug/log.ts<br/>per-session event stream"]
     end
 
-    Gemini["Gemini API<br/>Live voice + gemini-3.5-flash"]
+    Gemini["Gemini API<br/>Live voice — gemini-3.1-flash-live-preview<br/>oracle + Sköll — gemini-3.5-flash"]
 
     Page --> Action
     Page --> NewGame

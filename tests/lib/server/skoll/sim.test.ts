@@ -1,5 +1,11 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { playFloorGame, simulateFloor, type SimMetrics } from '$lib/server/skoll/sim';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
+import {
+	playFloorGame,
+	simulateFloor,
+	median,
+	skollSeedFor,
+	type SimMetrics
+} from '$lib/server/skoll/sim';
 import { GameEngine, selectSecret } from '$lib/server/engine/engine';
 import { freshSkollState, takeSkollTurn } from '$lib/server/skoll/skoll';
 
@@ -15,6 +21,25 @@ describe('playFloorGame', () => {
 
 	it('is reproducible: same seed → same result', async () => {
 		expect(await playFloorGame(42)).toEqual(await playFloorGame(42));
+	});
+
+	it('records gemini-sourced moves (floorMoves stays 0) and bails out at the move cap', async () => {
+		// A decider that only ever Asks never wins, so Sköll plays to MAX_MOVES and returns won:false —
+		// the cap guard. Every move is a valid gemini decision, so floorMoves must stay 0.
+		const alwaysAsk = vi.fn(async () => ({
+			kind: 'ask' as const,
+			query: { axis: 'element' as const, value: 'Fire' }
+		}));
+		const r = await playFloorGame(
+			3,
+			new GameEngine(3),
+			freshSkollState(skollSeedFor(3)),
+			alwaysAsk
+		);
+		expect(r.won).toBe(false);
+		expect(r.floorMoves).toBe(0);
+		expect(r.turns).toBe(100); // MAX_MOVES
+		expect(alwaysAsk).toHaveBeenCalled();
 	});
 
 	it('throws on an illegal Cast (engine rejects) — a harness invariant breach, not silent', async () => {
@@ -66,6 +91,37 @@ describe('wrong-cast memory (production parity)', () => {
 	});
 });
 
+describe('median', () => {
+	it('returns 0 for an empty list', () => {
+		expect(median([])).toBe(0);
+	});
+
+	it('returns the middle of an odd-length list', () => {
+		expect(median([5])).toBe(5);
+		expect(median([1, 2, 3])).toBe(2);
+	});
+
+	it('averages the two middle values of an even-length list', () => {
+		expect(median([1, 2])).toBe(1.5);
+		expect(median([5, 6, 6, 6, 6, 7, 7, 11, 11, 12])).toBe(6.5);
+	});
+});
+
+describe('skollSeedFor', () => {
+	it('is deterministic and decorrelated from the engine seed', () => {
+		expect(skollSeedFor(7)).toBe(skollSeedFor(7));
+		expect(skollSeedFor(7)).not.toBe(7);
+		expect(skollSeedFor(1)).not.toBe(skollSeedFor(2));
+	});
+
+	it('produces a uint32', () => {
+		const s = skollSeedFor(123456);
+		expect(Number.isInteger(s)).toBe(true);
+		expect(s).toBeGreaterThanOrEqual(0);
+		expect(s).toBeLessThanOrEqual(0xffffffff);
+	});
+});
+
 describe('simulateFloor — pacing target', () => {
 	// The deliverable: Sköll's OWN wins average 7.5–9 turns so a competent human can beat him. The
 	// floor is the seeded, network-free proxy for that pacing (Gemini can't run in CI). The sim runs
@@ -79,6 +135,15 @@ describe('simulateFloor — pacing target', () => {
 
 	it('wins every game in self-play (the secret always survives its own answers)', () => {
 		expect(metrics.winRate).toBe(1);
+	});
+
+	it('zeroes the turn metrics on an empty sweep', async () => {
+		const empty = await simulateFloor(0);
+		expect(empty.meanTurns).toBe(0);
+		expect(empty.medianTurns).toBe(0);
+		expect(empty.minTurns).toBe(0);
+		expect(empty.maxTurns).toBe(0);
+		expect(empty.distribution).toEqual([]);
 	});
 
 	it("[S] keeps Sköll's mean win in the 7.5–9-turn window", () => {

@@ -27,11 +27,22 @@ export interface SimResult {
 	secret: string;
 	turns: number;
 	won: boolean;
+	/** Moves that fell back to the floor (decider threw or returned an illegal move). The floor-only
+	 *  sweep expects this to equal `turns`; a live run uses it to reject floor-contaminated proof. */
+	floorMoves: number;
 }
 
 // A decider that always rejects, so planMove always drops to the deterministic floor. This is how the
 // sim measures the floor through the real orchestration without a network or a key.
 const FLOOR_ONLY: SkollDecide = () => Promise.reject(new Error('sim: floor-only'));
+
+// Production seeds the engine and Sköll from two INDEPENDENT randomSeed() calls (create vs getSkoll),
+// so Sköll's opening hunch — the one fact handed to Gemini — is uncorrelated with the secret. Reusing
+// one seed for both would couple the hunch/move stream to selectSecret(seed) and measure a synthetic
+// setup. Derive a decorrelated-but-deterministic Sköll seed (Knuth multiplicative hash) to mirror prod.
+export function skollSeedFor(seed: number): number {
+	return Math.imul(seed, 2654435761) >>> 0;
+}
 
 export interface SimMetrics {
 	games: number;
@@ -56,28 +67,33 @@ const MAX_MOVES = 100;
  * @param engine engine override, for tests that need to force the harness-invariant guards; defaults
  *   to a fresh engine on the same seed.
  * @param state Sköll-state override, for tests that need to pre-collapse the live set; defaults to a
- *   fresh seeded state (the production path).
+ *   fresh state on an independent (decorrelated) seed, mirroring production's separate randomSeed().
+ * @param decide move decider; defaults to the floor-only rejector. The live runner passes the real
+ *   `decideSkollMove` to play a live Gemini game through this exact loop.
  */
 export async function playFloorGame(
 	seed: number,
 	engine: GameEngine = new GameEngine(seed),
-	state: SkollState = freshSkollState(seed)
+	state: SkollState = freshSkollState(skollSeedFor(seed)),
+	decide: SkollDecide = FLOOR_ONLY
 ): Promise<SimResult> {
 	const secret = selectSecret(seed);
 	let turns = 0;
+	let floorMoves = 0;
 
 	for (let move = 0; move < MAX_MOVES; move++) {
 		// The human seat takes no action in self-play — hand the turn straight to Sköll.
 		if (engine.activePlayer === 'Human') engine.passTurn();
 
-		const out = await takeSkollTurn(engine, state, FLOOR_ONLY, state.rng);
+		const out = await takeSkollTurn(engine, state, decide, state.rng);
 		turns += 1;
+		if (out.source === 'floor') floorMoves += 1;
 
 		if (out.kind === 'cast') {
 			// An illegal cast (unknown rune, out of turn, round over) is a harness regression, not play.
 			if (!out.result.ok)
 				throw new Error(`harness: illegal cast (${out.result.reason}) on seed ${seed}`);
-			if (out.result.won) return { seed, secret: secret.name, turns, won: true };
+			if (out.result.won) return { seed, secret: secret.name, turns, won: true, floorMoves };
 			// A legal-but-wrong cast is real self-play slack; takeSkollTurn already ruled the rune out.
 			continue;
 		}
@@ -88,7 +104,7 @@ export async function playFloorGame(
 
 	// Unreachable from truthful play (a wrong cast can't recur, so the trait space bounds the loop);
 	// the cap only guards against a logic regression turning into a hang.
-	return { seed, secret: secret.name, turns, won: false };
+	return { seed, secret: secret.name, turns, won: false, floorMoves };
 }
 
 /** Aggregate self-play metrics across a contiguous seed sweep `[startSeed, startSeed + games)`. */
@@ -112,9 +128,9 @@ export async function simulateFloor(games: number, startSeed = 1): Promise<SimMe
 		wins: winning.length,
 		winRate: winning.length / games,
 		meanTurns: turns.length ? sum / turns.length : 0,
-		medianTurns: turns.length ? turns[Math.floor(turns.length / 2)] : 0,
+		medianTurns: median(turns),
 		minTurns: turns.length ? turns[0] : 0,
-		maxTurns: turns.length ? (turns.at(-1) as number) : 0,
+		maxTurns: turns.at(-1) ?? 0,
 		distribution: [...counts.entries()]
 			.sort((a, b) => a[0] - b[0])
 			.map(([t, count]) => ({ turns: t, count }))
@@ -132,6 +148,13 @@ async function withQuietConsole<T>(fn: () => Promise<T>): Promise<T> {
 		console.error = error;
 		console.warn = warn;
 	}
+}
+
+/** Median of an ascending-sorted list — averages the two middle values on an even count. */
+export function median(sorted: number[]): number {
+	if (!sorted.length) return 0;
+	const mid = Math.floor(sorted.length / 2);
+	return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 /** Total rune count — surfaced so the corpus header can note the board size without re-importing. */
