@@ -11,3 +11,4 @@
 - [ ] Add architecture diagrams
 - [ ] Fix reload bug where page resets and interrupts state of the wolf's turn. We never get the update, so what happens?
 - [ ] Change "Your Move" pill color on opponent turn
+- [ ] Asking a new question auto-passes the turn.
