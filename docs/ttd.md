@@ -8,7 +8,7 @@
 - [x] Prevent board from shuffle on reload when session doesn't change _(`boardSeed` is held per round in `session.ts` — stable across a refresh, reminted with the round; e2e asserts order stability on reload)_
 - [ ] Fine-tune Sköll prompt to allow for wins between 7.5-9 turns with randomizer. Keep metrics output as corpus.
 - [ ] Add session scoping to the /debug screen
-- [ ] Add architecture diagrams
+- [x] Add architecture diagrams _(`docs/architecture.md` — system, turn/Advance, voice tool-call loop, session lifecycle; linked from README + AGENTS)_
 - [ ] Fix reload bug where page resets and interrupts state of the wolf's turn. We never get the update, so what happens?
 - [ ] Change "Your Move" pill color on opponent turn
 - [ ] Asking a new question auto-passes the turn.
