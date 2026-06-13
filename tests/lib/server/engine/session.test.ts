@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { GameEngine, selectSecret } from '$lib/server/engine/engine';
 import {
 	getEngine,
@@ -173,5 +173,16 @@ describe('session engine registry', () => {
 
 		// Survived: still the same won round, never reset.
 		expect(getEngine('active-keep').status).toBe('won');
+	});
+
+	// Vite re-evaluates server modules on every dev save (HMR). The registry is anchored on
+	// globalThis precisely so that re-eval doesn't wipe live rounds and re-roll their secrets —
+	// re-importing the module must resolve a known session to the very same engine. Last in the
+	// file: it resets the module registry, which must not bleed into the static-imported tests above.
+	it('survives module re-evaluation (dev HMR) — the round and its secret outlive a reload', async () => {
+		const engine = getEngine('hmr-survivor');
+		vi.resetModules();
+		const reimported = await import('$lib/server/engine/session');
+		expect(reimported.getEngine('hmr-survivor')).toBe(engine);
 	});
 });
