@@ -140,13 +140,16 @@
 
 	.corona {
 		position: absolute;
-		inset: -12%;
+		/* Reach trimmed and the pulse capped below so the glow's soft edge stays clear of the
+		   panel's clipped top border — at the old -12% + scale(1.05) the crown hit the seam and
+		   was sliced flat. The gradient still spills past the disc; it just no longer touches the box. */
+		inset: -10%;
 		border-radius: 50%;
 		background: radial-gradient(
 			circle,
 			rgba(var(--corona-rgb), 0.85) 0%,
-			rgba(var(--corona-rgb), 0.3) 46%,
-			transparent 72%
+			rgba(var(--corona-rgb), 0.3) 48%,
+			transparent 78%
 		);
 		opacity: 0.08;
 		transition: opacity 0.25s ease;
@@ -276,7 +279,9 @@
 	/* Hearing: corona flares with the player's voice; rim runes ignite. */
 	.medallion[data-voice-state='hearing'] .corona {
 		opacity: calc(0.34 + var(--flare) * 0.56);
-		transform: scale(calc(1 + var(--flare) * 0.07));
+		/* Flare scale capped to match the pulse ceiling so a loud voice can't push the glow into
+		   the panel's clipped border. */
+		transform: scale(calc(1 + var(--flare) * 0.03));
 		transition:
 			opacity 0.12s linear,
 			transform 0.12s linear;
@@ -354,7 +359,7 @@
 		}
 		50% {
 			opacity: 0.82;
-			transform: scale(1.05);
+			transform: scale(1.03);
 		}
 	}
 

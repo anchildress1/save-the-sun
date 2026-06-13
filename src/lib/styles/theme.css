@@ -125,7 +125,9 @@
 .btn::before {
 	content: '';
 	position: absolute;
-	inset: -0.2rem -0.3rem;
+	/* Concentric with the button box: the ornate frame is the hover/focus reactive surface, so an
+	   asymmetric inset parked its glow off-center from the element it decorates. */
+	inset: -0.3rem;
 	z-index: 0;
 	pointer-events: none;
 	border: 10px solid transparent;
