@@ -33,7 +33,11 @@ export interface DebugEvent {
 
 // Bounded so an abandoned round can't grow memory; a single round never approaches it.
 const MAX_EVENTS = 200;
-const logs = new Map<string, DebugEvent[]>();
+// Anchored on globalThis for the same reason the engine registry is (session.ts): Vite re-evaluates
+// this module on every dev save, which would wipe the log while the engine survives — desyncing the
+// /debug stream from the live round (the secret it names would no longer match the engine's).
+const globalForLogs = globalThis as typeof globalThis & { __stsLogs?: Map<string, DebugEvent[]> };
+const logs: Map<string, DebugEvent[]> = (globalForLogs.__stsLogs ??= new Map());
 
 /** Append one event to a session's log, assigning the next seq and trimming the oldest past the cap. */
 export function logEvent(sessionId: string, event: Omit<DebugEvent, 'seq'>): void {
@@ -73,7 +77,11 @@ export interface GeminiCall {
 }
 
 const sessionStore = new AsyncLocalStorage<string>();
-const geminiSinks = new Map<string, GeminiCall[]>();
+// Same globalThis anchor as `logs` — survives dev HMR so a session's pending raw I/O isn't lost.
+const globalForSinks = globalThis as typeof globalThis & {
+	__stsGeminiSinks?: Map<string, GeminiCall[]>;
+};
+const geminiSinks: Map<string, GeminiCall[]> = (globalForSinks.__stsGeminiSinks ??= new Map());
 
 /** Open the session context so a Gemini call teed inside `fn` is attributed to this session. */
 export function runWithSession<T>(sessionId: string, fn: () => T): T {
