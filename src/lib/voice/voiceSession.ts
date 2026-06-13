@@ -44,8 +44,10 @@ export type VoiceEvent =
 	| { type: 'asleep' }
 	| { type: 'eclipsed' }
 	| { type: 'error'; reason: VoiceErrorReason; notice: string }
-	// Text arrives as incremental fragments; turn boundaries ride the state events.
-	| { type: 'transcript'; direction: 'in' | 'out'; text: string };
+	// Text arrives as incremental fragments; turn boundaries ride the state events. The turn's
+	// end carries one `final` out fragment — the whole assembled line — so the caption can flush
+	// to the complete text even when audio drains (and the turn settles) before the tail fragments.
+	| { type: 'transcript'; direction: 'in' | 'out'; text: string; final?: boolean };
 
 export type VoiceListener = (event: VoiceEvent) => void;
 
@@ -338,10 +340,15 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	// Transcripts reach the UI as live fragments (S10's surface); the /debug stream gets one
-	// assembled line per side per turn instead of a fragment flood.
+	// assembled line per side per turn instead of a fragment flood. The out side also re-emits as
+	// one `final` fragment here: the streamed fragments can truncate in the UI when the turn
+	// settles mid-stream, so the whole line is replayed once the turn is actually done.
 	function flushTranscripts(): void {
 		if (transcriptIn) teeDebug('info', `heard: ${transcriptIn}`);
-		if (transcriptOut) teeDebug('info', `spoke: ${transcriptOut}`);
+		if (transcriptOut) {
+			teeDebug('info', `spoke: ${transcriptOut}`);
+			emit({ type: 'transcript', direction: 'out', text: transcriptOut, final: true });
+		}
 		transcriptIn = '';
 		transcriptOut = '';
 	}

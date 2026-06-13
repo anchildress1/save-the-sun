@@ -1614,6 +1614,29 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 			.toHaveTextContent('The fire holds your answer.');
 	});
 
+	it('the final flush restores the whole line when a mid-stream settle truncated the fragments', async () => {
+		// The streamed fragments stop short and the turn settles to listening (caption closed)
+		// before the tail lands — the page copy is now truncated. The final fragment carries the
+		// whole assembled line and flushes the complete text back into the panel.
+		const screen = render(Page, pageProps);
+		emit({ type: 'thinking' });
+		emit({ type: 'transcript', direction: 'out', text: 'I wake' });
+		emit({ type: 'speaking' });
+		emit({ type: 'listening' }); // turn settles before the tail fragment arrives
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('I wake');
+		emit({ type: 'transcript', direction: 'out', text: 'I wake with the fire.', final: true });
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('I wake with the fire.');
+	});
+
+	it('a final fragment closes the caption — the next turn replaces, never appends to it', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'transcript', direction: 'out', text: 'First answer.', final: true });
+		emit({ type: 'thinking' });
+		emit({ type: 'transcript', direction: 'out', text: 'Second answer.' });
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('Second answer.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain('First');
+	});
+
 	it('input speech through a confirmation exchange opens the S8 gate (debug-only transcript, no UI line)', async () => {
 		mockAction({
 			type: 'React',

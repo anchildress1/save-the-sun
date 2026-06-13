@@ -442,6 +442,25 @@ describe('voiceSession oracle speech', () => {
 		expect(tees.join(' ')).toContain('spoke: It is cast.');
 	});
 
+	it('flushes the whole assembled out line as a final fragment on turnComplete', () => {
+		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'It is ' } } });
+		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'cast.' } } });
+		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		// The streamed fragments, then one authoritative final carrying the complete line — the
+		// caption flush the UI needs when the turn settles before the tail fragments land.
+		expect(events).toContainEqual({
+			type: 'transcript',
+			direction: 'out',
+			text: 'It is cast.',
+			final: true
+		});
+	});
+
+	it('a silent turnComplete emits no final out fragment', () => {
+		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		expect(events.filter((e) => e.type === 'transcript')).toEqual([]);
+	});
+
 	it('a silent turnComplete tees no transcript lines', () => {
 		callbacks!.onmessage({ serverContent: { turnComplete: true } });
 		const teed = teeBodies().join(' ');

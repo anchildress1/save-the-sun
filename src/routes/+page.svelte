@@ -286,6 +286,13 @@
 					// The player spoke since arming — the gate may accept the confirming call (S8).
 					// The input transcript itself is debug-only; it is not surfaced in the rite UI.
 					if (voiceConfirm) voiceConfirm.heard = true;
+				} else if (event.final) {
+					// Turn's end: the whole assembled line, authoritative over the streamed fragments.
+					// Streaming alone truncates when the turn settles before the tail lands — this flushes
+					// the complete text. Closed so the next turn's first fragment starts fresh.
+					voiceCaption = event.text;
+					answer = event.text;
+					captionOpen = false;
 				} else {
 					voiceCaption = captionOpen ? voiceCaption + event.text : event.text;
 					captionOpen = true;
