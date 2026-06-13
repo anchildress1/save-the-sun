@@ -174,6 +174,9 @@ export function createVoiceSession(): VoiceSession {
 			if (!silenceTimer) restartSilenceClock();
 		} else clearSilenceClock();
 		if (!changed && next !== 'hearing') return;
+		// Flush the Oracle's transcript when the next player turn starts — the true boundary
+		// where we know all trailing chunks have landed (SDK gives no ordering guarantee).
+		if (next === 'thinking') flushTranscriptOut();
 		if (next === 'hearing') emit({ type: 'hearing', amplitude: lastAmplitude });
 		else emit({ type: next });
 	}
@@ -182,6 +185,7 @@ export function createVoiceSession(): VoiceSession {
 		// A mid-turn sleep/failure must not swallow what was already transcribed — but tee only,
 		// never as a UI `final`: the page may have cleared the panel and switched rounds already.
 		flushTranscripts(false);
+		flushTranscriptOut();
 		generation++;
 		liveReady = false;
 		awaitingDrain = false;
@@ -342,19 +346,26 @@ export function createVoiceSession(): VoiceSession {
 
 	// Transcripts reach the UI as live fragments (S10's surface); the /debug stream gets one
 	// assembled line per side per turn instead of a fragment flood. On a real turn boundary the out
-	// side also re-emits as one `final` fragment: the streamed fragments can truncate in the UI when
-	// the turn settles mid-stream, so the whole line is replayed once the turn is done. A teardown
-	// (sleep/new round/failure) tees only — `emitFinal: false` — or the prior round's line would land
-	// on the page after it has cleared the panel and switched rounds, persisting a stale caption.
+	// side re-emits as one `final` fragment with the text assembled so far — trailing chunks
+	// (SDK gives no ordering guarantee) keep arriving as non-finals and append on the page until
+	// the next `thinking` resets the caption. The debug tee for `spoke:` therefore happens at
+	// `thinking`, not here, so it captures the complete transcript including any trailing chunks.
+	// A teardown (sleep/new round/failure) tees only — `emitFinal: false` — or the prior round's
+	// line would land on the page after it has cleared and switched rounds, persisting a stale caption.
 	function flushTranscripts(emitFinal = true): void {
 		if (transcriptIn) teeDebug('info', `heard: ${transcriptIn}`);
+		transcriptIn = '';
+		if (transcriptOut && emitFinal)
+			emit({ type: 'transcript', direction: 'out', text: transcriptOut, final: true });
+	}
+
+	// Tee and reset the Oracle's assembled out-transcript. Called at `thinking` (start of next
+	// player turn) and on teardown — the two moments we know trailing chunks have settled.
+	function flushTranscriptOut(): void {
 		if (transcriptOut) {
 			teeDebug('info', `spoke: ${transcriptOut}`);
-			if (emitFinal)
-				emit({ type: 'transcript', direction: 'out', text: transcriptOut, final: true });
+			transcriptOut = '';
 		}
-		transcriptIn = '';
-		transcriptOut = '';
 	}
 
 	function playOracleAudio(parts: Part[]): void {

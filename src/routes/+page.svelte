@@ -280,11 +280,12 @@
 				// was a decline or drift — do not leave the destructive gate armed.
 				if (voiceConfirm?.spoke && voiceConfirm.heard) voiceConfirm = null;
 				voiceState = event.type;
-				// Trailing unordered chunks arrive between final and listening (not after).
-				// listening is the true inter-turn boundary — reset so the next turn starts fresh.
-				captionOpen = false;
 				break;
 			case 'thinking':
+				// SDK gives no ordering guarantee for outputTranscription vs turnComplete; trailing
+				// chunks can arrive after listening. Reset only here — the player's turn starting
+				// is the true boundary where all Oracle chunks have settled.
+				captionOpen = false;
 				voiceState = event.type;
 				break;
 			case 'speaking':

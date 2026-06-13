@@ -431,11 +431,17 @@ describe('voiceSession oracle speech', () => {
 		expect(vs.state).toBe('listening');
 	});
 
-	it('tees one assembled transcript line per side on turnComplete — no fragment flood', () => {
+	it('tees one assembled transcript line per side — heard at turnComplete, spoke when next player turn begins', async () => {
 		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'cast ' } } });
 		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'the rune' } } });
 		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'It is cast.' } } });
 		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		// heard: tees at turnComplete; spoke: tees at thinking (SDK gives no ordering guarantee
+		// for outputTranscription vs turnComplete, so trailing chunks can arrive after turnComplete).
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
 		const tees = teeBodies();
 		expect(tees.filter((body) => body.includes('heard:'))).toHaveLength(1);
 		expect(tees.join(' ')).toContain('heard: cast the rune');
@@ -468,9 +474,13 @@ describe('voiceSession oracle speech', () => {
 		expect(teed).not.toContain('spoke:');
 	});
 
-	it('a barge-in flushes the cut line to the tee', () => {
+	it('a barge-in tees the cut line when the player finishes their input', async () => {
 		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'The night holds' } } });
 		callbacks!.onmessage({ serverContent: { interrupted: true } });
+		// spoke: is deferred to thinking so trailing chunks can still land before the tee fires.
+		micChunk!('a', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
 		expect(teeBodies().join(' ')).toContain('spoke: The night holds');
 	});
 
