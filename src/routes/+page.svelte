@@ -1433,7 +1433,9 @@
 	.board-section {
 		display: flex;
 		flex-direction: column;
-		justify-content: center;
+		/* Top-align so the first rune row meets the oracle panel's top edge. Centering left the
+		   board floating in its column's slack — a phantom top margin the sidebar never had. */
+		justify-content: flex-start;
 	}
 
 	.oracle-panel {
@@ -1480,9 +1482,15 @@
 	/* Bleeds past the panel padding; relative so the moon anchors to the banner, not the panel —
 	   percentage-of-panel positioning put the moon behind the opaque wolf on tall viewports. */
 	.skoll-art {
-		position: relative;
-		width: calc(100% + 2.2rem);
-		margin: 0 -1.1rem;
+		/* Pinned to the panel floor and stacked BEHIND the controls (z-index 2). The image rises
+		   up behind the buttons — sky and moon ghost through the gaps — while the wolf, anchored to
+		   the image bottom, stays fully clear below them. Bleeds the panel padding on both sides. */
+		position: absolute;
+		left: -1.1rem;
+		right: -1.1rem;
+		bottom: 0;
+		z-index: 0;
+		pointer-events: none;
 	}
 
 	.skoll-moon {
@@ -1806,9 +1814,9 @@
 	.skoll-banner {
 		display: block;
 		width: 100%;
-		/* The bottom band of the art, sized so the wolf's nose tip sits at the top edge —
-		   directly under the cast controls in flow. */
-		height: 28.25rem;
+		/* Tall enough that the wolf sits at the panel floor while the sky/moon above it rises far up
+		   behind the controls — as much of the picture as possible shows, the wolf never clipped. */
+		height: 40rem;
 		object-fit: cover;
 		object-position: 50% 100%;
 		filter: saturate(var(--skoll-saturation)) brightness(var(--skoll-brightness))
