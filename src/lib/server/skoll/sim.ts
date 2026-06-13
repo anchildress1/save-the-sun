@@ -77,8 +77,6 @@ export async function playFloorGame(
 		// The human seat takes no action in self-play — hand the turn straight to Sköll.
 		if (engine.activePlayer === 'Human') engine.passTurn();
 
-		// Default decider is FLOOR_ONLY (the CI-measurable floor); the live runner passes the real
-		// Gemini brain (decideSkollMove) to drive a live game through this same production loop.
 		const out = await takeSkollTurn(engine, state, decide, state.rng);
 		turns += 1;
 		if (out.source === 'floor') floorMoves += 1;

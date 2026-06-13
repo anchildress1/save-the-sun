@@ -34,10 +34,19 @@ function resolveAlias(rest) {
 // Load .env into process.env so the $env shim can hand the live brain its key (local runs only).
 function loadDotEnv() {
 	try {
-		for (const line of readFileSync(path.join(ROOT, '.env'), 'utf8').split('\n')) {
-			const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-			if (m && process.env[m[1]] === undefined)
-				process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+		for (const raw of readFileSync(path.join(ROOT, '.env'), 'utf8').split('\n')) {
+			const line = raw.replace(/^\s*export\s+/, '').trim();
+			if (!line || line.startsWith('#')) continue;
+			const eq = line.indexOf('=');
+			if (eq === -1) continue;
+			const key = line.slice(0, eq).trim();
+			if (!/^[A-Z0-9_]+$/.test(key) || process.env[key] !== undefined) continue;
+			let val = line.slice(eq + 1).trim();
+			// Strip a wrapping quote pair; on an unquoted value, drop a trailing ` # comment` (a `#`
+			// inside quotes is part of the value, so only the unquoted branch trims it).
+			if (/^(['"]).*\1$/.test(val)) val = val.slice(1, -1);
+			else val = val.replace(/\s+#.*$/, '');
+			process.env[key] = val;
 		}
 	} catch {
 		/* no .env — floor runs need none; the live path will fail loudly on a missing key */
@@ -209,8 +218,9 @@ function preserveLiveSection() {
 	if (existsSync(corpusPath)) {
 		const text = readFileSync(corpusPath, 'utf8');
 		const a = text.indexOf(LIVE_MARKER_START);
-		const b = text.indexOf(LIVE_MARKER_END);
-		if (a !== -1 && b !== -1) return text.slice(a + LIVE_MARKER_START.length, b).trim();
+		// Search the end marker AFTER the start so duplicated/misordered markers can't slice backwards.
+		const b = a === -1 ? -1 : text.indexOf(LIVE_MARKER_END, a + LIVE_MARKER_START.length);
+		if (a !== -1 && b > a) return text.slice(a + LIVE_MARKER_START.length, b).trim();
 	}
 	return '## Live wolf testing\n\n_No live run recorded yet. Run `node scripts/skoll-sim.mjs --live` locally (needs a key)._';
 }
