@@ -6,16 +6,26 @@
 	// SSR gives the first paint; the page then polls so the log stays live while screen-shared.
 	let { data }: PageProps = $props();
 	let events = $state<DebugEvent[]>(untrack(() => data.events));
+	// Displayed id tracks the server's resolved id; the poll URL stays pinned to the requested id
+	// below, so a server-side canonicalization updates the header without re-scoping the poll.
+	let sessionId = $state(untrack(() => data.sessionId));
+
+	// Keep polling scoped to the viewed session (the requested id), not the poller's own cookie.
+	const requestedId = untrack(() => data.sessionId);
+	const pollUrl = requestedId
+		? `/api/debug?session=${encodeURIComponent(requestedId)}`
+		: '/api/debug';
 
 	// Newest first so the latest move is on top during the demo (no scrolling to follow along).
 	const ordered = $derived([...events].reverse());
 
 	async function refresh() {
 		try {
-			const res = await fetch('/api/debug');
+			const res = await fetch(pollUrl);
 			if (!res.ok) return;
-			const next = (await res.json()) as { events: DebugEvent[] };
+			const next = (await res.json()) as { sessionId?: string; events: DebugEvent[] };
 			events = next.events;
+			if (next.sessionId) sessionId = next.sessionId; // reflect any server canonicalization
 		} catch {
 			// A dropped poll is harmless — the next tick retries; never break the view over it.
 		}
@@ -40,6 +50,9 @@
 <main>
 	<header>
 		<h1>Debug log 🐞</h1>
+		{#if sessionId}
+			<p class="session">session <code>{sessionId}</code></p>
+		{/if}
 	</header>
 
 	{#if ordered.length === 0}
@@ -94,7 +107,21 @@
 		font-family: var(--font-body);
 	}
 	h1 {
+		margin: 0 0 0.4rem;
+	}
+	.session {
 		margin: 0 0 clamp(1rem, 0.5rem + 1.5vw, 1.75rem);
+		font-size: 0.85rem;
+		color: #b8b8c0;
+	}
+	.session code {
+		padding: 0.05rem 0.4rem;
+		border-radius: 0.25rem;
+		background: #121215;
+		color: #c8cdda;
+		font-size: 0.8rem;
+		user-select: all; /* one click selects the whole id to copy onto the watching screen */
+		overflow-wrap: anywhere;
 	}
 	.empty {
 		color: #b8b8c0;
