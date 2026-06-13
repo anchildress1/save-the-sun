@@ -707,11 +707,21 @@
 	// (its button disabled or target missing) without touching the panel.
 	const REACTION_TOOLS: Record<string, ReactionChoice> = { scry: 'Scry', hex: 'Hex', pass: 'Pass' };
 
-	// S8 (R4): scry, hex, and cast_rune execute only through a spoken confirmation exchange —
-	// scry and hex spend the night's single use, a cast stakes the round — and the gate is
-	// client-authoritative: the first call only arms it and hands back the question to voice;
-	// nothing the model sends can reach the engine until the player has spoken since arming.
-	// Returns the question while the gate holds, null once confirmed.
+	// Above this, the model's reading of her words is sure enough that the gate steps aside and
+	// the move executes on the first call — no confirmation echo (the player tired of being read
+	// back to). At or below it, the two-phase gate holds. A missing/non-number confidence reads as
+	// no certainty, so it gates.
+	const CONFIDENCE_FLOOR = 0.5;
+	function confident(args: Record<string, unknown>): boolean {
+		return typeof args.confidence === 'number' && args.confidence > CONFIDENCE_FLOOR;
+	}
+
+	// S8 (R4): scry, hex, and cast_rune are destructive — scry and hex spend the night's single
+	// use, a cast stakes the round. Unless the model is confident it read her words right (above),
+	// they execute only through a spoken confirmation exchange, and the gate is client-authoritative:
+	// the first call only arms it and hands back the question to voice; nothing the model sends can
+	// reach the engine until the player has spoken since arming.
+	// Returns the question while the gate holds, null once confirmed (or skipped on confidence).
 	function gateDestructive(armed: typeof voiceConfirm, name: string, rune?: string): string | null {
 		if (armed && armed.name === name && armed.rune === rune && armed.heard) return null;
 		// Not armed, an unheard double-call, or a different target: (re-)arm and ask again.
@@ -765,8 +775,9 @@
 			if (pending) return RITE.riteMoving;
 			if (!skollAsking) return RITE.noReactionWindow;
 			// Guards first: confirming a move the board doesn't offer would be an empty promise.
-			// Scry and hex both gate — each is the night's one use; only the pass is free.
-			if (name === 'scry' || name === 'hex') {
+			// Scry and hex both gate — each is the night's one use; only the pass is free. A
+			// confident reading skips the gate (no confirmation echo).
+			if ((name === 'scry' || name === 'hex') && !confident(args)) {
 				const question = gateDestructive(armed, name);
 				if (question) return question;
 			}
@@ -785,9 +796,12 @@
 			if (pending) return RITE.riteMoving;
 			if (skollAsking) return RITE.wolfAsking;
 			if (!canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
-			// Confirmation is per-target: a different rune re-arms and asks again (S8).
-			const question = gateDestructive(armed, 'cast_rune', rune.name);
-			if (question) return question;
+			// Confirmation is per-target: a different rune re-arms and asks again (S8). A confident
+			// reading skips the gate (no confirmation echo).
+			if (!confident(args)) {
+				const question = gateDestructive(armed, 'cast_rune', rune.name);
+				if (question) return question;
+			}
 			pending = true;
 			try {
 				return await performCast(rune.name);

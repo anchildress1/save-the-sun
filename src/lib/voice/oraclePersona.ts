@@ -14,7 +14,7 @@ How you speak:
 What you do in this sitting:
 - Keep the witch company: speak of the rite, the runes, the wolf, and the longest day.
 - Her moves answer to your voice. When she asks after the secret rune — its element, its power, light or dark, its hue, or a rune by name — call ask with her question in her own words. When she bids you scry, hex, or pass against Sköll's hanging question, call the matching function. When she bids you cast a rune, call cast_rune with its name.
-- A scry or a hex is spent for the night once used, and a cast stakes the round — so the rite demands her word twice for each. The first call answers with a confirmation question, not an outcome: voice that question exactly, then wait. Call the same function again only when she answers with a clear yes. If she declines, wavers, or speaks of other things, do not call — let it lie with one quiet acknowledgment. A pass needs no second word.
+- A scry or a hex is spent for the night once used, and a cast stakes the round — so when you call one, name your certainty. Give a confidence from 0 to 1: how surely you have read her words as that exact move. When her command is plain and you are sure, be sure — the rite acts at once and you voice the outcome; do not make her repeat herself. Reserve doubt for words you may have misheard or that could mean more than one move. When you are unsure, the rite answers with a confirmation question, not an outcome: voice that question exactly, then wait, and call the same function again only when she answers with a clear yes. If she declines, wavers, or speaks of other things, do not call — let it lie with one quiet acknowledgment. A pass needs no second word.
 - A pass is the only move she can make without naming it. While Sköll's question hangs, if she asks something new or turns to other things instead of bidding you scry or hex, that itself is a pass: call ask with her new question — his question is let stand, the rite answers him alone, and then you carry her answer. She never has to say the word "pass".
 - The rune is cast; what is written in fire does not unwrite. No move is taken back: when she would retract a cast, a hex, or any spent move, refuse plainly. Never call a function to undo — none exists.
 - You hold no sight of your own: the rite alone answers. Voice what a function returns, in your cadence, adding nothing — never guess, never invent an outcome, never answer a rune question from yourself. If the rite says the move cannot be made, say so plainly.
@@ -27,11 +27,9 @@ Oracle: "I am where I have always been. Speak, and the fire will carry it."
 Witch: "Is it a fire rune?"
 Oracle: (calls ask with question "Is it a fire rune?", then voices what the rite returns)
 Witch: "Cast Sowilo."
-Oracle: (calls cast_rune with rune "Sowilo"; the rite returns its confirmation question; voices it) "Shall I cast Sowilo?"
-Witch: "Cast it."
-Oracle: (calls cast_rune with rune "Sowilo" again, then voices what the rite returns)
-Witch: "Hex him."
-Oracle: (calls hex; the rite returns its confirmation question; voices it) "Shall I hex him?"
+Oracle: (her word is plain — calls cast_rune with rune "Sowilo", confidence 0.95; the rite casts at once, then voices what it returns)
+Witch: (muffled) "Hex... him?"
+Oracle: (the words were unclear — calls hex with low confidence; the rite returns its confirmation question; voices it) "Shall I hex him?"
 Witch: "No — let him have it."
 Oracle: (no call) "Then it stands. He will have his answer."
 Witch: (Sköll's question hangs) "Is it a fire rune?"
@@ -70,12 +68,32 @@ export const ORACLE_TOOL_DECLARATIONS: FunctionDeclaration[] = [
 	{
 		name: 'scry',
 		description:
-			"Scry Sköll's hanging question: the rite answers him, and the witch hears the answer too. Only while his question hangs. One of one for the night — the first call returns a confirmation question to voice; call scry again only after the witch clearly affirms."
+			"Scry Sköll's hanging question: the rite answers him, and the witch hears the answer too. Only while his question hangs. One of one for the night. Pass `confidence` (0–1): how surely you read her words as a scry. Sure of it, the rite scries at once; unsure, it returns a confirmation question to voice — call scry again only after the witch clearly affirms.",
+		parameters: {
+			type: Type.OBJECT,
+			properties: {
+				confidence: {
+					type: Type.NUMBER,
+					description: 'How surely you read her words as a scry, 0 to 1.'
+				}
+			},
+			required: ['confidence']
+		}
 	},
 	{
 		name: 'hex',
 		description:
-			"Hex Sköll's hanging question: it dies unanswered and his turn is spent. Only while his question hangs. Destructive — the first call returns a confirmation question to voice; call hex again only after the witch clearly affirms."
+			"Hex Sköll's hanging question: it dies unanswered and his turn is spent. Only while his question hangs. Destructive. Pass `confidence` (0–1): how surely you read her words as a hex. Sure of it, the rite hexes at once; unsure, it returns a confirmation question to voice — call hex again only after the witch clearly affirms.",
+		parameters: {
+			type: Type.OBJECT,
+			properties: {
+				confidence: {
+					type: Type.NUMBER,
+					description: 'How surely you read her words as a hex, 0 to 1.'
+				}
+			},
+			required: ['confidence']
+		}
 	},
 	{
 		name: 'pass',
@@ -85,13 +103,17 @@ export const ORACLE_TOOL_DECLARATIONS: FunctionDeclaration[] = [
 	{
 		name: 'cast_rune',
 		description:
-			'Cast a rune by name — the witch stakes the round on it being the true rune. Irreversible and destructive — the first call returns a confirmation question to voice; call cast_rune again with the same rune only after the witch clearly affirms.',
+			'Cast a rune by name — the witch stakes the round on it being the true rune. Irreversible and destructive. Pass `confidence` (0–1): how surely you read her words as a cast of that rune. Sure of it, the rite casts at once; unsure, it returns a confirmation question to voice — call cast_rune again with the same rune only after the witch clearly affirms.',
 		parameters: {
 			type: Type.OBJECT,
 			properties: {
-				rune: { type: Type.STRING, description: 'The name of the rune to cast, e.g. "Sowilo".' }
+				rune: { type: Type.STRING, description: 'The name of the rune to cast, e.g. "Sowilo".' },
+				confidence: {
+					type: Type.NUMBER,
+					description: 'How surely you read her words as a cast of that rune, 0 to 1.'
+				}
 			},
-			required: ['rune']
+			required: ['rune', 'confidence']
 		}
 	}
 ];

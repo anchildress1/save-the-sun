@@ -1261,6 +1261,45 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		);
 		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Scry' }]);
 	});
+
+	// Confidence skip: when the model is sure it read her words right, the gate steps aside and the
+	// move lands on the first call — no confirmation echo to repeat her back to her.
+	it('a confident hex executes on the first call — no confirmation, no spoken word needed', async () => {
+		mockAction({
+			type: 'React',
+			outcome: { ok: true, choice: 'Hex' },
+			skollReaction: { hexed: true },
+			state: HUMAN_TURN
+		});
+		render(Page, reactProps);
+		const outcome = await executor()({ name: 'hex', args: { confidence: 0.95 } });
+		expect(outcome).toBe(
+			"You close the Oracle's lips. His question dies unanswered — his turn with it."
+		);
+		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Hex' }]);
+	});
+
+	it('a confident cast executes on the first call — no confirmation question', async () => {
+		mockAction({
+			type: 'Cast',
+			cast: { ok: true, won: false, turnConsumed: true },
+			state: HUMAN_TURN
+		});
+		render(Page, pageProps);
+		const outcome = await executor()({
+			name: 'cast_rune',
+			args: { rune: 'Sowilo', confidence: 0.9 }
+		});
+		expect(outcome).toBe('Sowilo is not the one. The night holds.');
+		expect(actionBodies()).toEqual([{ type: 'Cast', player: 'Human', runeName: 'Sowilo' }]);
+	});
+
+	it('confidence at the floor still gates — the skip is strictly above half', async () => {
+		render(Page, reactProps);
+		const outcome = await executor()({ name: 'scry', args: { confidence: 0.5 } });
+		expect(outcome).toBe(CONFIRM_SCRY);
+		expect(actionBodies()).toHaveLength(0);
+	});
 });
 
 describe('Save the Sun page — cast lockout (S9)', () => {
