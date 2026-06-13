@@ -141,7 +141,9 @@ sequenceDiagram
     Live->>Voice: toolCall ask / scry / hex / pass / cast_rune
     Voice->>Exec: executeVoiceTool(call)
 
-    alt scry / hex / cast_rune — S8 two-phase gate
+    alt scry / hex / cast_rune — confident reading (confidence > 0.5)
+        Note right of Exec: gate steps aside — the move executes on the first call
+    else unsure — S8 confirmation gate
         Exec-->>Voice: confirmation question (arm, await spoken reply)
         Note right of Exec: confirming call executes only after the player speaks
     end
@@ -156,7 +158,7 @@ sequenceDiagram
 ```
 
 - The browser only ever holds the **ephemeral** token; the real `GEMINI_API_KEY` stays server-side, masked at the debug sink.
-- **S8 gate** — `scry`, `hex`, `cast_rune` are destructive (a one-night charge or the whole round), so the first call only arms a confirmation and asks again. Client-authoritative: nothing reaches the engine until the player has spoken since arming.
+- **S8 gate** — `scry`, `hex`, `cast_rune` are destructive (a one-night charge or the whole round). The model scores each call with a `confidence` (0–1) for how surely it read her words; above `0.5` the executor skips the gate and the move lands on the first call (no confirmation echo). At or below it — or with no confidence at all — the first call only arms a confirmation and asks again. Client-authoritative: while the gate holds, nothing reaches the engine until the player has spoken since arming.
 - **S9 lockout** — while a cast is in flight (`casting`), the executor seals: the lockout outranks every guard and the gate.
 - The button game never depends on the voice module being alive; a denied or absent mic seals the session into the terminal `eclipsed` state and is never re-prompted.
 
