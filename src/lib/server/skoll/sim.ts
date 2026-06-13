@@ -130,7 +130,7 @@ export async function simulateFloor(games: number, startSeed = 1): Promise<SimMe
 		meanTurns: turns.length ? sum / turns.length : 0,
 		medianTurns: median(turns),
 		minTurns: turns.length ? turns[0] : 0,
-		maxTurns: turns.length ? (turns.at(-1) as number) : 0,
+		maxTurns: turns.at(-1) ?? 0,
 		distribution: [...counts.entries()]
 			.sort((a, b) => a[0] - b[0])
 			.map(([t, count]) => ({ turns: t, count }))
