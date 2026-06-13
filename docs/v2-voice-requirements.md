@@ -129,8 +129,8 @@ A build-time script generates Sköll's audio with Gemini TTS (voice `Algieba`, d
 **R10 — Everything spoken is also written.**
 Voice is an enhancement layer, never the sole carrier of game information.
 
-- [ ] The Oracle's spoken answers render as text in the existing Answer panel (the Live session emits output transcripts for free).
-- [ ] What the Oracle *heard* (input transcript) is visible, so a mishear is caught before it matters.
+- [x] The Oracle's spoken answers render as text in the existing Answer panel (the Live session emits output transcripts for free).
+- [x] What the Oracle *heard* (input transcript) is visible, so a mishear is caught before it matters.
 - [ ] Sköll's clips display captions—his script is prebaked, so caption text ships with the clips.
 
 **R11 — Output mute.**

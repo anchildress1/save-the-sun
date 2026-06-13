@@ -100,6 +100,14 @@ The questions are short by design: the exchanges recur, and a spoken preamble ev
 
 Retraction is refused in character — the persona carries the doctrine verbatim: *"What is written in fire does not unwrite. The rune stands."*
 
+### Transcripts (voice, S10)
+
+Everything spoken is also written (R10). Her speech captions live into the Answer panel — the caption is whatever she actually says, so confirmations and guard answers reach the player in text through her voice even though the page prints no panel line for them. What she heard renders as a quiet line under the frame, so a mishear is caught before it matters; it is replaced by each utterance and leaves when the voice sleeps:
+
+> The fire hears: “{input transcript}”
+
+The label keeps the fire metaphor the medallion's notices already own ("The fire cannot hear you").
+
 ### Interpretation echo (public, before the answer)
 Pattern: **`You ask after {paraphrase}.`**—then a held beat, then the answer.
 

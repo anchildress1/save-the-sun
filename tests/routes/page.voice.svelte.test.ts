@@ -355,13 +355,12 @@ describe('Save the Sun page — eclipse medallion wiring (S3)', () => {
 		expect(screen.getByTestId('voice-notice').element().textContent).toBe('');
 	});
 
-	it('ignores transcript fragments — they belong to S10, and must not disturb the panel', async () => {
+	it('a transcript fragment never disturbs the medallion or the notice — it is text, not state', async () => {
 		const screen = render(Page, pageProps);
 		emit({ type: 'transcript', direction: 'out', text: 'The fire holds your answer.' });
 		await expect
 			.element(screen.getByTestId('eclipse-medallion'))
 			.toHaveAttribute('data-voice-state', 'asleep');
-		expect(screen.getByTestId('answer').element().textContent?.trim()).toBe('');
 		expect(screen.getByTestId('voice-notice').element().textContent).toBe('');
 	});
 
@@ -1283,5 +1282,200 @@ describe('Save the Sun page — cast lockout (S9)', () => {
 		settleAdvance(new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN })));
 		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeEnabled();
 		expect(actionBodies().map((body) => body.type)).toEqual(['Cast', 'Advance']);
+	});
+});
+
+describe('Save the Sun page — transcripts to text (S10)', () => {
+	const VIEW_KEY = 'save-the-sun:view';
+
+	// All driven by transcript events, never the speaker — the R10 muted guarantee.
+
+	it('renders her speech in the Answer panel as the fragments arrive', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'thinking' });
+		emit({ type: 'transcript', direction: 'out', text: 'The fire holds' });
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The fire holds');
+		emit({ type: 'transcript', direction: 'out', text: ' your answer.' });
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('The fire holds your answer.');
+	});
+
+	it('a settled turn closes the caption — the next turn replaces, never appends', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'transcript', direction: 'out', text: 'First answer.' });
+		emit({ type: 'speaking' });
+		emit({ type: 'listening' });
+		emit({ type: 'thinking' });
+		emit({ type: 'transcript', direction: 'out', text: 'Second answer.' });
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('Second answer.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain('First');
+	});
+
+	it('a barge-in starts a fresh caption — her cut line never bleeds into the next', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'speaking' });
+		emit({ type: 'transcript', direction: 'out', text: 'You ask after the fire-runes' });
+		emit({ type: 'hearing', amplitude: 0.2 });
+		emit({ type: 'thinking' });
+		emit({ type: 'transcript', direction: 'out', text: 'No. Sól is not reaching for gold.' });
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('No. Sól is not reaching for gold.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain('fire-runes');
+	});
+
+	it('her caption overwrites a board-made line — never appends to it', async () => {
+		// A voiced ask paints the engine line first (S7); her spoken rendition then owns the panel.
+		mockAction({
+			type: 'Ask',
+			oracle: { ok: true, answer: 'Yes. Sól is reaching for a fire rune.', turnConsumed: true },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, pageProps);
+		await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Yes. Sól is reaching for a fire rune.');
+		emit({ type: 'transcript', direction: 'out', text: 'Yes — Sól reaches for fire.' });
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Yes — Sól reaches for fire.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain(
+			'reaching for a fire rune'
+		);
+	});
+
+	it('a mid-turn board line never absorbs the next fragment — the caption reclaims the panel', async () => {
+		// A tool call paints the engine line into `answer` between two of her fragments; the
+		// caption buffer is what keeps the second fragment off the engine line's tail.
+		mockAction({
+			type: 'Ask',
+			oracle: { ok: true, answer: 'Yes. Sól is reaching for a fire rune.', turnConsumed: true },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, pageProps);
+		emit({ type: 'thinking' });
+		emit({ type: 'transcript', direction: 'out', text: 'You ask after fire.' });
+		await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
+		emit({ type: 'transcript', direction: 'out', text: ' It is so.' });
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('You ask after fire. It is so.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain('reaching');
+	});
+
+	it('fragments straddling the speaking event stay one caption', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'thinking' });
+		emit({ type: 'transcript', direction: 'out', text: 'The fire holds' });
+		emit({ type: 'speaking' });
+		emit({ type: 'transcript', direction: 'out', text: ' your answer.' });
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('The fire holds your answer.');
+	});
+
+	it('fragments straddling the hearing flares stay one utterance', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'transcript', direction: 'in', text: 'is it ' });
+		emit({ type: 'hearing', amplitude: 0.2 });
+		emit({ type: 'transcript', direction: 'in', text: 'a fire rune' });
+		await expect
+			.element(screen.getByTestId('voice-heard'))
+			.toHaveTextContent('The fire hears: “is it a fire rune”');
+	});
+
+	it('the heard line renders through a confirmation exchange — the same speech opens the gate', async () => {
+		mockAction({
+			type: 'React',
+			outcome: { ok: true, choice: 'Hex' },
+			skollReaction: { hexed: true },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+			}
+		});
+		expect(await executor()({ name: 'hex', args: {} })).toBe(CONFIRM_HEX);
+		emit({ type: 'transcript', direction: 'in', text: 'yes, hex him' });
+		await expect
+			.element(screen.getByTestId('voice-heard'))
+			.toHaveTextContent('The fire hears: “yes, hex him”');
+		const outcome = await executor()({ name: 'hex', args: {} });
+		expect(outcome).toBe(
+			"You close the Oracle's lips. His question dies unanswered — his turn with it."
+		);
+	});
+
+	it('the eclipse seal clears the heard line too', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
+		emit({ type: 'eclipsed' });
+		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
+	});
+
+	it('the caption persists with the round view — a reload resumes her last spoken line', async () => {
+		render(Page, pageProps);
+		emit({ type: 'transcript', direction: 'out', text: 'The night holds.' });
+		await vi.waitFor(() => {
+			expect(JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}').answer).toBe('The night holds.');
+		});
+	});
+
+	it('shows what she heard, fragment by fragment', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'transcript', direction: 'in', text: 'is it ' });
+		emit({ type: 'transcript', direction: 'in', text: 'a fire rune' });
+		await expect
+			.element(screen.getByTestId('voice-heard'))
+			.toHaveTextContent('The fire hears: “is it a fire rune”');
+	});
+
+	it('a new utterance after her reply replaces the heard line', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
+		emit({ type: 'transcript', direction: 'out', text: 'No.' });
+		emit({ type: 'transcript', direction: 'in', text: 'is it dark' });
+		await expect
+			.element(screen.getByTestId('voice-heard'))
+			.toHaveTextContent('The fire hears: “is it dark”');
+		expect(screen.getByTestId('voice-heard').element().textContent).not.toContain('gold');
+	});
+
+	it('a turn that settles without a reply also closes the utterance', async () => {
+		// The thinking-rescue path: listening arrives with no out-fragment between.
+		const screen = render(Page, pageProps);
+		emit({ type: 'transcript', direction: 'in', text: 'first try' });
+		emit({ type: 'thinking' });
+		emit({ type: 'listening' });
+		emit({ type: 'transcript', direction: 'in', text: 'second try' });
+		await expect
+			.element(screen.getByTestId('voice-heard'))
+			.toHaveTextContent('The fire hears: “second try”');
+		expect(screen.getByTestId('voice-heard').element().textContent).not.toContain('first');
+	});
+
+	it('the heard line leaves with the session — the caption stays', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'transcript', direction: 'out', text: 'The night holds.' });
+		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
+		emit({ type: 'asleep' });
+		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The night holds.');
+	});
+
+	it('a session error clears the heard line with the mic', async () => {
+		const screen = render(Page, pageProps);
+		emit({ type: 'transcript', direction: 'in', text: 'is it gold' });
+		emit({
+			type: 'error',
+			reason: 'socket',
+			notice: "The Oracle's voice falters. The rite continues by hand."
+		});
+		await expect.element(screen.getByTestId('voice-heard')).not.toBeInTheDocument();
 	});
 });
