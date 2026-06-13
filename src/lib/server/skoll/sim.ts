@@ -35,9 +35,13 @@ export interface SimMetrics {
 // bounded by the trait space; this cap only guards against a logic regression turning into a hang.
 const MAX_MOVES = 100;
 
-/** Drive Sköll's floor through a real engine for one seed until he casts the secret. */
-export function playFloorGame(seed: number): SimResult {
-	const engine = new GameEngine(seed);
+/**
+ * Drive Sköll's floor through a real engine for one seed until he casts the secret.
+ * @param seed PRNG seed — fixes the secret and the floor's move stream (reproducible).
+ * @param engine engine override, for tests that need to force the harness-invariant guards; defaults
+ *   to a fresh engine on the same seed.
+ */
+export function playFloorGame(seed: number, engine: GameEngine = new GameEngine(seed)): SimResult {
 	const secret = selectSecret(seed);
 	const rng = mulberry32(seed);
 	const facts: EarnedFact[] = [];
@@ -53,17 +57,23 @@ export function playFloorGame(seed: number): SimResult {
 
 		if (decision.kind === 'cast') {
 			const result = engine.cast('Sköll', decision.runeName);
-			if (result.ok && result.won) return { seed, secret: secret.name, turns, won: true };
-			// Wrong cast: record it as a ruled-out fact so the floor never names it again, then play on.
+			// An illegal cast (unknown rune, out of turn, round over) is a harness regression, not play —
+			// fail loud rather than fold it into the wrong-cast slack and hide the bug.
+			if (!result.ok) throw new Error(`harness: illegal cast (${result.reason}) on seed ${seed}`);
+			if (result.won) return { seed, secret: secret.name, turns, won: true };
+			// Legal but wrong cast: record it as a ruled-out fact so the floor never names it again. This
+			// is real self-play slack (a wrong guess on the final pair), not a failure.
 			const ruledOut: Query = { axis: 'rune', value: decision.runeName };
 			facts.push({ query: ruledOut, answer: false });
 			asked.push(ruledOut);
 			continue;
 		}
 
-		// In this controlled harness Sköll is always the active player on a live round, so a floor Ask
-		// is always legal — the floor only emits well-formed queries. Record the truthful answer.
-		const result = engine.ask('Sköll', decision.query) as { ok: true; answer: boolean };
+		// Sköll is always the active player on a live round here and the floor only emits well-formed
+		// queries, so a floor Ask is always legal. A not-ok result is therefore a harness invariant
+		// breach (engine/floor regression) — throw rather than assert the type and record a bad fact.
+		const result = engine.ask('Sköll', decision.query);
+		if (!result.ok) throw new Error(`harness: illegal ask (${result.reason}) on seed ${seed}`);
 		facts.push({ query: decision.query, answer: result.answer });
 		asked.push(decision.query);
 	}

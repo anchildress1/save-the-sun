@@ -64,9 +64,9 @@ export function splitScore(query: Query, live: Rune[]): number | null {
 
 // How sharply the floor favors a hunch over a clean split. The selection weight is
 // `minorityCount^(-HUNCH_BIAS)`, so a narrow question (small minority side, like "is it Sowilo?")
-// outweighs the perfect 50/50 cutoff — the opposite of an optimizer. Tuned against the self-play
-// sweep so wins average inside [7.5, 9] turns; lower it toward 0 to play sharper (fewer turns),
-// raise it to play more scattered (more turns). 0.6 centers the sweep near 8.3.
+// outweighs the perfect 50/50 cutoff — the opposite of an optimizer. Tuned against the engine-driven
+// self-play sweep so wins average inside [7.5, 9] turns (mean ≈ 7.9); lower it toward 0 to play
+// sharper (fewer turns), raise it to play more scattered (more turns).
 const HUNCH_BIAS = 0.6;
 
 /**

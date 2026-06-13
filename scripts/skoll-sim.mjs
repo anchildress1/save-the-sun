@@ -55,8 +55,21 @@ const { simulateFloor, BOARD_SIZE } = await import(
 	pathToFileURL(path.join(LIB, 'server', 'skoll', 'sim.ts')).href
 );
 
-const games = Number.parseInt(process.argv[2] ?? '1000', 10);
+const DEFAULT_GAMES = 1000;
+const games = parseGames(process.argv[2]);
 const TARGET = { lo: 7.5, hi: 9 };
+
+// A non-positive or non-numeric arg yields NaN/0 win rates and a garbage corpus — reject it loudly
+// rather than silently writing nonsense. No arg falls back to the default sweep.
+function parseGames(arg) {
+	if (arg === undefined) return DEFAULT_GAMES;
+	const n = Number(arg);
+	if (!Number.isInteger(n) || n < 1) {
+		console.error(`games must be a positive integer, got "${arg}"`);
+		process.exit(1);
+	}
+	return n;
+}
 const metrics = simulateFloor(games);
 const inWindow = metrics.meanTurns >= TARGET.lo && metrics.meanTurns <= TARGET.hi;
 
