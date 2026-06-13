@@ -96,6 +96,7 @@ Declare five functions on the Live session: `ask`, `hex`, `scry`, `pass`, `cast_
 
 - [ ] Single speaker toggle silences Oracle + Sköll audio; text/captions unaffected; mic streaming unaffected
 - [ ] State persists for the session
+- [ ] Keyboard nav wired in for oracle controls
 - Depends: S2
 
 ## Phase 3 — The wolf 🐺
