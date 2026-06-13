@@ -65,6 +65,8 @@
 		// run — never shown in the panel, since no move was made.
 		wolfAsking: 'His question hangs — scry, hex, or pass.',
 		noReactionWindow: 'Sköll asks nothing to scry, hex, or pass.',
+		scrySpent: 'Your scrying is spent for the night.',
+		hexSpent: 'Your hex is spent for the night.',
 		riteDone: 'The longest day is decided — begin anew.',
 		unknownRune: (name: string) => `No rune named ${name} lies on the board.`,
 		// Cast lockout (S9, R5): while a cast's engine round-trip is in flight, every voiced
@@ -767,6 +769,12 @@
 		// stale affirmation must never carry over to execute a later call.
 		const armed = voiceConfirm;
 		voiceConfirm = null;
+		// Confidence skips the gate only on a CLEAN call. Once a confirmation is armed, defer to the
+		// gate — it alone judges whether the player has spoken (heard). This blocks the batched
+		// self-confirm: the Live client can fire calls together, so the model could arm a gate then
+		// stake the round with a high-confidence call in the same breath; while an exchange stands,
+		// confidence can't jump it (R4).
+		const confirmArmed = armed !== null;
 		// S9 (R5): the cast lockout outranks every guard and the gate — checked after the
 		// capture above so the armed exchange still dies, but before anything else can answer.
 		if (casting) return RITE.castSacred;
@@ -805,10 +813,15 @@
 		if (Object.hasOwn(REACTION_TOOLS, name)) {
 			if (pending) return RITE.riteMoving;
 			if (!skollAsking) return RITE.noReactionWindow;
+			// A spent charge is no move: the server would resolve a chargeless Scry/Hex as a Pass,
+			// silently letting his question stand. The button disables for this; the voice path must
+			// refuse it too, or a confident "scry him" passes by accident.
+			if (name === 'scry' && !heldScry) return RITE.scrySpent;
+			if (name === 'hex' && !heldHex) return RITE.hexSpent;
 			// Guards first: confirming a move the board doesn't offer would be an empty promise.
 			// Scry and hex both gate — each is the night's one use; only the pass is free. A
-			// confident reading skips the gate (no confirmation echo).
-			if ((name === 'scry' || name === 'hex') && !confident(args)) {
+			// confident reading skips the gate (no echo), unless a confirmation is already armed.
+			if ((name === 'scry' || name === 'hex') && (!confident(args) || confirmArmed)) {
 				const question = gateDestructive(armed, name);
 				if (question) return question;
 			}
@@ -828,8 +841,8 @@
 			if (skollAsking) return RITE.wolfAsking;
 			if (!canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
 			// Confirmation is per-target: a different rune re-arms and asks again (S8). A confident
-			// reading skips the gate (no confirmation echo).
-			if (!confident(args)) {
+			// reading skips the gate, unless a confirmation is already armed.
+			if (!confident(args) || confirmArmed) {
 				const question = gateDestructive(armed, 'cast_rune', rune.name);
 				if (question) return question;
 			}

@@ -1301,6 +1301,36 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 			expect(actionBodies()).toHaveLength(0);
 		}
 	);
+
+	// The Live client batches calls, so a confident call must not jump a confirmation that was
+	// armed in the same breath and never heard — else the model self-confirms (R4 bypass).
+	it('a confident call cannot jump an armed, unheard confirmation', async () => {
+		render(Page, pageProps);
+		// Low confidence arms the gate.
+		expect(await executor()({ name: 'cast_rune', args: { rune: 'Sowilo', confidence: 0.2 } })).toBe(
+			confirmCast('Sowilo')
+		);
+		// A high-confidence second call before the player speaks still asks — it never stakes the round.
+		expect(
+			await executor()({ name: 'cast_rune', args: { rune: 'Sowilo', confidence: 0.99 } })
+		).toBe(confirmCast('Sowilo'));
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	// A spent charge is no move — the server resolves a chargeless Scry/Hex as a Pass. A confident
+	// reading must not silently let his question stand; the voice path refuses, like the button.
+	it('a voiced scry when the charge is spent is refused, not silently passed', async () => {
+		render(Page, {
+			...pageProps,
+			data: {
+				...pageProps.data,
+				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: false, Hex: true } }
+			}
+		});
+		const outcome = await executor()({ name: 'scry', args: { confidence: 0.99 } });
+		expect(outcome).toBe('Your scrying is spent for the night.');
+		expect(actionBodies()).toHaveLength(0);
+	});
 });
 
 describe('Save the Sun page — cast lockout (S9)', () => {

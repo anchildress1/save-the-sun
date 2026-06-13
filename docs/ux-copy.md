@@ -81,6 +81,8 @@ A voiced action calls the same engine function as its button, and the Oracle voi
 | Ask or Cast while Sköll's question hangs | "His question hangs — scry, hex, or pass." |
 | Ask or Cast on Sköll's turn | "The wolf is moving. Hold." |
 | Scry / Hex / Pass with no hanging question | "Sköll asks nothing to scry, hex, or pass." |
+| Scry when the night's one scry is already spent | "Your scrying is spent for the night." |
+| Hex when the night's one hex is already spent | "Your hex is spent for the night." |
 | Any move after the round resolves | "The longest day is decided — begin anew." |
 | Cast of a rune not on the board | "No rune named {name} lies on the board." |
 
