@@ -4,7 +4,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 // assert (secure: !dev). Also keeps the dev-only "created" debug log out of the test output.
 vi.mock('$app/environment', () => ({ dev: false }));
 
-import { handle, SESSIONLESS_PATHS } from '../src/hooks.server';
+import { handle, SESSIONLESS_PATHS, READONLY_SESSION_PATHS } from '../src/hooks.server';
 
 function fakeEvent(existing?: string, pathname = '/') {
 	const store = new Map<string, string>();
@@ -96,4 +96,34 @@ describe('session hook', () => {
 		expect(set).not.toHaveBeenCalled();
 		expect(resolve).toHaveBeenCalledOnce();
 	});
+
+	it.each([...READONLY_SESSION_PATHS])(
+		'does not mint a session for %s (no cookie)',
+		async (path) => {
+			const { event, set, locals } = fakeEvent(undefined, path);
+			await handle({ event, resolve } as never);
+			expect(set).not.toHaveBeenCalled();
+			expect(locals.sessionId).toBe('');
+		}
+	);
+
+	it.each([...READONLY_SESSION_PATHS])(
+		'reads an existing cookie on %s without re-setting',
+		async (path) => {
+			const { event, set, locals } = fakeEvent('known-session', path);
+			await handle({ event, resolve } as never);
+			expect(locals.sessionId).toBe('known-session');
+			expect(set).not.toHaveBeenCalled();
+		}
+	);
+
+	it.each([...READONLY_SESSION_PATHS].map((p) => `${p}/`))(
+		'does not mint a session for the trailing-slash variant %s',
+		async (path) => {
+			const { event, set, locals } = fakeEvent(undefined, path);
+			await handle({ event, resolve } as never);
+			expect(set).not.toHaveBeenCalled();
+			expect(locals.sessionId).toBe('');
+		}
+	);
 });
