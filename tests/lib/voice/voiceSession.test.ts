@@ -479,6 +479,16 @@ describe('voiceSession oracle speech', () => {
 		vs.sleep();
 		expect(teeBodies().join(' ')).toContain('heard: is it a fire rune');
 	});
+
+	it('sleep mid-line tees the partial but emits no UI final — never bleeds into the next round', () => {
+		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'The night holds' } } });
+		events = [];
+		vs.sleep();
+		// Teed for /debug…
+		expect(teeBodies().join(' ')).toContain('spoke: The night holds');
+		// …but never delivered as a caption the page would paint over a freshly cleared new round.
+		expect(events.filter((e) => e.type === 'transcript')).toEqual([]);
+	});
 });
 
 describe('voiceSession silence timeout (S5)', () => {

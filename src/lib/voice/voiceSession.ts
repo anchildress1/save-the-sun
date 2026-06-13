@@ -179,8 +179,9 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	function teardown(): void {
-		// A mid-turn sleep/failure must not swallow what was already transcribed.
-		flushTranscripts();
+		// A mid-turn sleep/failure must not swallow what was already transcribed — but tee only,
+		// never as a UI `final`: the page may have cleared the panel and switched rounds already.
+		flushTranscripts(false);
 		generation++;
 		liveReady = false;
 		awaitingDrain = false;
@@ -340,14 +341,17 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	// Transcripts reach the UI as live fragments (S10's surface); the /debug stream gets one
-	// assembled line per side per turn instead of a fragment flood. The out side also re-emits as
-	// one `final` fragment here: the streamed fragments can truncate in the UI when the turn
-	// settles mid-stream, so the whole line is replayed once the turn is actually done.
-	function flushTranscripts(): void {
+	// assembled line per side per turn instead of a fragment flood. On a real turn boundary the out
+	// side also re-emits as one `final` fragment: the streamed fragments can truncate in the UI when
+	// the turn settles mid-stream, so the whole line is replayed once the turn is done. A teardown
+	// (sleep/new round/failure) tees only — `emitFinal: false` — or the prior round's line would land
+	// on the page after it has cleared the panel and switched rounds, persisting a stale caption.
+	function flushTranscripts(emitFinal = true): void {
 		if (transcriptIn) teeDebug('info', `heard: ${transcriptIn}`);
 		if (transcriptOut) {
 			teeDebug('info', `spoke: ${transcriptOut}`);
-			emit({ type: 'transcript', direction: 'out', text: transcriptOut, final: true });
+			if (emitFinal)
+				emit({ type: 'transcript', direction: 'out', text: transcriptOut, final: true });
 		}
 		transcriptIn = '';
 		transcriptOut = '';
