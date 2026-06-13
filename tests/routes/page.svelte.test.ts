@@ -579,6 +579,48 @@ describe('Save the Sun page', () => {
 		expect(screen.container.querySelector('[data-testid="reaction-prompt"]')).toBeNull();
 	});
 
+	// Regression: the static reactions row dropped Pass entirely, so the button vanished from the DOM
+	// on every window close while Scry/Hex stayed (their disabled placeholders held). It read as
+	// "Pass disappears at random." Pass must hold a disabled slot whenever the window is closed.
+	it('keeps a disabled Pass in the static row when no reaction window is open', async () => {
+		render(Page, pageProps);
+		const reactions = document.querySelector('.reactions');
+		expect(reactions).not.toBeNull();
+		const labels = [...reactions!.querySelectorAll('.reaction-btn')].map((b) =>
+			b.textContent?.trim()
+		);
+		expect(labels).toEqual(['Scry', 'Hex', 'Pass']);
+		const pass = [...reactions!.querySelectorAll<HTMLButtonElement>('.reaction-btn')].find(
+			(b) => b.textContent?.trim() === 'Pass'
+		);
+		expect(pass?.disabled).toBe(true);
+	});
+
+	it('never removes Pass from the DOM across the open→close reaction transition', async () => {
+		gameStub({ advance: advanceAsk(), react: reactResult({ hexed: false }) });
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		// Window open: the live prompt carries an enabled Pass.
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
+		const promptPass = screen
+			.getByTestId('reaction-prompt')
+			.element()
+			.querySelector<HTMLButtonElement>('button.btn--secondary');
+		expect(promptPass?.textContent?.trim()).toBe('Pass');
+		expect(promptPass?.disabled).toBe(false);
+		await screen.getByRole('button', { name: 'Pass' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('You hold your hand. Let him have his answer.');
+		// Window closed: the prompt is gone, but a Pass button still exists (the disabled placeholder).
+		expect(screen.container.querySelector('[data-testid="reaction-prompt"]')).toBeNull();
+		const stillThere = [
+			...screen.container.querySelectorAll<HTMLButtonElement>('.reaction-btn')
+		].find((b) => b.textContent?.trim() === 'Pass');
+		expect(stillThere, 'Pass must not vanish when the window closes').toBeTruthy();
+		expect(stillThere?.disabled).toBe(true);
+	});
+
 	it('shares the answer when the human Scries Sköll Ask', async () => {
 		gameStub({
 			advance: advanceAsk(),

@@ -1030,9 +1030,21 @@
 					>
 						Hex
 					</button>
+					<!-- Pass holds its slot here too: without it the button vanished from the DOM every time
+					     the reaction window closed, so it read as "Pass disappears" while Scry/Hex stayed put. -->
+					<button
+						class="btn btn--secondary reaction-btn"
+						type="button"
+						title="When your rival asks, let the question stand."
+						aria-describedby="pass-hint"
+						disabled
+					>
+						Pass
+					</button>
 					<!-- title alone is unreliable for AT and disabled buttons aren't focusable; expose the
 					     same guidance to assistive tech through described-by text. -->
 					<span id="scry-hint" class="sr-only">When your rival asks, hear the answer too.</span>
+					<span id="pass-hint" class="sr-only">When your rival asks, let the question stand.</span>
 					<span id="hex-hint" class="sr-only"
 						>When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted.</span
 					>
@@ -1289,7 +1301,11 @@
 		font-weight: 400;
 		letter-spacing: 0.04em;
 		color: var(--gold-bright);
-		text-shadow: 0 0 18px rgba(217, 169, 74, 0.3);
+		/* Grounded then gilded: a tight dark offset keeps the wordmark legible over the moon art,
+		   a close gold glow reads as carved metal — the single diffuse 18px blur muddied both. */
+		text-shadow:
+			0 1px 1px rgba(6, 9, 18, 0.85),
+			0 0 8px rgba(217, 169, 74, 0.45);
 	}
 
 	/* The wordmark doubles as the home affordance — back to the intro splash. Inherits the h1 look so it
@@ -1412,7 +1428,8 @@
 		gap: 1.5rem;
 		flex: 1;
 		min-height: 0;
-		margin-top: 0.4rem;
+		/* No margin-top: main's flex `gap` already owns the header→layout rhythm. The extra margin
+		   stacked on top of the gap, so this seam ran wider than every other section break. */
 	}
 
 	.board-section {
