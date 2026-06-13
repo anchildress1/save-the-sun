@@ -101,7 +101,7 @@ export function simulateFloor(games: number, startSeed = 1): SimMetrics {
 		meanTurns: turns.length ? sum / turns.length : 0,
 		medianTurns: turns.length ? turns[Math.floor(turns.length / 2)] : 0,
 		minTurns: turns.length ? turns[0] : 0,
-		maxTurns: turns.length ? turns[turns.length - 1] : 0,
+		maxTurns: turns.length ? (turns.at(-1) as number) : 0,
 		distribution: [...counts.entries()]
 			.sort((a, b) => a[0] - b[0])
 			.map(([t, count]) => ({ turns: t, count }))
