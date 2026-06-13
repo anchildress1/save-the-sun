@@ -74,3 +74,31 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          # Block until the Compute Engine finishes so the issue count below is final, not stale.
+          args: -Dsonar.qualitygate.wait=true
+
+      - name: Enforce zero Sonar issues
+        # The default quality gate tolerates low-severity issues; we don't. Fail CI on ANY
+        # unresolved issue of ANY severity. Runs after the scan's qualitygate.wait, so the
+        # analysis is fully computed and the issue count is authoritative.
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            scope="pullRequest=${PR_NUMBER}"
+          else
+            scope="branch=main"
+          fi
+          api="https://sonarcloud.io/api/issues/search?componentKeys=anchildress1_save-the-sun&${scope}&resolved=false"
+          result=$(curl -sfSL -u "${SONAR_TOKEN}:" "${api}&ps=100")
+          count=$(echo "$result" | jq -r '.total')
+          echo "Unresolved Sonar issues for ${scope}: ${count}"
+          if [ "${count}" != "0" ]; then
+            echo "$result" | jq -r '.issues[] | "::error::[\(.severity)] \(.component | sub("^[^:]+:";"")):\(.textRange.startLine // 0) \(.rule) — \(.message)"'
+            echo "::error::SonarCloud reports ${count} unresolved issue(s); CI fails on any severity."
+            exit 1
+          fi
