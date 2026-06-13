@@ -277,8 +277,9 @@
 	/* Hearing: corona flares with the player's voice; rim runes ignite. */
 	.medallion[data-voice-state='hearing'] .corona {
 		opacity: calc(0.34 + var(--flare) * 0.56);
-		/* Flare scale capped to the pulse ceiling so a loud voice can't push the glow past the frame. */
-		transform: scale(calc(1 + var(--flare) * 0.03));
+		/* Full mic-amplitude flare — the player must see the medallion react to their voice. The
+		   oracle-speaking glow is contained by its own pulse cap; the mic flare must not be clamped. */
+		transform: scale(calc(1 + var(--flare) * 0.07));
 		transition:
 			opacity 0.12s linear,
 			transform 0.12s linear;
