@@ -57,11 +57,14 @@ const MAX_MOVES = 100;
  *   to a fresh engine on the same seed.
  * @param state Sköll-state override, for tests that need to pre-collapse the live set; defaults to a
  *   fresh seeded state (the production path).
+ * @param decide move decider; defaults to the floor-only rejector. The live runner passes the real
+ *   `decideSkollMove` to play a live Gemini game through this exact loop.
  */
 export async function playFloorGame(
 	seed: number,
 	engine: GameEngine = new GameEngine(seed),
-	state: SkollState = freshSkollState(seed)
+	state: SkollState = freshSkollState(seed),
+	decide: SkollDecide = FLOOR_ONLY
 ): Promise<SimResult> {
 	const secret = selectSecret(seed);
 	let turns = 0;
@@ -70,7 +73,9 @@ export async function playFloorGame(
 		// The human seat takes no action in self-play — hand the turn straight to Sköll.
 		if (engine.activePlayer === 'Human') engine.passTurn();
 
-		const out = await takeSkollTurn(engine, state, FLOOR_ONLY, state.rng);
+		// Default decider is FLOOR_ONLY (the CI-measurable floor); the live runner passes the real
+		// Gemini brain (decideSkollMove) to drive a live game through this same production loop.
+		const out = await takeSkollTurn(engine, state, decide, state.rng);
 		turns += 1;
 
 		if (out.kind === 'cast') {
