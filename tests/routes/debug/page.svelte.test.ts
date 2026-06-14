@@ -78,7 +78,7 @@ describe('/debug view', () => {
 			message: 'Sköll asks…',
 			data: { source: 'gemini' }
 		};
-		const { container } = renderWith([verdict, secret, floor, oracle, skollLlm]);
+		const { container } = renderWith([verdict, floor, secret, oracle, skollLlm]);
 		const li = (c: string) => container.querySelector<HTMLElement>(`li.${c}`)!;
 		// Color = owner.
 		expect(li('engine')).toBeTruthy();
@@ -88,10 +88,10 @@ describe('/debug view', () => {
 		const kind = (el: HTMLElement) => el.querySelector('.kind-badge')!.classList;
 		expect(kind(li('oracle')).contains('llm')).toBe(true); // Oracle reads via Gemini → LLM
 		expect(kind(li('engine')).contains('deterministic')).toBe(true); // engine verdict
-		// Sköll: gemini-sourced → LLM; floor-sourced → deterministic. Newest-first → skollLlm before floor.
+		// Sköll: gemini-sourced → LLM; floor-sourced → deterministic. Oldest-first → floor before skollLlm.
 		const skolls = container.querySelectorAll<HTMLElement>('li.skoll');
-		expect(skolls[0].querySelector('.kind-badge')!.classList.contains('llm')).toBe(true);
-		expect(skolls[1].querySelector('.kind-badge')!.classList.contains('deterministic')).toBe(true);
+		expect(skolls[0].querySelector('.kind-badge')!.classList.contains('deterministic')).toBe(true);
+		expect(skolls[1].querySelector('.kind-badge')!.classList.contains('llm')).toBe(true);
 	});
 
 	it('shows a raw Gemini call as a Sköll card (his move), LLM-badged', () => {
@@ -122,7 +122,7 @@ describe('/debug view', () => {
 			message: 'raw Gemini move call',
 			data: { request: { contents: 'board…' }, response: { text: '{}' } }
 		};
-		const screen = renderWith([gemini, floor]);
+		const screen = renderWith([floor, gemini]);
 		const { container } = screen;
 		// The parsed turn info (head + message) stays visible; only the data payload hides.
 		expect(container.textContent).toContain('raw Gemini move call');
@@ -133,7 +133,7 @@ describe('/debug view', () => {
 		// Gemini entries use a specific summary; other data entries use the generic one.
 		expect(screen.getByText('full request / response')).toBeDefined();
 		expect(screen.getByText('details')).toBeDefined();
-		// Input [gemini(7), floor(2)] reversed → DOM order [floor, gemini] — gemini is allDetails[1].
+		// Input [floor(2), gemini(7)] oldest-first → DOM order [floor, gemini] — gemini is allDetails[1].
 		const geminiDetails = allDetails[1]!;
 		await screen.getByText('full request / response').click();
 		expect(geminiDetails.open).toBe(true);
@@ -150,11 +150,11 @@ describe('/debug view', () => {
 		expect(container.querySelector('pre')?.textContent).toContain('floor'); // the data block
 	});
 
-	it('renders newest first and shows the round secret in the open', async () => {
+	it('renders oldest first and shows the round secret in the open', async () => {
 		const { container } = renderWith([verdict, floor, secret]);
 		await expect.element(container.querySelector<HTMLElement>('li.engine')!).toBeInTheDocument();
 		const seqs = [...container.querySelectorAll('.seq')].map((n) => n.textContent);
-		expect(seqs).toEqual(['#3', '#2', '#1']);
+		expect(seqs).toEqual(['#1', '#2', '#3']);
 		expect(container.textContent).toContain('secret is Sowilo');
 	});
 

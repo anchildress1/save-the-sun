@@ -8,8 +8,8 @@
 	let events = $state<DebugEvent[]>(untrack(() => data.events));
 	const sessionId = untrack(() => data.sessionId);
 
-	// Newest first so the latest move is on top during the demo (no scrolling to follow along).
-	const ordered = $derived([...events].reverse());
+	// Chronological order — heard → tool call → result reads naturally top-to-bottom.
+	const ordered = $derived([...events]);
 
 	async function refresh() {
 		try {
@@ -49,7 +49,7 @@
 	{#if ordered.length === 0}
 		<p class="empty">No events yet. Play a turn and they appear here.</p>
 	{:else}
-		<ol reversed>
+		<ol>
 			{#each ordered as event (event.seq)}
 				<li class="ev {ownerClass(event)} {event.level}">
 					<div class="head">
