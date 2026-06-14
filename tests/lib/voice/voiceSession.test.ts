@@ -46,6 +46,7 @@ let speaker: {
 	close: ReturnType<typeof vi.fn>;
 	busy: boolean;
 	onDrained: ReturnType<typeof vi.fn>;
+	setMuted: ReturnType<typeof vi.fn>;
 	drain: (() => void) | undefined;
 };
 let callbacks: Callbacks | undefined;
@@ -94,6 +95,7 @@ beforeEach(() => {
 		onDrained: vi.fn((cb: () => void) => {
 			speaker.drain = cb;
 		}),
+		setMuted: vi.fn(),
 		drain: undefined
 	};
 	audio.createSpeaker.mockReturnValue(speaker);
@@ -1771,5 +1773,43 @@ describe('voiceSession direct (S7)', () => {
 			reason: 'socket',
 			notice: "The Oracle's voice falters. The rite continues by hand."
 		});
+	});
+});
+
+describe('voiceSession output mute (S11)', () => {
+	it('defaults to audible and exposes the muted flag', () => {
+		expect(vs.muted).toBe(false);
+	});
+
+	it('setMuted pushes straight to the live speaker', async () => {
+		await awaken();
+		vs.setMuted(true);
+		expect(vs.muted).toBe(true);
+		expect(speaker.setMuted).toHaveBeenLastCalledWith(true);
+		vs.setMuted(false);
+		expect(vs.muted).toBe(false);
+		expect(speaker.setMuted).toHaveBeenLastCalledWith(false);
+	});
+
+	it('opens the speaker muted when muted before the wake — a resume never starts audible', async () => {
+		vs.setMuted(true);
+		await awaken();
+		expect(audio.createSpeaker).toHaveBeenLastCalledWith(true);
+	});
+
+	it('keeps the mute preference across a sleep/wake cycle', async () => {
+		await awaken();
+		vs.setMuted(true);
+		vs.sleep();
+		expect(vs.muted).toBe(true);
+		await awaken();
+		// The preference survives teardown, so the new speaker opens muted on its own.
+		expect(audio.createSpeaker).toHaveBeenLastCalledWith(true);
+	});
+
+	it('setMuted is a safe no-op on the speaker while asleep', () => {
+		expect(() => vs.setMuted(true)).not.toThrow();
+		expect(vs.muted).toBe(true);
+		expect(speaker.setMuted).not.toHaveBeenCalled();
 	});
 });

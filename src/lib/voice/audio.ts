@@ -143,12 +143,21 @@ export interface Speaker {
 	readonly busy: boolean;
 	/** Called whenever playback runs dry naturally (not via stop). */
 	onDrained(callback: () => void): void;
+	/** Output mute (R11): silence playback without touching the queue. Audio still decodes and
+	 *  drains on schedule, so `busy`, the drain callback, and caption turn-timing are unchanged —
+	 *  only the sound is gated. */
+	setMuted(muted: boolean): void;
 	close(): void;
 }
 
-export function createSpeaker(): Speaker {
+export function createSpeaker(muted = false): Speaker {
 	const context = new AudioContext({ sampleRate: SPEAKER_SAMPLE_RATE });
 	void context.resume();
+	// A master gain between the sources and the output is the mute seam: gain 0 silences whatever
+	// is scheduled without dropping buffers, so unmuting mid-line resumes cleanly.
+	const master = context.createGain();
+	master.gain.value = muted ? 0 : 1;
+	master.connect(context.destination);
 	const active = new Set<AudioBufferSourceNode>();
 	let cursor = 0;
 	let drained: (() => void) | null = null;
@@ -177,7 +186,7 @@ export function createSpeaker(): Speaker {
 			for (let i = 0; i < pcm.length; i++) channel[i] = pcm[i] / 0x8000;
 			const node = context.createBufferSource();
 			node.buffer = buffer;
-			node.connect(context.destination);
+			node.connect(master);
 			node.onended = () => {
 				active.delete(node);
 				if (active.size === 0) drained?.();
@@ -193,6 +202,9 @@ export function createSpeaker(): Speaker {
 		},
 		onDrained(callback) {
 			drained = callback;
+		},
+		setMuted(next) {
+			master.gain.value = next ? 0 : 1;
 		},
 		close() {
 			stop();

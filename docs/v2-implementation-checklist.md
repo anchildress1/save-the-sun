@@ -89,14 +89,14 @@ Declare five functions on the Live session: `ask`, `hex`, `scry`, `pass`, `cast_
 
 - [x] Oracle output transcript renders in existing Answer panel as she speaks — fragments accumulate per turn into `answer` (so her last spoken line persists with the round view like any voiced line); turn boundaries ride the state events, and a barge-in starts a fresh caption — with no truncation signal, a cut caption may hold words never spoken, so it must never be extended
 - [x] Input transcript (what she heard) captured from the session's `in` transcript events — the UI line under the Answer frame was removed (it read as stray debug text); the transcript belongs in `/debug` instead, tracked in `ttd.md`
-- [ ] Verify with output muted once S11 lands — S10's text surfaces render from the session's `transcript` events, not speaker playback, but the mute control does not exist yet
+- [x] Verify with output muted once S11 lands — S10's text surfaces render from the session's `transcript` events, not speaker playback; S11 mutes via a master gain (audio still decodes and drains), so the caption stream is provably independent of audible output
 - Depends: S2
 
 ### S11 — Output mute (R11)
 
-- [ ] Single speaker toggle silences Oracle + Sköll audio; text/captions unaffected; mic streaming unaffected
-- [ ] State persists for the session
-- [ ] Keyboard nav wired in for oracle controls
+- [x] Single speaker toggle silences Oracle + Sköll audio; text/captions unaffected; mic streaming unaffected — the toggle drives a master gain in the Oracle `Speaker` (audio still decodes/drains, so caption turn-timing is byte-for-byte identical to unmuted); the shared preference (`outputMute.ts`) is the seam S13's wolf player reads the same way
+- [x] State persists for the session — `sessionStorage` (`save-the-sun:muted`), survives a reload, resets with the tab; distinct from the per-round view in `viewState.ts`
+- [x] Keyboard nav wired in for oracle controls — the medallion + mute toggle sit in one `role="group"` ("Oracle voice controls"); both are native buttons (Tab moves, Enter/Space fire), each with a focus-visible ring; the mute toggle is an `aria-pressed` toggle button
 - Depends: S2
 
 ## Phase 3 — The wolf 🐺

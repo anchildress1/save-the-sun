@@ -8,6 +8,7 @@
 	import type { MedallionState } from '$lib/components/medallionState';
 	import { voiceSession, type VoiceEvent, type VoiceToolCall } from '$lib/voice/voiceSession';
 	import { oracleBoardEcho } from '$lib/voice/oraclePersona';
+	import { readMuted, writeMuted } from '$lib/voice/outputMute';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
@@ -89,7 +90,11 @@
 		askHintCast: 'Name your rune or step back from the cast, then ask.',
 		askHintPending: 'The rite is moving. Hold, then ask.',
 		askHintWolf: 'Sköll is moving. Hold, then ask.',
-		askHintOver: 'The rite is over.'
+		askHintOver: 'The rite is over.',
+		// Output mute (S11): the toggle's accessible name carries the action plus the reassurance
+		// that nothing is lost — the words still arrive in the panel.
+		muteVoices: 'Silence the voices. Their words still appear in writing.',
+		unmuteVoices: 'Let the voices be heard.'
 	};
 
 	let castMode = $state(false);
@@ -239,6 +244,9 @@
 	let voiceNotice = $state('');
 	// Per round, persisted with the view (S6): the invitation speaks once per game, not per tap.
 	let voiceInvited = $state(false);
+	// Output mute (S11): silences the spoken voices; captions, mic, and the board are untouched.
+	// Seeded from sessionStorage on mount so the preference survives a reload within the session.
+	let muted = $state(false);
 
 	// S8: the armed confirmation for a gated tool call (scry, hex, cast_rune). `heard` flips when
 	// the player speaks after arming — the confirming call is refused without it, so the model can
@@ -331,6 +339,14 @@
 		if (invitation && voiceSession.state !== 'asleep' && voiceSession.state !== 'eclipsed') {
 			voiceInvited = true;
 		}
+	}
+
+	// S11: one toggle for both voices. The session applies it to live and future speakers; the
+	// preference persists for the session. Independent of wake/sleep — you can mute while listening.
+	function toggleMute() {
+		muted = !muted;
+		writeMuted(muted);
+		voiceSession.setMuted(muted);
 	}
 
 	// Return type is derived from the action's `type`, so a caller can't request a
@@ -428,6 +444,10 @@
 		if (voiceState === 'eclipsed' && voiceSession.notice) {
 			voiceNotice = voiceSession.notice;
 		}
+		// Adopt the session's persisted mute preference, then push it onto the singleton — a remount
+		// (or a wake before this mount) must not start audible if the player muted earlier.
+		muted = readMuted();
+		voiceSession.setMuted(muted);
 		return () => {
 			window.removeEventListener('resize', onReposition);
 			window.removeEventListener('scroll', onReposition, true);
@@ -972,7 +992,26 @@
 
 		<aside class="oracle-panel">
 			<div class="voice-stack">
-				<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
+				<!-- One labeled group for the Oracle's two controls: wake/sleep (medallion) and output
+				     mute. Both are native buttons, so Tab moves between them and Enter/Space fire. -->
+				<div class="voice-controls" role="group" aria-label="Oracle voice controls">
+					<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
+					<button
+						class="mute-toggle"
+						type="button"
+						data-testid="mute-toggle"
+						aria-pressed={muted}
+						aria-label={muted ? RITE.unmuteVoices : RITE.muteVoices}
+						onclick={toggleMute}
+					>
+						<svg viewBox="0 0 24 24" aria-hidden="true">
+							<path d="M4 9v6h4l5 4V5L8 9H4z" />
+							<path class="wave wave--near" d="M16 9a3.5 3.5 0 0 1 0 6" />
+							<path class="wave wave--far" d="M18.5 6.5a7 7 0 0 1 0 11" />
+							<line class="mute-strike" x1="3.5" y1="4" x2="20.5" y2="20" />
+						</svg>
+					</button>
+				</div>
 				<!-- Always mounted (a live region born with content is skipped by screen readers) and
 				     absolutely positioned: appearing must never reflow the panel under the player. -->
 				<p class="voice-notice" data-testid="voice-notice" role="status">{voiceNotice}</p>
@@ -1547,6 +1586,68 @@
 
 	.voice-stack {
 		position: relative;
+	}
+
+	/* The medallion stays centered; the mute toggle rides the top-right corner so adding it never
+	   shifts the disc. */
+	.voice-controls {
+		position: relative;
+	}
+
+	.mute-toggle {
+		position: absolute;
+		top: 0;
+		right: 0.25rem;
+		display: grid;
+		place-items: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		padding: 0;
+		border: 1px solid var(--gold-dim);
+		border-radius: 50%;
+		background: rgba(6, 9, 18, 0.7);
+		color: var(--gold-bright);
+		cursor: pointer;
+		transition:
+			color 0.2s ease,
+			border-color 0.2s ease;
+	}
+
+	.mute-toggle svg {
+		width: 1.25rem;
+		height: 1.25rem;
+		fill: currentColor;
+		stroke: currentColor;
+		stroke-width: 1.6;
+		stroke-linecap: round;
+	}
+
+	.mute-toggle .wave {
+		fill: none;
+	}
+
+	/* Pressed = muted: dim the control, hide the sound waves, and strike the speaker — a shape
+	   signal, never color alone. */
+	.mute-toggle[aria-pressed='true'] {
+		color: var(--ink-faint);
+		border-color: var(--ink-faint);
+	}
+
+	.mute-toggle .mute-strike {
+		display: none;
+	}
+
+	.mute-toggle[aria-pressed='true'] .wave {
+		display: none;
+	}
+
+	.mute-toggle[aria-pressed='true'] .mute-strike {
+		display: inline;
+	}
+
+	.mute-toggle:focus-visible {
+		outline: 2px solid var(--gold-bright);
+		outline-offset: 3px;
 	}
 
 	/* Overlay pill under the disc: legible at body size, opaque backdrop, zero layout impact. */

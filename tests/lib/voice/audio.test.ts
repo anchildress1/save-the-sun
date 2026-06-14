@@ -10,6 +10,11 @@ interface FakeSource {
 	onended: (() => void) | null;
 }
 
+interface FakeGain {
+	gain: { value: number };
+	connect: ReturnType<typeof vi.fn>;
+}
+
 class FakeAudioContext {
 	static instances: FakeAudioContext[] = [];
 	sampleRate: number;
@@ -20,10 +25,17 @@ class FakeAudioContext {
 	audioWorklet = { addModule: vi.fn(async () => {}) };
 	createMediaStreamSource = vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() }));
 	sources: FakeSource[] = [];
+	gains: FakeGain[] = [];
 
 	constructor(options: { sampleRate: number }) {
 		this.sampleRate = options.sampleRate;
 		FakeAudioContext.instances.push(this);
+	}
+
+	createGain(): FakeGain {
+		const gain: FakeGain = { gain: { value: 1 }, connect: vi.fn() };
+		this.gains.push(gain);
+		return gain;
 	}
 
 	createBuffer(_channels: number, length: number, rate: number) {
@@ -239,7 +251,35 @@ describe('createSpeaker', () => {
 		expect(first.start).toHaveBeenCalledExactlyOnceWith(1);
 		expect(second.start).toHaveBeenCalledExactlyOnceWith(1 + 2 / SPEAKER_SAMPLE_RATE);
 		expect([...first.buffer!.getChannelData(0)]).toEqual([0.5, -0.5]);
-		expect(first.connect).toHaveBeenCalledExactlyOnceWith(context.destination);
+		// Sources feed the master gain (the mute seam); the master alone reaches the output.
+		const master = context.gains[0];
+		expect(first.connect).toHaveBeenCalledExactlyOnceWith(master);
+		expect(master.connect).toHaveBeenCalledExactlyOnceWith(context.destination);
+	});
+
+	it('starts silent when created muted and restores full gain on unmute', () => {
+		const speaker = createSpeaker(true);
+		const master = FakeAudioContext.instances[0].gains[0];
+		expect(master.gain.value).toBe(0);
+		speaker.setMuted(false);
+		expect(master.gain.value).toBe(1);
+	});
+
+	it('setMuted(true) silences output but still schedules and drains the queue', () => {
+		const speaker = createSpeaker();
+		const context = FakeAudioContext.instances[0];
+		const master = context.gains[0];
+		const drained = vi.fn();
+		speaker.onDrained(drained);
+		speaker.setMuted(true);
+		expect(master.gain.value).toBe(0);
+		// Muting attenuates only — playback still schedules and drains, so caption turn-timing holds.
+		speaker.enqueue(pcmBase64(1));
+		const [source] = context.sources;
+		expect(source.start).toHaveBeenCalledTimes(1);
+		expect(speaker.busy).toBe(true);
+		source.onended!();
+		expect(drained).toHaveBeenCalledTimes(1);
 	});
 
 	it('reports busy until every scheduled chunk ends, then fires drained once', () => {

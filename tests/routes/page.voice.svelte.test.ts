@@ -14,10 +14,12 @@ const voiceMock = vi.hoisted(() => {
 		listeners,
 		state: 'asleep',
 		notice: null as string | null,
+		muted: false,
 		wake: vi.fn(async () => {}),
 		sleep: vi.fn(),
 		setToolExecutor: vi.fn(),
 		direct: vi.fn(),
+		setMuted: vi.fn(),
 		emit(event: unknown) {
 			for (const listener of listeners) listener(event);
 		}
@@ -30,11 +32,15 @@ vi.mock('$lib/voice/voiceSession', () => ({
 		sleep: voiceMock.sleep,
 		setToolExecutor: voiceMock.setToolExecutor,
 		direct: voiceMock.direct,
+		setMuted: voiceMock.setMuted,
 		get state() {
 			return voiceMock.state;
 		},
 		get notice() {
 			return voiceMock.notice;
+		},
+		get muted() {
+			return voiceMock.muted;
 		},
 		subscribe(listener: (event: unknown) => void) {
 			voiceMock.listeners.add(listener);
@@ -110,6 +116,8 @@ beforeEach(() => {
 	voiceMock.listeners.clear();
 	voiceMock.state = 'asleep';
 	voiceMock.notice = null;
+	voiceMock.muted = false;
+	sessionStorage.clear();
 	localStorage.setItem('save-the-sun:onboarded', '1');
 	vi.stubGlobal(
 		'fetch',
@@ -1669,5 +1677,61 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 		await executor()({ name: 'ask', args: { question: 'does it hold?' } });
 		emit({ type: 'asleep' });
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The night holds.');
+	});
+});
+
+describe('Save the Sun page — output mute (S11)', () => {
+	const MUTE_LABEL = 'Silence the voices. Their words still appear in writing.';
+	const UNMUTE_LABEL = 'Let the voices be heard.';
+
+	it('opens unmuted and pushes the stored preference onto the session on mount', async () => {
+		const screen = render(Page, pageProps);
+		const toggle = screen.getByTestId('mute-toggle');
+		await expect.element(toggle).toHaveAttribute('aria-pressed', 'false');
+		expect(toggle.element().getAttribute('aria-label')).toBe(MUTE_LABEL);
+		// The mount adopts the persisted preference (default false) and pushes it to the singleton.
+		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(false);
+	});
+
+	it('groups the voice controls for keyboard nav', async () => {
+		const screen = render(Page, pageProps);
+		const group = screen.container.querySelector('.voice-controls')!;
+		expect(group.getAttribute('role')).toBe('group');
+		expect(group.getAttribute('aria-label')).toBe('Oracle voice controls');
+		// Both controls are real buttons inside the group — Tab reaches each, Enter/Space fire.
+		expect(group.querySelector('[data-testid="eclipse-medallion"]')!.tagName).toBe('BUTTON');
+		expect(group.querySelector('[data-testid="mute-toggle"]')!.tagName).toBe('BUTTON');
+	});
+
+	it('toggles mute on click, flips the label, and drives the session', async () => {
+		const screen = render(Page, pageProps);
+		const toggle = screen.getByTestId('mute-toggle');
+		await toggle.click();
+		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
+		await expect.element(toggle).toHaveAttribute('aria-pressed', 'true');
+		expect(toggle.element().getAttribute('aria-label')).toBe(UNMUTE_LABEL);
+		await toggle.click();
+		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(false);
+		await expect.element(toggle).toHaveAttribute('aria-pressed', 'false');
+	});
+
+	it('persists the mute preference for the session', async () => {
+		const first = render(Page, pageProps);
+		await first.getByTestId('mute-toggle').click();
+		expect(sessionStorage.getItem('save-the-sun:muted')).toBe('true');
+		first.unmount();
+		// A remount within the session resumes muted — the toggle reads pressed and the session
+		// is told to stay silent.
+		const second = render(Page, pageProps);
+		await expect.element(second.getByTestId('mute-toggle')).toHaveAttribute('aria-pressed', 'true');
+		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
+	});
+
+	it('mutes independently of wake — the control works while the session sleeps', async () => {
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('mute-toggle').click();
+		// Muting is not a wake: the session was never woken, only told to silence output.
+		expect(voiceMock.wake).not.toHaveBeenCalled();
+		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
 	});
 });

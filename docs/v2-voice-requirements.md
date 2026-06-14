@@ -134,7 +134,7 @@ Voice is an enhancement layer, never the sole carrier of game information.
 - [ ] Sköll's clips display captions—his script is prebaked, so caption text ships with the clips.
 
 **R11 — Output mute.**
-- [ ] One speaker toggle silences both characters' audio; captions and text continue. Mic behavior is unaffected.
+- [x] One speaker toggle silences both characters' audio; captions and text continue. Mic behavior is unaffected. (S11: a master gain on the Oracle `Speaker` attenuates to silence without dropping the queue, so captions, mic streaming, and the state machine are untouched. The preference persists for the session in `sessionStorage` and is the shared seam S13's wolf player consults.)
 
 ### Nice-to-Have (P1) ✨
 

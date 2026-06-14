@@ -77,8 +77,12 @@ export interface VoiceSession {
 	 * second queued turn would talk over the one in flight, and the panel already carries the
 	 * line. A throwing send means the socket is dead — fails the session. */
 	direct(text: string): void;
+	/** Output mute (R11): silence the Oracle's audio while captions, mic, and the state machine
+	 * carry on. Persists across wake/sleep; a speaker opened while muted starts silent. */
+	setMuted(muted: boolean): void;
 	readonly state: VoiceState;
 	readonly notice: string | null;
+	readonly muted: boolean;
 	subscribe(listener: VoiceListener): () => void;
 }
 
@@ -113,6 +117,8 @@ export function createVoiceSession(): VoiceSession {
 	let session: Session | null = null;
 	let mic: MicCapture | null = null;
 	let speaker: Speaker | null = null;
+	// Survives wake/sleep so a muted player stays muted across every resume this session.
+	let muted = false;
 	let lastAmplitude = 0;
 	let awaitingDrain = false;
 	let hearingQuietTimer: ReturnType<typeof setTimeout> | null = null;
@@ -518,7 +524,7 @@ export function createVoiceSession(): VoiceSession {
 
 	function openSpeaker(): boolean {
 		try {
-			speaker = createSpeaker();
+			speaker = createSpeaker(muted);
 			speaker.onDrained(onDrained);
 			return true;
 		} catch (err) {
@@ -703,11 +709,18 @@ export function createVoiceSession(): VoiceSession {
 			toolExecutor = executor;
 		},
 		direct,
+		setMuted(next: boolean) {
+			muted = next;
+			speaker?.setMuted(next);
+		},
 		get state() {
 			return state;
 		},
 		get notice() {
 			return notice;
+		},
+		get muted() {
+			return muted;
 		},
 		subscribe(listener: VoiceListener) {
 			listeners.add(listener);
