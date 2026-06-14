@@ -868,6 +868,38 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		});
 	});
 
+	it('suppresses TTS while the Live Oracle is speaking, but voices it when the mic is idle', async () => {
+		const ok = {
+			type: 'Ask',
+			oracle: {
+				ok: true,
+				query: { axis: 'element', value: 'Sun' },
+				answer: askAnswer,
+				affirmative: true,
+				turnConsumed: true
+			},
+			state: HUMAN_TURN
+		};
+
+		// Live mid-utterance: a TTS line would play over her Live audio, so it is suppressed.
+		mockAction(ok);
+		voiceMock.state = 'speaking';
+		const speaking = render(Page, pageProps);
+		await speaking.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
+		await speaking.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect.element(speaking.getByTestId('answer')).toHaveTextContent(askAnswer);
+		expect(deliveryMock.deliver).not.toHaveBeenCalled();
+		speaking.unmount();
+
+		// Mic merely idle (listening): the typed answer is hers to voice.
+		mockAction(ok);
+		voiceMock.state = 'listening';
+		const idle = render(Page, pageProps);
+		await idle.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
+		await idle.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await vi.waitFor(() => expect(deliveryMock.deliver).toHaveBeenCalledOnce());
+	});
+
 	it('a voiced ask is never delivered via TTS — the Live model already speaks it', async () => {
 		mockAction({
 			type: 'Ask',

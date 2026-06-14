@@ -8,6 +8,9 @@ import type { LineDescriptor } from '$lib/server/voice/lines';
 
 let speaker: Speaker | null = null;
 let muted = false;
+// Bumped by stop/disable so an in-flight deliver() that is still fetching drops its remaining chunks
+// instead of playing a stale line over a fresh round (or a torn-down page).
+let generation = 0;
 
 /**
  * Init/resume the delivery speaker. MUST run inside a user gesture — browsers block an
@@ -34,13 +37,16 @@ export function setDeliveryMuted(next: boolean): void {
 
 /** Close the speaker and drop it; a later {@link enableDelivery} reopens one. */
 export function disableDelivery(): void {
+	generation++; // invalidate any in-flight deliver() so its late chunks never reach a new speaker
 	speaker?.close();
 	speaker = null;
 }
 
-/** Drop whatever is queued or playing without closing the speaker — a new round abandons the
- *  previous round's unfinished line so it can't bleed over the fresh one. */
+/** Drop whatever is queued or playing, and invalidate any in-flight fetch, without closing the
+ *  speaker — a new round abandons the previous round's unfinished line so it can't bleed over the
+ *  fresh one even if its TTS response is still arriving. */
 export function stopDelivery(): void {
+	generation++;
 	speaker?.stop();
 }
 
@@ -53,11 +59,16 @@ export function stopDelivery(): void {
 export async function deliver(descriptor: LineDescriptor): Promise<void> {
 	const active = speaker;
 	if (!active) return;
+	// Snapshot the generation: a stop/disable during the await drops the rest of this stream so a
+	// stale line never plays over a fresh round or a torn-down page.
+	const gen = generation;
+	const abort = new AbortController();
 	try {
 		const res = await fetch('/api/voice/tts', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(descriptor)
+			body: JSON.stringify(descriptor),
+			signal: abort.signal
 		});
 		if (!res.ok || !res.body) return;
 		const reader = res.body.getReader();
@@ -66,6 +77,11 @@ export async function deliver(descriptor: LineDescriptor): Promise<void> {
 		// NDJSON: one base64 PCM chunk per line. Enqueue each complete line as it streams in; the
 		// speaker schedules them back-to-back, so playback starts at the first chunk.
 		for (;;) {
+			// Invalidated mid-stream (stop/disable) or the speaker was swapped — abandon the rest.
+			if (gen !== generation || speaker !== active) {
+				abort.abort();
+				return;
+			}
 			const { done, value } = await reader.read();
 			if (done) break;
 			buffer += decoder.decode(value, { stream: true });
@@ -73,12 +89,15 @@ export async function deliver(descriptor: LineDescriptor): Promise<void> {
 			while ((nl = buffer.indexOf('\n')) >= 0) {
 				const chunk = buffer.slice(0, nl);
 				buffer = buffer.slice(nl + 1);
-				// Guard against a disable/re-enable mid-stream — never enqueue onto a closed speaker.
-				if (chunk && speaker === active) active.enqueue(chunk);
+				if (gen !== generation || speaker !== active) {
+					abort.abort();
+					return;
+				}
+				if (chunk) active.enqueue(chunk);
 			}
 		}
 	} catch {
-		/* network failure — the panel already carries the line; stay silent */
+		/* network failure or abort — the panel already carries the line; stay silent */
 	}
 }
 

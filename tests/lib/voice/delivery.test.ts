@@ -68,7 +68,8 @@ describe('delivery seam', () => {
 		expect(fetch).toHaveBeenCalledWith('/api/voice/tts', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(LINE)
+			body: JSON.stringify(LINE),
+			signal: expect.any(AbortSignal)
 		});
 		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['pcm-a', 'pcm-b', 'pcm-c']);
 	});
@@ -117,6 +118,36 @@ describe('delivery seam', () => {
 
 		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['first']);
 		expect(audio.speaker.close).toHaveBeenCalledTimes(1);
+	});
+
+	it('stopDelivery invalidates an in-flight fetch so late chunks never play', async () => {
+		let releaseSecond: () => void = () => {};
+		const body = new ReadableStream<Uint8Array>({
+			async start(controller) {
+				const enc = new TextEncoder();
+				controller.enqueue(enc.encode('first\n'));
+				await new Promise<void>((resolve) => {
+					releaseSecond = resolve;
+				});
+				controller.enqueue(enc.encode('second\n'));
+				controller.close();
+			}
+		});
+		vi.mocked(fetch).mockResolvedValueOnce(new Response(body));
+		enableDelivery();
+
+		const inflight = deliver(LINE);
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first'));
+		// A new round stops delivery while this fetch is still streaming.
+		stopDelivery();
+		releaseSecond();
+		await inflight;
+
+		// The stale chunk is dropped, but the speaker stays open (stop, not close).
+		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['first']);
+		expect(audio.speaker.stop).toHaveBeenCalled();
+		expect(audio.speaker.close).not.toHaveBeenCalled();
+		expect(deliveryReady()).toBe(true);
 	});
 
 	it('whenDrained resolves immediately when nothing is playing', async () => {
