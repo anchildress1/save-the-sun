@@ -279,7 +279,9 @@
 				// player already answered the confirmation and no matching tool call landed, it
 				// was a decline or drift — do not leave the destructive gate armed.
 				if (voiceConfirm?.spoke && voiceConfirm.heard) voiceConfirm = null;
+				captionOpen = false; // Oracle's turn is done; next turn must start fresh, not append.
 				voiceState = event.type;
+				if (roundOver) voiceSession.sleep();
 				break;
 			case 'thinking':
 				// SDK gives no ordering guarantee for outputTranscription vs turnComplete; trailing
