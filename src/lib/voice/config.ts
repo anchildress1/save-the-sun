@@ -6,6 +6,10 @@ export const LIVE_MODEL = 'gemini-3.1-flash-live-preview';
 // No Kore fallback needed.
 export const ORACLE_VOICE = 'Gacrux'; // Aoede, Callirrhoe, Gacrux
 
+// Server-side TTS delivery (voice-as-delivery, P1): the Oracle's lines are synthesized key-side
+// here instead of streamed from a Live session. Returns PCM16 mono @ SPEAKER_SAMPLE_RATE.
+export const TTS_MODEL = 'gemini-3.1-flash-tts-preview';
+
 // Live API audio contract: PCM16 mono, 16kHz up, 24kHz down. Not tunable.
 export const MIC_SAMPLE_RATE = 16_000;
 export const SPEAKER_SAMPLE_RATE = 24_000;
