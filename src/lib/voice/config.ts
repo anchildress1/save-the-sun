@@ -4,7 +4,7 @@ export const LIVE_MODEL = 'gemini-3.1-flash-live-preview';
 
 // Confirmed available on LIVE_MODEL by a real connect — re-verify if the model changes.
 // No Kore fallback needed.
-export const ORACLE_VOICE = 'Gacux'; // Aoede, Callirrhoe, Gacrux
+export const ORACLE_VOICE = 'Gacrux'; // Aoede, Callirrhoe, Gacrux
 
 // Live API audio contract: PCM16 mono, 16kHz up, 24kHz down. Not tunable.
 export const MIC_SAMPLE_RATE = 16_000;
