@@ -281,6 +281,9 @@
 				if (voiceConfirm?.spoke && voiceConfirm.heard) voiceConfirm = null;
 				captionOpen = false;
 				voiceState = event.type;
+				// Sleep when it's not the human's input moment: round over, or Sköll's advance
+				// phase (his ask window is the one exception — human still needs to react).
+				if (roundOver || (activePlayer === 'Sköll' && !skollAsking)) voiceSession.sleep();
 				break;
 			case 'thinking':
 				voiceState = event.type;
