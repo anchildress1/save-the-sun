@@ -17,3 +17,6 @@
 - [ ] Sort debug view in reverse chronological order
 - [ ] Undo the 'don't think' Skoll logic
 - [ ] Oracle spoken flair — dynamic/dramatized TTS lines; drop the preset allow-list for a server-authored-line gate (so she can surprise without the endpoint becoming free arbitrary-text TTS)
+- [ ] Sköll taunt bucket + idle bucket (P2 deferred) — the taunt bucket needs a spoken input (returns with the mic, P5); idle is a client timer, not an engine event. Both kept in `skollScript.ts`, unwired and unsynthesized. Wire + generate when their trigger exists.
+- [ ] Sköll dynamic spoken lines — his Ask (names a sign) and winning cast (names `{Rune}`) stay text on his frame; voicing them later needs per-sign/per-rune prebuilds or a narrow TTS exception (a future call, not a P2 blocker).
+- [ ] Defeat-exit choreography — his concession clip ("Keep your dawn, witch.") queues behind her victory line on the shared speaker (so it never speaks over her), but the end-screen splash timing vs. his caption is loose; tighten if it reads early.

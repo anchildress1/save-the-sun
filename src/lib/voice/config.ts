@@ -6,6 +6,10 @@ export const LIVE_MODEL = 'gemini-3.1-flash-live-preview';
 // No Kore fallback needed.
 export const ORACLE_VOICE = 'Gacrux'; // Aoede, Callirrhoe, Gacrux
 
+// Sköll's voice (R8). His clips are prebuilt at build time (scripts/skoll-voice.mjs), never
+// synthesized at runtime — swapping this means regenerating the library, not a live config flip.
+export const SKOLL_VOICE = 'Algieba'; // smooth — swappable, regenerate the clip library to change
+
 // Server-side TTS delivery (voice-as-delivery, P1): the Oracle's lines are synthesized key-side
 // here instead of streamed from a Live session. Returns PCM16 mono @ SPEAKER_SAMPLE_RATE.
 export const TTS_MODEL = 'gemini-3.1-flash-tts-preview';

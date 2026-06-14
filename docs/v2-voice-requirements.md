@@ -119,23 +119,23 @@ A medallion at the top of the Oracle panel is both the voice toggle and the stat
 - [x] The 5-second clock starts only after the Oracle (or Sköll) finishes speaking—their speech never counts as the player's silence.
 - [x] Tapping the medallion resumes listening.
 
-**R8 — Sköll clip library.**
-A build-time script generates Sköll's audio with Gemini TTS (voice `Algieba`, director's-notes style prompt) from a script file grouped by trigger bucket (working set drafted in `ux-copy.md` §2). One to three variants per trigger.
+**R8 — Sköll clip library.** *(landed under migration P2.)*
+A build-time script generates Sköll's audio with Gemini TTS (voice `Algieba`, director's-notes style prompt) from `src/lib/voice/skollScript.ts` grouped by trigger bucket. One to three variants per trigger.
 
-- [ ] Clips ship as static assets; runtime playback only, zero per-game generation calls.
-- [ ] Given the player taunts the wolf (detected from the Oracle session's input transcripts by a small director module), then a clip from the taunt bucket plays with no perceptible delay.
-- [ ] Regenerating the library is one script run after editing his script file.
+- [x] Clips ship as static assets (`static/audio/skoll/*.pcm.b64`); runtime playback only, zero per-game generation calls. Warmed into memory (`preloadClips`) when audio is enabled, so a trigger plays with no fetch latency (taunt-to-clip-start metric).
+- [~] Given the player taunts the wolf (detected from input transcripts), then a clip from the taunt bucket plays — **deferred to P5**: the taunt needs a spoken input, and P1–P4 have no mic. The bucket stays in the script, unwired. P2 wires the **engine-event** triggers (first turn, hunt milestones, wrong cast, Hexed Ask, player win).
+- [x] Regenerating the library is one script run (`node scripts/skoll-voice.mjs --force` / `make voice-clips`) after editing his script file. Retries the TTS model's 500s; a plain rerun fills any clip a 500 burst dropped.
 
-**R9 — Mic discipline during Sköll playback.**
-- [ ] Given a Sköll clip is playing, then mic audio streaming to the Oracle session is paused, and the Oracle does not respond to his lines.
-- [ ] One speaker at a time: the director module never plays Sköll over the Oracle; he waits for her line to finish.
+**R9 — Mic discipline during Sköll playback.** *(landed under migration P2.)*
+- [x] Given a Sköll clip is playing, then mic audio streaming to the Oracle session is paused — while Live still coexists (before P4), an awake session sleeps before his clip; with no mic (board-only play) there is nothing to pause.
+- [x] One speaker at a time: the director never plays Sköll over the Oracle — structural, his clip rides the **same** speaker queue as her lines, so it serializes after hers and can never overlap.
 
 **R10 — Everything spoken is also written.**
 Voice is an enhancement layer, never the sole carrier of game information.
 
 - [x] The Oracle's spoken answers render as text in the existing Answer panel (the Live session emits output transcripts for free).
 - [x] What the Oracle *heard* (input transcript) is teed to the `/debug` stream, not the rite UI — the answer panel carries the spoken result, and the S8 confirm gate guards a mishear before any destructive action commits.
-- [ ] Sköll's clips display captions—his script is prebaked, so caption text ships with the clips.
+- [x] Sköll's clips display captions—his caption rides his own frame (`skoll-caption`), the verbatim line from `skollScript.ts`, shown with or without audio (P2).
 
 **R11 — Output mute.**
 - [x] One speaker toggle silences both characters' audio; captions and text continue. Mic behavior is unaffected. (S11: a master gain on the Oracle `Speaker` attenuates to silence without dropping the queue, so captions, mic streaming, and the state machine are untouched. The preference persists for the session in `sessionStorage` and is the shared seam S13's wolf player consults.)

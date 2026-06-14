@@ -13,8 +13,11 @@
 		disableDelivery,
 		stopDelivery,
 		deliver,
+		deliverClip,
+		preloadClips,
 		whenDrained
 	} from '$lib/voice/delivery';
+	import { createSkollDirector, allSkollClipUrls, type SkollClip } from '$lib/voice/skollDirector';
 	import type { LineDescriptor } from '$lib/server/voice/lines';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
@@ -297,6 +300,30 @@
 	// outside a user gesture). The captions/panel render regardless; this only governs sound.
 	let audioOn = $state(false);
 
+	// Sköll's voice (P2, R8): engine events pick a prebuilt taunt clip. The director owns no-repeat
+	// and milestone memory; the page owns playback, his caption, and R9 isolation. His caption rides
+	// his own frame, never the Oracle's panel (R10 — everything spoken is also written).
+	const skollDirector = createSkollDirector();
+	let skollCaption = $state('');
+
+	// Voice one Sköll clip. Caption always (R10); audio only when the speaker is open. The clip rides
+	// the SAME shared speaker as the Oracle, so it serializes after any line of hers — he never speaks
+	// over her (R9). While Live still coexists (P2 ships before P4), a live mic would hear him, so an
+	// awake session sleeps first (R9 mic isolation; silence-idle is a full sleep, S5). The medallion
+	// shows skoll-speaking through playback, then settles back to asleep.
+	const SKOLL_CLIP_CAP_MS = 6000;
+	async function playSkollClip(clip: SkollClip | null) {
+		if (clip === null) return;
+		skollCaption = clip.caption;
+		if (!audioOn) return; // text-only: the caption stands, no medallion churn, no mic change
+		if (voiceState !== 'asleep' && voiceState !== 'eclipsed') voiceSession.sleep();
+		voiceState = 'skoll-speaking';
+		await deliverClip(clip.url);
+		await whenDrained(SKOLL_CLIP_CAP_MS);
+		// Only settle if nothing else seized the medallion meanwhile (a fresh wake, a new clip).
+		if (voiceState === 'skoll-speaking') voiceState = 'asleep';
+	}
+
 	// S8: the armed confirmation for a gated tool call (scry, hex, cast_rune). `heard` flips when
 	// the player speaks after arming — the confirming call is refused without it, so the model can
 	// never execute both phases in one breath. `spoke` flips on the Oracle's first turn since
@@ -405,6 +432,9 @@
 				return;
 			}
 			audioOn = true;
+			// Warm Sköll's clip library now (the opt-in gesture) so his first taunt plays with no
+			// fetch latency (R8). Background + best-effort — a miss falls back to a live fetch.
+			void preloadClips(allSkollClipUrls());
 		} else {
 			audioOn = false;
 			disableDelivery();
@@ -458,6 +488,10 @@
 			const { skoll, state } = (await res.json()) as AdvanceResponse;
 			applyState(state);
 			applySkoll(skoll);
+			// His turn earns a taunt (P2): the first opens the night, later ones mark a hunt milestone
+			// (the director returns null on a turn that earns no new line). Only on a real Ask — a Sköll
+			// win is his text cast ({Rune}), which stays on his frame, not a spoken clip.
+			if (skoll?.asks) void playSkollClip(skollDirector.turn(turns));
 			// A Sköll win deliberately leaves the Oracle's last voiced line in place (the answer, and
 			// his Scry note when he overheard it) — that line is the WHY of the loss, and the end
 			// screen already owns the "Sköll takes the sun" text. Never double it into the panel.
@@ -685,6 +719,8 @@
 			if (skollReaction?.hexed) {
 				line = RITE.hexHim;
 				heldHex = false;
+				// His question silenced — the wolf answers the Hex (P2). His clip rides his own frame.
+				void playSkollClip(skollDirector.hexed());
 			} else if (skollReaction?.scried) {
 				// §3: the Scry framing leads, then the answer he was owed — now yours too.
 				line = `${RITE.scryHim} ${skollReaction.scried.answer}`;
@@ -764,6 +800,8 @@
 			askValue = '';
 			skollEcho = '';
 			skollAsking = false;
+			skollCaption = '';
+			skollDirector.reset(); // forget the night's first-turn, milestone, and no-repeat memory
 			heldScry = true;
 			heldHex = true;
 			voiceInvited = false; // a new round re-arms the Oracle's wake invitation
@@ -797,6 +835,9 @@
 			let line: string;
 			if (cast.ok) {
 				line = cast.won ? RITE.runeTrue : RITE.wrongCast(runeName);
+				// P2: the wolf gloats at a wrong cast; at a true cast he concedes his one exit line,
+				// queued behind her victory line on the shared speaker so it never speaks over her.
+				void playSkollClip(cast.won ? skollDirector.playerWin() : skollDirector.wrongCast());
 			} else {
 				console.warn('[ui] Cast rejected by engine:', cast.reason);
 				line = RITE.castFalters;
@@ -1166,6 +1207,11 @@
 			<div class="skoll-frame" data-testid="skoll-frame" role="status">
 				{#if skollEcho}
 					<p class="skoll-echo" data-testid="skoll-echo">{skollEcho}</p>
+				{/if}
+				{#if skollCaption}
+					<!-- R10: his spoken taunt, also written. Rides his own frame, never the Oracle's panel;
+					     a taunt follows his Ask, never replaces it (ux-copy §2). -->
+					<p class="skoll-caption" data-testid="skoll-caption">{skollCaption}</p>
 				{/if}
 			</div>
 
@@ -1855,6 +1901,20 @@
 		font-size: 1rem;
 		line-height: 1.45;
 		color: var(--ink);
+	}
+
+	/* His taunt caption — under the Ask, in his steel, set apart from the inference the player reacts to. */
+	.skoll-caption {
+		margin: 0.45rem 0 0;
+		font-family: var(--font-story-body);
+		font-size: 0.9rem;
+		font-style: italic;
+		line-height: 1.4;
+		color: var(--steel);
+	}
+
+	.skoll-caption:first-child {
+		margin-top: 0;
 	}
 
 	.reactions {

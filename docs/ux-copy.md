@@ -2,7 +2,7 @@
 
 Every player-facing string, plus the voice rules that govern them. Diegetic (in-world) voice only—the dev.to submission post is a separate, judge-facing register and is out of scope here. Mechanics in `game-spec.md`, rune data in `rune-board.md`.
 
-Production notes: the Oracle's answers may be templated (engine fills `{trait}`/`{value}`). Sköll's only player-facing **text** line is his templated Ask—taunts and cast lines were cut from the v1 board (see §2), but return as the spoken taunt library (§2, draft pending approval). No emoji anywhere; no exclamation in any diegetic line except the single allowlisted one in Sköll's winning-cast bucket.
+Production notes: the Oracle's answers may be templated (engine fills `{trait}`/`{value}`). Sköll's only player-facing **text** line is his templated Ask—taunts and cast lines were cut from the v1 board (see §2), but return as the spoken taunt library (§2; source of truth `src/lib/voice/skollScript.ts`). No emoji anywhere; no exclamation in any diegetic line except the single allowlisted one in Sköll's winning-cast bucket.
 
 ---
 
@@ -174,12 +174,13 @@ Power is spoken as a word (1–6), not the Oracle's digit grammar—the register
 
 _Cut from the v1 UI (flavor, not inference): the idle/turn taunts, the escalation tier (was P2), and the public cast lines ("I name it. {Rune}." / "The hunt ends. {Rune}.")._ The cut applies to his on-board **text** surface only—the spoken taunt library below revives these for the voice layer.
 
-### Sköll script—spoken taunt library (draft, pending approval)
+### Sköll script—spoken taunt library
+
+> Lines tightened 2026-06-14 to his winning-cast cadence: two short beats, ~3–7 words. A taunt that takes a breath to say costs a breath to synthesize and wears the pacing thin — short keeps the menace, the spend, and the latency all low. The machine-readable source of truth is `src/lib/voice/skollScript.ts`; this table is the human copy of it.
 
 Open items:
 
-- **Sköll script** (Ashley): trigger buckets and line variants below are the working draft—they need approval before the prebaked TTS library can be generated. **Blocking for R8.**
-- **Taunt detection rules** (engineering): keyword list vs. lightweight intent check on transcripts for routing player trash-talk to the wolf. Ambiguous utterances default to the Oracle's Ask path—mis-routing a real question to a taunt is the worse failure. Resolve during implementation.
+- **Taunt detection rules** (engineering): keyword list vs. lightweight intent check on transcripts for routing player trash-talk to the wolf. Ambiguous utterances default to the Oracle's Ask path—mis-routing a real question to a taunt is the worse failure. Deferred with the taunt bucket to P5 (needs a spoken input; see `architecture.md`).
 
 Library rules:
 
@@ -187,66 +188,67 @@ Library rules:
 - One line per trigger, drawn from the bucket; **no line repeats within a night.**
 - Voice holds to the charter: predatory, sardonic, cold—he taunts the play, never the player. "Witch" is his only address. The library's single exclamation lives in the winning-cast bucket and nowhere else.
 - Reaction resolutions stay in the rite's third-person voice (§3); a taunt may follow a resolution, never replace it.
+- **P2 generates the engine-event buckets only** (marked below). The idle, taunt, and winning-cast buckets are deferred — idle is a client timer, the taunt needs a spoken input (P5), and the winning cast names a `{Rune}` (dynamic, stays text on his frame per `architecture.md`).
 
-**The night opens (his first turn)**
+**The night opens (his first turn)** — _generated (P2)_
 
-- "Run the night out if you like, witch. It ends in my jaws."
-- "I have chased her since the world was young. You have had one supper."
-- "Ask your questions. The sun already knows how this ends."
+- "The night ends in my jaws."
+- "I have hunted her for ages."
+- "The sun knows how this ends."
 
-**The witch hesitates (idle on your turn)**
+**The hunt, far (his field still wide)** — _generated (P2)_
 
-- "You hesitate. I do not."
-- "Count them again, slower. I have all night."
-- "The fire burns down while you stare, witch."
+- "The scent is thin. It thickens."
+- "A wide field. I have run wider."
+- "Every answer trims the dark."
 
-**The hunt, far (his field still wide)**
+**The hunt, closing** — _generated (P2)_
 
-- "The scent is thin yet. It thickens."
-- "A wide field. I have worn down wider."
-- "Every answer trims the dark — mine as much as yours."
-
-**The hunt, closing**
-
-- "Fewer places for her to hide."
+- "Fewer places left to hide."
 - "The trail warms underfoot."
-- "I can taste which one it is. Almost."
+- "I taste which one. Almost."
 
-**The hunt, near (one or two left)**
+**The hunt, near (one or two left)** — _generated (P2)_
 
-- "Two left, witch. I only need the one."
-- "Close enough now to hear her burn."
-- "One more answer and the dawn is mine."
+- "Two left. I need one."
+- "Close enough to hear her burn."
+- "One answer, and dawn is mine."
 
-**The witch casts wrong**
+**The witch casts wrong** — _generated (P2)_
 
-- "All that careful crossing, and you cast that."
 - "Wrong rune. The night thanks you."
-- "Spend your turns freely. I spend mine on the hunt."
+- "All that crossing, for that."
+- "Spend your turns. I hunt."
 
-**His Ask is Hexed**
+**His Ask is Hexed** — _generated (P2)_
 
-- "Silence the Oracle if it comforts you. My nose still works."
-- "Clever. It will not save you twice."
+- "Silence her. My nose works."
+- "Clever. It saves you once."
 - "Kill the question. The trail remains."
 
-**The witch taunts him (routed by detection)**
+**The witch wins (defeat exit — one line, rare)** — _generated (P2)_
+
+- "Keep your dawn, witch. Another year comes."
+
+_The defeat line plays in the Rite transcript only, after Sól's victory sequence resolves — never over her beats. Her rarity stays the power; his exit is an aside, not a scene._
+
+**The witch hesitates (idle on your turn)** — _deferred (client timer, not an engine event)_
+
+- "You hesitate. I do not."
+- "Count them again, slower."
+- "The fire burns while you stare."
+
+**The witch taunts him (routed by detection)** — _deferred to P5 (needs a spoken input)_
 
 - "Bold words from prey."
-- "Save your breath for asking. You will want it at dawn."
-- "Louder ones have stood at that fire. The sun set on them all."
+- "Save your breath for dawn."
+- "Louder ones have burned."
 
-**His winning cast**
+**His winning cast** — _stays text on his frame (names a `{Rune}`, dynamic)_
 
 - "I name it. {Rune}."
 - "The hunt ends. {Rune}."
 - "{Rune}! And the dawn dies with it." _(the library's one exclamation)_
-
-**The witch wins (defeat exit — one line, rare)**
-
-- "Keep your dawn, witch. There is always another year."
-
-_The defeat line plays in the Rite transcript only, after Sól's victory sequence resolves — never over her beats. Her rarity stays the power; his exit is an aside, not a scene._
 
 ## 3. Reactions—Scry & Hex
 
