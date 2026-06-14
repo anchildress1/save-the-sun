@@ -343,20 +343,17 @@
 		}
 	}
 
-	// One toggle for both voices (P1). Turning audio on opens the delivery speaker from this tap —
+	// Sound on/off for both voices (P1). Turning it on opens the delivery speaker from this tap —
 	// the gesture browsers require — and unsilences the Live speaker too; turning it off silences
-	// both without dropping any queue (R11: captions keep rendering). The first audio-on of a round
-	// delivers the Oracle's greeting as her first spoken line. Independent of the mic (medallion).
+	// both without dropping any queue (R11: captions keep rendering). Purely a sound switch: it
+	// speaks nothing on its own (no wake greeting — that was a Live-session artifact). Independent
+	// of the mic (medallion).
 	function toggleAudio() {
 		audioOn = !audioOn;
 		if (audioOn) enableDelivery(); // must run inside the tap — opens the AudioContext
 		writeMuted(!audioOn);
 		setDeliveryMuted(!audioOn);
 		voiceSession.setMuted(!audioOn);
-		if (audioOn && !voiceInvited) {
-			deliver({ kind: 'greeting' });
-			voiceInvited = true;
-		}
 	}
 
 	// Build the descriptor for the Oracle's own spoken line (answer or refusal) so the delivery
@@ -708,11 +705,6 @@
 			voiceInvited = false; // a new round re-arms the Oracle's wake invitation
 			// Also cancels an in-flight wake, so a slow first wake can't mark the fresh round invited.
 			voiceSession.sleep();
-			// Audio already on: the fresh round greets straight away (her first delivered line).
-			if (audioOn) {
-				deliver({ kind: 'greeting' });
-				voiceInvited = true;
-			}
 			applyState(state);
 			cancelCast();
 			return true;

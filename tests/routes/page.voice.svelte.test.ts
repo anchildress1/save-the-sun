@@ -1729,7 +1729,7 @@ describe('Save the Sun page — audio toggle (voice-as-delivery P1)', () => {
 		expect(group.querySelector('[data-testid="mute-toggle"]')!.tagName).toBe('BUTTON');
 	});
 
-	it('turning audio on opens the speaker, unsilences both sinks, and greets', async () => {
+	it('turning audio on opens the speaker and unsilences both sinks', async () => {
 		const screen = render(Page, pageProps);
 		const toggle = screen.getByTestId('mute-toggle');
 		await toggle.click();
@@ -1739,8 +1739,6 @@ describe('Save the Sun page — audio toggle (voice-as-delivery P1)', () => {
 		expect(deliveryMock.setDeliveryMuted).toHaveBeenLastCalledWith(false);
 		await expect.element(toggle).toHaveAttribute('aria-pressed', 'false');
 		expect(toggle.element().getAttribute('aria-label')).toBe(MUTE_LABEL);
-		// Her first delivered line of the round is the greeting.
-		expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'greeting' });
 
 		await toggle.click();
 		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
@@ -1748,14 +1746,14 @@ describe('Save the Sun page — audio toggle (voice-as-delivery P1)', () => {
 		await expect.element(toggle).toHaveAttribute('aria-pressed', 'true');
 	});
 
-	it('greets only once per round — a second audio-on does not re-greet', async () => {
+	it('is a pure sound switch — speaks nothing on its own (no wake greeting)', async () => {
 		const screen = render(Page, pageProps);
 		const toggle = screen.getByTestId('mute-toggle');
-		await toggle.click(); // on → greet
+		await toggle.click(); // on
 		await toggle.click(); // off
-		await toggle.click(); // on again → no second greeting
-		const greetings = deliveryMock.deliver.mock.calls.filter(([d]) => d.kind === 'greeting');
-		expect(greetings).toHaveLength(1);
+		await toggle.click(); // on again
+		// Toggling sound never delivers a line; the Oracle speaks only her actual answers/refusals.
+		expect(deliveryMock.deliver).not.toHaveBeenCalled();
 	});
 
 	it('writes the mute preference for the shared seam, but always opens off (gesture-gated)', async () => {
