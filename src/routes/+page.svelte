@@ -1652,11 +1652,12 @@
 		width: 2.25rem;
 		height: 2.25rem;
 		padding: 0;
-		border: 1px solid var(--gold-dim);
+		border: 1px solid var(--gold-bright);
 		border-radius: 50%;
-		/* Color matches the info button (.ai-note-btn): muted at rest, gold on hover. */
-		background: rgba(6, 9, 18, 0.45);
-		color: var(--ink-muted);
+		/* The state is the signal, not hover: ON is gold and gently lit; OFF dims, hollows, and
+		   strikes the speaker below. Click toggles between the two. */
+		background: rgba(217, 169, 74, 0.12);
+		color: var(--gold-bright);
 		cursor: pointer;
 		transition:
 			color 0.2s ease,
@@ -1664,11 +1665,17 @@
 			background 0.2s ease;
 	}
 
-	.mute-toggle:hover,
-	.mute-toggle:focus-visible {
-		color: var(--gold-bright);
+	/* OFF (muted): hollow it out and dim the icon — paired with the strike below, so the state
+	   reads by shape and color both. */
+	.mute-toggle[aria-pressed='true'] {
+		border-color: var(--gold-dim);
+		background: rgba(6, 9, 18, 0.5);
+		color: var(--ink-faint);
+	}
+
+	/* Hover is a quiet affordance only — it never carries the on/off meaning. */
+	.mute-toggle:hover {
 		border-color: var(--gold-bright);
-		background: rgba(217, 169, 74, 0.08);
 	}
 
 	.mute-toggle svg {
@@ -1684,8 +1691,7 @@
 		fill: none;
 	}
 
-	/* Pressed = muted: hide the sound waves and strike the speaker — a shape signal, never color
-	   alone, so the resting color stays matched to the info button in both states. */
+	/* Muted: hide the sound waves and strike the speaker — the shape half of the on/off signal. */
 	.mute-toggle .mute-strike {
 		display: none;
 	}
