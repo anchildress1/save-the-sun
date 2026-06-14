@@ -44,9 +44,10 @@ export type VoiceEvent =
 	| { type: 'asleep' }
 	| { type: 'eclipsed' }
 	| { type: 'error'; reason: VoiceErrorReason; notice: string }
-	// Text arrives as incremental fragments; turn boundaries ride the state events. When `thinking`
-	// fires (the player's next turn starting), one `final` out fragment carries the whole assembled
-	// line — that is the true SDK boundary where all trailing outputTranscription chunks have landed.
+	// Text arrives as incremental fragments; turn boundaries ride the state events. One `final` out
+	// fragment fires when `thinking` is entered from the player's input phase (hearing → silence, or
+	// direct()) — that is the true boundary where trailing outputTranscription chunks have settled.
+	// onToolCall also enters `thinking` mid-Oracle-turn (from `speaking`); no `final` fires there.
 	| { type: 'transcript'; direction: 'in' | 'out'; text: string; final?: boolean };
 
 export type VoiceListener = (event: VoiceEvent) => void;
@@ -165,7 +166,8 @@ export function createVoiceSession(): VoiceSession {
 
 	// 'hearing' re-emits every chunk so the medallion corona can track live amplitude.
 	function toState(next: VoiceState): void {
-		const changed = state !== next;
+		const prev = state;
+		const changed = prev !== next;
 		state = next;
 		// R7 clock runs only on the player's turn; hearing arms-if-unset so RMS never resets
 		// it, while a barge-in cutting straight from speaking still gets a fresh clock.
@@ -174,10 +176,11 @@ export function createVoiceSession(): VoiceSession {
 			if (!silenceTimer) restartSilenceClock();
 		} else clearSilenceClock();
 		if (!changed && next !== 'hearing') return;
-		// At the start of the next player turn all trailing Oracle chunks have settled (SDK gives
-		// no ordering guarantee between outputTranscription and turnComplete, so the `final` must
-		// wait for this true boundary, not fire at turnComplete where transcriptOut may be partial).
-		if (next === 'thinking') {
+		// `final` fires only at the true player→Oracle boundary: silence timer from `hearing`
+		// or a direct() call from `listening`. onToolCall also calls toState('thinking') from
+		// `speaking` mid-Oracle-turn — that is not the boundary where all chunks have settled,
+		// so transcriptOut must keep accumulating until the player's silence fires.
+		if (next === 'thinking' && (prev === 'hearing' || prev === 'listening')) {
 			if (transcriptOut)
 				emit({ type: 'transcript', direction: 'out', text: transcriptOut, final: true });
 			flushTranscriptOut();
