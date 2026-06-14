@@ -231,12 +231,6 @@
 	// Per round, persisted with the view (S6): the invitation speaks once per game, not per tap.
 	let voiceInvited = $state(false);
 
-	// S10: fragments carry no turn marker (boundaries ride state events), and `voiceCaption`
-	// stays apart from `answer` so a fragment never extends a board-made line. The input transcript
-	// is debug-only — it is teed to /debug, never shown in the rite UI.
-	let voiceCaption = '';
-	let captionOpen = false;
-
 	// S8: the armed confirmation for a gated tool call (scry, hex, cast_rune). `heard` flips when
 	// the player speaks after arming — the confirming call is refused without it, so the model can
 	// never execute both phases in one breath. `spoke` flips on the Oracle's first turn since
@@ -252,8 +246,6 @@
 	function onVoiceEvent(event: VoiceEvent) {
 		switch (event.type) {
 			case 'hearing':
-				// Barge-in cut her line; the next fragment must start fresh, never extend it.
-				captionOpen = false;
 				voiceState = 'hearing';
 				voiceAmplitude = event.amplitude;
 				break;
@@ -265,7 +257,6 @@
 				voiceAmplitude = 0;
 				// Silence timeout, sleep tap, or the seal: the exchange is over, nothing executes (R4).
 				voiceConfirm = null;
-				captionOpen = false;
 				break;
 			case 'waking':
 				voiceState = 'waking';
@@ -279,15 +270,10 @@
 				// player already answered the confirmation and no matching tool call landed, it
 				// was a decline or drift — do not leave the destructive gate armed.
 				if (voiceConfirm?.spoke && voiceConfirm.heard) voiceConfirm = null;
-				captionOpen = false; // Oracle's turn is done; next turn must start fresh, not append.
 				voiceState = event.type;
 				if (roundOver) voiceSession.sleep();
 				break;
 			case 'thinking':
-				// SDK gives no ordering guarantee for outputTranscription vs turnComplete; trailing
-				// chunks can arrive after listening. Reset only here — the player's turn starting
-				// is the true boundary where all Oracle chunks have settled.
-				captionOpen = false;
 				voiceState = event.type;
 				break;
 			case 'speaking':
@@ -307,25 +293,14 @@
 				voiceState = 'asleep';
 				voiceAmplitude = 0;
 				voiceConfirm = null;
-				captionOpen = false;
 				break;
 			case 'transcript':
 				if (event.direction === 'in') {
 					// The player spoke since arming — the gate may accept the confirming call (S8).
 					// The input transcript itself is debug-only; it is not surfaced in the rite UI.
 					if (voiceConfirm) voiceConfirm.heard = true;
-				} else if (event.final) {
-					// Complete assembled line from voiceSession, fired at thinking (the true SDK turn
-					// boundary). All trailing outputTranscription chunks have settled by this point, so
-					// this carries the full text — captionOpen stays true so the next Oracle turn can
-					// still start fresh via a non-final that hits captionOpen=false after thinking.
-					voiceCaption = event.text;
-					answer = event.text;
-				} else {
-					voiceCaption = captionOpen ? voiceCaption + event.text : event.text;
-					captionOpen = true;
-					answer = voiceCaption;
 				}
+				// out-transcript is audio-only; answer is set by the tool executor (engine truth)
 				break;
 			default:
 				event satisfies never; // a new S10/S13 event type must be handled, not dropped

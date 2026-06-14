@@ -1557,45 +1557,7 @@ describe('Save the Sun page — cast lockout (S9)', () => {
 describe('Save the Sun page — transcripts to text (S10)', () => {
 	const VIEW_KEY = 'save-the-sun:view';
 
-	// All driven by transcript events, never the speaker — the R10 muted guarantee.
-
-	it('renders her speech in the Answer panel as the fragments arrive', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'thinking' });
-		emit({ type: 'transcript', direction: 'out', text: 'The fire holds' });
-		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The fire holds');
-		emit({ type: 'transcript', direction: 'out', text: ' your answer.' });
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('The fire holds your answer.');
-	});
-
-	it('a settled turn closes the caption — the next turn replaces, never appends', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'out', text: 'First answer.' });
-		emit({ type: 'speaking' });
-		emit({ type: 'listening' });
-		emit({ type: 'thinking' });
-		emit({ type: 'transcript', direction: 'out', text: 'Second answer.' });
-		await expect.element(screen.getByTestId('answer')).toHaveTextContent('Second answer.');
-		expect(screen.getByTestId('answer').element().textContent).not.toContain('First');
-	});
-
-	it('a barge-in starts a fresh caption — her cut line never bleeds into the next', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'speaking' });
-		emit({ type: 'transcript', direction: 'out', text: 'You ask after the fire-runes' });
-		emit({ type: 'hearing', amplitude: 0.2 });
-		emit({ type: 'thinking' });
-		emit({ type: 'transcript', direction: 'out', text: 'No. Sól is not reaching for gold.' });
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('No. Sól is not reaching for gold.');
-		expect(screen.getByTestId('answer').element().textContent).not.toContain('fire-runes');
-	});
-
-	it('her caption overwrites a board-made line — never appends to it', async () => {
-		// A voiced ask paints the engine line first (S7); her spoken rendition then owns the panel.
+	it('out-transcript is audio-only — never updates the answer panel', async () => {
 		mockAction({
 			type: 'Ask',
 			oracle: { ok: true, answer: 'Yes. Sól is reaching for a fire rune.', turnConsumed: true },
@@ -1607,65 +1569,10 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('Yes. Sól is reaching for a fire rune.');
 		emit({ type: 'transcript', direction: 'out', text: 'Yes — Sól reaches for fire.' });
+		// voice transcript must not overwrite the engine answer
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('Yes — Sól reaches for fire.');
-		expect(screen.getByTestId('answer').element().textContent).not.toContain(
-			'reaching for a fire rune'
-		);
-	});
-
-	it('a mid-turn board line never absorbs the next fragment — the caption reclaims the panel', async () => {
-		// A tool call paints the engine line into `answer` between two of her fragments; the
-		// caption buffer is what keeps the second fragment off the engine line's tail.
-		mockAction({
-			type: 'Ask',
-			oracle: { ok: true, answer: 'Yes. Sól is reaching for a fire rune.', turnConsumed: true },
-			state: HUMAN_TURN
-		});
-		const screen = render(Page, pageProps);
-		emit({ type: 'thinking' });
-		emit({ type: 'transcript', direction: 'out', text: 'You ask after fire.' });
-		await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
-		emit({ type: 'transcript', direction: 'out', text: ' It is so.' });
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('You ask after fire. It is so.');
-		expect(screen.getByTestId('answer').element().textContent).not.toContain('reaching');
-	});
-
-	it('fragments straddling the speaking event stay one caption', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'thinking' });
-		emit({ type: 'transcript', direction: 'out', text: 'The fire holds' });
-		emit({ type: 'speaking' });
-		emit({ type: 'transcript', direction: 'out', text: ' your answer.' });
-		await expect
-			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('The fire holds your answer.');
-	});
-
-	it('the final flush restores the whole line when a mid-stream settle truncated the fragments', async () => {
-		// The streamed fragments stop short and the turn settles to listening (caption closed)
-		// before the tail lands — the page copy is now truncated. The final fragment carries the
-		// whole assembled line and flushes the complete text back into the panel.
-		const screen = render(Page, pageProps);
-		emit({ type: 'thinking' });
-		emit({ type: 'transcript', direction: 'out', text: 'I wake' });
-		emit({ type: 'speaking' });
-		emit({ type: 'listening' }); // turn settles before the tail fragment arrives
-		await expect.element(screen.getByTestId('answer')).toHaveTextContent('I wake');
-		emit({ type: 'transcript', direction: 'out', text: 'I wake with the fire.', final: true });
-		await expect.element(screen.getByTestId('answer')).toHaveTextContent('I wake with the fire.');
-	});
-
-	it('a final fragment closes the caption — the next turn replaces, never appends to it', async () => {
-		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'out', text: 'First answer.', final: true });
-		emit({ type: 'thinking' });
-		emit({ type: 'transcript', direction: 'out', text: 'Second answer.' });
-		await expect.element(screen.getByTestId('answer')).toHaveTextContent('Second answer.');
-		expect(screen.getByTestId('answer').element().textContent).not.toContain('First');
+			.toHaveTextContent('Yes. Sól is reaching for a fire rune.');
 	});
 
 	it('input speech through a confirmation exchange opens the S8 gate (debug-only transcript, no UI line)', async () => {
@@ -1690,17 +1597,27 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 		expect(outcome).toBe("You close the Oracle's lips; his turn dies with the question.");
 	});
 
-	it('the caption persists with the round view — a reload resumes her last spoken line', async () => {
+	it('engine answer persists with the round view — a reload resumes it', async () => {
+		mockAction({
+			type: 'Ask',
+			oracle: { ok: true, answer: 'The night holds.', turnConsumed: true },
+			state: HUMAN_TURN
+		});
 		render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'out', text: 'The night holds.' });
+		await executor()({ name: 'ask', args: { question: 'does it hold?' } });
 		await vi.waitFor(() => {
 			expect(JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}').answer).toBe('The night holds.');
 		});
 	});
 
-	it('the Oracle caption survives the session sleeping', async () => {
+	it('engine answer survives the session sleeping', async () => {
+		mockAction({
+			type: 'Ask',
+			oracle: { ok: true, answer: 'The night holds.', turnConsumed: true },
+			state: HUMAN_TURN
+		});
 		const screen = render(Page, pageProps);
-		emit({ type: 'transcript', direction: 'out', text: 'The night holds.' });
+		await executor()({ name: 'ask', args: { question: 'does it hold?' } });
 		emit({ type: 'asleep' });
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The night holds.');
 	});
