@@ -1684,20 +1684,22 @@
 		inline-size: 1.3rem;
 		block-size: 1.3rem;
 		border-radius: 50%;
-		/* OFF: a dim slate disc with a light, struck speaker. ON: aged gold with a dark glyph. */
-		background: var(--ink-faint);
-		color: var(--ink);
+		/* An outlined ring, never a filled disc: a thin gold-dim hoop with the speaker glyph inside.
+		   OFF dims and strikes it; ON lights the ring and glyph to aged gold. */
+		background: transparent;
+		border: 1px solid var(--gold-dim);
+		color: var(--ink-muted);
 		transform: translateY(-50%);
 		transition:
 			inset-inline-start 0.2s ease,
-			background 0.2s ease,
+			border-color 0.2s ease,
 			color 0.2s ease;
 	}
 
 	.voice-switch[aria-checked='true'] .voice-switch__thumb {
 		inset-inline-start: calc(100% - 1.3rem - 0.16rem);
-		background: var(--gold);
-		color: rgba(6, 9, 18, 0.9);
+		border-color: var(--gold);
+		color: var(--gold);
 	}
 
 	.voice-switch__thumb svg {
