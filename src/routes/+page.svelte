@@ -1654,12 +1654,21 @@
 		padding: 0;
 		border: 1px solid var(--gold-dim);
 		border-radius: 50%;
-		background: rgba(6, 9, 18, 0.7);
-		color: var(--gold-bright);
+		/* Color matches the info button (.ai-note-btn): muted at rest, gold on hover. */
+		background: rgba(6, 9, 18, 0.45);
+		color: var(--ink-muted);
 		cursor: pointer;
 		transition:
 			color 0.2s ease,
-			border-color 0.2s ease;
+			border-color 0.2s ease,
+			background 0.2s ease;
+	}
+
+	.mute-toggle:hover,
+	.mute-toggle:focus-visible {
+		color: var(--gold-bright);
+		border-color: var(--gold-bright);
+		background: rgba(217, 169, 74, 0.08);
 	}
 
 	.mute-toggle svg {
@@ -1675,13 +1684,8 @@
 		fill: none;
 	}
 
-	/* Pressed = muted: dim the control, hide the sound waves, and strike the speaker — a shape
-	   signal, never color alone. */
-	.mute-toggle[aria-pressed='true'] {
-		color: var(--ink-faint);
-		border-color: var(--ink-faint);
-	}
-
+	/* Pressed = muted: hide the sound waves and strike the speaker — a shape signal, never color
+	   alone, so the resting color stays matched to the info button in both states. */
 	.mute-toggle .mute-strike {
 		display: none;
 	}
