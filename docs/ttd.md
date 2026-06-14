@@ -1,5 +1,7 @@
 # Things to Do
 
+- [ ] Voice rearchitecture — Live monolith → layered TTS delivery (Live demoted to an opt-in mic adapter). Plan + phases P1–P5 in [`architecture.md`](architecture.md#migration-plan--live-monolith--layered-delivery).
+
 - [x] Fix bug that page order refreshes on reload, even though game state remains _(S8.5: crossings + the voiced Oracle line persist across a reload, keyed by rune id; the board order itself now also holds — `boardSeed` is minted per round and stable across refreshes)_
 - [x] Optimize image download and caching on the server to load faster
 - [x] Ensure DEV is allowed for embed to CloudRun

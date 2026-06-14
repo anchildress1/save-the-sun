@@ -2,6 +2,8 @@
 
 > Implementation units for AI agents. Source of truth: `v2-voice-requirements.md`. Refs = requirement IDs there.
 > Config constants: Oracle voice `Gacrux` (verified on Live 2026-06-11 — `Kore` fallback not needed), Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, silence timeout 5000ms.
+>
+> ⚠️ **Delivery model superseded.** Stories S1–S11 shipped a Live-first design now being rearchitected — see [`architecture.md` → Target architecture + Migration plan](./architecture.md#target-architecture--voice-as-delivery-planned). Audio becomes mic-independent server-side TTS delivery; Live is demoted to an opt-in mic adapter. These stories are kept as the shipped record; the forward path is the migration's P1–P5, not the Live story order below. (S12 Sköll-clip work below is **net-new**, not yet built, and is a prerequisite for retiring Live.)
 
 ---
 

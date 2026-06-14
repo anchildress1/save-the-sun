@@ -6,6 +6,8 @@
 
 ## Voice medallion level strip (S3 / R6)
 
+> The asset itself is unchanged, but what drives it shifts under the [voice rearchitecture](./architecture.md#target-architecture--voice-as-delivery-planned): the medallion becomes an audio-state display (P3), and mic-flare on `hearing` returns only with the opt-in mic (P5).
+
 | | |
 |---|---|
 | File | `src/lib/assets-webp/ui/voice-medallion-levels.webp` |

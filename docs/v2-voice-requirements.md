@@ -2,6 +2,8 @@
 
 > Save the Sun — talk to the Oracle, hear the wolf answer.
 > Status: Draft v1 · 2026-06-10
+>
+> ⚠️ **Delivery model superseded.** The Live-first design here shipped (S1–S11) but is being rearchitected — see [`architecture.md` → Target architecture: voice as delivery](./architecture.md#target-architecture--voice-as-delivery-planned) and its migration plan. Live is demoted to an optional, opt-in mic adapter; audio moves to mic-independent server-side TTS delivery shared by the Oracle and Sköll. **R1** (Live session) and **R2** (Live-token endpoint) are superseded; **Goal 2** (real-time barge-in) and **R4/R5/R7** (spoken confirmation, cast lockout, silence timeout) defer to the opt-in mic; the delivery-agnostic ones still hold (R3 parity, R10 everything-written, R11 output mute). The architecture doc's **requirement-fate table** maps every item.
 
 ---
 
@@ -26,6 +28,8 @@ The game's core loop—Ask, Hex, Scry, Pass, Cast—runs entirely on buttons and
 - **Multilingual support.** English only for v1.
 
 ## Decisions Locked 🔒
+
+> ⚠️ Superseded by the [voice rearchitecture](./architecture.md#target-architecture--voice-as-delivery-planned): **Oracle voice channel** (Live API → server-side interpret + TTS delivery), **Mic activation** (the medallion becomes the audio toggle; the mic is optional and deferred to the opt-in Live adapter), **Auth** (the Live-token endpoint gives way to a server TTS endpoint), and **Voiced answers** (no awake session — audio is a delivery channel). The Sköll-clip channel, output mute, captions, and turn-parity rows stand.
 
 | Decision | Choice |
 |---|---|

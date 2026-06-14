@@ -332,6 +332,8 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 
 ### Eclipse medallion (voice control)
 
+> ⚠️ Control semantics are being rearchitected — see [`architecture.md` → voice as delivery](./architecture.md#target-architecture--voice-as-delivery-planned). The medallion's wake/sleep + mic-gating below is the shipped Live behavior; under the migration it becomes the audio on/off toggle and the mic is optional. **The labels and announcements in this table are reworked as part of P3** — "Wake the Oracle," "The Oracle listens," "Silence the voice," and the mic-denied/eclipsed states describe mic behavior P3–P4 won't have. The Oracle's *spoken-line* copy elsewhere (her answers, guards, confirmations) stands unchanged.
+
 The medallion is a labeled button: its accessible name carries the state plus what a tap does. The announcement column is the polite live-region line for transitions a player must never miss—mic privacy and who holds the fire; hearing/thinking stay quiet (still "listening" to a listener). Visual states live in `v2-voice-requirements.md` R6.
 
 | State | Button label | Announced |
