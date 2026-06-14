@@ -26,8 +26,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	// synthesized — the gate is the line, not the request shape. Validated BEFORE any quota spend so a
 	// flood of malformed/unknown payloads can't exhaust the synth budget.
 	if (line === null) return badLine();
-	// The descriptor's kind picks the voice (Sköll's lines in his voice, the Oracle's in hers) and the
-	// synthesis prompt (Sköll's line wrapped in his director's-notes growl; the Oracle's spoken bare).
+	// The descriptor's kind picks the voice (Sköll's lines in his voice, the Oracle's in hers); the
+	// synthesis prompt wraps the line in that speaker's director's-notes (both voices, never bare).
 	const voice = voiceForLine(body);
 	const prompt = synthPrompt(body, line);
 

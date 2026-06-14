@@ -139,6 +139,23 @@ describe('composeLine', () => {
 		expect(composeLine({ kind: 'outcome', result: 'win' })).toBe(OUTCOME_LINES.win.coda);
 		expect(composeLine({ kind: 'outcome', result: 'lose' })).toBe(OUTCOME_LINES.lose.verse);
 	});
+
+	// Allow-list IDs are matched by own-property only — an inherited key (e.g. a prototype method
+	// name) must be rejected with null, never resolve to a function the route would synthesize.
+	it('rejects an inherited-property id for react and outcome', () => {
+		expect(
+			composeLine({ kind: 'react', line: 'toString' } as unknown as LineDescriptor)
+		).toBeNull();
+		expect(
+			composeLine({ kind: 'react', line: 'hasOwnProperty' } as unknown as LineDescriptor)
+		).toBeNull();
+		expect(
+			composeLine({ kind: 'outcome', result: 'toString' } as unknown as LineDescriptor)
+		).toBeNull();
+		expect(
+			composeLine({ kind: 'outcome', result: 'constructor' } as unknown as LineDescriptor)
+		).toBeNull();
+	});
 });
 
 describe('voiceForLine', () => {

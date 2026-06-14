@@ -156,6 +156,41 @@ describe('delivery seam', () => {
 		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['her-1', 'her-2', 'his-1', 'his-2']);
 	});
 
+	it('drops a line queued behind an in-flight one when a stop lands before its turn', async () => {
+		// The first line streams one chunk then pends; the second is queued behind it. A stop while
+		// the second waits its turn (generation captured at enqueue) must drop it — it can't fetch or
+		// play into the fresh round even though the speaker stays open.
+		let releaseFirst: () => void = () => {};
+		const firstBody = new ReadableStream<Uint8Array>({
+			async start(controller) {
+				const enc = new TextEncoder();
+				controller.enqueue(enc.encode('her-1\n'));
+				await new Promise<void>((resolve) => {
+					releaseFirst = resolve;
+				});
+				controller.enqueue(enc.encode('her-2\n'));
+				controller.close();
+			}
+		});
+		vi.mocked(fetch)
+			.mockResolvedValueOnce(new Response(firstBody))
+			.mockResolvedValueOnce(ndjsonResponse('his-1', 'his-2'));
+		enableDelivery();
+
+		const first = deliver(LINE);
+		const second = deliver(LINE);
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('her-1'));
+
+		stopDelivery(); // a new round bumps generation while the second line is still queued
+		releaseFirst();
+		await Promise.all([first, second]);
+
+		// The first's remaining chunk and the entire second line are dropped — only the pre-stop chunk
+		// played, and the queued line never fetched.
+		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['her-1']);
+		expect(fetch).toHaveBeenCalledTimes(1);
+	});
+
 	it('stopDelivery invalidates an in-flight fetch so late chunks never play', async () => {
 		let releaseSecond: () => void = () => {};
 		const body = new ReadableStream<Uint8Array>({

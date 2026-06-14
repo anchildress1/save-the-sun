@@ -154,9 +154,11 @@
 	// queued behind any cast line on the shared speaker. Once per round; reset by a new game.
 	let outcomeVoiced = false;
 	$effect(() => {
-		if (showEndScreen && !outcomeVoiced) {
+		// Flip the once-guard only when the line is actually delivered (audio on + Live idle) — so if
+		// audio is off when the splash lands, a later toggle-on can still voice the outcome.
+		if (showEndScreen && !outcomeVoiced && audioOn && liveIdle()) {
 			outcomeVoiced = true;
-			if (liveIdle()) void deliver({ kind: 'outcome', result: endOutcome });
+			void deliver({ kind: 'outcome', result: endOutcome });
 		}
 	});
 	let nightProgress = $derived(

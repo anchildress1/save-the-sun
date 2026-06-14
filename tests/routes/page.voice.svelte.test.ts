@@ -2058,6 +2058,15 @@ describe('Save the Sun page — outcome voiced (R10)', () => {
 		);
 	});
 
+	it('does not voice the outcome while audio is off (the once-guard stays armed)', async () => {
+		const WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 4 };
+		mockAction({ type: 'Cast', cast: { ok: true, won: true, turnConsumed: true }, state: WON });
+		const screen = render(Page, pageProps); // audio off — no mute-toggle click
+		await startBoardCast(screen);
+
+		expect(deliveryMock.deliver).not.toHaveBeenCalledWith({ kind: 'outcome', result: 'win' });
+	});
+
 	it('voices the loss outcome (Sköll) when his Advance ends the round', async () => {
 		const SKOLL_WON: GameState = {
 			activePlayer: 'Sköll',

@@ -45,9 +45,46 @@ export type LineDescriptor =
 	// voice, the loss's verse in Sköll's, so the player hears who took the day.
 	| { kind: 'outcome'; result: Outcome };
 
-// Bound a power query to the real board (runes are 1-6), shared by the answer and scry composers.
-function powerInRange(query: ReturnType<typeof parseQuery>): boolean {
-	return !(query?.axis === 'power' && (query.value < MIN_POWER || query.value > MAX_POWER));
+// Parse a query and bound it to the real board (runes are 1-6); null on anything malformed or
+// out-of-range. Shared by the answer, Sköll-ask, and scry composers.
+function validBoardQuery(raw: unknown): ReturnType<typeof parseQuery> {
+	const query = parseQuery(raw);
+	if (query === null) return null;
+	if (query.axis === 'power' && (query.value < MIN_POWER || query.value > MAX_POWER)) return null;
+	return query;
+}
+
+function composeAnswer(raw: unknown, affirmative: unknown): string | null {
+	if (typeof affirmative !== 'boolean') return null;
+	const query = validBoardQuery(raw);
+	return query ? voiceAnswer(query, affirmative) : null;
+}
+
+function composeReact(line: ReactionLineId, raw: unknown, affirmative: unknown): string | null {
+	// own-property only: an inherited key (e.g. "toString") must not pass the allow-list.
+	if (!Object.hasOwn(REACTION_LINES, line)) return null;
+	const framing = REACTION_LINES[line];
+	if (!carriesAnswer(line)) return framing; // Hex/Pass are framing only
+	if (typeof affirmative !== 'boolean') return null;
+	const query = validBoardQuery(raw);
+	if (query === null) return null;
+	const ans = voiceAnswer(query, affirmative);
+	// human-scry frames then reveals; skoll-scry reveals then notes he overheard (ux-copy §3).
+	return line === 'human-scry' ? `${framing} ${ans}` : `${ans} ${framing}`;
+}
+
+function composeCast(result: 'true' | 'wrong' | 'falters', rune: unknown): string | null {
+	if (result === 'true') return CAST_TRUE;
+	if (result === 'falters') return CAST_FALTERS;
+	// wrong: name only a real board rune (the cast path already canonicalizes to one).
+	const match = runes.find((r) => r.name === rune);
+	return match ? wrongCastLine(match.name) : null;
+}
+
+function composeOutcome(result: Outcome): string | null {
+	// own-property only: an inherited key must not resolve to a prototype method.
+	if (!Object.hasOwn(OUTCOME_LINES, result)) return null;
+	return OUTCOME_LINES[result][VOICED_BEAT[result]];
 }
 
 /** Compose the exact server-owned line for a descriptor, or null when it is not allow-listed. */
@@ -57,45 +94,18 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 			return REFUSAL_CLASSES.has(descriptor.refusal as RefusalClass)
 				? refusalLine(descriptor.refusal as RefusalClass)
 				: null;
-		case 'answer': {
-			if (typeof descriptor.affirmative !== 'boolean') return null;
-			const query = parseQuery(descriptor.query);
-			if (query === null) return null;
-			if (query.axis === 'power' && (query.value < MIN_POWER || query.value > MAX_POWER))
-				return null;
-			return voiceAnswer(query, descriptor.affirmative);
-		}
+		case 'answer':
+			return composeAnswer(descriptor.query, descriptor.affirmative);
 		case 'skoll-ask': {
-			const query = parseQuery(descriptor.query);
-			if (query === null) return null;
-			if (query.axis === 'power' && (query.value < MIN_POWER || query.value > MAX_POWER))
-				return null;
-			return skollAskEcho(query);
+			const query = validBoardQuery(descriptor.query);
+			return query ? skollAskEcho(query) : null;
 		}
-		case 'react': {
-			const id = descriptor.line;
-			if (!(id in REACTION_LINES)) return null;
-			const framing = REACTION_LINES[id];
-			// Hex/Pass are framing only; the two scry lines lead/trail the overheard answer.
-			if (!carriesAnswer(id)) return framing;
-			if (typeof descriptor.affirmative !== 'boolean') return null;
-			const query = parseQuery(descriptor.query);
-			if (query === null || !powerInRange(query)) return null;
-			const ans = voiceAnswer(query, descriptor.affirmative);
-			// human-scry frames then reveals; skoll-scry reveals then notes he overheard (ux-copy §3).
-			return id === 'human-scry' ? `${framing} ${ans}` : `${ans} ${framing}`;
-		}
-		case 'cast': {
-			if (descriptor.result === 'true') return CAST_TRUE;
-			if (descriptor.result === 'falters') return CAST_FALTERS;
-			// wrong: name only a real board rune (the cast path already canonicalizes to one).
-			const rune = runes.find((r) => r.name === descriptor.rune);
-			return rune ? wrongCastLine(rune.name) : null;
-		}
-		case 'outcome': {
-			const lines = OUTCOME_LINES[descriptor.result];
-			return lines ? lines[VOICED_BEAT[descriptor.result]] : null;
-		}
+		case 'react':
+			return composeReact(descriptor.line, descriptor.query, descriptor.affirmative);
+		case 'cast':
+			return composeCast(descriptor.result, descriptor.rune);
+		case 'outcome':
+			return composeOutcome(descriptor.result);
 	}
 }
 

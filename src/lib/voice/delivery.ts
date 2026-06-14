@@ -97,19 +97,21 @@ let chain: Promise<void> = Promise.resolve();
  * stays silent rather than surfacing an error.
  */
 export function deliver(descriptor: LineDescriptor): Promise<void> {
-	if (!speaker) return Promise.resolve();
-	const run = chain.then(() => streamLine(descriptor));
+	const active = speaker;
+	if (!active) return Promise.resolve();
+	// Snapshot the speaker + generation at ENQUEUE time, not when the chain reaches this line: a
+	// stop/disable while it waits its turn behind an in-flight line bumps generation, and the queued
+	// line must then drop (isStale) instead of fetching/playing into the fresh round.
+	const gen = generation;
+	const run = chain.then(() => streamLine(descriptor, active, gen));
 	chain = run.catch(() => {});
 	return run;
 }
 
-async function streamLine(descriptor: LineDescriptor): Promise<void> {
-	const active = speaker;
-	if (!active) return;
-	// Snapshot the generation: a stop/disable during the await drops the rest of this stream so a
-	// stale line never plays over a fresh round or a torn-down page.
-	const gen = generation;
-	if (isStale(active, gen)) return; // a stop landed while this line waited its turn in the chain
+async function streamLine(descriptor: LineDescriptor, active: Speaker, gen: number): Promise<void> {
+	// Stale if a stop/disable bumped the generation (or swapped the speaker) since this line was
+	// enqueued — whether that happened while it waited its turn or mid-stream below.
+	if (isStale(active, gen)) return;
 	const abort = new AbortController();
 	try {
 		const res = await fetch('/api/voice/tts', {
