@@ -448,12 +448,17 @@ describe('voiceSession oracle speech', () => {
 		expect(tees.join(' ')).toContain('spoke: It is cast.');
 	});
 
-	it('flushes the whole assembled out line as a final fragment on turnComplete', () => {
+	it('emits a final fragment at thinking — the true boundary where all chunks have settled', async () => {
 		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'It is ' } } });
 		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'cast.' } } });
 		callbacks!.onmessage({ serverContent: { turnComplete: true } });
-		// The streamed fragments, then one authoritative final carrying the complete line — the
-		// caption flush the UI needs when the turn settles before the tail fragments land.
+		// turnComplete fires no final — SDK gives no ordering guarantee for outputTranscription,
+		// so trailing chunks can still arrive. Wait for thinking (next player turn) instead.
+		expect(events.filter((e) => e.type === 'transcript' && e.final)).toEqual([]);
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
 		expect(events).toContainEqual({
 			type: 'transcript',
 			direction: 'out',
@@ -462,8 +467,12 @@ describe('voiceSession oracle speech', () => {
 		});
 	});
 
-	it('a silent turnComplete emits no final out fragment', () => {
+	it('a silent turn emits no final out fragment — neither at turnComplete nor at thinking', async () => {
 		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
 		expect(events.filter((e) => e.type === 'transcript')).toEqual([]);
 	});
 

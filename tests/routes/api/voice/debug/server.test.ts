@@ -64,6 +64,22 @@ describe('POST /api/voice/debug', () => {
 		resetLog('voice-debug-other');
 	});
 
+	it('forwards a data object when present', async () => {
+		await post({ level: 'info', message: 'tool call: ask', data: { args: { question: 'fire?' } } });
+		const event = getEvents(SID)[0];
+		expect(event.data).toEqual({ args: { question: 'fire?' } });
+	});
+
+	it.each([
+		['an array', [1, 2]],
+		['a string', 'bad'],
+		['a number', 42],
+		['null', null]
+	])('omits data when it is %s', async (_label, data) => {
+		await post({ level: 'info', message: 'hi', data });
+		expect(getEvents(SID)[0].data).toBeUndefined();
+	});
+
 	it.each([
 		['a non-JSON body', () => call('not json')],
 		['a null body', () => post(null)],

@@ -112,7 +112,7 @@ describe('/debug view', () => {
 		expect(card.querySelector('.msg')?.textContent).toContain('raw Gemini move call');
 	});
 
-	it('collapses raw Gemini I/O by default and toggles open/closed on click', async () => {
+	it('collapses any event with data by default and toggles open/closed on click', async () => {
 		const gemini: DebugEvent = {
 			seq: 7,
 			owner: 'Sköll',
@@ -124,17 +124,21 @@ describe('/debug view', () => {
 		};
 		const screen = renderWith([gemini, floor]);
 		const { container } = screen;
-		// The parsed turn info (head + message) stays visible; only the raw I/O hides.
+		// The parsed turn info (head + message) stays visible; only the data payload hides.
 		expect(container.textContent).toContain('raw Gemini move call');
-		const details = container.querySelector<HTMLDetailsElement>('details.io')!;
-		expect(details.open).toBe(false);
-		// Gemini calls only: the floor event's data block stays inline, no expander.
-		expect(container.querySelectorAll('details.io')).toHaveLength(1);
-		expect(container.querySelectorAll('pre').length).toBeGreaterThanOrEqual(2);
+		const allDetails = container.querySelectorAll<HTMLDetailsElement>('details.io');
+		// Both events have data — both get an expander; all collapsed by default.
+		expect(allDetails).toHaveLength(2);
+		for (const d of allDetails) expect(d.open).toBe(false);
+		// Gemini entries use a specific summary; other data entries use the generic one.
+		expect(screen.getByText('full request / response')).toBeDefined();
+		expect(screen.getByText('details')).toBeDefined();
+		// Input [gemini(7), floor(2)] reversed → DOM order [floor, gemini] — gemini is allDetails[1].
+		const geminiDetails = allDetails[1]!;
 		await screen.getByText('full request / response').click();
-		expect(details.open).toBe(true);
+		expect(geminiDetails.open).toBe(true);
 		await screen.getByText('full request / response').click();
-		expect(details.open).toBe(false);
+		expect(geminiDetails.open).toBe(false);
 	});
 
 	it('renders an event as a message + JSON detail, flagging warn', async () => {

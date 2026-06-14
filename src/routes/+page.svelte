@@ -313,9 +313,10 @@
 					// The input transcript itself is debug-only; it is not surfaced in the rite UI.
 					if (voiceConfirm) voiceConfirm.heard = true;
 				} else if (event.final) {
-					// Catch-up flush from voiceSession: the assembled line to date. Trailing chunks
-					// (transcript is unordered vs turnComplete per SDK) still arrive as non-final after
-					// this — captionOpen stays true so they append rather than restart.
+					// Complete assembled line from voiceSession, fired at thinking (the true SDK turn
+					// boundary). All trailing outputTranscription chunks have settled by this point, so
+					// this carries the full text — captionOpen stays true so the next Oracle turn can
+					// still start fresh via a non-final that hits captionOpen=false after thinking.
 					voiceCaption = event.text;
 					answer = event.text;
 				} else {

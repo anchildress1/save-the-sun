@@ -14,7 +14,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	} catch {
 		return json({ error: 'Invalid voice debug event.' }, { status: 400 });
 	}
-	const { level, message } = (body ?? {}) as Record<string, unknown>;
+	const { level, message, data } = (body ?? {}) as Record<string, unknown>;
 	if (typeof message !== 'string' || message.length === 0 || !LEVELS.has(level as string)) {
 		return json({ error: 'Invalid voice debug event.' }, { status: 400 });
 	}
@@ -25,7 +25,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		kind: 'llm',
 		part: 'Voice',
 		level: level as 'info' | 'error',
-		message: message.slice(0, MAX_MESSAGE_CHARS)
+		message: message.slice(0, MAX_MESSAGE_CHARS),
+		...(data !== null && typeof data === 'object' && !Array.isArray(data)
+			? { data: data as Record<string, unknown> }
+			: {})
 	});
 	return new Response(null, { status: 204 });
 };

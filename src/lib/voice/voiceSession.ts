@@ -44,9 +44,9 @@ export type VoiceEvent =
 	| { type: 'asleep' }
 	| { type: 'eclipsed' }
 	| { type: 'error'; reason: VoiceErrorReason; notice: string }
-	// Text arrives as incremental fragments; turn boundaries ride the state events. The turn's
-	// end carries one `final` out fragment — the whole assembled line — so the caption can flush
-	// to the complete text even when audio drains (and the turn settles) before the tail fragments.
+	// Text arrives as incremental fragments; turn boundaries ride the state events. When `thinking`
+	// fires (the player's next turn starting), one `final` out fragment carries the whole assembled
+	// line — that is the true SDK boundary where all trailing outputTranscription chunks have landed.
 	| { type: 'transcript'; direction: 'in' | 'out'; text: string; final?: boolean };
 
 export type VoiceListener = (event: VoiceEvent) => void;
@@ -174,17 +174,22 @@ export function createVoiceSession(): VoiceSession {
 			if (!silenceTimer) restartSilenceClock();
 		} else clearSilenceClock();
 		if (!changed && next !== 'hearing') return;
-		// Flush the Oracle's transcript when the next player turn starts — the true boundary
-		// where we know all trailing chunks have landed (SDK gives no ordering guarantee).
-		if (next === 'thinking') flushTranscriptOut();
+		// At the start of the next player turn all trailing Oracle chunks have settled (SDK gives
+		// no ordering guarantee between outputTranscription and turnComplete, so the `final` must
+		// wait for this true boundary, not fire at turnComplete where transcriptOut may be partial).
+		if (next === 'thinking') {
+			if (transcriptOut)
+				emit({ type: 'transcript', direction: 'out', text: transcriptOut, final: true });
+			flushTranscriptOut();
+		}
 		if (next === 'hearing') emit({ type: 'hearing', amplitude: lastAmplitude });
 		else emit({ type: next });
 	}
 
 	function teardown(): void {
-		// A mid-turn sleep/failure must not swallow what was already transcribed — but tee only,
-		// never as a UI `final`: the page may have cleared the panel and switched rounds already.
-		flushTranscripts(false);
+		// A mid-turn sleep/failure flushes transcriptIn to /debug but never emits a UI `final` —
+		// the `final` belongs to `thinking`, and teardown skips thinking entirely.
+		flushTranscripts();
 		flushTranscriptOut();
 		generation++;
 		liveReady = false;
@@ -212,16 +217,23 @@ export function createVoiceSession(): VoiceSession {
 	// socket kills the tee in the same instant, and the diagnostics must not die with it.
 	// Scrubbing lives here, the single sink: SDK error and close strings can embed the session's
 	// ephemeral token in a URL, and the /debug stream is public.
-	function teeDebug(level: 'info' | 'error', message: string, extraToken = ''): void {
+	function teeDebug(
+		level: 'info' | 'error',
+		message: string,
+		extraToken = '',
+		data?: Record<string, unknown>
+	): void {
 		let scrubbed = message;
 		for (const token of new Set([mintedToken, extraToken])) {
 			if (token) scrubbed = scrubbed.split(token).join('[ephemeral-token]');
 		}
+		const body: Record<string, unknown> = { level, message: scrubbed };
+		if (data !== undefined) body.data = data;
 		// keepalive: the final slept/transcript tees fire during page teardown and must survive it.
 		void fetch('/api/voice/debug', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ level, message: scrubbed }),
+			body: JSON.stringify(body),
 			keepalive: true
 		})
 			.then((response) => {
@@ -345,18 +357,12 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	// Transcripts reach the UI as live fragments (S10's surface); the /debug stream gets one
-	// assembled line per side per turn instead of a fragment flood. On a real turn boundary the out
-	// side re-emits as one `final` fragment with the text assembled so far — trailing chunks
-	// (SDK gives no ordering guarantee) keep arriving as non-finals and append on the page until
-	// the next `thinking` resets the caption. The debug tee for `spoke:` therefore happens at
-	// `thinking`, not here, so it captures the complete transcript including any trailing chunks.
-	// A teardown (sleep/new round/failure) tees only — `emitFinal: false` — or the prior round's
-	// line would land on the page after it has cleared and switched rounds, persisting a stale caption.
-	function flushTranscripts(emitFinal = true): void {
+	// assembled line per side per turn. The `final` out fragment is deferred to `thinking` (the
+	// true SDK turn boundary) so it always carries the complete assembled text — turnComplete has
+	// no ordering guarantee with outputTranscription, so firing there could emit a partial line.
+	function flushTranscripts(): void {
 		if (transcriptIn) teeDebug('info', `heard: ${transcriptIn}`);
 		transcriptIn = '';
-		if (transcriptOut && emitFinal)
-			emit({ type: 'transcript', direction: 'out', text: transcriptOut, final: true });
 	}
 
 	// Tee and reset the Oracle's assembled out-transcript. Called at `thinking` (start of next
@@ -411,7 +417,7 @@ export function createVoiceSession(): VoiceSession {
 
 	async function runToolCall(call: FunctionCall, myGeneration: number): Promise<void> {
 		const name = call.name ?? '';
-		teeDebug('info', `tool call: ${name}(${JSON.stringify(call.args ?? {})})`);
+		teeDebug('info', `tool call: ${name}`, '', { args: call.args ?? {} });
 		let response: Record<string, unknown>;
 		try {
 			if (!toolExecutor) throw new Error('no tool executor registered');
@@ -440,7 +446,7 @@ export function createVoiceSession(): VoiceSession {
 			);
 			return;
 		}
-		teeDebug('info', `tool result: ${name} → ${JSON.stringify(response)}`);
+		teeDebug('info', `tool result: ${name}`, '', response);
 		if (state === 'thinking') armThinkingRescue();
 	}
 

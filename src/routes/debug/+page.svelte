@@ -30,9 +30,10 @@
 
 	const ownerClass = (e: DebugEvent) => e.owner.toLowerCase().replace('ö', 'o'); // 'Sköll' → 'skoll'
 	const KIND_LABEL = { input: 'input', llm: 'Gemini AI', deterministic: 'deterministic' } as const;
-	// Raw Gemini I/O is multi-KB per call — collapsed by default so the stream reads as the
-	// parsed turn story; the full request/response is one click away (and one click back).
-	const isRawGemini = (e: DebugEvent) => e.message.startsWith('raw Gemini');
+	// Raw Gemini I/O is multi-KB per call; voice tool calls carry args/results. Both are collapsed
+	// so the stream reads as the parsed turn story — the detail is one click away.
+	const summaryFor = (e: DebugEvent) =>
+		e.message.startsWith('raw Gemini') ? 'full request / response' : 'details';
 </script>
 
 <svelte:head><title>Save the Sun — debug</title></svelte:head>
@@ -61,14 +62,10 @@
 
 					<p class="msg">{event.message}</p>
 					{#if event.data}
-						{#if isRawGemini(event)}
-							<details class="io">
-								<summary>full request / response</summary>
-								<pre>{pretty(event.data)}</pre>
-							</details>
-						{:else}
+						<details class="io">
+							<summary>{summaryFor(event)}</summary>
 							<pre>{pretty(event.data)}</pre>
-						{/if}
+						</details>
 					{/if}
 				</li>
 			{/each}
