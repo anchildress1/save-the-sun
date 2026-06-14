@@ -89,7 +89,7 @@ const HEARING_HOLD_MS = 800;
 // A cough can reach thinking with no reply ever coming.
 const THINKING_FALLBACK_MS = 10_000;
 // R7: this long with no recognizable player speech idles the session back to asleep.
-const SILENCE_TIMEOUT_MS = 5_000;
+const SILENCE_TIMEOUT_MS = 10_000;
 const SETUP_TIMEOUT_MS = 10_000;
 // A hung token endpoint or blackholed handshake must fail the wake, not strand it in waking.
 const TOKEN_TIMEOUT_MS = 10_000;
