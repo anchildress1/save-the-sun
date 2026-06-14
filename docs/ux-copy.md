@@ -356,6 +356,17 @@ Voice failure notices (emitted by the session client, shown as one quiet line by
 
 Mic permission and no-mic failures are final for the session (R1): the medallion seals into the eclipsed state, the notice stays, and no second permission prompt ever fires. Token, socket, and dead-audio failures stay retryable by tapping again.
 
+### Output mute (voice control)
+
+A second control beside the medallion: a toggle button (`aria-pressed`) that silences both voices while their words keep arriving in the panel. Distinct from the medallion — muting is not sleeping; the session stays awake and the mic stays open. The preference persists for the session (R11).
+
+| State | Button label (accessible name) |
+|---|---|
+| Audible (tap mutes) | **"Silence the voices. Their words still appear in writing."** |
+| Muted (tap unmutes) | **"Let the voices be heard."** |
+
+Muted is signaled by shape, never color alone: the speaker glyph loses its sound waves and gains a strike.
+
 ### Empty & error states (stay at the fire)
 | State | Copy |
 |---|---|
