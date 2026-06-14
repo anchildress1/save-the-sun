@@ -1297,7 +1297,7 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		render(Page, reactProps);
 		await executor()({ name: 'hex', args: {} });
 		const outcome = await executor()({ name: 'pass', args: {} });
-		expect(outcome).toBe('You hold your hand; let him answer.');
+		expect(outcome).toBe('You hold your hand; I give Sköll his answer.');
 		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Pass' }]);
 	});
 
