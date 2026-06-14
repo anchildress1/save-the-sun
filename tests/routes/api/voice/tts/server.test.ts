@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const tts = vi.hoisted(() => ({ synthesize: vi.fn() }));
-vi.mock('$lib/server/voice/tts', () => ({ synthesize: tts.synthesize }));
+const tts = vi.hoisted(() => ({ synthesizeStream: vi.fn() }));
+vi.mock('$lib/server/voice/tts', () => ({ synthesizeStream: tts.synthesizeStream }));
 
 import { POST } from '$routes/api/voice/tts/+server';
 import { resetTtsWindows, TTS_SESSION_LIMIT } from '$lib/server/voice/rateLimit';
 import { ORACLE_GREETING } from '$lib/server/voice/lines';
+
+function streamOf(...chunks: string[]) {
+	return (async function* () {
+		yield* chunks;
+	})();
+}
 
 function call(sessionId: string, body: unknown) {
 	return POST({
@@ -26,45 +32,46 @@ describe('POST /api/voice/tts', () => {
 
 	afterEach(() => vi.restoreAllMocks());
 
-	it('voices an allow-listed line as base64 audio', async () => {
-		tts.synthesize.mockResolvedValueOnce({ ok: true, audio: 'pcm-bytes' });
+	it('streams an allow-listed line as NDJSON base64 chunks', async () => {
+		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm-a', 'pcm-b'));
 
 		const response = await call('happy', { kind: 'greeting' });
 
 		expect(response.status).toBe(200);
-		expect(await response.json()).toEqual({ audio: 'pcm-bytes' });
-		expect(tts.synthesize).toHaveBeenCalledExactlyOnceWith(ORACLE_GREETING);
+		expect(response.headers.get('content-type')).toContain('application/x-ndjson');
+		expect(await response.text()).toBe('pcm-a\npcm-b\n');
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(ORACLE_GREETING);
+	});
+
+	it('returns an empty body when synthesis yields nothing', async () => {
+		tts.synthesizeStream.mockReturnValueOnce(streamOf());
+
+		const response = await call('silent', { kind: 'greeting' });
+
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('');
 	});
 
 	it('rejects a malformed JSON body with 400', async () => {
 		const response = await call('bad-json', 'not json{');
 		expect(response.status).toBe(400);
-		expect(tts.synthesize).not.toHaveBeenCalled();
+		expect(tts.synthesizeStream).not.toHaveBeenCalled();
 	});
 
 	it('rejects an unshaped descriptor with 400', async () => {
 		const response = await call('bad-shape', { kind: 'whatever' });
 		expect(response.status).toBe(400);
-		expect(tts.synthesize).not.toHaveBeenCalled();
+		expect(tts.synthesizeStream).not.toHaveBeenCalled();
 	});
 
 	it('rejects a well-shaped but non-allow-listed line with 400', async () => {
 		const response = await call('not-listed', { kind: 'refusal', refusal: 'made-up' });
 		expect(response.status).toBe(400);
-		expect(tts.synthesize).not.toHaveBeenCalled();
-	});
-
-	it('returns 503 when synthesis fails', async () => {
-		tts.synthesize.mockResolvedValueOnce({ ok: false });
-
-		const response = await call('synth-down', { kind: 'greeting' });
-
-		expect(response.status).toBe(503);
-		expect((await response.json()).error).toBe('Voice is unavailable.');
+		expect(tts.synthesizeStream).not.toHaveBeenCalled();
 	});
 
 	it('rejects requests over the per-session limit with 429 and retry-after', async () => {
-		tts.synthesize.mockResolvedValue({ ok: true, audio: 'pcm' });
+		tts.synthesizeStream.mockReturnValue(streamOf('pcm'));
 		for (let i = 0; i < TTS_SESSION_LIMIT; i++) {
 			expect((await call('greedy', { kind: 'greeting' })).status).toBe(200);
 		}
@@ -74,6 +81,6 @@ describe('POST /api/voice/tts', () => {
 		expect(response.status).toBe(429);
 		expect(response.headers.get('retry-after')).toBe('60');
 		// The denied request never reaches synthesis.
-		expect(tts.synthesize).toHaveBeenCalledTimes(TTS_SESSION_LIMIT);
+		expect(tts.synthesizeStream).toHaveBeenCalledTimes(TTS_SESSION_LIMIT);
 	});
 });

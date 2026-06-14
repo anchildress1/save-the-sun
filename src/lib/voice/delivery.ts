@@ -39,9 +39,10 @@ export function disableDelivery(): void {
 }
 
 /**
- * Voice one server-owned line: fetch its audio from the TTS route and enqueue it. A no-op until a
- * gesture has enabled the speaker. Audio is an enhancement layer — the line is already on the
- * panel — so a synth or network failure stays silent rather than surfacing an error.
+ * Voice one server-owned line: stream its audio from the TTS route and enqueue each PCM chunk as
+ * it arrives, so she starts speaking at the first chunk rather than after the whole clip. A no-op
+ * until a gesture has enabled the speaker. Audio is an enhancement layer — the line is already on
+ * the panel — so a synth or network failure stays silent rather than surfacing an error.
  */
 export async function deliver(descriptor: LineDescriptor): Promise<void> {
 	const active = speaker;
@@ -52,10 +53,24 @@ export async function deliver(descriptor: LineDescriptor): Promise<void> {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(descriptor)
 		});
-		if (!res.ok) return;
-		const { audio } = (await res.json()) as { audio?: string };
-		// Guard against a disable/re-enable during the await — never enqueue onto a closed speaker.
-		if (audio && speaker === active) active.enqueue(audio);
+		if (!res.ok || !res.body) return;
+		const reader = res.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = '';
+		// NDJSON: one base64 PCM chunk per line. Enqueue each complete line as it streams in; the
+		// speaker schedules them back-to-back, so playback starts at the first chunk.
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			buffer += decoder.decode(value, { stream: true });
+			let nl: number;
+			while ((nl = buffer.indexOf('\n')) >= 0) {
+				const chunk = buffer.slice(0, nl);
+				buffer = buffer.slice(nl + 1);
+				// Guard against a disable/re-enable mid-stream — never enqueue onto a closed speaker.
+				if (chunk && speaker === active) active.enqueue(chunk);
+			}
+		}
 	} catch {
 		/* network failure — the panel already carries the line; stay silent */
 	}

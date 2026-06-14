@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const sdk = vi.hoisted(() => {
-	const generateContent = vi.fn();
+	const generateContentStream = vi.fn();
 	const GoogleGenAI = vi.fn(function GoogleGenAI(this: {
-		models: { generateContent: typeof generateContent };
+		models: { generateContentStream: typeof generateContentStream };
 	}) {
-		this.models = { generateContent };
+		this.models = { generateContentStream };
 	});
-	return { generateContent, GoogleGenAI };
+	return { generateContentStream, GoogleGenAI };
 });
 
 vi.mock('@google/genai', () => ({
@@ -21,14 +21,27 @@ const mock = vi.hoisted(() => ({
 
 vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
 
-import { synthesize, resetTtsCache } from '$lib/server/voice/tts';
+import { synthesizeStream, resetTtsCache } from '$lib/server/voice/tts';
 import { ORACLE_VOICE, TTS_MODEL } from '$lib/voice/config';
 
-function audioResponse(data: string) {
-	return { candidates: [{ content: { parts: [{ inlineData: { data } }] } }] };
+// A Gemini stream is an async iterable of parts; each part may carry one inline-audio chunk.
+function streamOf(...chunks: (string | null)[]) {
+	return (async function* () {
+		for (const data of chunks) {
+			yield {
+				candidates: [{ content: { parts: [data === null ? {} : { inlineData: { data } }] } }]
+			};
+		}
+	})();
 }
 
-describe('synthesize', () => {
+async function collect(gen: AsyncGenerator<string>): Promise<string[]> {
+	const out: string[] = [];
+	for await (const c of gen) out.push(c);
+	return out;
+}
+
+describe('synthesizeStream', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		resetTtsCache();
@@ -38,13 +51,13 @@ describe('synthesize', () => {
 
 	afterEach(() => vi.restoreAllMocks());
 
-	it('synthesizes a line to base64 audio with the Oracle voice', async () => {
-		sdk.generateContent.mockResolvedValueOnce(audioResponse('UECAf...'));
+	it('streams audio chunks with the Oracle voice, skipping empty parts', async () => {
+		sdk.generateContentStream.mockResolvedValueOnce(streamOf('aaa', null, 'bbb'));
 
-		const result = await synthesize('I wake with the fire.');
+		const chunks = await collect(synthesizeStream('I wake with the fire.'));
 
-		expect(result).toEqual({ ok: true, audio: 'UECAf...' });
-		expect(sdk.generateContent).toHaveBeenCalledExactlyOnceWith({
+		expect(chunks).toEqual(['aaa', 'bbb']);
+		expect(sdk.generateContentStream).toHaveBeenCalledExactlyOnceWith({
 			model: TTS_MODEL,
 			contents: [{ role: 'user', parts: [{ text: 'I wake with the fire.' }] }],
 			config: {
@@ -55,51 +68,50 @@ describe('synthesize', () => {
 	});
 
 	it('replays a cached clip without a second Gemini call', async () => {
-		sdk.generateContent.mockResolvedValueOnce(audioResponse('cached-pcm'));
+		sdk.generateContentStream.mockResolvedValueOnce(streamOf('one', 'two'));
 
-		const first = await synthesize('Speak your question, witch.');
-		const second = await synthesize('Speak your question, witch.');
+		const first = await collect(synthesizeStream('Speak your question, witch.'));
+		const second = await collect(synthesizeStream('Speak your question, witch.'));
 
-		expect(first).toEqual({ ok: true, audio: 'cached-pcm' });
-		expect(second).toEqual({ ok: true, audio: 'cached-pcm' });
-		expect(sdk.generateContent).toHaveBeenCalledTimes(1);
+		expect(first).toEqual(['one', 'two']);
+		expect(second).toEqual(['one', 'two']);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(1);
 	});
 
-	it('fails without touching the SDK when the key is not configured', async () => {
+	it('yields nothing without touching the SDK when the key is not configured', async () => {
 		mock.env.GEMINI_API_KEY = undefined;
 
-		const result = await synthesize('I wake with the fire.');
-
-		expect(result).toEqual({ ok: false });
+		expect(await collect(synthesizeStream('I wake with the fire.'))).toEqual([]);
 		expect(sdk.GoogleGenAI).not.toHaveBeenCalled();
 		expect(vi.mocked(console.error).mock.calls.flat().join(' ')).toContain('not configured');
 	});
 
-	it('fails when the model returns no audio', async () => {
-		sdk.generateContent.mockResolvedValueOnce({ candidates: [{ content: { parts: [] } }] });
-
-		expect(await synthesize('I wake with the fire.')).toEqual({ ok: false });
-	});
-
-	it('fails and masks the key when synth rejects', async () => {
-		sdk.generateContent.mockRejectedValueOnce(
+	it('masks the key and stops when the stream rejects', async () => {
+		sdk.generateContentStream.mockRejectedValueOnce(
 			new Error('500 from https://api?key=test-gemini-key down')
 		);
 
-		const result = await synthesize('I wake with the fire.');
-
-		expect(result).toEqual({ ok: false });
+		expect(await collect(synthesizeStream('I wake with the fire.'))).toEqual([]);
 		const logged = vi.mocked(console.error).mock.calls.flat().join(' ');
 		expect(logged).toContain('[gemini-api-key]');
 		expect(logged).not.toContain('test-gemini-key');
 	});
 
-	it('does not cache a failed synth', async () => {
-		sdk.generateContent.mockRejectedValueOnce(new Error('transient'));
-		sdk.generateContent.mockResolvedValueOnce(audioResponse('recovered'));
+	it('does not cache a stream that errors mid-flight', async () => {
+		const partial = (async function* () {
+			yield { candidates: [{ content: { parts: [{ inlineData: { data: 'half' } }] } }] };
+			throw new Error('dropped');
+		})();
+		sdk.generateContentStream.mockResolvedValueOnce(partial);
+		sdk.generateContentStream.mockResolvedValueOnce(streamOf('whole-a', 'whole-b'));
 
-		expect(await synthesize('I wake with the fire.')).toEqual({ ok: false });
-		expect(await synthesize('I wake with the fire.')).toEqual({ ok: true, audio: 'recovered' });
-		expect(sdk.generateContent).toHaveBeenCalledTimes(2);
+		// First attempt streams one chunk then dies — not cached.
+		expect(await collect(synthesizeStream('I wake with the fire.'))).toEqual(['half']);
+		// Second attempt re-synthesizes (no cache hit) and returns the complete clip.
+		expect(await collect(synthesizeStream('I wake with the fire.'))).toEqual([
+			'whole-a',
+			'whole-b'
+		]);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
 	});
 });

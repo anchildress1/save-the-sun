@@ -26,8 +26,11 @@ import {
 
 const GREETING = { kind: 'greeting' } as const;
 
-function audioOk(data: string) {
-	return { ok: true, json: async () => ({ audio: data }) } as Response;
+// A streaming TTS response: NDJSON, one base64 chunk per line.
+function ndjsonResponse(...chunks: string[]) {
+	return new Response(chunks.map((c) => c + '\n').join(''), {
+		headers: { 'content-type': 'application/x-ndjson' }
+	});
 }
 
 describe('delivery seam', () => {
@@ -54,8 +57,8 @@ describe('delivery seam', () => {
 		expect(audio.speaker.enqueue).not.toHaveBeenCalled();
 	});
 
-	it('fetches the line audio and enqueues it once enabled', async () => {
-		vi.mocked(fetch).mockResolvedValueOnce(audioOk('pcm-bytes'));
+	it('streams the line audio and enqueues each chunk as it arrives', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm-a', 'pcm-b', 'pcm-c'));
 		enableDelivery();
 
 		await deliver(GREETING);
@@ -65,11 +68,11 @@ describe('delivery seam', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(GREETING)
 		});
-		expect(audio.speaker.enqueue).toHaveBeenCalledExactlyOnceWith('pcm-bytes');
+		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['pcm-a', 'pcm-b', 'pcm-c']);
 	});
 
 	it('stays silent when the route refuses the line', async () => {
-		vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response);
+		vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 400 }));
 		enableDelivery();
 
 		await deliver({ kind: 'refusal', refusal: 'empty' });
@@ -85,21 +88,32 @@ describe('delivery seam', () => {
 		expect(audio.speaker.enqueue).not.toHaveBeenCalled();
 	});
 
-	it('does not enqueue onto a speaker closed mid-fetch', async () => {
-		let release: (r: Response) => void = () => {};
-		vi.mocked(fetch).mockReturnValueOnce(
-			new Promise<Response>((resolve) => {
-				release = resolve;
-			})
-		);
+	it('does not enqueue onto a speaker closed mid-stream', async () => {
+		// A stream that emits one chunk, then waits — letting the test disable delivery before the
+		// second chunk lands. The chunk after the close must not reach the (closed) speaker.
+		let releaseSecond: () => void = () => {};
+		const body = new ReadableStream<Uint8Array>({
+			async start(controller) {
+				const enc = new TextEncoder();
+				controller.enqueue(enc.encode('first\n'));
+				await new Promise<void>((resolve) => {
+					releaseSecond = resolve;
+				});
+				controller.enqueue(enc.encode('second\n'));
+				controller.close();
+			}
+		});
+		vi.mocked(fetch).mockResolvedValueOnce(new Response(body));
 		enableDelivery();
 
 		const inflight = deliver(GREETING);
+		// Let the first chunk be read, then close the speaker before releasing the second.
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first'));
 		disableDelivery();
-		release(audioOk('late-pcm'));
+		releaseSecond();
 		await inflight;
 
-		expect(audio.speaker.enqueue).not.toHaveBeenCalled();
+		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['first']);
 		expect(audio.speaker.close).toHaveBeenCalledTimes(1);
 	});
 
