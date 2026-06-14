@@ -15,6 +15,7 @@ import { POST } from '$routes/api/voice/tts/+server';
 import { resetTtsWindows, TTS_SESSION_LIMIT } from '$lib/server/voice/rateLimit';
 import { refusalLine } from '$lib/server/oracle/oracle';
 import { skollAskEcho } from '$lib/server/skoll/skoll';
+import { synthPrompt } from '$lib/server/voice/lines';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 
 function streamOf(...chunks: string[]) {
@@ -52,23 +53,26 @@ describe('POST /api/voice/tts', () => {
 		expect(response.status).toBe(200);
 		expect(response.headers.get('content-type')).toContain('application/x-ndjson');
 		expect(await response.text()).toBe('pcm-a\npcm-b\n');
+		// Her line is synthesized wrapped in the Oracle's director's-notes, in her voice.
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
-			refusalLine('empty'),
+			synthPrompt({ kind: 'refusal', refusal: 'empty' }, refusalLine('empty')),
 			ORACLE_VOICE
 		);
 	});
 
-	it('voices Sköll’s Ask from the query in his own voice', async () => {
+	it('voices Sköll’s Ask in his voice, wrapped in his director’s-notes growl', async () => {
 		tts.synthesizeStream.mockReturnValueOnce(streamOf('grr'));
 		const query = { axis: 'element', value: 'Fire' };
+		const line = skollAskEcho(query as Parameters<typeof skollAskEcho>[0]);
 
 		const response = await call('wolf', { kind: 'skoll-ask', query });
 
 		expect(response.status).toBe(200);
-		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
-			skollAskEcho(query as Parameters<typeof skollAskEcho>[0]),
-			SKOLL_VOICE
-		);
+		// The synthesized text is the directed prompt (not the bare line) — that's what makes him growl.
+		const prompt = synthPrompt({ kind: 'skoll-ask', query }, line);
+		expect(prompt).not.toBe(line);
+		expect(prompt).toContain(`"${line}"`);
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE);
 	});
 
 	it('rejects a malformed JSON body with 400 before charging the budget', async () => {

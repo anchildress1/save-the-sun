@@ -3,6 +3,7 @@ import {
 	composeLine,
 	isLineDescriptor,
 	voiceForLine,
+	synthPrompt,
 	type LineDescriptor
 } from '$lib/server/voice/lines';
 import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
@@ -99,6 +100,21 @@ describe('voiceForLine', () => {
 		expect(voiceForLine({ kind: 'skoll-ask', query: {} })).toBe(SKOLL_VOICE);
 		expect(voiceForLine({ kind: 'refusal', refusal: 'empty' })).toBe(ORACLE_VOICE);
 		expect(voiceForLine({ kind: 'answer', query: {}, affirmative: true })).toBe(ORACLE_VOICE);
+	});
+});
+
+describe('synthPrompt', () => {
+	it('wraps each line in its speaker’s director’s-notes, quoting the line', () => {
+		const skoll = synthPrompt({ kind: 'skoll-ask', query: {} }, 'I scent a fire rune on her.');
+		const oracle = synthPrompt(
+			{ kind: 'refusal', refusal: 'empty' },
+			'Speak your question, witch.'
+		);
+		// Each carries its own direction (distinct) and ends on the quoted line, not the bare line.
+		expect(skoll).toContain('"I scent a fire rune on her."');
+		expect(skoll).not.toBe('I scent a fire rune on her.');
+		expect(oracle).toContain('"Speak your question, witch."');
+		expect(skoll.slice(0, 40)).not.toBe(oracle.slice(0, 40)); // different speaker notes
 	});
 });
 

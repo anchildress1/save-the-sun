@@ -62,6 +62,30 @@ export function voiceForLine(descriptor: LineDescriptor): string {
 	return descriptor.kind === 'skoll-ask' ? SKOLL_VOICE : ORACLE_VOICE;
 }
 
+// Director's-notes prompts the TTS model reads as a delivery instruction, speaking only the quoted
+// line. A bare line reads flat and generic — the same model says it in two unmistakable registers
+// only when each line carries its speaker's note. These shape the two prebuilt voices into character.
+const SKOLL_TTS_DIRECTION =
+	'Read this line as Sköll, the monstrous wolf who hunts the sun. Deep, gravelly, guttural — a low ' +
+	'chest growl, cold and predatory, heavy with menace, never bright or smooth. Keep it clipped. ' +
+	'Speak only the line, no narration:';
+
+const ORACLE_TTS_DIRECTION =
+	'Read this line as the Oracle, keeper of the rite. Reverent, calm, and certain, with quiet weight ' +
+	'— but at a natural, brisk speaking pace; do not slow down, drag, or pause between words, and ' +
+	'never sound bright, chatty, or sing-song. She knows the answer before it is asked. Speak only ' +
+	'the line, no narration:';
+
+/**
+ * The exact text handed to the TTS model for a composed line: each line wrapped in its speaker's
+ * director's-notes so the model voices it in character (Sköll's growl, the Oracle's ceremony).
+ * Deterministic, so the route can cache by it.
+ */
+export function synthPrompt(descriptor: LineDescriptor, line: string): string {
+	const direction = descriptor.kind === 'skoll-ask' ? SKOLL_TTS_DIRECTION : ORACLE_TTS_DIRECTION;
+	return `${direction}\n\n"${line}"`;
+}
+
 /** Narrow an untrusted payload to a LineDescriptor shape (values still validated by composeLine). */
 export function isLineDescriptor(value: unknown): value is LineDescriptor {
 	if (typeof value !== 'object' || value === null) return false;
