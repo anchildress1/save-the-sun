@@ -7,8 +7,15 @@
 	import EclipseMedallion from '$lib/components/EclipseMedallion.svelte';
 	import type { MedallionState } from '$lib/components/medallionState';
 	import { voiceSession, type VoiceEvent, type VoiceToolCall } from '$lib/voice/voiceSession';
-	import { oracleBoardEcho } from '$lib/voice/oraclePersona';
-	import { readMuted, writeMuted } from '$lib/voice/outputMute';
+	import { writeMuted } from '$lib/voice/outputMute';
+	import {
+		enableDelivery,
+		disableDelivery,
+		stopDelivery,
+		deliver,
+		whenDrained
+	} from '$lib/voice/delivery';
+	import type { LineDescriptor } from '$lib/server/voice/lines';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
@@ -131,9 +138,12 @@
 	let humanWon = $derived(roundOver && winner === 'Human');
 	let skollWon = $derived(roundOver && winner === 'Sköll');
 	let outcomeLine = $derived(humanWon ? RITE.sunCrests : RITE.skollTakes);
-	// The end-screen rite takes over the moment the round resolves (S9). It owns the replay surface, so
-	// the header's own controls fold away while it is up — one "Begin another night" on screen, not two.
-	let showEndScreen = $derived(roundOver);
+	// The end-screen rite takes over when the round resolves (S9). It owns the replay surface, so the
+	// header's own controls fold away while it is up — one "Begin another night" on screen, not two.
+	// Held back (`endHeld`) until the Oracle's last spoken line has drained, so the splash never stomps
+	// her answer mid-sentence when Sköll's winning cast lands right behind it.
+	let endHeld = $state(false);
+	let showEndScreen = $derived(roundOver && !endHeld);
 	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
 	let nightProgress = $derived(
 		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
@@ -172,6 +182,10 @@
 		roundStatus = state.status;
 		turns = state.turns;
 		winner = state.winner;
+		// Hold the end-screen the instant the round resolves with audio on, synchronously — otherwise
+		// the splash flashes for one frame before the post-render effect below can catch it. The effect
+		// still owns releasing the hold once her last line has drained.
+		if (state.status === 'won' && audioOn) endHeld = true;
 	}
 
 	// His box shows ONLY his templated question when he Asks, blank otherwise. The cast outcome derives
@@ -231,6 +245,40 @@
 		}
 	});
 
+	// The most recent Oracle line's audio (or null when none/text-only). Not reactive — just a handle
+	// the end-screen hold awaits so the splash never preempts her final answer.
+	let answerAudio: Promise<void> | null = null;
+
+	// Hold the end-screen splash until her last line has been heard. Only when audio is on — silent
+	// play resolves instantly. Capped (8s) so a stuck synth can never strand the round on the board.
+	$effect(() => {
+		if (!roundOver || !audioOn) {
+			endHeld = false;
+			return;
+		}
+		endHeld = true;
+		let cancelled = false;
+		const HOLD_CAP_MS = 8000;
+		// Wait for her line to finish streaming in, then drain — but race the whole wait against a hard
+		// cap so a hung fetch/stream (answerAudio never settling) can never strand the splash off-screen.
+		Promise.race([
+			(async () => {
+				try {
+					await answerAudio;
+				} catch {
+					/* a failed delivery never blocks the splash */
+				}
+				await whenDrained(HOLD_CAP_MS);
+			})(),
+			new Promise((resolve) => setTimeout(resolve, HOLD_CAP_MS))
+		]).finally(() => {
+			if (!cancelled) endHeld = false;
+		});
+		return () => {
+			cancelled = true;
+		};
+	});
+
 	let selectedRune = $derived(
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
 	);
@@ -244,9 +292,10 @@
 	let voiceNotice = $state('');
 	// Per round, persisted with the view (S6): the invitation speaks once per game, not per tap.
 	let voiceInvited = $state(false);
-	// Output mute (S11): silences the spoken voices; captions, mic, and the board are untouched.
-	// Seeded from sessionStorage on mount so the preference survives a reload within the session.
-	let muted = $state(false);
+	// Audio on/off (voice-as-delivery, P1): the one toggle that gates both voices. Off by default —
+	// audio stays silent until a tap opens the delivery speaker (browsers block an AudioContext
+	// outside a user gesture). The captions/panel render regardless; this only governs sound.
+	let audioOn = $state(false);
 
 	// S8: the armed confirmation for a gated tool call (scry, hex, cast_rune). `heard` flips when
 	// the player speaks after arming — the confirming call is refused without it, so the model can
@@ -341,12 +390,36 @@
 		}
 	}
 
-	// S11: one toggle for both voices. The session applies it to live and future speakers; the
-	// preference persists for the session. Independent of wake/sleep — you can mute while listening.
-	function toggleMute() {
-		muted = !muted;
-		writeMuted(muted);
-		voiceSession.setMuted(muted);
+	// Sound on/off for both voices (P1). Turning it on opens the delivery speaker from this tap — the
+	// gesture browsers require; turning it off CLOSES it, so an audio-off board never POSTs to the TTS
+	// route. Also gates the Live speaker. Purely a sound switch: it speaks nothing on its own (no wake
+	// greeting — that was a Live-session artifact). Independent of the mic (medallion).
+	function toggleAudio() {
+		if (!audioOn) {
+			try {
+				enableDelivery(); // must run inside the tap — opens the AudioContext
+			} catch (err) {
+				// Web Audio unsupported, or the browser's AudioContext cap is hit: stay in the silent
+				// fallback rather than claiming audio is on with no speaker behind it.
+				console.error('[ui] could not open the delivery speaker:', err);
+				return;
+			}
+			audioOn = true;
+		} else {
+			audioOn = false;
+			disableDelivery();
+		}
+		writeMuted(!audioOn);
+		voiceSession.setMuted(!audioOn);
+	}
+
+	// Build the descriptor for the Oracle's own spoken line (answer or refusal) so the delivery
+	// layer can voice it via the server TTS route. System lines (Sköll's, the engine's) aren't hers.
+	function oracleVoice(oracle: ActionResponse<'Ask'>['oracle']): LineDescriptor | null {
+		if (!oracle) return null;
+		if (oracle.ok) return { kind: 'answer', query: oracle.query, affirmative: oracle.affirmative };
+		if (oracle.reason === 'refusal') return { kind: 'refusal', refusal: oracle.refusal };
+		return null;
 	}
 
 	// Return type is derived from the action's `type`, so a caller can't request a
@@ -444,10 +517,11 @@
 		if (voiceState === 'eclipsed' && voiceSession.notice) {
 			voiceNotice = voiceSession.notice;
 		}
-		// Adopt the session's persisted mute preference, then push it onto the singleton — a remount
-		// (or a wake before this mount) must not start audible if the player muted earlier.
-		muted = readMuted();
-		voiceSession.setMuted(muted);
+		// Audio is off until a tap opens the delivery speaker (gesture requirement), so the Live sink
+		// starts silent and no delivery speaker exists yet — a wake before this mount can't play before
+		// the player has enabled audio.
+		audioOn = false;
+		voiceSession.setMuted(true);
 		return () => {
 			window.removeEventListener('resize', onReposition);
 			window.removeEventListener('scroll', onReposition, true);
@@ -455,6 +529,9 @@
 			unsubscribeVoice();
 			voiceSession.setToolExecutor(null); // a dead page's game must not answer tool calls
 			voiceSession.sleep(); // never leave the mic streaming with no UI attached
+			// Close the delivery speaker too, or a late TTS response could play into a dead page and
+			// the AudioContext would leak past unmount.
+			disableDelivery();
 		};
 	});
 
@@ -524,7 +601,7 @@
 	// Never throws: a failed dispatch settles the panel and reports the silent-Oracle line.
 	async function performAsk(
 		question: string
-	): Promise<{ line: string; hers: boolean; consumed: boolean }> {
+	): Promise<{ line: string; hers: boolean; consumed: boolean; voice: LineDescriptor | null }> {
 		try {
 			const { oracle, state, skollVsYou } = await dispatch({
 				type: 'Ask',
@@ -556,13 +633,13 @@
 				outcome = { line: RITE.oracleSilent, hers: false, consumed: false };
 			}
 			answer = outcome.line;
-			return outcome;
+			return { ...outcome, voice: outcome.hers ? oracleVoice(oracle) : null };
 		} catch (err) {
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
 			console.error('[ui] Ask dispatch failed:', err);
 			answer = RITE.oracleSilent;
-			return { line: RITE.oracleSilent, hers: false, consumed: false };
+			return { line: RITE.oracleSilent, hers: false, consumed: false, voice: null };
 		}
 	}
 
@@ -577,9 +654,13 @@
 		try {
 			const outcome = await performAsk(question);
 			if (outcome.consumed) askValue = '';
-			// The witch typed instead of speaking; if the session is awake her answer is spoken
-			// too (S7) — the session drops the direction unless it is idle.
-			if (outcome.hers) voiceSession.direct(oracleBoardEcho(outcome.line));
+			// Voice her own line through the delivery seam (server TTS) — but only while the Live session
+			// is genuinely idle (asleep or listening). Any other state (waking setup, hearing the player,
+			// thinking, speaking) means Live is or is about to be voicing, and a TTS line would collide.
+			// A no-op when audio is off (no speaker). The handle lets a round that ends on Sköll's next
+			// move hold the splash until she's heard.
+			const liveIdle = voiceSession.state === 'asleep' || voiceSession.state === 'listening';
+			answerAudio = outcome.voice && liveIdle ? deliver(outcome.voice) : null;
 			await advanceSkoll();
 		} finally {
 			pending = false;
@@ -688,6 +769,9 @@
 			voiceInvited = false; // a new round re-arms the Oracle's wake invitation
 			// Also cancels an in-flight wake, so a slow first wake can't mark the fresh round invited.
 			voiceSession.sleep();
+			// Drop any still-playing/queued Oracle line from the round just ended — TTS delivery is
+			// fire-and-forget, so without this a prior answer could bleed over the fresh blank round.
+			stopDelivery();
 			applyState(state);
 			cancelCast();
 			return true;
@@ -997,19 +1081,22 @@
 				<div class="voice-controls" role="group" aria-label="Oracle voice controls">
 					<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
 					<button
-						class="mute-toggle"
+						class="voice-switch"
 						type="button"
+						role="switch"
 						data-testid="mute-toggle"
-						aria-pressed={muted}
-						aria-label={muted ? RITE.unmuteVoices : RITE.muteVoices}
-						onclick={toggleMute}
+						aria-checked={audioOn}
+						aria-label={audioOn ? RITE.muteVoices : RITE.unmuteVoices}
+						onclick={toggleAudio}
 					>
-						<svg viewBox="0 0 24 24" aria-hidden="true">
-							<path d="M4 9v6h4l5 4V5L8 9H4z" />
-							<path class="wave wave--near" d="M16 9a3.5 3.5 0 0 1 0 6" />
-							<path class="wave wave--far" d="M18.5 6.5a7 7 0 0 1 0 11" />
-							<line class="mute-strike" x1="3.5" y1="4" x2="20.5" y2="20" />
-						</svg>
+						<span class="voice-switch__thumb">
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path d="M4 9v6h4l5 4V5L8 9H4z" />
+								<path class="wave wave--near" d="M16 9a3.5 3.5 0 0 1 0 6" />
+								<path class="wave wave--far" d="M18.5 6.5a7 7 0 0 1 0 11" />
+								<line class="mute-strike" x1="3.5" y1="4" x2="20.5" y2="20" />
+							</svg>
+						</span>
 					</button>
 				</div>
 				<!-- Always mounted (a live region born with content is skipped by screen readers) and
@@ -1594,60 +1681,98 @@
 		position: relative;
 	}
 
-	.mute-toggle {
+	/* A pill switch: a track with a sliding thumb. The state is the signal — the thumb's position
+	   (left/right) and the track tint both flip on click; hover is only a quiet affordance. */
+	.voice-switch {
 		position: absolute;
 		top: 0;
 		right: 0.25rem;
-		display: grid;
-		place-items: center;
-		width: 2.25rem;
-		height: 2.25rem;
+		inline-size: 3.1rem;
+		block-size: 1.7rem;
 		padding: 0;
+		/* Restrained: a dark track in both states with a soft gold-dim ring; the thumb is the only
+		   gold, and aged (--gold), never the bright accent — so it sits in the muted palette. */
 		border: 1px solid var(--gold-dim);
-		border-radius: 50%;
-		background: rgba(6, 9, 18, 0.7);
-		color: var(--gold-bright);
+		border-radius: 999px;
+		background: rgba(6, 9, 18, 0.6);
 		cursor: pointer;
 		transition:
-			color 0.2s ease,
+			background 0.2s ease,
 			border-color 0.2s ease;
 	}
 
-	.mute-toggle svg {
-		width: 1.25rem;
-		height: 1.25rem;
+	/* ON: only a whisper of warmth in the track — the thumb's position and gold carry the state. */
+	.voice-switch[aria-checked='true'] {
+		background: var(--gold-faint);
+	}
+
+	.voice-switch:hover {
+		border-color: var(--gold);
+	}
+
+	.voice-switch__thumb {
+		position: absolute;
+		inset-block-start: 50%;
+		inset-inline-start: 0.16rem;
+		display: grid;
+		place-items: center;
+		inline-size: 1.3rem;
+		block-size: 1.3rem;
+		border-radius: 50%;
+		/* An outlined ring, never a filled disc: a thin gold-dim hoop with the speaker glyph inside.
+		   OFF dims and strikes it; ON lights the ring and glyph to aged gold. */
+		background: transparent;
+		border: 1px solid var(--gold-dim);
+		color: var(--ink-muted);
+		transform: translateY(-50%);
+		transition:
+			inset-inline-start 0.2s ease,
+			border-color 0.2s ease,
+			color 0.2s ease;
+	}
+
+	.voice-switch[aria-checked='true'] .voice-switch__thumb {
+		inset-inline-start: calc(100% - 1.3rem - 0.16rem);
+		border-color: var(--gold);
+		color: var(--gold);
+	}
+
+	.voice-switch__thumb svg {
+		width: 0.95rem;
+		height: 0.95rem;
 		fill: currentColor;
 		stroke: currentColor;
-		stroke-width: 1.6;
+		stroke-width: 1.8;
 		stroke-linecap: round;
 	}
 
-	.mute-toggle .wave {
+	.voice-switch .wave {
 		fill: none;
 	}
 
-	/* Pressed = muted: dim the control, hide the sound waves, and strike the speaker — a shape
-	   signal, never color alone. */
-	.mute-toggle[aria-pressed='true'] {
-		color: var(--ink-faint);
-		border-color: var(--ink-faint);
-	}
-
-	.mute-toggle .mute-strike {
+	/* OFF: hide the sound waves and strike the speaker — the shape half of the on/off signal. */
+	.voice-switch .mute-strike {
 		display: none;
 	}
 
-	.mute-toggle[aria-pressed='true'] .wave {
+	.voice-switch[aria-checked='false'] .wave {
 		display: none;
 	}
 
-	.mute-toggle[aria-pressed='true'] .mute-strike {
+	.voice-switch[aria-checked='false'] .mute-strike {
 		display: inline;
 	}
 
-	.mute-toggle:focus-visible {
+	.voice-switch:focus-visible {
 		outline: 2px solid var(--gold-bright);
 		outline-offset: 3px;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.voice-switch,
+		.voice-switch__thumb {
+			transition: none;
+		}
 	}
 
 	/* Overlay pill under the disc: legible at body size, opaque backdrop, zero layout impact. */

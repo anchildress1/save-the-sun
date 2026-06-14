@@ -132,9 +132,11 @@ export function answerAsk(
 		);
 
 	// The echo is for the opponent's Ask; your own Ask shows the answer, which restates the trait.
+	// query rides along so the delivery layer can voice this exact line via the server TTS route.
 	return {
 		ok: true,
 		echo: `You ask after ${paraphrase}.`,
+		query,
 		answer: voiceAnswer(query, result.answer),
 		affirmative: result.answer,
 		turnConsumed: true

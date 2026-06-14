@@ -29,6 +29,13 @@ export type Interpretation = QueryInterpretation | RefusalInterpretation;
 export type Interpret = (question: string) => Promise<Interpretation>;
 
 export type OracleResult =
-	| { ok: true; echo: string; answer: string; affirmative: boolean; turnConsumed: true }
+	| {
+			ok: true;
+			echo: string;
+			query: Query;
+			answer: string;
+			affirmative: boolean;
+			turnConsumed: true;
+	  }
 	| { ok: false; reason: 'refusal'; refusal: RefusalClass; line: string; turnConsumed: false }
 	| { ok: false; reason: 'engine'; engineReason: InvalidReason; turnConsumed: false };

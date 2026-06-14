@@ -3,7 +3,11 @@ import {
 	claimMintSlot,
 	resetMintWindows,
 	SESSION_LIMIT,
-	GLOBAL_LIMIT
+	GLOBAL_LIMIT,
+	claimTtsSlot,
+	resetTtsWindows,
+	TTS_SESSION_LIMIT,
+	TTS_GLOBAL_LIMIT
 } from '$lib/server/voice/rateLimit';
 
 const T0 = 1_000_000;
@@ -131,5 +135,37 @@ describe('claimMintSlot', () => {
 			expect(claimMintSlot('late-witch', T0 + 61_000)).toEqual({ ok: true });
 		}
 		expect(claimMintSlot('late-witch', T0 + 61_000).ok).toBe(false);
+	});
+});
+
+describe('claimTtsSlot', () => {
+	beforeEach(() => {
+		resetTtsWindows();
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+	});
+
+	afterEach(() => vi.restoreAllMocks());
+
+	it('allows exactly TTS_SESSION_LIMIT claims per session within one window', () => {
+		for (let i = 0; i < TTS_SESSION_LIMIT; i++) {
+			expect(claimTtsSlot('witch', T0)).toEqual({ ok: true });
+		}
+		expect(claimTtsSlot('witch', T0)).toEqual({ ok: false, retryAfterSeconds: 60 });
+	});
+
+	it('runs an independent window from the mint limiter', () => {
+		// Draining minting leaves TTS untouched — separate limiters, separate ceilings.
+		for (let i = 0; i < SESSION_LIMIT; i++) claimMintSlot('witch', T0);
+		expect(claimMintSlot('witch', T0).ok).toBe(false);
+		expect(claimTtsSlot('witch', T0)).toEqual({ ok: true });
+	});
+
+	it('denies any session once the global TTS window is exhausted, warning once', () => {
+		const sessionsNeeded = TTS_GLOBAL_LIMIT / TTS_SESSION_LIMIT;
+		for (let s = 0; s < sessionsNeeded; s++) {
+			for (let i = 0; i < TTS_SESSION_LIMIT; i++) claimTtsSlot(`flood-${s}`, T0);
+		}
+		expect(claimTtsSlot('fresh', T0).ok).toBe(false);
+		expect(vi.mocked(console.warn).mock.calls[0].join(' ')).toContain('global TTS');
 	});
 });

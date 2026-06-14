@@ -13,3 +13,7 @@
 - [x] Add architecture diagrams _(`docs/architecture.md` — system, turn/Advance, voice tool-call loop, session lifecycle; linked from README + AGENTS)_
 - [x] Change "Your Move" pill color on opponent turn
 - [x] Asking a new question while Sköll's question hangs auto-passes his question and answers the new one _(no need to say "pass" — the ask path resolves his hanging question as a Pass, then dispatches her new Ask; scry/hex still need her word twice)_
+- [ ] Align the badges on the debug view to add Answer for Oracle.
+- [ ] Sort debug view in reverse chronological order
+- [ ] Undo the 'don't think' Skoll logic
+- [ ] Oracle spoken flair — dynamic/dramatized TTS lines; drop the preset allow-list for a server-authored-line gate (so she can surprise without the endpoint becoming free arbitrary-text TTS)
