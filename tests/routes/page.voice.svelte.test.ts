@@ -1554,6 +1554,55 @@ describe('Save the Sun page — cast lockout (S9)', () => {
 	});
 });
 
+describe('Save the Sun page — turn-gated sleep', () => {
+	it('sleeps when a board action hands the turn to Sköll while already listening', async () => {
+		const skollTurn: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		// Cast resolves immediately; Advance is held — we're testing the reactive effect, not
+		// the full cast flow, so we don't need the advance to complete.
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = readBody(init as RequestInit | undefined);
+			if (body.type === 'Cast')
+				return new Response(
+					JSON.stringify({
+						type: 'Cast',
+						cast: { ok: true, won: false, turnConsumed: true },
+						state: skollTurn
+					})
+				);
+			return new Promise(() => {}); // hold the Advance; never resolves in this test
+		});
+		const screen = render(Page, pageProps);
+
+		// Session reaches listening during Human's turn — the gate must not fire yet
+		emit({ type: 'listening' });
+		expect(voiceMock.sleep).not.toHaveBeenCalled();
+
+		// Board cast returns a Sköll turn — reactive gate sleeps without a new voice event
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await screen.getByRole('button', { name: 'Name it' }).click();
+		await vi.waitFor(() => expect(voiceMock.sleep).toHaveBeenCalled());
+	});
+
+	it('sleeps when the round resolves while already listening', async () => {
+		const won: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 6 };
+		mockAction({ type: 'Cast', cast: { ok: true, won: true, turnConsumed: true }, state: won });
+		const screen = render(Page, pageProps);
+
+		emit({ type: 'listening' });
+		expect(voiceMock.sleep).not.toHaveBeenCalled();
+
+		await startBoardCast(screen);
+		await vi.waitFor(() => expect(voiceMock.sleep).toHaveBeenCalled());
+	});
+});
+
 describe('Save the Sun page — transcripts to text (S10)', () => {
 	const VIEW_KEY = 'save-the-sun:view';
 

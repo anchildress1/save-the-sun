@@ -516,8 +516,8 @@ describe('voiceSession silence timeout (S5)', () => {
 		events = [];
 	});
 
-	it('idles to asleep after 10s of no recognizable speech — mic, socket, and speaker all close', async () => {
-		await vi.advanceTimersByTimeAsync(10_000);
+	it('idles to asleep after 5s of no recognizable speech — mic, socket, and speaker all close', async () => {
+		await vi.advanceTimersByTimeAsync(5_000);
 		expect(micStop).toHaveBeenCalledTimes(1);
 		expect(liveSession.close).toHaveBeenCalledTimes(1);
 		expect(speaker.close).toHaveBeenCalledTimes(1);
@@ -527,18 +527,18 @@ describe('voiceSession silence timeout (S5)', () => {
 	});
 
 	it('idles silently — no error event, no notice, no audio nudge (R7)', async () => {
-		await vi.advanceTimersByTimeAsync(10_000);
+		await vi.advanceTimersByTimeAsync(5_000);
 		expect(eventTypes()).not.toContain('error');
 		expect(vs.notice).toBeNull();
 		expect(speaker.enqueue).not.toHaveBeenCalled();
 	});
 
 	it('an input transcript resets the clock — recognizable speech keeps the session awake', async () => {
-		await vi.advanceTimersByTimeAsync(9_000);
+		await vi.advanceTimersByTimeAsync(4_000);
 		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'oracle' } } });
-		await vi.advanceTimersByTimeAsync(9_000); // 18s total, but only 9s since the last words
+		await vi.advanceTimersByTimeAsync(4_000); // 8s total, but only 4s since the last words
 		expect(vs.state).toBe('listening');
-		await vi.advanceTimersByTimeAsync(1_000); // 10s since the last words
+		await vi.advanceTimersByTimeAsync(1_000); // 5s since the last words
 		expect(vs.state).toBe('asleep');
 	});
 
@@ -549,7 +549,7 @@ describe('voiceSession silence timeout (S5)', () => {
 			await vi.advanceTimersByTimeAsync(1_000);
 		}
 		expect(vs.state).toBe('hearing'); // 8 transcript resets keep the clock alive
-		await vi.advanceTimersByTimeAsync(10_000); // then true silence idles it
+		await vi.advanceTimersByTimeAsync(5_000); // then true silence idles it
 		expect(vs.state).toBe('asleep');
 	});
 
@@ -579,7 +579,7 @@ describe('voiceSession silence timeout (S5)', () => {
 		speaker.busy = false;
 		speaker.drain!();
 		expect(vs.state).toBe('listening');
-		await vi.advanceTimersByTimeAsync(9_999);
+		await vi.advanceTimersByTimeAsync(4_999);
 		expect(vs.state).toBe('listening');
 		await vi.advanceTimersByTimeAsync(1);
 		expect(vs.state).toBe('asleep');
@@ -608,7 +608,7 @@ describe('voiceSession silence timeout (S5)', () => {
 		});
 		callbacks!.onmessage({ serverContent: { interrupted: true } }); // speaking → hearing, clock was paused
 		expect(vs.state).toBe('hearing');
-		await vi.advanceTimersByTimeAsync(10_000);
+		await vi.advanceTimersByTimeAsync(5_000);
 		expect(vs.state).toBe('asleep');
 	});
 
@@ -618,12 +618,12 @@ describe('voiceSession silence timeout (S5)', () => {
 		await vi.advanceTimersByTimeAsync(800);
 		await vi.advanceTimersByTimeAsync(10_000); // rescue → listening
 		expect(vs.state).toBe('listening');
-		await vi.advanceTimersByTimeAsync(10_000);
+		await vi.advanceTimersByTimeAsync(5_000);
 		expect(vs.state).toBe('asleep');
 	});
 
 	it('a medallion tap resumes after a silence idle (R7)', async () => {
-		await vi.advanceTimersByTimeAsync(10_000);
+		await vi.advanceTimersByTimeAsync(5_000);
 		expect(vs.state).toBe('asleep');
 		events = [];
 		await awaken();
@@ -685,7 +685,7 @@ describe('voiceSession wake invitation (S6)', () => {
 		speaker.busy = false;
 		speaker.drain!();
 		expect(vs.state).toBe('listening');
-		await vi.advanceTimersByTimeAsync(10_000);
+		await vi.advanceTimersByTimeAsync(5_000);
 		expect(vs.state).toBe('asleep');
 	});
 
@@ -694,7 +694,7 @@ describe('voiceSession wake invitation (S6)', () => {
 		await vi.advanceTimersByTimeAsync(10_000);
 		expect(vs.state).toBe('listening');
 		expect(teeBodies().join(' ')).toContain('thinking rescue fired');
-		await vi.advanceTimersByTimeAsync(10_000);
+		await vi.advanceTimersByTimeAsync(5_000);
 		expect(vs.state).toBe('asleep');
 	});
 

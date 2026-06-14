@@ -217,6 +217,15 @@
 		if (restored && !skollStalled) writeViewState(roundId, snapshot);
 	});
 
+	// Board-driven gate: sleep the session whenever the game hands off to Sköll or ends while the
+	// mic is live. The onVoiceEvent handler catches this at the next `listening` event; this effect
+	// catches it when the session is already listening and no new voice event arrives.
+	$effect(() => {
+		if (voiceState === 'listening' && (roundOver || (activePlayer === 'Sköll' && !skollAsking))) {
+			voiceSession.sleep();
+		}
+	});
+
 	let selectedRune = $derived(
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
 	);
