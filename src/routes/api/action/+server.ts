@@ -184,7 +184,13 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 			? { hexed: true }
 			: {
 					hexed: false,
-					...(answer.shared && { scried: { answer: voiceAnswer(askedQuery, answer.affirmative) } })
+					...(answer.shared && {
+						scried: {
+							answer: voiceAnswer(askedQuery, answer.affirmative),
+							query: askedQuery,
+							affirmative: answer.affirmative
+						}
+					})
 				};
 		return json({ type: 'React', outcome: reaction, skollReaction, state: gameState(engine) });
 	}

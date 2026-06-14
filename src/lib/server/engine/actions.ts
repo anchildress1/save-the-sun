@@ -73,10 +73,12 @@ export interface SkollTurn {
 	asks?: { echo: string; query: Query };
 }
 
-/** How Sköll's parked Ask resolved after the human reacted. A Hex kills it; a Scry shares it. */
+/** How Sköll's parked Ask resolved after the human reacted. A Hex kills it; a Scry shares it.
+ *  `scried` carries the structured query + verdict (not just the text) so the client can voice the
+ *  overheard answer through the TTS allow-list. */
 export interface SkollReaction {
 	hexed: boolean;
-	scried?: { answer: string };
+	scried?: { answer: string; query: Query; affirmative: boolean };
 }
 
 /** How Sköll reacted to the *human's* Ask: Hex kills it, Scry overhears it. */

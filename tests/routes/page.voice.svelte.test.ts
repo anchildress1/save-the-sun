@@ -918,7 +918,7 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		expect(deliveryMock.deliver).not.toHaveBeenCalled();
 	});
 
-	it("a typed Ask that Sköll hexes is not voiced — his Hex closed the Oracle's lips", async () => {
+	it('a typed Ask that Sköll hexes voices the §3 Hex line in the Oracle’s voice', async () => {
 		mockAction({ type: 'Ask', skollVsYou: { reaction: 'Hex' }, state: HUMAN_TURN });
 		const screen = render(Page, pageProps);
 		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
@@ -926,7 +926,10 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		await expect
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('Sköll silences the Oracle; your question dies.');
-		expect(deliveryMock.deliver).not.toHaveBeenCalled();
+		// The Hex resolution is a server-owned react line — voiced (R10), not just text.
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'react', line: 'skoll-hex' })
+		);
 	});
 });
 
@@ -1958,5 +1961,55 @@ describe('Save the Sun page — Sköll voiced via TTS (rework)', () => {
 			.element(screen.getByTestId('skoll-echo'))
 			.toHaveTextContent('I scent a fire rune on her.'); // still written (R10)
 		expect(deliveryMock.deliver).not.toHaveBeenCalledWith({ kind: 'skoll-ask', query: ASK_QUERY });
+	});
+});
+
+describe('Save the Sun page — reaction lines voiced (R10)', () => {
+	const reactProps = {
+		...pageProps,
+		data: {
+			...pageProps.data,
+			pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+		}
+	};
+
+	it('voices the human Scry resolution — the overheard answer in the Oracle’s voice', async () => {
+		const query = { axis: 'element', value: 'Fire' };
+		mockAction({
+			type: 'React',
+			outcome: { ok: true, choice: 'Scry', shareAnswer: true },
+			skollReaction: {
+				hexed: false,
+				scried: { answer: 'Yes. Sól is reaching for a fire rune.', query, affirmative: true }
+			},
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, reactProps);
+		await screen.getByRole('button', { name: 'Scry' }).click();
+
+		// The resolution is a server-owned react line carrying the structured answer.
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({
+				kind: 'react',
+				line: 'human-scry',
+				query,
+				affirmative: true
+			})
+		);
+	});
+
+	it('voices the human Hex resolution', async () => {
+		mockAction({
+			type: 'React',
+			outcome: { ok: true, choice: 'Hex' },
+			skollReaction: { hexed: true },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, reactProps);
+		await screen.getByRole('button', { name: 'Hex' }).click();
+
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'react', line: 'human-hex' })
+		);
 	});
 });

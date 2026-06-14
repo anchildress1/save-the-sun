@@ -8,6 +8,7 @@ import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
 import { skollAskEcho } from '$lib/server/skoll/skoll';
 import type { RefusalClass } from '$lib/server/oracle/types';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
+import { REACTION_LINES, carriesAnswer, type ReactionLineId } from '$lib/voice/reactionLines';
 
 const REFUSAL_CLASSES: ReadonlySet<RefusalClass> = new Set([
 	'mixed-type',
@@ -30,7 +31,15 @@ export type LineDescriptor =
 	| { kind: 'answer'; query: unknown; affirmative: boolean }
 	// Sköll's Ask (a game move, R10): his first-person line composed from the same query the engine
 	// parked, so the route still voices only a server-owned line — never arbitrary client text.
-	| { kind: 'skoll-ask'; query: unknown };
+	| { kind: 'skoll-ask'; query: unknown }
+	// A reaction resolution (Scry/Hex/Pass, ux-copy §3): the fixed framing from REACTION_LINES, plus
+	// the overheard answer for the two scry lines (composed from the query, so still server-owned).
+	| { kind: 'react'; line: ReactionLineId; query?: unknown; affirmative?: boolean };
+
+// Bound a power query to the real board (runes are 1-6), shared by the answer and scry composers.
+function powerInRange(query: ReturnType<typeof parseQuery>): boolean {
+	return !(query?.axis === 'power' && (query.value < MIN_POWER || query.value > MAX_POWER));
+}
 
 /** Compose the exact server-owned line for a descriptor, or null when it is not allow-listed. */
 export function composeLine(descriptor: LineDescriptor): string | null {
@@ -53,6 +62,19 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 			if (query.axis === 'power' && (query.value < MIN_POWER || query.value > MAX_POWER))
 				return null;
 			return skollAskEcho(query);
+		}
+		case 'react': {
+			const id = descriptor.line;
+			if (!(id in REACTION_LINES)) return null;
+			const framing = REACTION_LINES[id];
+			// Hex/Pass are framing only; the two scry lines lead/trail the overheard answer.
+			if (!carriesAnswer(id)) return framing;
+			if (typeof descriptor.affirmative !== 'boolean') return null;
+			const query = parseQuery(descriptor.query);
+			if (query === null || !powerInRange(query)) return null;
+			const ans = voiceAnswer(query, descriptor.affirmative);
+			// human-scry frames then reveals; skoll-scry reveals then notes he overheard (ux-copy §3).
+			return id === 'human-scry' ? `${framing} ${ans}` : `${ans} ${framing}`;
 		}
 	}
 }
@@ -97,6 +119,8 @@ export function isLineDescriptor(value: unknown): value is LineDescriptor {
 			return 'query' in v && 'affirmative' in v;
 		case 'skoll-ask':
 			return 'query' in v;
+		case 'react':
+			return typeof v.line === 'string';
 		default:
 			return false;
 	}
