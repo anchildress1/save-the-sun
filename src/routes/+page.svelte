@@ -1046,19 +1046,22 @@
 				<div class="voice-controls" role="group" aria-label="Oracle voice controls">
 					<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
 					<button
-						class="mute-toggle"
+						class="voice-switch"
 						type="button"
+						role="switch"
 						data-testid="mute-toggle"
-						aria-pressed={!audioOn}
+						aria-checked={audioOn}
 						aria-label={audioOn ? RITE.muteVoices : RITE.unmuteVoices}
 						onclick={toggleAudio}
 					>
-						<svg viewBox="0 0 24 24" aria-hidden="true">
-							<path d="M4 9v6h4l5 4V5L8 9H4z" />
-							<path class="wave wave--near" d="M16 9a3.5 3.5 0 0 1 0 6" />
-							<path class="wave wave--far" d="M18.5 6.5a7 7 0 0 1 0 11" />
-							<line class="mute-strike" x1="3.5" y1="4" x2="20.5" y2="20" />
-						</svg>
+						<span class="voice-switch__thumb">
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path d="M4 9v6h4l5 4V5L8 9H4z" />
+								<path class="wave wave--near" d="M16 9a3.5 3.5 0 0 1 0 6" />
+								<path class="wave wave--far" d="M18.5 6.5a7 7 0 0 1 0 11" />
+								<line class="mute-strike" x1="3.5" y1="4" x2="20.5" y2="20" />
+							</svg>
+						</span>
 					</button>
 				</div>
 				<!-- Always mounted (a live region born with content is skipped by screen readers) and
@@ -1643,70 +1646,93 @@
 		position: relative;
 	}
 
-	.mute-toggle {
+	/* A pill switch: a track with a sliding thumb. The state is the signal — the thumb's position
+	   (left/right) and the track tint both flip on click; hover is only a quiet affordance. */
+	.voice-switch {
 		position: absolute;
 		top: 0;
 		right: 0.25rem;
-		display: grid;
-		place-items: center;
-		width: 2.25rem;
-		height: 2.25rem;
+		inline-size: 3.1rem;
+		block-size: 1.7rem;
 		padding: 0;
-		border: 1px solid var(--gold-bright);
-		border-radius: 50%;
-		/* The state is the signal, not hover: ON is gold and gently lit; OFF dims, hollows, and
-		   strikes the speaker below. Click toggles between the two. */
-		background: rgba(217, 169, 74, 0.12);
-		color: var(--gold-bright);
+		border: 1px solid var(--gold-dim);
+		border-radius: 999px;
+		background: rgba(6, 9, 18, 0.55);
 		cursor: pointer;
 		transition:
-			color 0.2s ease,
-			border-color 0.2s ease,
-			background 0.2s ease;
+			background 0.2s ease,
+			border-color 0.2s ease;
 	}
 
-	/* OFF (muted): hollow it out and dim the icon — paired with the strike below, so the state
-	   reads by shape and color both. */
-	.mute-toggle[aria-pressed='true'] {
-		border-color: var(--gold-dim);
-		background: rgba(6, 9, 18, 0.5);
-		color: var(--ink-faint);
-	}
-
-	/* Hover is a quiet affordance only — it never carries the on/off meaning. */
-	.mute-toggle:hover {
+	/* ON: the track lights gold and the thumb has slid to the lit end. */
+	.voice-switch[aria-checked='true'] {
+		background: rgba(217, 169, 74, 0.18);
 		border-color: var(--gold-bright);
 	}
 
-	.mute-toggle svg {
-		width: 1.25rem;
-		height: 1.25rem;
+	.voice-switch:hover {
+		border-color: var(--gold-bright);
+	}
+
+	.voice-switch__thumb {
+		position: absolute;
+		inset-block-start: 50%;
+		inset-inline-start: 0.16rem;
+		display: grid;
+		place-items: center;
+		inline-size: 1.3rem;
+		block-size: 1.3rem;
+		border-radius: 50%;
+		/* Dim disc when off, bright gold when on; the speaker glyph rides it in dark ink. */
+		background: var(--ink-muted);
+		color: rgba(6, 9, 18, 0.92);
+		transform: translateY(-50%);
+		transition:
+			inset-inline-start 0.2s ease,
+			background 0.2s ease;
+	}
+
+	.voice-switch[aria-checked='true'] .voice-switch__thumb {
+		inset-inline-start: calc(100% - 1.3rem - 0.16rem);
+		background: var(--gold-bright);
+	}
+
+	.voice-switch__thumb svg {
+		width: 0.95rem;
+		height: 0.95rem;
 		fill: currentColor;
 		stroke: currentColor;
-		stroke-width: 1.6;
+		stroke-width: 1.8;
 		stroke-linecap: round;
 	}
 
-	.mute-toggle .wave {
+	.voice-switch .wave {
 		fill: none;
 	}
 
-	/* Muted: hide the sound waves and strike the speaker — the shape half of the on/off signal. */
-	.mute-toggle .mute-strike {
+	/* OFF: hide the sound waves and strike the speaker — the shape half of the on/off signal. */
+	.voice-switch .mute-strike {
 		display: none;
 	}
 
-	.mute-toggle[aria-pressed='true'] .wave {
+	.voice-switch[aria-checked='false'] .wave {
 		display: none;
 	}
 
-	.mute-toggle[aria-pressed='true'] .mute-strike {
+	.voice-switch[aria-checked='false'] .mute-strike {
 		display: inline;
 	}
 
-	.mute-toggle:focus-visible {
+	.voice-switch:focus-visible {
 		outline: 2px solid var(--gold-bright);
 		outline-offset: 3px;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.voice-switch,
+		.voice-switch__thumb {
+			transition: none;
+		}
 	}
 
 	/* Overlay pill under the disc: legible at body size, opaque backdrop, zero layout impact. */

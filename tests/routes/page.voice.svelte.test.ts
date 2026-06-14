@@ -1711,8 +1711,9 @@ describe('Save the Sun page — audio toggle (voice-as-delivery P1)', () => {
 	it('opens with audio off — both sinks silent until a gesture enables it', async () => {
 		const screen = render(Page, pageProps);
 		const toggle = screen.getByTestId('mute-toggle');
-		// Off by default: the control reads pressed (struck) and offers to let the voices be heard.
-		await expect.element(toggle).toHaveAttribute('aria-pressed', 'true');
+		// A switch, off by default (unchecked + struck), offering to let the voices be heard.
+		expect(toggle.element().getAttribute('role')).toBe('switch');
+		await expect.element(toggle).toHaveAttribute('aria-checked', 'false');
 		expect(toggle.element().getAttribute('aria-label')).toBe(UNMUTE_LABEL);
 		// Mount silences both the Live speaker and the delivery seam; no speaker is opened yet.
 		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
@@ -1738,13 +1739,13 @@ describe('Save the Sun page — audio toggle (voice-as-delivery P1)', () => {
 		expect(deliveryMock.enableDelivery).toHaveBeenCalledOnce();
 		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(false);
 		expect(deliveryMock.setDeliveryMuted).toHaveBeenLastCalledWith(false);
-		await expect.element(toggle).toHaveAttribute('aria-pressed', 'false');
+		await expect.element(toggle).toHaveAttribute('aria-checked', 'true');
 		expect(toggle.element().getAttribute('aria-label')).toBe(MUTE_LABEL);
 
 		await toggle.click();
 		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
 		expect(deliveryMock.setDeliveryMuted).toHaveBeenLastCalledWith(true);
-		await expect.element(toggle).toHaveAttribute('aria-pressed', 'true');
+		await expect.element(toggle).toHaveAttribute('aria-checked', 'false');
 	});
 
 	it('is a pure sound switch — speaks nothing on its own (no wake greeting)', async () => {
@@ -1765,7 +1766,9 @@ describe('Save the Sun page — audio toggle (voice-as-delivery P1)', () => {
 		first.unmount();
 		// Audio cannot auto-resume without a fresh gesture: a remount opens off regardless.
 		const second = render(Page, pageProps);
-		await expect.element(second.getByTestId('mute-toggle')).toHaveAttribute('aria-pressed', 'true');
+		await expect
+			.element(second.getByTestId('mute-toggle'))
+			.toHaveAttribute('aria-checked', 'false');
 		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
 	});
 
