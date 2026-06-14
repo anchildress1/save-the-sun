@@ -97,7 +97,12 @@ describe('openMic', () => {
 		const verdict = await openMic(vi.fn());
 		expect(verdict.ok).toBe(true);
 		expect(getUserMedia).toHaveBeenCalledExactlyOnceWith({
-			audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }
+			audio: {
+				channelCount: 1,
+				echoCancellation: true,
+				noiseSuppression: true,
+				autoGainControl: false
+			}
 		});
 		const context = FakeAudioContext.instances[0];
 		expect(context.sampleRate).toBe(MIC_SAMPLE_RATE);

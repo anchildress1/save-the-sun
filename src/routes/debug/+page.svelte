@@ -141,6 +141,10 @@
 	li.engine {
 		border-inline-start-color: var(--engine);
 	}
+	li.error {
+		border-inline-start-color: #e05555;
+		background: #1e1518;
+	}
 	.head {
 		display: flex;
 		flex-wrap: wrap;
