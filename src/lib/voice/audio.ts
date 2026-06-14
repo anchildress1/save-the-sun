@@ -78,7 +78,12 @@ export async function openMic(onChunk: MicChunkHandler): Promise<MicVerdict> {
 	let stream: MediaStream;
 	try {
 		stream = await navigator.mediaDevices.getUserMedia({
-			audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }
+			audio: {
+				channelCount: 1,
+				echoCancellation: true,
+				noiseSuppression: true,
+				autoGainControl: false
+			}
 		});
 	} catch (err) {
 		return { ok: false, reason: micFailure(err), detail: failureDetail(err) };

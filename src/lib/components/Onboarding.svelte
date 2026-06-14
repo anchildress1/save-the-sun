@@ -354,12 +354,15 @@
 		padding: 1.6rem 1.8rem;
 		overflow-y: auto;
 		text-align: center;
-		/* Moon art stays visible without competing with the tour copy. */
+		/* Moon pinned to top: image strip at 45% container height, gradient fades to solid at 40%. */
 		background:
-			linear-gradient(180deg, rgba(4, 8, 16, 0.78) 0%, rgba(6, 9, 18, 0.9) 100%),
-			var(--modal-bg) center / cover no-repeat;
-		border: 1px solid var(--gold-dim);
-		border-radius: 12px;
+			linear-gradient(180deg, rgba(4, 8, 16, 0.38) 0%, rgba(6, 9, 18, 0.97) 40%),
+			var(--modal-bg) top center / auto 45% no-repeat;
+		border: 14px solid transparent;
+		border-image-source: var(--button-border);
+		border-image-slice: 44 56;
+		border-image-width: 14px 18px;
+		border-image-repeat: stretch;
 		box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
 	}
 

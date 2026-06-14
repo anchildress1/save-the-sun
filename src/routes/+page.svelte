@@ -231,12 +231,6 @@
 	// Per round, persisted with the view (S6): the invitation speaks once per game, not per tap.
 	let voiceInvited = $state(false);
 
-	// S10: fragments carry no turn marker (boundaries ride state events), and `voiceCaption`
-	// stays apart from `answer` so a fragment never extends a board-made line. The input transcript
-	// is debug-only — it is teed to /debug, never shown in the rite UI.
-	let voiceCaption = '';
-	let captionOpen = false;
-
 	// S8: the armed confirmation for a gated tool call (scry, hex, cast_rune). `heard` flips when
 	// the player speaks after arming — the confirming call is refused without it, so the model can
 	// never execute both phases in one breath. `spoke` flips on the Oracle's first turn since
@@ -252,8 +246,6 @@
 	function onVoiceEvent(event: VoiceEvent) {
 		switch (event.type) {
 			case 'hearing':
-				// Barge-in cut her line; the next fragment must start fresh, never extend it.
-				captionOpen = false;
 				voiceState = 'hearing';
 				voiceAmplitude = event.amplitude;
 				break;
@@ -265,7 +257,6 @@
 				voiceAmplitude = 0;
 				// Silence timeout, sleep tap, or the seal: the exchange is over, nothing executes (R4).
 				voiceConfirm = null;
-				captionOpen = false;
 				break;
 			case 'waking':
 				voiceState = 'waking';
@@ -279,7 +270,6 @@
 				// player already answered the confirmation and no matching tool call landed, it
 				// was a decline or drift — do not leave the destructive gate armed.
 				if (voiceConfirm?.spoke && voiceConfirm.heard) voiceConfirm = null;
-				captionOpen = false;
 				voiceState = event.type;
 				// Sleep when it's not the human's input moment: round over, or Sköll's advance
 				// phase (his ask window is the one exception — human still needs to react).
@@ -305,25 +295,14 @@
 				voiceState = 'asleep';
 				voiceAmplitude = 0;
 				voiceConfirm = null;
-				captionOpen = false;
 				break;
 			case 'transcript':
 				if (event.direction === 'in') {
 					// The player spoke since arming — the gate may accept the confirming call (S8).
 					// The input transcript itself is debug-only; it is not surfaced in the rite UI.
 					if (voiceConfirm) voiceConfirm.heard = true;
-				} else if (event.final) {
-					// Turn's end: the whole assembled line, authoritative over the streamed fragments.
-					// Streaming alone truncates when the turn settles before the tail lands — this flushes
-					// the complete text. Closed so the next turn's first fragment starts fresh.
-					voiceCaption = event.text;
-					answer = event.text;
-					captionOpen = false;
-				} else {
-					voiceCaption = captionOpen ? voiceCaption + event.text : event.text;
-					captionOpen = true;
-					answer = voiceCaption;
 				}
+				// out-transcript is audio-only; answer is set by the tool executor (engine truth)
 				break;
 			default:
 				event satisfies never; // a new S10/S13 event type must be handled, not dropped
