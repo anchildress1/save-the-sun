@@ -83,7 +83,7 @@ export async function deliver(descriptor: LineDescriptor): Promise<void> {
  */
 export function whenDrained(timeoutMs: number): Promise<void> {
 	const active = speaker;
-	if (!active || !active.busy) return Promise.resolve();
+	if (!active?.busy) return Promise.resolve();
 	return new Promise((resolve) => {
 		let settled = false;
 		const finish = () => {
