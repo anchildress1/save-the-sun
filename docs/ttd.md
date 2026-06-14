@@ -16,3 +16,4 @@
 - [ ] Align the badges on the debug view to add Answer for Oracle.
 - [ ] Sort debug view in reverse chronological order
 - [ ] Undo the 'don't think' Skoll logic
+- [ ] Oracle spoken flair — dynamic/dramatized TTS lines; drop the preset allow-list for a server-authored-line gate (so she can surprise without the endpoint becoming free arbitrary-text TTS)

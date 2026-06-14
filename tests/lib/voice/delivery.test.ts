@@ -26,7 +26,7 @@ import {
 	resetDelivery
 } from '$lib/voice/delivery';
 
-const GREETING = { kind: 'greeting' } as const;
+const LINE = { kind: 'refusal', refusal: 'empty' } as const;
 
 // A streaming TTS response: NDJSON, one base64 chunk per line.
 function ndjsonResponse(...chunks: string[]) {
@@ -54,7 +54,7 @@ describe('delivery seam', () => {
 	});
 
 	it('does not fetch or play before the speaker is enabled', async () => {
-		await deliver(GREETING);
+		await deliver(LINE);
 		expect(fetch).not.toHaveBeenCalled();
 		expect(audio.speaker.enqueue).not.toHaveBeenCalled();
 	});
@@ -63,12 +63,12 @@ describe('delivery seam', () => {
 		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm-a', 'pcm-b', 'pcm-c'));
 		enableDelivery();
 
-		await deliver(GREETING);
+		await deliver(LINE);
 
 		expect(fetch).toHaveBeenCalledWith('/api/voice/tts', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(GREETING)
+			body: JSON.stringify(LINE)
 		});
 		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['pcm-a', 'pcm-b', 'pcm-c']);
 	});
@@ -86,7 +86,7 @@ describe('delivery seam', () => {
 		vi.mocked(fetch).mockRejectedValueOnce(new Error('offline'));
 		enableDelivery();
 
-		await expect(deliver(GREETING)).resolves.toBeUndefined();
+		await expect(deliver(LINE)).resolves.toBeUndefined();
 		expect(audio.speaker.enqueue).not.toHaveBeenCalled();
 	});
 
@@ -108,7 +108,7 @@ describe('delivery seam', () => {
 		vi.mocked(fetch).mockResolvedValueOnce(new Response(body));
 		enableDelivery();
 
-		const inflight = deliver(GREETING);
+		const inflight = deliver(LINE);
 		// Let the first chunk be read, then close the speaker before releasing the second.
 		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first'));
 		disableDelivery();

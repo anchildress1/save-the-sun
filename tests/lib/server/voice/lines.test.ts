@@ -1,17 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import {
-	composeLine,
-	isLineDescriptor,
-	ORACLE_GREETING,
-	type LineDescriptor
-} from '$lib/server/voice/lines';
+import { composeLine, isLineDescriptor, type LineDescriptor } from '$lib/server/voice/lines';
 import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
 
 describe('composeLine', () => {
-	it('voices the round greeting', () => {
-		expect(composeLine({ kind: 'greeting' })).toBe(ORACLE_GREETING);
-	});
-
 	it('voices every refusal class with the canonical line', () => {
 		for (const refusal of [
 			'mixed-type',
@@ -82,15 +73,15 @@ describe('composeLine', () => {
 });
 
 describe('isLineDescriptor', () => {
-	it('accepts the three line kinds', () => {
-		expect(isLineDescriptor({ kind: 'greeting' })).toBe(true);
+	it('accepts the two line kinds', () => {
 		expect(isLineDescriptor({ kind: 'refusal', refusal: 'empty' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'answer', query: {}, affirmative: true })).toBe(true);
 	});
 
 	it('rejects malformed shapes', () => {
 		expect(isLineDescriptor(null)).toBe(false);
-		expect(isLineDescriptor('greeting')).toBe(false);
+		expect(isLineDescriptor('refusal')).toBe(false);
+		expect(isLineDescriptor({ kind: 'greeting' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'unknown' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'refusal' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'answer', query: {} })).toBe(false);

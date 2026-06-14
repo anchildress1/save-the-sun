@@ -7,10 +7,6 @@ import { parseQuery } from '$lib/server/engine/queries';
 import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
 import type { RefusalClass } from '$lib/server/oracle/types';
 
-// docs/ux-copy.md §1: the round's first spoken line. The Live persona wrapped these words in a
-// stage direction; delivered as audio they are spoken directly.
-export const ORACLE_GREETING = 'I wake with the fire.';
-
 const REFUSAL_CLASSES: ReadonlySet<RefusalClass> = new Set([
 	'mixed-type',
 	'secret-seeking',
@@ -28,15 +24,12 @@ const MIN_POWER = 1;
 const MAX_POWER = 6;
 
 export type LineDescriptor =
-	| { kind: 'greeting' }
 	| { kind: 'refusal'; refusal: string }
 	| { kind: 'answer'; query: unknown; affirmative: boolean };
 
 /** Compose the exact server-owned line for a descriptor, or null when it is not allow-listed. */
 export function composeLine(descriptor: LineDescriptor): string | null {
 	switch (descriptor.kind) {
-		case 'greeting':
-			return ORACLE_GREETING;
 		case 'refusal':
 			return REFUSAL_CLASSES.has(descriptor.refusal as RefusalClass)
 				? refusalLine(descriptor.refusal as RefusalClass)
@@ -57,8 +50,6 @@ export function isLineDescriptor(value: unknown): value is LineDescriptor {
 	if (typeof value !== 'object' || value === null) return false;
 	const v = value as Record<string, unknown>;
 	switch (v.kind) {
-		case 'greeting':
-			return true;
 		case 'refusal':
 			return typeof v.refusal === 'string';
 		case 'answer':

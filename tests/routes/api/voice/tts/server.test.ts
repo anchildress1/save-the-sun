@@ -13,7 +13,7 @@ vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
 
 import { POST } from '$routes/api/voice/tts/+server';
 import { resetTtsWindows, TTS_SESSION_LIMIT } from '$lib/server/voice/rateLimit';
-import { ORACLE_GREETING } from '$lib/server/voice/lines';
+import { refusalLine } from '$lib/server/oracle/oracle';
 
 function streamOf(...chunks: string[]) {
 	return (async function* () {
@@ -45,12 +45,12 @@ describe('POST /api/voice/tts', () => {
 	it('streams an allow-listed line as NDJSON base64 chunks', async () => {
 		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm-a', 'pcm-b'));
 
-		const response = await call('happy', { kind: 'greeting' });
+		const response = await call('happy', { kind: 'refusal', refusal: 'empty' });
 
 		expect(response.status).toBe(200);
 		expect(response.headers.get('content-type')).toContain('application/x-ndjson');
 		expect(await response.text()).toBe('pcm-a\npcm-b\n');
-		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(ORACLE_GREETING);
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(refusalLine('empty'));
 	});
 
 	it('rejects a malformed JSON body with 400 before charging the budget', async () => {
@@ -78,14 +78,14 @@ describe('POST /api/voice/tts', () => {
 
 		// Drain far past the per-session synth limit — cached replays never charge it.
 		for (let i = 0; i < TTS_SESSION_LIMIT + 5; i++) {
-			expect((await call('cache-fan', { kind: 'greeting' })).status).toBe(200);
+			expect((await call('cache-fan', { kind: 'refusal', refusal: 'empty' })).status).toBe(200);
 		}
 	});
 
 	it('returns 503 for an uncached line when the key is not configured', async () => {
 		mock.env.GEMINI_API_KEY = undefined;
 
-		const response = await call('keyless', { kind: 'greeting' });
+		const response = await call('keyless', { kind: 'refusal', refusal: 'empty' });
 
 		expect(response.status).toBe(503);
 		expect((await response.json()).error).toBe('Voice is unavailable.');
@@ -95,10 +95,10 @@ describe('POST /api/voice/tts', () => {
 	it('rejects an uncached request over the per-session limit with 429 and retry-after', async () => {
 		tts.synthesizeStream.mockReturnValue(streamOf('pcm'));
 		for (let i = 0; i < TTS_SESSION_LIMIT; i++) {
-			expect((await call('greedy', { kind: 'greeting' })).status).toBe(200);
+			expect((await call('greedy', { kind: 'refusal', refusal: 'empty' })).status).toBe(200);
 		}
 
-		const response = await call('greedy', { kind: 'greeting' });
+		const response = await call('greedy', { kind: 'refusal', refusal: 'empty' });
 
 		expect(response.status).toBe(429);
 		expect(response.headers.get('retry-after')).toBe('60');
