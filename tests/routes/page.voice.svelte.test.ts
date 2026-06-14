@@ -49,6 +49,17 @@ vi.mock('$lib/voice/voiceSession', () => ({
 	}
 }));
 
+// The delivery seam (voice-as-delivery, P1) is mocked at the boundary too: these tests assert the
+// page calls it, not that a real AudioContext opens or the TTS route answers.
+const deliveryMock = vi.hoisted(() => ({
+	enableDelivery: vi.fn(),
+	deliveryReady: vi.fn(() => false),
+	setDeliveryMuted: vi.fn(),
+	deliver: vi.fn<(descriptor: { kind: string }) => Promise<void>>(async () => {})
+}));
+
+vi.mock('$lib/voice/delivery', () => deliveryMock);
+
 const emit = (event: VoiceEvent) => voiceMock.emit(event);
 
 const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
@@ -832,44 +843,56 @@ describe('Save the Sun page — engine tool calls (S7)', () => {
 		);
 	});
 
-	it('a typed answer is spoken at the fire — the session decides whether it can land', async () => {
+	it('a typed answer is voiced through the delivery seam with her line descriptor', async () => {
 		mockAction({
 			type: 'Ask',
-			oracle: { ok: true, answer: askAnswer, turnConsumed: true },
+			oracle: {
+				ok: true,
+				query: { axis: 'element', value: 'Sun' },
+				answer: askAnswer,
+				affirmative: true,
+				turnConsumed: true
+			},
 			state: HUMAN_TURN
 		});
-		voiceMock.state = 'listening';
 		const screen = render(Page, pageProps);
 		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
-		await vi.waitFor(() => expect(voiceMock.direct).toHaveBeenCalledOnce());
-		const direction = String(voiceMock.direct.mock.calls[0][0]);
-		expect(direction).toContain('Stage direction');
-		expect(direction).toContain(askAnswer);
+		await vi.waitFor(() => expect(deliveryMock.deliver).toHaveBeenCalledOnce());
+		expect(deliveryMock.deliver).toHaveBeenCalledWith({
+			kind: 'answer',
+			query: { axis: 'element', value: 'Sun' },
+			affirmative: true
+		});
 	});
 
-	it('a voiced ask is never re-spoken — the tool result already carries the line', async () => {
+	it('a voiced ask is never delivered via TTS — the Live model already speaks it', async () => {
 		mockAction({
 			type: 'Ask',
-			oracle: { ok: true, answer: askAnswer, turnConsumed: true },
+			oracle: {
+				ok: true,
+				query: { axis: 'element', value: 'Sun' },
+				answer: askAnswer,
+				affirmative: true,
+				turnConsumed: true
+			},
 			state: HUMAN_TURN
 		});
 		voiceMock.state = 'listening';
 		render(Page, pageProps);
 		await executor()({ name: 'ask', args: { question: 'is it a fire rune?' } });
-		expect(voiceMock.direct).not.toHaveBeenCalled();
+		expect(deliveryMock.deliver).not.toHaveBeenCalled();
 	});
 
-	it("a typed Ask that Sköll hexes is not spoken — his Hex closed the Oracle's lips", async () => {
+	it("a typed Ask that Sköll hexes is not voiced — his Hex closed the Oracle's lips", async () => {
 		mockAction({ type: 'Ask', skollVsYou: { reaction: 'Hex' }, state: HUMAN_TURN });
-		voiceMock.state = 'listening';
 		const screen = render(Page, pageProps);
 		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('Sköll silences the Oracle; your question dies.');
-		expect(voiceMock.direct).not.toHaveBeenCalled();
+		expect(deliveryMock.deliver).not.toHaveBeenCalled();
 	});
 });
 
@@ -1680,17 +1703,20 @@ describe('Save the Sun page — transcripts to text (S10)', () => {
 	});
 });
 
-describe('Save the Sun page — output mute (S11)', () => {
+describe('Save the Sun page — audio toggle (voice-as-delivery P1)', () => {
 	const MUTE_LABEL = 'Silence the voices. Their words still appear in writing.';
 	const UNMUTE_LABEL = 'Let the voices be heard.';
 
-	it('opens unmuted and pushes the stored preference onto the session on mount', async () => {
+	it('opens with audio off — both sinks silent until a gesture enables it', async () => {
 		const screen = render(Page, pageProps);
 		const toggle = screen.getByTestId('mute-toggle');
-		await expect.element(toggle).toHaveAttribute('aria-pressed', 'false');
-		expect(toggle.element().getAttribute('aria-label')).toBe(MUTE_LABEL);
-		// The mount adopts the persisted preference (default false) and pushes it to the singleton.
-		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(false);
+		// Off by default: the control reads pressed (struck) and offers to let the voices be heard.
+		await expect.element(toggle).toHaveAttribute('aria-pressed', 'true');
+		expect(toggle.element().getAttribute('aria-label')).toBe(UNMUTE_LABEL);
+		// Mount silences both the Live speaker and the delivery seam; no speaker is opened yet.
+		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
+		expect(deliveryMock.setDeliveryMuted).toHaveBeenLastCalledWith(true);
+		expect(deliveryMock.enableDelivery).not.toHaveBeenCalled();
 	});
 
 	it('groups the voice controls for keyboard nav', async () => {
@@ -1703,35 +1729,50 @@ describe('Save the Sun page — output mute (S11)', () => {
 		expect(group.querySelector('[data-testid="mute-toggle"]')!.tagName).toBe('BUTTON');
 	});
 
-	it('toggles mute on click, flips the label, and drives the session', async () => {
+	it('turning audio on opens the speaker, unsilences both sinks, and greets', async () => {
 		const screen = render(Page, pageProps);
 		const toggle = screen.getByTestId('mute-toggle');
 		await toggle.click();
-		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
-		await expect.element(toggle).toHaveAttribute('aria-pressed', 'true');
-		expect(toggle.element().getAttribute('aria-label')).toBe(UNMUTE_LABEL);
-		await toggle.click();
+		// The tap is the gesture that opens the delivery speaker.
+		expect(deliveryMock.enableDelivery).toHaveBeenCalledOnce();
 		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(false);
+		expect(deliveryMock.setDeliveryMuted).toHaveBeenLastCalledWith(false);
 		await expect.element(toggle).toHaveAttribute('aria-pressed', 'false');
+		expect(toggle.element().getAttribute('aria-label')).toBe(MUTE_LABEL);
+		// Her first delivered line of the round is the greeting.
+		expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'greeting' });
+
+		await toggle.click();
+		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
+		expect(deliveryMock.setDeliveryMuted).toHaveBeenLastCalledWith(true);
+		await expect.element(toggle).toHaveAttribute('aria-pressed', 'true');
 	});
 
-	it('persists the mute preference for the session', async () => {
+	it('greets only once per round — a second audio-on does not re-greet', async () => {
+		const screen = render(Page, pageProps);
+		const toggle = screen.getByTestId('mute-toggle');
+		await toggle.click(); // on → greet
+		await toggle.click(); // off
+		await toggle.click(); // on again → no second greeting
+		const greetings = deliveryMock.deliver.mock.calls.filter(([d]) => d.kind === 'greeting');
+		expect(greetings).toHaveLength(1);
+	});
+
+	it('writes the mute preference for the shared seam, but always opens off (gesture-gated)', async () => {
 		const first = render(Page, pageProps);
 		await first.getByTestId('mute-toggle').click();
-		expect(sessionStorage.getItem('save-the-sun:muted')).toBe('true');
+		// Audio on writes the unmuted preference for the seam S13's wolf player reads.
+		expect(sessionStorage.getItem('save-the-sun:muted')).toBe('false');
 		first.unmount();
-		// A remount within the session resumes muted — the toggle reads pressed and the session
-		// is told to stay silent.
+		// Audio cannot auto-resume without a fresh gesture: a remount opens off regardless.
 		const second = render(Page, pageProps);
 		await expect.element(second.getByTestId('mute-toggle')).toHaveAttribute('aria-pressed', 'true');
 		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
 	});
 
-	it('mutes independently of wake — the control works while the session sleeps', async () => {
+	it('is independent of the mic — toggling audio never wakes the session', async () => {
 		const screen = render(Page, pageProps);
 		await screen.getByTestId('mute-toggle').click();
-		// Muting is not a wake: the session was never woken, only told to silence output.
 		expect(voiceMock.wake).not.toHaveBeenCalled();
-		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
 	});
 });

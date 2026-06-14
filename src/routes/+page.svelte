@@ -7,8 +7,9 @@
 	import EclipseMedallion from '$lib/components/EclipseMedallion.svelte';
 	import type { MedallionState } from '$lib/components/medallionState';
 	import { voiceSession, type VoiceEvent, type VoiceToolCall } from '$lib/voice/voiceSession';
-	import { oracleBoardEcho } from '$lib/voice/oraclePersona';
-	import { readMuted, writeMuted } from '$lib/voice/outputMute';
+	import { writeMuted } from '$lib/voice/outputMute';
+	import { enableDelivery, setDeliveryMuted, deliver } from '$lib/voice/delivery';
+	import type { LineDescriptor } from '$lib/server/voice/lines';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
@@ -244,9 +245,10 @@
 	let voiceNotice = $state('');
 	// Per round, persisted with the view (S6): the invitation speaks once per game, not per tap.
 	let voiceInvited = $state(false);
-	// Output mute (S11): silences the spoken voices; captions, mic, and the board are untouched.
-	// Seeded from sessionStorage on mount so the preference survives a reload within the session.
-	let muted = $state(false);
+	// Audio on/off (voice-as-delivery, P1): the one toggle that gates both voices. Off by default —
+	// audio stays silent until a tap opens the delivery speaker (browsers block an AudioContext
+	// outside a user gesture). The captions/panel render regardless; this only governs sound.
+	let audioOn = $state(false);
 
 	// S8: the armed confirmation for a gated tool call (scry, hex, cast_rune). `heard` flips when
 	// the player speaks after arming — the confirming call is refused without it, so the model can
@@ -341,12 +343,29 @@
 		}
 	}
 
-	// S11: one toggle for both voices. The session applies it to live and future speakers; the
-	// preference persists for the session. Independent of wake/sleep — you can mute while listening.
-	function toggleMute() {
-		muted = !muted;
-		writeMuted(muted);
-		voiceSession.setMuted(muted);
+	// One toggle for both voices (P1). Turning audio on opens the delivery speaker from this tap —
+	// the gesture browsers require — and unsilences the Live speaker too; turning it off silences
+	// both without dropping any queue (R11: captions keep rendering). The first audio-on of a round
+	// delivers the Oracle's greeting as her first spoken line. Independent of the mic (medallion).
+	function toggleAudio() {
+		audioOn = !audioOn;
+		if (audioOn) enableDelivery(); // must run inside the tap — opens the AudioContext
+		writeMuted(!audioOn);
+		setDeliveryMuted(!audioOn);
+		voiceSession.setMuted(!audioOn);
+		if (audioOn && !voiceInvited) {
+			deliver({ kind: 'greeting' });
+			voiceInvited = true;
+		}
+	}
+
+	// Build the descriptor for the Oracle's own spoken line (answer or refusal) so the delivery
+	// layer can voice it via the server TTS route. System lines (Sköll's, the engine's) aren't hers.
+	function oracleVoice(oracle: ActionResponse<'Ask'>['oracle']): LineDescriptor | null {
+		if (!oracle) return null;
+		if (oracle.ok) return { kind: 'answer', query: oracle.query, affirmative: oracle.affirmative };
+		if (oracle.reason === 'refusal') return { kind: 'refusal', refusal: oracle.refusal };
+		return null;
 	}
 
 	// Return type is derived from the action's `type`, so a caller can't request a
@@ -444,10 +463,11 @@
 		if (voiceState === 'eclipsed' && voiceSession.notice) {
 			voiceNotice = voiceSession.notice;
 		}
-		// Adopt the session's persisted mute preference, then push it onto the singleton — a remount
-		// (or a wake before this mount) must not start audible if the player muted earlier.
-		muted = readMuted();
-		voiceSession.setMuted(muted);
+		// Audio is off until a tap opens the delivery speaker (gesture requirement), so both sinks
+		// start silent — a wake before this mount must not play before the player has enabled audio.
+		audioOn = false;
+		voiceSession.setMuted(true);
+		setDeliveryMuted(true);
 		return () => {
 			window.removeEventListener('resize', onReposition);
 			window.removeEventListener('scroll', onReposition, true);
@@ -524,7 +544,7 @@
 	// Never throws: a failed dispatch settles the panel and reports the silent-Oracle line.
 	async function performAsk(
 		question: string
-	): Promise<{ line: string; hers: boolean; consumed: boolean }> {
+	): Promise<{ line: string; hers: boolean; consumed: boolean; voice: LineDescriptor | null }> {
 		try {
 			const { oracle, state, skollVsYou } = await dispatch({
 				type: 'Ask',
@@ -556,13 +576,13 @@
 				outcome = { line: RITE.oracleSilent, hers: false, consumed: false };
 			}
 			answer = outcome.line;
-			return outcome;
+			return { ...outcome, voice: outcome.hers ? oracleVoice(oracle) : null };
 		} catch (err) {
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
 			console.error('[ui] Ask dispatch failed:', err);
 			answer = RITE.oracleSilent;
-			return { line: RITE.oracleSilent, hers: false, consumed: false };
+			return { line: RITE.oracleSilent, hers: false, consumed: false, voice: null };
 		}
 	}
 
@@ -577,9 +597,9 @@
 		try {
 			const outcome = await performAsk(question);
 			if (outcome.consumed) askValue = '';
-			// The witch typed instead of speaking; if the session is awake her answer is spoken
-			// too (S7) — the session drops the direction unless it is idle.
-			if (outcome.hers) voiceSession.direct(oracleBoardEcho(outcome.line));
+			// Voice her own line through the delivery seam (server TTS) — mic-independent, so a typed
+			// Ask is spoken whenever audio is on. A no-op when audio is off (no speaker open yet).
+			if (outcome.voice) deliver(outcome.voice);
 			await advanceSkoll();
 		} finally {
 			pending = false;
@@ -688,6 +708,11 @@
 			voiceInvited = false; // a new round re-arms the Oracle's wake invitation
 			// Also cancels an in-flight wake, so a slow first wake can't mark the fresh round invited.
 			voiceSession.sleep();
+			// Audio already on: the fresh round greets straight away (her first delivered line).
+			if (audioOn) {
+				deliver({ kind: 'greeting' });
+				voiceInvited = true;
+			}
 			applyState(state);
 			cancelCast();
 			return true;
@@ -1000,9 +1025,9 @@
 						class="mute-toggle"
 						type="button"
 						data-testid="mute-toggle"
-						aria-pressed={muted}
-						aria-label={muted ? RITE.unmuteVoices : RITE.muteVoices}
-						onclick={toggleMute}
+						aria-pressed={!audioOn}
+						aria-label={audioOn ? RITE.muteVoices : RITE.unmuteVoices}
+						onclick={toggleAudio}
 					>
 						<svg viewBox="0 0 24 24" aria-hidden="true">
 							<path d="M4 9v6h4l5 4V5L8 9H4z" />
