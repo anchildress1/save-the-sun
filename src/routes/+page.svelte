@@ -654,12 +654,13 @@
 		try {
 			const outcome = await performAsk(question);
 			if (outcome.consumed) askValue = '';
-			// Voice her own line through the delivery seam (server TTS) — but not while the Live Oracle is
-			// mid-utterance (thinking/speaking), or the TTS line would play over her Live audio. When the
-			// mic is merely idle (asleep/listening), a typed answer is hers to voice. A no-op when audio is
-			// off (no speaker). The handle lets a round that ends on Sköll's next move hold the splash.
-			const liveSpeaking = voiceSession.state === 'speaking' || voiceSession.state === 'thinking';
-			answerAudio = outcome.voice && !liveSpeaking ? deliver(outcome.voice) : null;
+			// Voice her own line through the delivery seam (server TTS) — but only while the Live session
+			// is genuinely idle (asleep or listening). Any other state (waking setup, hearing the player,
+			// thinking, speaking) means Live is or is about to be voicing, and a TTS line would collide.
+			// A no-op when audio is off (no speaker). The handle lets a round that ends on Sköll's next
+			// move hold the splash until she's heard.
+			const liveIdle = voiceSession.state === 'asleep' || voiceSession.state === 'listening';
+			answerAudio = outcome.voice && liveIdle ? deliver(outcome.voice) : null;
 			await advanceSkoll();
 		} finally {
 			pending = false;

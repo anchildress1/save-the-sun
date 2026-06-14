@@ -50,6 +50,38 @@ export function stopDelivery(): void {
 	speaker?.stop();
 }
 
+// A delivery is stale once its speaker was swapped or its generation was bumped (stop/disable) —
+// its remaining chunks must not play.
+function isStale(active: Speaker, gen: number): boolean {
+	return speaker !== active || gen !== generation;
+}
+
+// Read the NDJSON stream and enqueue each base64 chunk as it arrives, so playback starts at the
+// first chunk. Bails (and aborts the fetch) the moment the delivery goes stale.
+async function pumpAudio(
+	body: ReadableStream<Uint8Array>,
+	active: Speaker,
+	gen: number,
+	abort: AbortController
+): Promise<void> {
+	const reader = body.getReader();
+	const decoder = new TextDecoder();
+	let buffer = '';
+	for (;;) {
+		if (isStale(active, gen)) return abort.abort();
+		const { done, value } = await reader.read();
+		if (done) return;
+		buffer += decoder.decode(value, { stream: true });
+		let nl: number;
+		while ((nl = buffer.indexOf('\n')) >= 0) {
+			const chunk = buffer.slice(0, nl);
+			buffer = buffer.slice(nl + 1);
+			if (isStale(active, gen)) return abort.abort();
+			if (chunk) active.enqueue(chunk);
+		}
+	}
+}
+
 /**
  * Voice one server-owned line: stream its audio from the TTS route and enqueue each PCM chunk as
  * it arrives, so she starts speaking at the first chunk rather than after the whole clip. A no-op
@@ -70,32 +102,7 @@ export async function deliver(descriptor: LineDescriptor): Promise<void> {
 			body: JSON.stringify(descriptor),
 			signal: abort.signal
 		});
-		if (!res.ok || !res.body) return;
-		const reader = res.body.getReader();
-		const decoder = new TextDecoder();
-		let buffer = '';
-		// NDJSON: one base64 PCM chunk per line. Enqueue each complete line as it streams in; the
-		// speaker schedules them back-to-back, so playback starts at the first chunk.
-		for (;;) {
-			// Invalidated mid-stream (stop/disable) or the speaker was swapped — abandon the rest.
-			if (gen !== generation || speaker !== active) {
-				abort.abort();
-				return;
-			}
-			const { done, value } = await reader.read();
-			if (done) break;
-			buffer += decoder.decode(value, { stream: true });
-			let nl: number;
-			while ((nl = buffer.indexOf('\n')) >= 0) {
-				const chunk = buffer.slice(0, nl);
-				buffer = buffer.slice(nl + 1);
-				if (gen !== generation || speaker !== active) {
-					abort.abort();
-					return;
-				}
-				if (chunk) active.enqueue(chunk);
-			}
-		}
+		if (res.ok && res.body) await pumpAudio(res.body, active, gen, abort);
 	} catch {
 		/* network failure or abort — the panel already carries the line; stay silent */
 	}
