@@ -109,9 +109,10 @@ function geminiEvents(sessionId: string, movePart: TurnPart): void {
 	}
 }
 
-// His templated Ask is surfaced for the human to react to; a Cast carries no flavor line.
+// His templated Ask is surfaced for the human to react to; a Cast carries no flavor line. The query
+// rides along so the client can voice the Ask through the TTS route (server recomposes the line).
 function describeTurn(out: SkollOutcome): SkollTurn {
-	return out.kind === 'ask' ? { asks: { echo: out.echo } } : {};
+	return out.kind === 'ask' ? { asks: { echo: out.echo, query: out.query } } : {};
 }
 
 // Validation is pure and runs before the lock; everything touching shared engine/Sköll memory runs
@@ -183,7 +184,13 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 			? { hexed: true }
 			: {
 					hexed: false,
-					...(answer.shared && { scried: { answer: voiceAnswer(askedQuery, answer.affirmative) } })
+					...(answer.shared && {
+						scried: {
+							answer: voiceAnswer(askedQuery, answer.affirmative),
+							query: askedQuery,
+							affirmative: answer.affirmative
+						}
+					})
 				};
 		return json({ type: 'React', outcome: reaction, skollReaction, state: gameState(engine) });
 	}

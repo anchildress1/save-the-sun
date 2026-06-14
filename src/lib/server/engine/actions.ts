@@ -4,6 +4,7 @@ import type { GameEngine, CastResult } from './engine';
 import { resolveReaction, type ReactionChoice, type ReactionOutcome } from './reactions';
 import { runOracle } from '$lib/server/oracle/oracle';
 import type { Interpret, OracleResult } from '$lib/server/oracle/types';
+import type { Query } from './queries';
 
 export type Player = 'Human' | 'Sköll';
 
@@ -67,13 +68,17 @@ export interface GameState {
  * must show the interrupt prompt; his answer is produced only once the human reacts.
  */
 export interface SkollTurn {
-	asks?: { echo: string };
+	// `query` rides along so the client can voice his Ask through the TTS route (the server recomposes
+	// his line from it — never arbitrary client text); `echo` is the same line as text (R10).
+	asks?: { echo: string; query: Query };
 }
 
-/** How Sköll's parked Ask resolved after the human reacted. A Hex kills it; a Scry shares it. */
+/** How Sköll's parked Ask resolved after the human reacted. A Hex kills it; a Scry shares it.
+ *  `scried` carries the structured query + verdict (not just the text) so the client can voice the
+ *  overheard answer through the TTS allow-list. */
 export interface SkollReaction {
 	hexed: boolean;
-	scried?: { answer: string };
+	scried?: { answer: string; query: Query; affirmative: boolean };
 }
 
 /** How Sköll reacted to the *human's* Ask: Hex kills it, Scry overhears it. */

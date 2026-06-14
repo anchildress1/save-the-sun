@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { composeLine, isLineDescriptor, type LineDescriptor } from '$lib/server/voice/lines';
+import {
+	composeLine,
+	isLineDescriptor,
+	voiceForLine,
+	synthPrompt,
+	type LineDescriptor
+} from '$lib/server/voice/lines';
 import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
+import { skollAskEcho } from '$lib/server/skoll/skoll';
+import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
+import { REACTION_LINES } from '$lib/voice/reactionLines';
+import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
+import { OUTCOME_LINES } from '$lib/voice/outcomeLines';
 
 describe('composeLine', () => {
 	it('voices every refusal class with the canonical line', () => {
@@ -70,12 +81,128 @@ describe('composeLine', () => {
 			} as unknown as LineDescriptor)
 		).toBeNull();
 	});
+
+	it('voices Sköll’s Ask from the parked query (his own line, not the Oracle’s)', () => {
+		const query = { axis: 'element', value: 'Fire' } as const;
+		expect(composeLine({ kind: 'skoll-ask', query })).toBe(skollAskEcho(query));
+	});
+
+	it('refuses a malformed or out-of-range Sköll Ask query', () => {
+		expect(
+			composeLine({ kind: 'skoll-ask', query: { axis: 'element', value: 'Plastic' } })
+		).toBeNull();
+		expect(
+			composeLine({ kind: 'skoll-ask', query: { axis: 'power', op: 'eq', value: 9 } })
+		).toBeNull();
+		expect(composeLine({ kind: 'skoll-ask', query: null })).toBeNull();
+	});
+
+	it('voices a framing-only reaction line verbatim', () => {
+		expect(composeLine({ kind: 'react', line: 'human-hex' })).toBe(REACTION_LINES['human-hex']);
+		expect(composeLine({ kind: 'react', line: 'human-pass' })).toBe(REACTION_LINES['human-pass']);
+		expect(composeLine({ kind: 'react', line: 'skoll-hex' })).toBe(REACTION_LINES['skoll-hex']);
+	});
+
+	it('composes a scry line with the overheard answer, in §3 order', () => {
+		const query = { axis: 'element', value: 'Fire' } as const;
+		const ans = voiceAnswer(query, true);
+		expect(composeLine({ kind: 'react', line: 'human-scry', query, affirmative: true })).toBe(
+			`${REACTION_LINES['human-scry']} ${ans}`
+		);
+		expect(composeLine({ kind: 'react', line: 'skoll-scry', query, affirmative: true })).toBe(
+			`${ans} ${REACTION_LINES['skoll-scry']}`
+		);
+	});
+
+	it('refuses a scry line without a valid answer, and an unknown reaction line', () => {
+		expect(composeLine({ kind: 'react', line: 'human-scry' })).toBeNull();
+		expect(
+			composeLine({ kind: 'react', line: 'skoll-scry', query: null, affirmative: true })
+		).toBeNull();
+		expect(composeLine({ kind: 'react', line: 'nope' } as unknown as LineDescriptor)).toBeNull();
+	});
+
+	it('voices the fixed cast lines and a wrong cast naming a real board rune', () => {
+		expect(composeLine({ kind: 'cast', result: 'true' })).toBe(CAST_TRUE);
+		expect(composeLine({ kind: 'cast', result: 'falters' })).toBe(CAST_FALTERS);
+		expect(composeLine({ kind: 'cast', result: 'wrong', rune: 'Sowilo' })).toBe(
+			wrongCastLine('Sowilo')
+		);
+	});
+
+	it('refuses a wrong cast that does not name a real board rune', () => {
+		expect(composeLine({ kind: 'cast', result: 'wrong', rune: 'Plastic' })).toBeNull();
+		expect(composeLine({ kind: 'cast', result: 'wrong' })).toBeNull();
+	});
+
+	it('voices the outcome beat — the win coda, the loss verse', () => {
+		expect(composeLine({ kind: 'outcome', result: 'win' })).toBe(OUTCOME_LINES.win.coda);
+		expect(composeLine({ kind: 'outcome', result: 'lose' })).toBe(OUTCOME_LINES.lose.verse);
+	});
+
+	// Allow-list IDs are matched by own-property only — an inherited key (e.g. a prototype method
+	// name) must be rejected with null, never resolve to a function the route would synthesize.
+	it('rejects an inherited-property id for react and outcome', () => {
+		expect(
+			composeLine({ kind: 'react', line: 'toString' } as unknown as LineDescriptor)
+		).toBeNull();
+		expect(
+			composeLine({ kind: 'react', line: 'hasOwnProperty' } as unknown as LineDescriptor)
+		).toBeNull();
+		expect(
+			composeLine({ kind: 'outcome', result: 'toString' } as unknown as LineDescriptor)
+		).toBeNull();
+		expect(
+			composeLine({ kind: 'outcome', result: 'constructor' } as unknown as LineDescriptor)
+		).toBeNull();
+	});
+});
+
+describe('voiceForLine', () => {
+	it('routes Sköll’s Ask to his voice, everything else to the Oracle’s', () => {
+		expect(voiceForLine({ kind: 'skoll-ask', query: {} })).toBe(SKOLL_VOICE);
+		expect(voiceForLine({ kind: 'refusal', refusal: 'empty' })).toBe(ORACLE_VOICE);
+		expect(voiceForLine({ kind: 'answer', query: {}, affirmative: true })).toBe(ORACLE_VOICE);
+		expect(voiceForLine({ kind: 'react', line: 'human-hex' })).toBe(ORACLE_VOICE);
+		expect(voiceForLine({ kind: 'cast', result: 'true' })).toBe(ORACLE_VOICE);
+		// The outcome splits by who took the day: a win is hers, a loss is his.
+		expect(voiceForLine({ kind: 'outcome', result: 'win' })).toBe(ORACLE_VOICE);
+		expect(voiceForLine({ kind: 'outcome', result: 'lose' })).toBe(SKOLL_VOICE);
+	});
+});
+
+describe('synthPrompt', () => {
+	it('wraps each line in its speaker’s director’s-notes, quoting the line', () => {
+		const skoll = synthPrompt({ kind: 'skoll-ask', query: {} }, 'I scent a fire rune on her.');
+		const oracle = synthPrompt(
+			{ kind: 'refusal', refusal: 'empty' },
+			'Speak your question, witch.'
+		);
+		// Each carries its own direction (distinct) and ends on the quoted line, not the bare line.
+		expect(skoll).toContain('"I scent a fire rune on her."');
+		expect(skoll).not.toBe('I scent a fire rune on her.');
+		expect(oracle).toContain('"Speak your question, witch."');
+		expect(skoll.slice(0, 40)).not.toBe(oracle.slice(0, 40)); // different speaker notes
+	});
+
+	it('gives the loss outcome Sköll’s growl, the win the Oracle’s notes', () => {
+		const lose = synthPrompt({ kind: 'outcome', result: 'lose' }, 'The night is everlasting.');
+		const win = synthPrompt({ kind: 'outcome', result: 'win' }, 'The light is yours to keep.');
+		const skollAsk = synthPrompt({ kind: 'skoll-ask', query: {} }, 'x');
+		const oracleAns = synthPrompt({ kind: 'refusal', refusal: 'empty' }, 'x');
+		expect(lose.slice(0, 40)).toBe(skollAsk.slice(0, 40)); // same Sköll direction
+		expect(win.slice(0, 40)).toBe(oracleAns.slice(0, 40)); // same Oracle direction
+	});
 });
 
 describe('isLineDescriptor', () => {
-	it('accepts the two line kinds', () => {
+	it('accepts the line kinds', () => {
 		expect(isLineDescriptor({ kind: 'refusal', refusal: 'empty' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'answer', query: {}, affirmative: true })).toBe(true);
+		expect(isLineDescriptor({ kind: 'skoll-ask', query: {} })).toBe(true);
+		expect(isLineDescriptor({ kind: 'react', line: 'human-hex' })).toBe(true);
+		expect(isLineDescriptor({ kind: 'cast', result: 'true' })).toBe(true);
+		expect(isLineDescriptor({ kind: 'outcome', result: 'win' })).toBe(true);
 	});
 
 	it('rejects malformed shapes', () => {
@@ -85,5 +212,8 @@ describe('isLineDescriptor', () => {
 		expect(isLineDescriptor({ kind: 'unknown' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'refusal' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'answer', query: {} })).toBe(false);
+		expect(isLineDescriptor({ kind: 'skoll-ask' })).toBe(false);
+		expect(isLineDescriptor({ kind: 'react' })).toBe(false);
+		expect(isLineDescriptor({ kind: 'cast' })).toBe(false);
 	});
 });

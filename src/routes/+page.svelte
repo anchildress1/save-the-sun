@@ -16,6 +16,8 @@
 		whenDrained
 	} from '$lib/voice/delivery';
 	import type { LineDescriptor } from '$lib/server/voice/lines';
+	import { REACTION_LINES } from '$lib/voice/reactionLines';
+	import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
@@ -48,19 +50,20 @@
 		wolfMoving: 'The wolf is moving. Hold.',
 		riteMoving: 'The rite is moving. Hold.',
 		oracleSilent: "The Oracle falls silent — the rite can't reach Sól.",
-		castFalters: 'The rite falters. The rune slips away.',
-		wrongCast: (name: string) => `${name} is not the one. The night holds.`,
-		runeTrue: 'The rune is true.',
+		castFalters: CAST_FALTERS,
+		wrongCast: wrongCastLine,
+		runeTrue: CAST_TRUE,
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
 		wolfStalled: 'The wolf stalls — rouse him.',
-		scryHim: 'You lean into the dark; his answer is yours.',
-		hexHim: "You close the Oracle's lips; his turn dies with the question.",
-		passHim: 'You hold your hand; let him answer.',
+		// Shared with the TTS allow-list so the panel text and the voiced line are one source.
+		scryHim: REACTION_LINES['human-scry'],
+		hexHim: REACTION_LINES['human-hex'],
+		passHim: REACTION_LINES['human-pass'],
 		// Sköll's skill plays, voiced in the Oracle's text (rite voice, third person — never his gloat).
 		// Hex replaces the answer (the question died); the Scry note trails the answer he overheard.
-		skollHexes: 'Sköll silences the Oracle; your question dies.',
-		skollScried: 'Sköll listened at the threshold — the answer is his too.',
+		skollHexes: REACTION_LINES['skoll-hex'],
+		skollScried: REACTION_LINES['skoll-scry'],
 		sunCrests: 'Sól crests the rim of the world.',
 		skollTakes: 'Sköll takes the sun.',
 		nightHolds: 'The night lies deep and unbroken.',
@@ -145,6 +148,19 @@
 	let endHeld = $state(false);
 	let showEndScreen = $derived(roundOver && !endHeld);
 	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
+
+	// Voice the outcome once the splash is up (ux-copy §4): a win in the Oracle's voice, a loss in
+	// Sköll's — so the player hears who took the day. The line is one beat of the splash copy (R10),
+	// queued behind any cast line on the shared speaker. Once per round; reset by a new game.
+	let outcomeVoiced = false;
+	$effect(() => {
+		// Flip the once-guard only when the line is actually delivered (audio on + Live idle) — so if
+		// audio is off when the splash lands, a later toggle-on can still voice the outcome.
+		if (showEndScreen && !outcomeVoiced && audioOn && liveIdle()) {
+			outcomeVoiced = true;
+			void deliver({ kind: 'outcome', result: endOutcome });
+		}
+	});
 	let nightProgress = $derived(
 		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
 	);
@@ -422,6 +438,18 @@
 		return null;
 	}
 
+	// Sköll's Ask descriptor — the server recomposes his line from the query, so the TTS route still
+	// voices only a server-owned line, just in his voice.
+	function skollVoice(query: unknown): LineDescriptor {
+		return { kind: 'skoll-ask', query };
+	}
+
+	// A TTS line may only go out when the Live session is genuinely idle (asleep or listening) — any
+	// other state means Live is or is about to be voicing, and a server line would collide.
+	function liveIdle(): boolean {
+		return voiceSession.state === 'asleep' || voiceSession.state === 'listening';
+	}
+
 	// Return type is derived from the action's `type`, so a caller can't request a
 	// mismatched result shape.
 	async function dispatch<T extends GameAction['type']>(
@@ -458,6 +486,11 @@
 			const { skoll, state } = (await res.json()) as AdvanceResponse;
 			applyState(state);
 			applySkoll(skoll);
+			// His Ask is a game move (R10) — written on his frame and voiced in his own voice through the
+			// same delivery seam as the Oracle (the server recomposes his line from the query, so the
+			// route still voices only server-owned text). Gated to an idle Live session like her answer;
+			// deliver() itself no-ops when audio is off (no speaker), so no needless synth then.
+			if (skoll?.asks && liveIdle()) void deliver(skollVoice(skoll.asks.query));
 			// A Sköll win deliberately leaves the Oracle's last voiced line in place (the answer, and
 			// his Scry note when he overheard it) — that line is the WHY of the loss, and the end
 			// screen already owns the "Sköll takes the sun" text. Never double it into the panel.
@@ -601,7 +634,7 @@
 	// Never throws: a failed dispatch settles the panel and reports the silent-Oracle line.
 	async function performAsk(
 		question: string
-	): Promise<{ line: string; hers: boolean; consumed: boolean; voice: LineDescriptor | null }> {
+	): Promise<{ line: string; consumed: boolean; voice: LineDescriptor | null }> {
 		try {
 			const { oracle, state, skollVsYou } = await dispatch({
 				type: 'Ask',
@@ -609,37 +642,49 @@
 				question
 			});
 			applyState(state);
-			let outcome: { line: string; hers: boolean; consumed: boolean };
+			let outcome: { line: string; consumed: boolean; voice: LineDescriptor | null };
 			if (skollVsYou?.reaction === 'Hex') {
-				// The Oracle text names the Hex — the question died, so it replaces the answer.
-				// Not hers to voice: his Hex closed her lips.
-				outcome = { line: RITE.skollHexes, hers: false, consumed: true };
+				// His Hex closed her lips — the rite names it (replacing the answer), voiced as the §3 line.
+				outcome = {
+					line: RITE.skollHexes,
+					consumed: true,
+					voice: { kind: 'react', line: 'skoll-hex' }
+				};
 			} else if (skollVsYou?.reaction === 'Scry' && oracle?.ok) {
-				// The Oracle still speaks your answer (he overheard it), with his Scry noted after it.
-				outcome = { line: `${oracle.answer} ${RITE.skollScried}`, hers: true, consumed: true };
+				// The Oracle still speaks your answer (he overheard it), then notes his Scry — one voiced line.
+				outcome = {
+					line: `${oracle.answer} ${RITE.skollScried}`,
+					consumed: true,
+					voice: {
+						kind: 'react',
+						line: 'skoll-scry',
+						query: oracle.query,
+						affirmative: oracle.affirmative
+					}
+				};
 			} else if (oracle?.ok) {
-				outcome = { line: oracle.answer, hers: true, consumed: true };
+				outcome = { line: oracle.answer, consumed: true, voice: oracleVoice(oracle) };
 			} else if (oracle?.reason === 'refusal') {
-				outcome = { line: oracle.line, hers: true, consumed: false };
+				outcome = { line: oracle.line, consumed: false, voice: oracleVoice(oracle) };
 			} else if (oracle) {
-				// not-your-turn means the engine has handed the turn to Sköll.
+				// not-your-turn means the engine has handed the turn to Sköll. System line — not voiced.
 				outcome = {
 					line: oracle.engineReason === 'not-your-turn' ? RITE.wolfMoving : RITE.oracleSilent,
-					hers: false,
-					consumed: false
+					consumed: false,
+					voice: null
 				};
 			} else {
 				// no oracle and not a Hex — unexpected; fail to a safe line
-				outcome = { line: RITE.oracleSilent, hers: false, consumed: false };
+				outcome = { line: RITE.oracleSilent, consumed: false, voice: null };
 			}
 			answer = outcome.line;
-			return { ...outcome, voice: outcome.hers ? oracleVoice(oracle) : null };
+			return outcome;
 		} catch (err) {
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
 			console.error('[ui] Ask dispatch failed:', err);
 			answer = RITE.oracleSilent;
-			return { line: RITE.oracleSilent, hers: false, consumed: false, voice: null };
+			return { line: RITE.oracleSilent, consumed: false, voice: null };
 		}
 	}
 
@@ -655,12 +700,10 @@
 			const outcome = await performAsk(question);
 			if (outcome.consumed) askValue = '';
 			// Voice her own line through the delivery seam (server TTS) — but only while the Live session
-			// is genuinely idle (asleep or listening). Any other state (waking setup, hearing the player,
-			// thinking, speaking) means Live is or is about to be voicing, and a TTS line would collide.
-			// A no-op when audio is off (no speaker). The handle lets a round that ends on Sköll's next
-			// move hold the splash until she's heard.
-			const liveIdle = voiceSession.state === 'asleep' || voiceSession.state === 'listening';
-			answerAudio = outcome.voice && liveIdle ? deliver(outcome.voice) : null;
+			// is idle (liveIdle); any other state means Live is or is about to be voicing and a TTS line
+			// would collide. A no-op when audio is off (no speaker). The handle lets a round that ends on
+			// Sköll's next move hold the splash until she's heard.
+			answerAudio = outcome.voice && liveIdle() ? deliver(outcome.voice) : null;
 			await advanceSkoll();
 		} finally {
 			pending = false;
@@ -682,17 +725,29 @@
 			// can fail (e.g. no charge after a desync), which the server resolves as a Pass. Spend the
 			// charge only when the reaction truly landed, so the UI never diverges from engine truth.
 			let line: string;
+			let voice: LineDescriptor;
 			if (skollReaction?.hexed) {
 				line = RITE.hexHim;
+				voice = { kind: 'react', line: 'human-hex' };
 				heldHex = false;
 			} else if (skollReaction?.scried) {
 				// §3: the Scry framing leads, then the answer he was owed — now yours too.
 				line = `${RITE.scryHim} ${skollReaction.scried.answer}`;
+				voice = {
+					kind: 'react',
+					line: 'human-scry',
+					query: skollReaction.scried.query,
+					affirmative: skollReaction.scried.affirmative
+				};
 				heldScry = false;
 			} else {
 				line = RITE.passHim; // a Pass, or a reaction that didn't land
+				voice = { kind: 'react', line: 'human-pass' };
 			}
 			answer = line;
+			// Voice the resolution in the Oracle's voice (her panel), gated like her answer — a no-op
+			// when audio is off, and silent while Live is mid-turn so a TTS line can't collide.
+			if (liveIdle()) void deliver(voice);
 			return line;
 		} catch (err) {
 			console.error('[ui] React dispatch failed:', err);
@@ -766,6 +821,7 @@
 			skollAsking = false;
 			heldScry = true;
 			heldHex = true;
+			outcomeVoiced = false; // the fresh round re-arms the end-screen outcome voice
 			voiceInvited = false; // a new round re-arms the Oracle's wake invitation
 			// Also cancels an in-flight wake, so a slow first wake can't mark the fresh round invited.
 			voiceSession.sleep();
@@ -795,13 +851,21 @@
 			});
 			applyState(state);
 			let line: string;
+			let voice: LineDescriptor;
 			if (cast.ok) {
 				line = cast.won ? RITE.runeTrue : RITE.wrongCast(runeName);
+				voice = cast.won
+					? { kind: 'cast', result: 'true' }
+					: { kind: 'cast', result: 'wrong', rune: runeName };
 			} else {
 				console.warn('[ui] Cast rejected by engine:', cast.reason);
 				line = RITE.castFalters;
+				voice = { kind: 'cast', result: 'falters' };
 			}
 			answer = line;
+			// Voice the cast outcome in her voice; keep the handle so a winning cast's end-screen splash
+			// waits for "The rune is true." to be heard (whenDrained). Gated like her answer.
+			answerAudio = liveIdle() ? deliver(voice) : null;
 			return line;
 		} catch (err) {
 			console.error('[ui] Cast dispatch failed:', err);

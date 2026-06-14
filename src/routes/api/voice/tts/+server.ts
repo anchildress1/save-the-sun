@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { claimTtsSlot } from '$lib/server/voice/rateLimit';
-import { composeLine, isLineDescriptor } from '$lib/server/voice/lines';
+import { composeLine, isLineDescriptor, voiceForLine, synthPrompt } from '$lib/server/voice/lines';
 import { synthesizeStream, isCached } from '$lib/server/voice/tts';
 import type { RequestHandler } from './$types';
 
@@ -26,11 +26,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	// synthesized — the gate is the line, not the request shape. Validated BEFORE any quota spend so a
 	// flood of malformed/unknown payloads can't exhaust the synth budget.
 	if (line === null) return badLine();
+	// The descriptor's kind picks the voice (Sköll's lines in his voice, the Oracle's in hers); the
+	// synthesis prompt wraps the line in that speaker's director's-notes (both voices, never bare).
+	const voice = voiceForLine(body);
+	const prompt = synthPrompt(body, line);
 
 	// A cached line replays from memory — no Gemini call — so it skips both the synth budget and the
 	// key requirement. Only an uncached line costs a synth: gate it, and fail loudly (503, not a silent
 	// empty 200) when voice is unconfigured so a deploy/config failure is visible.
-	if (!isCached(line)) {
+	if (!isCached(prompt, voice)) {
 		if (!env.GEMINI_API_KEY) return json({ error: 'Voice is unavailable.' }, { status: 503 });
 		const verdict = claimTtsSlot(locals.sessionId);
 		if (!verdict.ok) {
@@ -46,7 +50,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream<Uint8Array>({
 		async start(controller) {
-			for await (const chunk of synthesizeStream(line)) {
+			for await (const chunk of synthesizeStream(prompt, voice)) {
 				controller.enqueue(encoder.encode(chunk + '\n'));
 			}
 			controller.close();

@@ -5,7 +5,13 @@
 
 import { parseQuery } from '$lib/server/engine/queries';
 import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
+import { skollAskEcho } from '$lib/server/skoll/skoll';
 import type { RefusalClass } from '$lib/server/oracle/types';
+import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
+import { REACTION_LINES, carriesAnswer, type ReactionLineId } from '$lib/voice/reactionLines';
+import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
+import { OUTCOME_LINES, VOICED_BEAT, type Outcome } from '$lib/voice/outcomeLines';
+import { runes } from '$lib/board';
 
 const REFUSAL_CLASSES: ReadonlySet<RefusalClass> = new Set([
 	'mixed-type',
@@ -25,7 +31,61 @@ const MAX_POWER = 6;
 
 export type LineDescriptor =
 	| { kind: 'refusal'; refusal: string }
-	| { kind: 'answer'; query: unknown; affirmative: boolean };
+	| { kind: 'answer'; query: unknown; affirmative: boolean }
+	// Sköll's Ask (a game move, R10): his first-person line composed from the same query the engine
+	// parked, so the route still voices only a server-owned line — never arbitrary client text.
+	| { kind: 'skoll-ask'; query: unknown }
+	// A reaction resolution (Scry/Hex/Pass, ux-copy §3): the fixed framing from REACTION_LINES, plus
+	// the overheard answer for the two scry lines (composed from the query, so still server-owned).
+	| { kind: 'react'; line: ReactionLineId; query?: unknown; affirmative?: boolean }
+	// A cast resolution (ux-copy §4): the true/falters lines are fixed; the wrong line names the rune,
+	// validated against the board so the route still voices only a server-owned line.
+	| { kind: 'cast'; result: 'true' | 'wrong' | 'falters'; rune?: string }
+	// The end-screen outcome (ux-copy §4): one beat of the splash copy — the win's coda in the Oracle's
+	// voice, the loss's verse in Sköll's, so the player hears who took the day.
+	| { kind: 'outcome'; result: Outcome };
+
+// Parse a query and bound it to the real board (runes are 1-6); null on anything malformed or
+// out-of-range. Shared by the answer, Sköll-ask, and scry composers.
+function validBoardQuery(raw: unknown): ReturnType<typeof parseQuery> {
+	const query = parseQuery(raw);
+	if (query === null) return null;
+	if (query.axis === 'power' && (query.value < MIN_POWER || query.value > MAX_POWER)) return null;
+	return query;
+}
+
+function composeAnswer(raw: unknown, affirmative: unknown): string | null {
+	if (typeof affirmative !== 'boolean') return null;
+	const query = validBoardQuery(raw);
+	return query ? voiceAnswer(query, affirmative) : null;
+}
+
+function composeReact(line: ReactionLineId, raw: unknown, affirmative: unknown): string | null {
+	// own-property only: an inherited key (e.g. "toString") must not pass the allow-list.
+	if (!Object.hasOwn(REACTION_LINES, line)) return null;
+	const framing = REACTION_LINES[line];
+	if (!carriesAnswer(line)) return framing; // Hex/Pass are framing only
+	if (typeof affirmative !== 'boolean') return null;
+	const query = validBoardQuery(raw);
+	if (query === null) return null;
+	const ans = voiceAnswer(query, affirmative);
+	// human-scry frames then reveals; skoll-scry reveals then notes he overheard (ux-copy §3).
+	return line === 'human-scry' ? `${framing} ${ans}` : `${ans} ${framing}`;
+}
+
+function composeCast(result: 'true' | 'wrong' | 'falters', rune: unknown): string | null {
+	if (result === 'true') return CAST_TRUE;
+	if (result === 'falters') return CAST_FALTERS;
+	// wrong: name only a real board rune (the cast path already canonicalizes to one).
+	const match = runes.find((r) => r.name === rune);
+	return match ? wrongCastLine(match.name) : null;
+}
+
+function composeOutcome(result: Outcome): string | null {
+	// own-property only: an inherited key must not resolve to a prototype method.
+	if (!Object.hasOwn(OUTCOME_LINES, result)) return null;
+	return OUTCOME_LINES[result][VOICED_BEAT[result]];
+}
 
 /** Compose the exact server-owned line for a descriptor, or null when it is not allow-listed. */
 export function composeLine(descriptor: LineDescriptor): string | null {
@@ -34,15 +94,53 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 			return REFUSAL_CLASSES.has(descriptor.refusal as RefusalClass)
 				? refusalLine(descriptor.refusal as RefusalClass)
 				: null;
-		case 'answer': {
-			if (typeof descriptor.affirmative !== 'boolean') return null;
-			const query = parseQuery(descriptor.query);
-			if (query === null) return null;
-			if (query.axis === 'power' && (query.value < MIN_POWER || query.value > MAX_POWER))
-				return null;
-			return voiceAnswer(query, descriptor.affirmative);
+		case 'answer':
+			return composeAnswer(descriptor.query, descriptor.affirmative);
+		case 'skoll-ask': {
+			const query = validBoardQuery(descriptor.query);
+			return query ? skollAskEcho(query) : null;
 		}
+		case 'react':
+			return composeReact(descriptor.line, descriptor.query, descriptor.affirmative);
+		case 'cast':
+			return composeCast(descriptor.result, descriptor.rune);
+		case 'outcome':
+			return composeOutcome(descriptor.result);
 	}
+}
+
+/** Which prebuilt voice speaks a descriptor — Sköll's lines (his Ask, the loss) in his voice,
+ *  everything else the Oracle's. */
+export function voiceForLine(descriptor: LineDescriptor): string {
+	const skoll =
+		descriptor.kind === 'skoll-ask' ||
+		(descriptor.kind === 'outcome' && descriptor.result === 'lose');
+	return skoll ? SKOLL_VOICE : ORACLE_VOICE;
+}
+
+// Director's-notes prompts the TTS model reads as a delivery instruction, speaking only the quoted
+// line. A bare line reads flat and generic — the same model says it in two unmistakable registers
+// only when each line carries its speaker's note. These shape the two prebuilt voices into character.
+const SKOLL_TTS_DIRECTION =
+	'Read this line as Sköll, the monstrous wolf who hunts the sun. Deep, gravelly, guttural — a low ' +
+	'chest growl, cold and predatory, heavy with menace, never bright or smooth. Keep it clipped. ' +
+	'Speak only the line, no narration:';
+
+const ORACLE_TTS_DIRECTION =
+	'Read this line as the Oracle, keeper of the rite. Reverent, calm, and certain, with quiet weight ' +
+	'— but at a natural, brisk speaking pace; do not slow down, drag, or pause between words, and ' +
+	'never sound bright, chatty, or sing-song. She knows the answer before it is asked. Speak only ' +
+	'the line, no narration:';
+
+/**
+ * The exact text handed to the TTS model for a composed line: each line wrapped in its speaker's
+ * director's-notes so the model voices it in character (Sköll's growl, the Oracle's ceremony).
+ * Deterministic, so the route can cache by it.
+ */
+export function synthPrompt(descriptor: LineDescriptor, line: string): string {
+	const direction =
+		voiceForLine(descriptor) === SKOLL_VOICE ? SKOLL_TTS_DIRECTION : ORACLE_TTS_DIRECTION;
+	return `${direction}\n\n"${line}"`;
 }
 
 /** Narrow an untrusted payload to a LineDescriptor shape (values still validated by composeLine). */
@@ -54,6 +152,13 @@ export function isLineDescriptor(value: unknown): value is LineDescriptor {
 			return typeof v.refusal === 'string';
 		case 'answer':
 			return 'query' in v && 'affirmative' in v;
+		case 'skoll-ask':
+			return 'query' in v;
+		case 'react':
+			return typeof v.line === 'string';
+		case 'cast':
+		case 'outcome':
+			return typeof v.result === 'string';
 		default:
 			return false;
 	}

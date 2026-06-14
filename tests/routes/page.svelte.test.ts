@@ -599,7 +599,7 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Pass' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('You hold your hand; let him answer.');
+			.toHaveTextContent('You hold your hand; I give Sköll his answer.');
 		// Prompt gone, the static reactions row is back.
 		expect(screen.container.querySelector('[data-testid="reaction-prompt"]')).toBeNull();
 	});
@@ -636,7 +636,7 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Pass' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('You hold your hand; let him answer.');
+			.toHaveTextContent('You hold your hand; I give Sköll his answer.');
 		// Window closed: the prompt is gone, but a Pass button still exists (the disabled placeholder).
 		expect(screen.container.querySelector('[data-testid="reaction-prompt"]')).toBeNull();
 		const stillThere = [
@@ -711,7 +711,7 @@ describe('Save the Sun page', () => {
 		await screen.getByRole('button', { name: 'Hex' }).click();
 		await expect
 			.element(screen.getByTestId('answer'))
-			.toHaveTextContent('You hold your hand; let him answer.');
+			.toHaveTextContent('You hold your hand; I give Sköll his answer.');
 	});
 
 	it('voices the Hex in the Oracle text when Sköll silences the human Ask', async () => {
