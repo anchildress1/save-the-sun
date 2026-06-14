@@ -22,8 +22,6 @@ import {
 	deliveryReady,
 	setDeliveryMuted,
 	deliver,
-	deliverClip,
-	preloadClips,
 	whenDrained,
 	resetDelivery
 } from '$lib/voice/delivery';
@@ -208,102 +206,6 @@ describe('delivery seam', () => {
 	it('stopDelivery is a no-op with no speaker open', () => {
 		expect(() => stopDelivery()).not.toThrow();
 		expect(audio.speaker.stop).not.toHaveBeenCalled();
-	});
-
-	describe('deliverClip (Sköll, P2)', () => {
-		const CLIP = '/audio/skoll/night-opens-1.pcm.b64';
-
-		it('does not fetch or play before the speaker is enabled', async () => {
-			await deliverClip(CLIP);
-			expect(fetch).not.toHaveBeenCalled();
-			expect(audio.speaker.enqueue).not.toHaveBeenCalled();
-		});
-
-		it('fetches the static clip and enqueues it as one blob on the shared speaker', async () => {
-			vi.mocked(fetch).mockResolvedValueOnce(new Response('skoll-pcm-blob\n'));
-			enableDelivery();
-
-			await deliverClip(CLIP);
-
-			expect(fetch).toHaveBeenCalledWith(CLIP, { signal: expect.any(AbortSignal) });
-			// Trimmed, single enqueue — the same speaker the Oracle uses, so the two serialize (R9).
-			expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['skoll-pcm-blob']);
-		});
-
-		it('stays silent when the clip is missing', async () => {
-			vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 404 }));
-			enableDelivery();
-
-			await deliverClip(CLIP);
-
-			expect(audio.speaker.enqueue).not.toHaveBeenCalled();
-		});
-
-		it('stays silent when the fetch rejects', async () => {
-			vi.mocked(fetch).mockRejectedValueOnce(new Error('offline'));
-			enableDelivery();
-
-			await expect(deliverClip(CLIP)).resolves.toBeUndefined();
-			expect(audio.speaker.enqueue).not.toHaveBeenCalled();
-		});
-
-		it('preloads clips into the cache, fetching each once', async () => {
-			vi.mocked(fetch).mockImplementation(async (url) => new Response(`blob-for-${String(url)}\n`));
-			const urls = ['/audio/skoll/night-opens-1.pcm.b64', '/audio/skoll/hexed-1.pcm.b64'];
-
-			await preloadClips(urls);
-			expect(fetch).toHaveBeenCalledTimes(2);
-
-			// A second preload is idempotent — already-cached urls are skipped.
-			await preloadClips(urls);
-			expect(fetch).toHaveBeenCalledTimes(2);
-		});
-
-		it('plays a preloaded clip with no fetch at trigger time', async () => {
-			vi.mocked(fetch).mockResolvedValueOnce(new Response('warm-blob\n'));
-			await preloadClips([CLIP]);
-			expect(fetch).toHaveBeenCalledTimes(1);
-
-			enableDelivery();
-			await deliverClip(CLIP);
-
-			// The trigger enqueued from cache — no second fetch.
-			expect(fetch).toHaveBeenCalledTimes(1);
-			expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['warm-blob']);
-		});
-
-		it('caches a cold-path clip so the next play skips the fetch', async () => {
-			vi.mocked(fetch).mockResolvedValueOnce(new Response('cold-blob\n'));
-			enableDelivery();
-
-			await deliverClip(CLIP); // cold: fetches + caches
-			await deliverClip(CLIP); // warm: no fetch
-
-			expect(fetch).toHaveBeenCalledTimes(1);
-			expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['cold-blob', 'cold-blob']);
-		});
-
-		it('drops a clip whose round was stopped while it was fetching', async () => {
-			let release: () => void = () => {};
-			const body = new ReadableStream<Uint8Array>({
-				async start(controller) {
-					await new Promise<void>((resolve) => {
-						release = resolve;
-					});
-					controller.enqueue(new TextEncoder().encode('late-blob'));
-					controller.close();
-				}
-			});
-			vi.mocked(fetch).mockResolvedValueOnce(new Response(body));
-			enableDelivery();
-
-			const inflight = deliverClip(CLIP);
-			stopDelivery(); // a new round abandons the previous round's clip
-			release();
-			await inflight;
-
-			expect(audio.speaker.enqueue).not.toHaveBeenCalled();
-		});
 	});
 
 	it('applies mute to a live speaker and remembers it for a later one', () => {

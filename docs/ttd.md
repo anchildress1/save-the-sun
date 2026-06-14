@@ -17,6 +17,5 @@
 - [ ] Sort debug view in reverse chronological order
 - [ ] Undo the 'don't think' Skoll logic
 - [ ] Oracle spoken flair — dynamic/dramatized TTS lines; drop the preset allow-list for a server-authored-line gate (so she can surprise without the endpoint becoming free arbitrary-text TTS)
-- [ ] Sköll taunt bucket + idle bucket (P2 deferred) — the taunt bucket needs a spoken input (returns with the mic, P5); idle is a client timer, not an engine event. Both kept in `skollScript.ts`, unwired and unsynthesized. Wire + generate when their trigger exists.
-- [ ] Sköll dynamic spoken lines — his Ask (names a sign) and winning cast (names `{Rune}`) stay text on his frame; voicing them later needs per-sign/per-rune prebuilds or a narrow TTS exception (a future call, not a P2 blocker).
-- [ ] Defeat-exit choreography — his concession clip ("Keep your dawn, witch.") queues behind her victory line on the shared speaker (so it never speaks over her), but the end-screen splash timing vs. his caption is loose; tighten if it reads early.
+- [ ] Sköll ambience layer (deferred) — the taunt library in `ux-copy.md` §2 (splash open, idle, hunt mood, reactions, defeat exit) as **audio-only** prebuilt clips (no caption, per revised R10). Lines approved + tightened; clip pipeline + context triggers are future work. The taunt-address bucket needs a spoken input → P5 (the mic).
+- [ ] Voice Sköll's winning cast — a game move (names `{Rune}`), currently text-only. Voice it the same way as his Ask: carry the cast rune on the `Advance` wire, add a `skoll-cast` line descriptor (server recomposes from the rune), deliver via the TTS seam; caption it (R10).

@@ -1,4 +1,4 @@
-.PHONY: install dev format format-check lint typecheck test build preview e2e perf secret-scan deploy clean ai-checks voice-clips
+.PHONY: install dev format format-check lint typecheck test build preview e2e perf secret-scan deploy clean ai-checks
 
 install:
 	pnpm install
@@ -39,11 +39,6 @@ perf:
 
 secret-scan:
 	npx secretlint
-
-# Regenerate Sköll's prebuilt voice clips (R8). Needs GEMINI_API_KEY (.env); local-only, never CI —
-# the clips ship as committed static assets. --force redoes all; bare run fills only what's missing.
-voice-clips:
-	node scripts/skoll-voice.mjs --force
 
 deploy:
 	./deploy.sh

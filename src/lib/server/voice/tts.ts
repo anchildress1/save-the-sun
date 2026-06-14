@@ -5,15 +5,18 @@
 
 import { GoogleGenAI, Modality } from '@google/genai';
 import { env } from '$env/dynamic/private';
-import { ORACLE_VOICE, TTS_MODEL } from '$lib/voice/config';
+import { TTS_MODEL } from '$lib/voice/config';
 import { maskApiKey } from '$lib/server/debug/log';
 
+// Keyed by voice + text: the Oracle and Sköll speak different lines, but a shared line in two voices
+// must cache as two clips, not collide.
 const cache = new Map<string, string[]>();
+const cacheKey = (voice: string, text: string) => `${voice}\n${text}`;
 
-/** Whether this exact line is already synthesized — a cached replay costs no Gemini call, so the
+/** Whether this exact line+voice is already synthesized — a cached replay costs no Gemini call, so the
  *  route can serve it without spending a synth-rate-limit slot. */
-export function isCached(text: string): boolean {
-	return cache.has(text);
+export function isCached(text: string, voice: string): boolean {
+	return cache.has(cacheKey(voice, text));
 }
 
 let client: GoogleGenAI | null = null;
@@ -29,8 +32,9 @@ function ai(apiKey: string): GoogleGenAI {
  * exists; otherwise streams from Gemini, accumulating the chunks to cache only on a clean finish.
  * Yields nothing (silent) when the key is missing or synthesis fails — the panel still has the line.
  */
-export async function* synthesizeStream(text: string): AsyncGenerator<string> {
-	const cached = cache.get(text);
+export async function* synthesizeStream(text: string, voice: string): AsyncGenerator<string> {
+	const key = cacheKey(voice, text);
+	const cached = cache.get(key);
 	if (cached !== undefined) {
 		yield* cached;
 		return;
@@ -48,7 +52,7 @@ export async function* synthesizeStream(text: string): AsyncGenerator<string> {
 			contents: [{ role: 'user', parts: [{ text }] }],
 			config: {
 				responseModalities: [Modality.AUDIO],
-				speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: ORACLE_VOICE } } }
+				speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
 			}
 		});
 		for await (const part of stream) {
@@ -59,7 +63,7 @@ export async function* synthesizeStream(text: string): AsyncGenerator<string> {
 			}
 		}
 		// Cache only a complete clip — a stream that errored mid-flight must not replay truncated.
-		if (chunks.length > 0) cache.set(text, chunks);
+		if (chunks.length > 0) cache.set(key, chunks);
 	} catch (err) {
 		// Keep the stack but mask it — an SDK error can embed the request URL, and with it the key.
 		const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);

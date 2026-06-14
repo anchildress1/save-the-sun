@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { composeLine, isLineDescriptor, type LineDescriptor } from '$lib/server/voice/lines';
+import {
+	composeLine,
+	isLineDescriptor,
+	voiceForLine,
+	type LineDescriptor
+} from '$lib/server/voice/lines';
 import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
+import { skollAskEcho } from '$lib/server/skoll/skoll';
+import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 
 describe('composeLine', () => {
 	it('voices every refusal class with the canonical line', () => {
@@ -70,12 +77,36 @@ describe('composeLine', () => {
 			} as unknown as LineDescriptor)
 		).toBeNull();
 	});
+
+	it('voices Sköll’s Ask from the parked query (his own line, not the Oracle’s)', () => {
+		const query = { axis: 'element', value: 'Fire' } as const;
+		expect(composeLine({ kind: 'skoll-ask', query })).toBe(skollAskEcho(query));
+	});
+
+	it('refuses a malformed or out-of-range Sköll Ask query', () => {
+		expect(
+			composeLine({ kind: 'skoll-ask', query: { axis: 'element', value: 'Plastic' } })
+		).toBeNull();
+		expect(
+			composeLine({ kind: 'skoll-ask', query: { axis: 'power', op: 'eq', value: 9 } })
+		).toBeNull();
+		expect(composeLine({ kind: 'skoll-ask', query: null })).toBeNull();
+	});
+});
+
+describe('voiceForLine', () => {
+	it('routes Sköll’s Ask to his voice, everything else to the Oracle’s', () => {
+		expect(voiceForLine({ kind: 'skoll-ask', query: {} })).toBe(SKOLL_VOICE);
+		expect(voiceForLine({ kind: 'refusal', refusal: 'empty' })).toBe(ORACLE_VOICE);
+		expect(voiceForLine({ kind: 'answer', query: {}, affirmative: true })).toBe(ORACLE_VOICE);
+	});
 });
 
 describe('isLineDescriptor', () => {
-	it('accepts the two line kinds', () => {
+	it('accepts the three line kinds', () => {
 		expect(isLineDescriptor({ kind: 'refusal', refusal: 'empty' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'answer', query: {}, affirmative: true })).toBe(true);
+		expect(isLineDescriptor({ kind: 'skoll-ask', query: {} })).toBe(true);
 	});
 
 	it('rejects malformed shapes', () => {
@@ -85,5 +116,6 @@ describe('isLineDescriptor', () => {
 		expect(isLineDescriptor({ kind: 'unknown' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'refusal' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'answer', query: {} })).toBe(false);
+		expect(isLineDescriptor({ kind: 'skoll-ask' })).toBe(false);
 	});
 });

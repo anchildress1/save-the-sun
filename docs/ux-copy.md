@@ -2,7 +2,7 @@
 
 Every player-facing string, plus the voice rules that govern them. Diegetic (in-world) voice only—the dev.to submission post is a separate, judge-facing register and is out of scope here. Mechanics in `game-spec.md`, rune data in `rune-board.md`.
 
-Production notes: the Oracle's answers may be templated (engine fills `{trait}`/`{value}`). Sköll's only player-facing **text** line is his templated Ask—taunts and cast lines were cut from the v1 board (see §2), but return as the spoken taunt library (§2; source of truth `src/lib/voice/skollScript.ts`). No emoji anywhere; no exclamation in any diegetic line except the single allowlisted one in Sköll's winning-cast bucket.
+Production notes: the Oracle's answers may be templated (engine fills `{trait}`/`{value}`). Sköll's player-facing **text** line is his templated Ask—now also voiced in his own voice through the shared server TTS route (a game move, R10). Taunts and cast lines were cut from the v1 board (see §2); they return as the deferred **ambience** library (§2 — audio-only flavor, no caption). No emoji anywhere; no exclamation in any diegetic line except the single allowlisted one in Sköll's winning-cast bucket.
 
 ---
 
@@ -174,81 +174,76 @@ Power is spoken as a word (1–6), not the Oracle's digit grammar—the register
 
 _Cut from the v1 UI (flavor, not inference): the idle/turn taunts, the escalation tier (was P2), and the public cast lines ("I name it. {Rune}." / "The hunt ends. {Rune}.")._ The cut applies to his on-board **text** surface only—the spoken taunt library below revives these for the voice layer.
 
-### Sköll script—spoken taunt library
+### Sköll script—ambience library (deferred)
 
-> Lines tightened 2026-06-14 to his winning-cast cadence: two short beats, ~3–7 words. A taunt that takes a breath to say costs a breath to synthesize and wears the pacing thin — short keeps the menace, the spend, and the latency all low. The machine-readable source of truth is `src/lib/voice/skollScript.ts`; this table is the human copy of it.
+> These are **ambience**, not game moves: atmosphere that sets the hunt's mood. By the revised R10 they are **audio-only** (no caption) — they carry no game state. His actual game-move lines (his Ask, his winning cast) are voiced through the shared TTS route and written; see "His Ask" above. This library is **deferred** — the lines are approved and tightened (2026-06-14, ~3–7 words), the clip pipeline is future work (`ttd.md`).
 
-Open items:
+Library rules (for when it lands):
 
-- **Taunt detection rules** (engineering): keyword list vs. lightweight intent check on transcripts for routing player trash-talk to the wolf. Ambiguous utterances default to the Oracle's Ask path—mis-routing a real question to a taunt is the worse failure. Deferred with the taunt bucket to P5 (needs a spoken input; see `architecture.md`).
-
-Library rules:
-
-- **Spoken only** (prebaked TTS). His on-board text surface still carries only his templated Ask; nothing here prints to the board or the Rite transcript except the defeat exit line, noted below.
+- **Spoken only**, audio-only — prebuilt clips played as-is, nothing printed (these are exempt from R10 captioning).
 - One line per trigger, drawn from the bucket; **no line repeats within a night.**
-- Voice holds to the charter: predatory, sardonic, cold—he taunts the play, never the player. "Witch" is his only address. The library's single exclamation lives in the winning-cast bucket and nowhere else.
-- Reaction resolutions stay in the rite's third-person voice (§3); a taunt may follow a resolution, never replace it.
-- **P2 generates the engine-event buckets only** (marked below). The idle, taunt, and winning-cast buckets are deferred — idle is a client timer, the taunt needs a spoken input (P5), and the winning cast names a `{Rune}` (dynamic, stays text on his frame per `architecture.md`).
+- Voice holds to the charter: predatory, sardonic, cold—he taunts the play, never the player. "Witch" is his only address. The single exclamation lives in the winning-cast bucket (a *game-move* line, voiced via TTS) and nowhere else.
+- **Triggers by context** — splash open (night-opens), an idle-on-your-turn timer (idle), hunt progression (far/closing/near), reactions (wrong cast, Hexed Ask), end screen (defeat exit). The taunt-address bucket needs a spoken input → returns with the mic (P5).
 
-**The night opens (his first turn)** — _generated (P2)_
+**The night opens (splash / round open)**
 
 - "The night ends in my jaws."
 - "I have hunted her for ages."
 - "The sun knows how this ends."
 
-**The hunt, far (his field still wide)** — _generated (P2)_
+**The hunt, far (his field still wide)**
 
 - "The scent is thin. It thickens."
 - "A wide field. I have run wider."
 - "Every answer trims the dark."
 
-**The hunt, closing** — _generated (P2)_
+**The hunt, closing**
 
 - "Fewer places left to hide."
 - "The trail warms underfoot."
 - "I taste which one. Almost."
 
-**The hunt, near (one or two left)** — _generated (P2)_
+**The hunt, near (one or two left)**
 
 - "Two left. I need one."
 - "Close enough to hear her burn."
 - "One answer, and dawn is mine."
 
-**The witch casts wrong** — _generated (P2)_
+**The witch casts wrong**
 
 - "Wrong rune. The night thanks you."
 - "All that crossing, for that."
 - "Spend your turns. I hunt."
 
-**His Ask is Hexed** — _generated (P2)_
+**His Ask is Hexed**
 
 - "Silence her. My nose works."
 - "Clever. It saves you once."
 - "Kill the question. The trail remains."
 
-**The witch wins (defeat exit — one line, rare)** — _generated (P2)_
+**The witch wins (defeat exit — one line, rare)**
 
 - "Keep your dawn, witch. Another year comes."
 
-_The defeat line plays in the Rite transcript only, after Sól's victory sequence resolves — never over her beats. Her rarity stays the power; his exit is an aside, not a scene._
+_The defeat line plays after Sól's victory sequence resolves — never over her beats. Her rarity stays the power; his exit is an aside, not a scene._
 
-**The witch hesitates (idle on your turn)** — _deferred (client timer, not an engine event)_
+**The witch hesitates (idle on your turn)**
 
 - "You hesitate. I do not."
 - "Count them again, slower."
 - "The fire burns while you stare."
 
-**The witch taunts him (routed by detection)** — _deferred to P5 (needs a spoken input)_
+**The witch taunts him (routed by detection — P5, needs the mic)**
 
 - "Bold words from prey."
 - "Save your breath for dawn."
 - "Louder ones have burned."
 
-**His winning cast** — _stays text on his frame (names a `{Rune}`, dynamic)_
+**His winning cast** — _a game move (names a `{Rune}`): voiced via TTS like his Ask, and written; not part of this ambience library_
 
 - "I name it. {Rune}."
 - "The hunt ends. {Rune}."
-- "{Rune}! And the dawn dies with it." _(the library's one exclamation)_
+- "{Rune}! And the dawn dies with it." _(the one allowed exclamation)_
 
 ## 3. Reactions—Scry & Hex
 

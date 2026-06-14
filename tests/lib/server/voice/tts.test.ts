@@ -22,7 +22,7 @@ const mock = vi.hoisted(() => ({
 vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
 
 import { synthesizeStream, isCached, resetTtsCache } from '$lib/server/voice/tts';
-import { ORACLE_VOICE, TTS_MODEL } from '$lib/voice/config';
+import { ORACLE_VOICE, SKOLL_VOICE, TTS_MODEL } from '$lib/voice/config';
 
 // A Gemini stream is an async iterable of parts; each part may carry one inline-audio chunk.
 function streamOf(...chunks: (string | null)[]) {
@@ -54,7 +54,7 @@ describe('synthesizeStream', () => {
 	it('streams audio chunks with the Oracle voice, skipping empty parts', async () => {
 		sdk.generateContentStream.mockResolvedValueOnce(streamOf('aaa', null, 'bbb'));
 
-		const chunks = await collect(synthesizeStream('I wake with the fire.'));
+		const chunks = await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE));
 
 		expect(chunks).toEqual(['aaa', 'bbb']);
 		expect(sdk.generateContentStream).toHaveBeenCalledExactlyOnceWith({
@@ -69,16 +69,43 @@ describe('synthesizeStream', () => {
 
 	it('isCached reports false until a line is synthesized, then true', async () => {
 		sdk.generateContentStream.mockResolvedValueOnce(streamOf('pcm'));
-		expect(isCached('I wake with the fire.')).toBe(false);
-		await collect(synthesizeStream('I wake with the fire.'));
-		expect(isCached('I wake with the fire.')).toBe(true);
+		expect(isCached('I wake with the fire.', ORACLE_VOICE)).toBe(false);
+		await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE));
+		expect(isCached('I wake with the fire.', ORACLE_VOICE)).toBe(true);
+	});
+
+	it('synthesizes the requested voice', async () => {
+		sdk.generateContentStream.mockResolvedValueOnce(streamOf('grr'));
+
+		await collect(synthesizeStream('I scent a fire rune on her.', SKOLL_VOICE));
+
+		expect(sdk.generateContentStream).toHaveBeenCalledExactlyOnceWith(
+			expect.objectContaining({
+				config: expect.objectContaining({
+					speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: SKOLL_VOICE } } }
+				})
+			})
+		);
+	});
+
+	it('caches per voice — the same line in two voices is two clips', async () => {
+		sdk.generateContentStream.mockResolvedValue(streamOf('x'));
+		const line = 'Two power. I can smell it.';
+
+		await collect(synthesizeStream(line, ORACLE_VOICE));
+		expect(isCached(line, ORACLE_VOICE)).toBe(true);
+		// The other voice is a separate cache entry — not yet synthesized.
+		expect(isCached(line, SKOLL_VOICE)).toBe(false);
+
+		await collect(synthesizeStream(line, SKOLL_VOICE));
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
 	});
 
 	it('replays a cached clip without a second Gemini call', async () => {
 		sdk.generateContentStream.mockResolvedValueOnce(streamOf('one', 'two'));
 
-		const first = await collect(synthesizeStream('Speak your question, witch.'));
-		const second = await collect(synthesizeStream('Speak your question, witch.'));
+		const first = await collect(synthesizeStream('Speak your question, witch.', ORACLE_VOICE));
+		const second = await collect(synthesizeStream('Speak your question, witch.', ORACLE_VOICE));
 
 		expect(first).toEqual(['one', 'two']);
 		expect(second).toEqual(['one', 'two']);
@@ -88,7 +115,7 @@ describe('synthesizeStream', () => {
 	it('yields nothing without touching the SDK when the key is not configured', async () => {
 		mock.env.GEMINI_API_KEY = undefined;
 
-		expect(await collect(synthesizeStream('I wake with the fire.'))).toEqual([]);
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([]);
 		expect(sdk.GoogleGenAI).not.toHaveBeenCalled();
 		expect(vi.mocked(console.error).mock.calls.flat().join(' ')).toContain('not configured');
 	});
@@ -98,7 +125,7 @@ describe('synthesizeStream', () => {
 			new Error('500 from https://api?key=test-gemini-key down')
 		);
 
-		expect(await collect(synthesizeStream('I wake with the fire.'))).toEqual([]);
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([]);
 		const logged = vi.mocked(console.error).mock.calls.flat().join(' ');
 		expect(logged).toContain('[gemini-api-key]');
 		expect(logged).not.toContain('test-gemini-key');
@@ -113,9 +140,11 @@ describe('synthesizeStream', () => {
 		sdk.generateContentStream.mockResolvedValueOnce(streamOf('whole-a', 'whole-b'));
 
 		// First attempt streams one chunk then dies — not cached.
-		expect(await collect(synthesizeStream('I wake with the fire.'))).toEqual(['half']);
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([
+			'half'
+		]);
 		// Second attempt re-synthesizes (no cache hit) and returns the complete clip.
-		expect(await collect(synthesizeStream('I wake with the fire.'))).toEqual([
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([
 			'whole-a',
 			'whole-b'
 		]);

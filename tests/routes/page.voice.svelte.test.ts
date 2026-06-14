@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Page from '$routes/+page.svelte';
 import type { GameState } from '$lib/server/engine/actions';
 import type { VoiceEvent } from '$lib/voice/voiceSession';
-import { SKOLL_SCRIPT } from '$lib/voice/skollScript';
 
 // S3: the page owns the voiceSession subscription and drives the medallion from its events.
 // The session module is mocked at the boundary so these tests emit the S2 contract directly —
@@ -58,8 +57,6 @@ const deliveryMock = vi.hoisted(() => ({
 	stopDelivery: vi.fn(),
 	deliveryReady: vi.fn(() => false),
 	deliver: vi.fn<(descriptor: { kind: string }) => Promise<void>>(async () => {}),
-	deliverClip: vi.fn<(url: string) => Promise<void>>(async () => {}),
-	preloadClips: vi.fn<(urls: string[]) => Promise<void>>(async () => {}),
 	whenDrained: vi.fn(async () => {})
 }));
 
@@ -1884,93 +1881,82 @@ describe('Save the Sun page — audio toggle (voice-as-delivery P1)', () => {
 	});
 });
 
-describe('Save the Sun page — Sköll voice (P2)', () => {
-	const wrongCastCaptions = SKOLL_SCRIPT['wrong-cast'].variants.map((v) => v.text);
-	const hexedCaptions = SKOLL_SCRIPT['hexed'].variants.map((v) => v.text);
+describe('Save the Sun page — Sköll voiced via TTS (rework)', () => {
+	const ASK_QUERY = { axis: 'element', value: 'Fire' };
 
-	it('warms the clip library when audio is enabled (the opt-in), not before', async () => {
-		const screen = render(Page, pageProps);
-		expect(deliveryMock.preloadClips).not.toHaveBeenCalled(); // silent by default — no 4.6MB download
-
-		await screen.getByTestId('mute-toggle').click(); // audio on
-		await vi.waitFor(() => expect(deliveryMock.preloadClips).toHaveBeenCalledTimes(1));
-		// The warmed set is every generated clip url.
-		const urls = deliveryMock.preloadClips.mock.calls[0][0];
-		expect(urls.length).toBeGreaterThan(0);
-		expect(urls.every((u) => /^\/audio\/skoll\/.+\.pcm\.b64$/.test(u))).toBe(true);
-	});
-
-	it('writes his taunt to his own frame on a wrong cast — text, even with audio off', async () => {
-		mockAction({
-			type: 'Cast',
-			cast: { ok: true, won: false, turnConsumed: true },
-			state: HUMAN_TURN
-		});
-		const screen = render(Page, pageProps);
-		await startBoardCast(screen);
-
-		const caption = screen.getByTestId('skoll-caption');
-		await vi.waitFor(() =>
-			expect(wrongCastCaptions).toContain(caption.element().textContent?.trim())
-		);
-		// R10: his line is written without any audio — no speaker opened, no clip fetched.
-		expect(deliveryMock.deliverClip).not.toHaveBeenCalled();
-	});
-
-	it('writes his taunt on a Hexed Ask', async () => {
-		const reactProps = {
-			...pageProps,
-			data: {
-				...pageProps.data,
-				pendingReaction: { echo: 'I scent a fire rune on her.', held: { Scry: true, Hex: true } }
+	function mockAskThenSkollAsk(skollTurn: GameState) {
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String(init?.body ?? '{}'));
+			if (body.type === 'Advance') {
+				// His turn: he Asks, carrying the query so the client can voice it.
+				return new Response(
+					JSON.stringify({
+						type: 'Advance',
+						skoll: { asks: { echo: 'I scent a fire rune on her.', query: ASK_QUERY } },
+						state: skollTurn
+					})
+				);
 			}
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						query: { axis: 'element', value: 'Sun' },
+						answer: 'Yes. Sól is reaching for a sun rune.',
+						affirmative: true,
+						turnConsumed: true
+					},
+					skollVsYou: { reaction: 'Pass' },
+					state: skollTurn
+				})
+			);
+		});
+	}
+
+	it('voices his Ask through the delivery seam in his own descriptor when audio is on', async () => {
+		const SKOLL_TURN: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
 		};
-		mockAction({
-			type: 'React',
-			outcome: { ok: true, choice: 'Hex' },
-			skollReaction: { hexed: true },
-			state: HUMAN_TURN
-		});
-		const screen = render(Page, reactProps);
-		await screen.getByRole('button', { name: 'Hex' }).click();
-
-		const caption = screen.getByTestId('skoll-caption');
-		await vi.waitFor(() => expect(hexedCaptions).toContain(caption.element().textContent?.trim()));
-	});
-
-	it('with audio on, plays his clip on the shared speaker and lights the medallion', async () => {
-		mockAction({
-			type: 'Cast',
-			cast: { ok: true, won: false, turnConsumed: true },
-			state: HUMAN_TURN
-		});
-		// Hold the clip "playing" so the skoll-speaking state is observable.
-		let releaseDrain: () => void = () => {};
-		deliveryMock.whenDrained.mockReturnValueOnce(
-			new Promise<void>((resolve) => {
-				releaseDrain = resolve;
-			})
-		);
+		mockAskThenSkollAsk(SKOLL_TURN);
 
 		const screen = render(Page, pageProps);
-		await screen.getByTestId('mute-toggle').click(); // audio on — opens the delivery speaker
-		await startBoardCast(screen);
+		await screen.getByTestId('mute-toggle').click(); // audio on, session asleep → liveIdle
+		await screen.getByLabelText('Ask the Oracle').fill('is it a sun rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
 
-		// His prebuilt clip is fetched through the shared deliver queue (R9: serializes after her).
+		// His Ask was delivered as a server-owned skoll-ask descriptor (not arbitrary text).
 		await vi.waitFor(() =>
-			expect(deliveryMock.deliverClip).toHaveBeenCalledWith(
-				expect.stringMatching(/^\/audio\/skoll\/wrong-cast-\d\.pcm\.b64$/)
-			)
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'skoll-ask', query: ASK_QUERY })
 		);
-		// The medallion shows his ember state while the clip plays.
+		// And it's written on his frame (R10).
 		await expect
-			.element(screen.getByTestId('eclipse-medallion'))
-			.toHaveAttribute('aria-label', 'Sköll speaks. Silence the voice.');
+			.element(screen.getByTestId('skoll-echo'))
+			.toHaveTextContent('I scent a fire rune on her.');
+	});
 
-		releaseDrain();
-		// Once it drains the medallion settles back to asleep.
+	it('writes his Ask but does not voice it while the Live session is mid-turn (not idle)', async () => {
+		const SKOLL_TURN: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		mockAskThenSkollAsk(SKOLL_TURN);
+		// A non-idle Live state: a TTS line would collide, so his Ask is not voiced (gated by liveIdle).
+		voiceMock.state = 'speaking';
+
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText('Ask the Oracle').fill('is it a sun rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+
 		await expect
-			.element(screen.getByTestId('eclipse-medallion'))
-			.toHaveAttribute('aria-label', 'The voice sleeps. Wake the Oracle.');
+			.element(screen.getByTestId('skoll-echo'))
+			.toHaveTextContent('I scent a fire rune on her.'); // still written (R10)
+		expect(deliveryMock.deliver).not.toHaveBeenCalledWith({ kind: 'skoll-ask', query: ASK_QUERY });
 	});
 });

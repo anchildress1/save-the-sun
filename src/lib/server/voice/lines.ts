@@ -5,7 +5,9 @@
 
 import { parseQuery } from '$lib/server/engine/queries';
 import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
+import { skollAskEcho } from '$lib/server/skoll/skoll';
 import type { RefusalClass } from '$lib/server/oracle/types';
+import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 
 const REFUSAL_CLASSES: ReadonlySet<RefusalClass> = new Set([
 	'mixed-type',
@@ -25,7 +27,10 @@ const MAX_POWER = 6;
 
 export type LineDescriptor =
 	| { kind: 'refusal'; refusal: string }
-	| { kind: 'answer'; query: unknown; affirmative: boolean };
+	| { kind: 'answer'; query: unknown; affirmative: boolean }
+	// Sköll's Ask (a game move, R10): his first-person line composed from the same query the engine
+	// parked, so the route still voices only a server-owned line — never arbitrary client text.
+	| { kind: 'skoll-ask'; query: unknown };
 
 /** Compose the exact server-owned line for a descriptor, or null when it is not allow-listed. */
 export function composeLine(descriptor: LineDescriptor): string | null {
@@ -42,7 +47,19 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 				return null;
 			return voiceAnswer(query, descriptor.affirmative);
 		}
+		case 'skoll-ask': {
+			const query = parseQuery(descriptor.query);
+			if (query === null) return null;
+			if (query.axis === 'power' && (query.value < MIN_POWER || query.value > MAX_POWER))
+				return null;
+			return skollAskEcho(query);
+		}
 	}
+}
+
+/** Which prebuilt voice speaks a descriptor — Sköll's lines in his voice, everything else the Oracle's. */
+export function voiceForLine(descriptor: LineDescriptor): string {
+	return descriptor.kind === 'skoll-ask' ? SKOLL_VOICE : ORACLE_VOICE;
 }
 
 /** Narrow an untrusted payload to a LineDescriptor shape (values still validated by composeLine). */
@@ -54,6 +71,8 @@ export function isLineDescriptor(value: unknown): value is LineDescriptor {
 			return typeof v.refusal === 'string';
 		case 'answer':
 			return 'query' in v && 'affirmative' in v;
+		case 'skoll-ask':
+			return 'query' in v;
 		default:
 			return false;
 	}

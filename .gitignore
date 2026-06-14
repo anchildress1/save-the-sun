@@ -38,6 +38,3 @@ coverage
 /*.png
 .playwright-mcp/
 .shots/
-
-# Sköll voice — QA listening files (the runtime clips are the committed .pcm.b64; the .wav is local-only)
-static/audio/skoll/*.wav

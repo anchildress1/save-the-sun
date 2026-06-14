@@ -119,23 +119,23 @@ A medallion at the top of the Oracle panel is both the voice toggle and the stat
 - [x] The 5-second clock starts only after the Oracle (or Sköll) finishes speaking—their speech never counts as the player's silence.
 - [x] Tapping the medallion resumes listening.
 
-**R8 — Sköll clip library.** *(landed under migration P2.)*
-A build-time script generates Sköll's audio with Gemini TTS (voice `Algieba`, director's-notes style prompt) from `src/lib/voice/skollScript.ts` grouped by trigger bucket. One to three variants per trigger.
+**R8 — Sköll's voice.** *(revised 2026-06-14 — split into game-move voice + ambience.)*
+His voice is `Algieba` (distinct from the Oracle's `Gacrux`). His lines split by kind:
 
-- [x] Clips ship as static assets (`static/audio/skoll/*.pcm.b64`); runtime playback only, zero per-game generation calls. Warmed into memory (`preloadClips`) when audio is enabled, so a trigger plays with no fetch latency (taunt-to-clip-start metric).
-- [~] Given the player taunts the wolf (detected from input transcripts), then a clip from the taunt bucket plays — **deferred to P5**: the taunt needs a spoken input, and P1–P4 have no mic. The bucket stays in the script, unwired. P2 wires the **engine-event** triggers (first turn, hunt milestones, wrong cast, Hexed Ask, player win).
-- [x] Regenerating the library is one script run (`node scripts/skoll-voice.mjs --force` / `make voice-clips`) after editing his script file. Retries the TTS model's 500s; a plain rerun fills any clip a 500 burst dropped.
+- [x] **Game moves via the shared TTS route** (landed, P2): his **Ask** is voiced in his voice through the same server TTS path as the Oracle — `lines.ts` recomposes his line server-side from the engine's parked `query` (`skoll-ask` descriptor → `skollAskEcho`), so the route still voices only a server-owned line; `tts.ts` takes a `voice` (cache keyed by voice + text). Written on his frame (R10). His winning cast follows the same way once the rune rides the wire — deferred.
+- [ ] **Ambience as prebuilt clips** (deferred): the taunt buckets (`ux-copy.md` §2 — splash open, idle, hunt mood) ship later as static clips played as-is, **audio-only** (no caption, per the revised R10 — ambience carries no game state). Build-time generation, runtime playback only, zero per-game calls. The taunt-address bucket needs a spoken input → returns with the mic (P5).
 
-**R9 — Mic discipline during Sköll playback.** *(landed under migration P2.)*
-- [x] Given a Sköll clip is playing, then mic audio streaming to the Oracle session is paused — while Live still coexists (before P4), an awake session sleeps before his clip; with no mic (board-only play) there is nothing to pause.
-- [x] One speaker at a time: the director never plays Sköll over the Oracle — structural, his clip rides the **same** speaker queue as her lines, so it serializes after hers and can never overlap.
+**R9 — One speaker; mic discipline.** *(partly landed; mic discipline returns with the mic.)*
+- [x] One speaker at a time: Sköll never speaks over the Oracle — structural, both voices ride the **same** TTS delivery seam, so his line serializes after hers and can never overlap.
+- [ ] Given a Sköll clip is playing, mic audio to the Oracle session is paused — returns with the ambience clip layer and/or the mic (P5); with no mic (P1–P4) there is nothing to pause.
 
-**R10 — Everything spoken is also written.**
-Voice is an enhancement layer, never the sole carrier of game information.
+**R10 — Every game move is written.** *(revised 2026-06-14.)*
+Voice never solely carries game information. Every **game move** — an Ask and its answer, a reaction (Scry/Hex/Pass), a cast and its outcome, a win or loss — renders as text regardless of audio. **Ambience is exempt**: atmospheric Sköll voice (the splash open, idle waiting, the closing-hunt mood) carries no game state, so it is **audio-only flavor and does not caption**. The test is *information, not who speaks*: if a line tells you what happened in the rite, it is written; if it only sets mood, it may be heard and not seen.
 
-- [x] The Oracle's spoken answers render as text in the existing Answer panel (the Live session emits output transcripts for free).
+- [x] The Oracle's spoken answers/refusals render as text in the Answer panel (each is a game move).
 - [x] What the Oracle *heard* (input transcript) is teed to the `/debug` stream, not the rite UI — the answer panel carries the spoken result, and the S8 confirm gate guards a mishear before any destructive action commits.
-- [x] Sköll's clips display captions—his caption rides his own frame (`skoll-caption`), the verbatim line from `skollScript.ts`, shown with or without audio (P2).
+- [x] Sköll's Ask — the inference the player must Scry/Hex/Pass — is written on his frame (`skoll-echo`) and voiced in his voice (P2); his winning cast names the `{Rune}` in text.
+- [ ] The deferred **ambience** layer (the taunt library) is audio-only by the exemption — no caption, since it carries no game state (`ttd.md`).
 
 **R11 — Output mute.**
 - [x] One speaker toggle silences both characters' audio; captions and text continue. Mic behavior is unaffected. (S11: a master gain on the Oracle `Speaker` attenuates to silence without dropping the queue, so captions, mic streaming, and the state machine are untouched. The preference persists for the session in `sessionStorage` and is the shared seam S13's wolf player consults.)

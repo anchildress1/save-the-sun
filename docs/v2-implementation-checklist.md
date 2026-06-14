@@ -3,7 +3,7 @@
 > Implementation units for AI agents. Source of truth: `v2-voice-requirements.md`. Refs = requirement IDs there.
 > Config constants: Oracle voice `Gacrux` (verified on Live 2026-06-11 — `Kore` fallback not needed), Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, silence timeout 5000ms.
 >
-> ⚠️ **Delivery model superseded.** Stories S1–S11 shipped a Live-first design now being rearchitected — see [`architecture.md` → Target architecture + Migration plan](./architecture.md#target-architecture--voice-as-delivery-planned). Audio becomes mic-independent server-side TTS delivery; Live is demoted to an opt-in mic adapter. These stories are kept as the shipped record; the forward path is the migration's P1–P5, not the Live story order below. (P1 Oracle TTS delivery and P2 Sköll's voice have **landed** — S12/S13 below were built under P2; P3–P5 remain. The Sköll voice was a prerequisite for retiring Live in P4.)
+> ⚠️ **Delivery model superseded.** Stories S1–S11 shipped a Live-first design now being rearchitected — see [`architecture.md` → Target architecture + Migration plan](./architecture.md#target-architecture--voice-as-delivery-planned). Audio becomes mic-independent server-side TTS delivery; Live is demoted to an opt-in mic adapter. These stories are kept as the shipped record; the forward path is the migration's P1–P5, not the Live story order below. (P1 Oracle TTS delivery and P2 Sköll's game-move voice have **landed** — P2 voices his **Ask** through the shared TTS route, like the Oracle; the prebuilt-clip S12/S13 were tried then reverted in favor of it, and the ambience layer is deferred. P3–P5 remain.)
 
 ---
 
@@ -103,30 +103,29 @@ Declare five functions on the Live session: `ask`, `hex`, `scry`, `pass`, `cast_
 
 ## Phase 3 — The wolf 🐺
 
-### S12 — Sköll script + generation pipeline (R8) — _landed under migration P2_
+### S12 — Sköll script + generation pipeline (R8) — _superseded: split into TTS game moves + deferred ambience_
 
-- [x] Script content: spoken taunt library in `ux-copy.md` §2 — tightened 2026-06-14 to his winning-cast cadence (~3–7 words). Machine-readable source of truth: `src/lib/voice/skollScript.ts` (buckets + variants + the director's-notes prompt, marking which are generated vs deferred).
-- [x] Build script: each generated line → Gemini TTS (`Algieba` — voice picked over `Charon` on the sample, `gemini-3.1-flash-tts-preview`, director's-notes prompt) → committed `static/audio/skoll/<id>.pcm.b64` clip; caption text is the script's line (R10). `scripts/skoll-voice.mjs` (`--list` / `--sample [--voice]` / full / `--force`); silence-trimmed.
-- [x] One command regenerates the full library (`node scripts/skoll-voice.mjs --force`, or `make voice-clips`)
-- [x] Retry logic for the TTS model's occasional 500s — the SDK's 3 backoff attempts, plus per-clip continue so a 500 burst is re-run by a plain rerun (only-missing) instead of failing the batch
+The original S12 (a prebuilt clip library) was built then **reverted**. Two reasons: his **game-move** lines (the Ask, the winning cast) are *dynamic* — exactly what the shared TTS route handles — and the rest of the script is **ambience** (splash/idle/hunt mood) that the revised R10 makes audio-only, not a captioned game move.
 
-### S13 — Director module (R8, R9) — _landed under migration P2_
+- [x] Script content: taunt library in `ux-copy.md` §2 — tightened 2026-06-14 to short, two-beat lines. Reserved for the **ambience** layer (future).
+- [ ] Ambience clip pipeline (prebuilt TTS, played as-is, no caption) — **deferred**; tracked in `ttd.md`. (`Algieba` voice picked over `Charon` by ear on a sample.)
 
-- [~] Watches input transcripts; taunt/address detection routes to wolf — **deferred to P5** (the taunt bucket needs a spoken input; no mic in P1–P4). Kept in the script, not wired.
-- [x] Game events trigger matching bucket — his first turn (night-opens), hunt milestones (far/closing/near, once each), wrong cast, Hexed Ask, player win (defeat-exit). Sköll's own winning cast names `{Rune}` → stays text on his frame.
-- [x] Random variant selection, no immediate repeats — per-bucket shuffled pool that refills without leading on the just-played line; injectable rng for tests
-- [x] One speaker at a time: Sköll waits for Oracle to finish — structural: his clip rides the **same** speaker queue, so it serializes after any Oracle line, never overlapping
-- [x] During Sköll playback: pause mic streaming — an awake Live session sleeps before his clip (R9 mic isolation while the layers coexist; silence-idle is a full sleep, S5)
-- [x] Clip start latency from trigger < 500ms — prebuilt static clip, one fetch + enqueue, no synthesis
-- [x] Captions render during playback — his caption rides his own frame (`skoll-caption`), shown with or without audio (R10)
-- [x] Medallion → sköll-speaking state during playback — when audio is on; reverts to asleep when the clip drains
-- Depends: S2, S3, S12
+### S13 — Director module (R8, R9) — _superseded by TTS game-move voicing_
+
+His **Ask** is now voiced through the shared TTS route in his voice (migration P2), not a clip director.
+
+- [x] His Ask (a game move) is voiced + written — `skoll-ask` line descriptor (`lines.ts`) recomposes his line server-side from the parked `query` via `skollAskEcho`; `tts.ts` voices it in `SKOLL_VOICE`; the page delivers it through the same `deliver()` seam as the Oracle, gated on an idle Live session. Written on his frame (`skoll-echo`, R10).
+- [x] One speaker at a time — structural: Oracle + Sköll share the one TTS delivery seam, so his line serializes after hers, never overlapping (R9).
+- [~] His winning cast (a game move naming `{Rune}`) — **deferred**: voice it the same way once the rune rides the `Advance` wire, with a caption (`ttd.md`).
+- [~] Taunt/address detection → wolf, idle/hunt ambience triggers — **deferred** with the ambience layer (taunt needs a spoken input → P5; idle is a client timer).
+- [~] Mic discipline during Sköll playback, medallion sköll-speaking — return with the ambience layer / the mic (P5).
+- Depends: S2, S12
 
 ---
 
 ## Order 🧭
 
 S1 → S2 → {S3, S6, S7} → {S4, S5, S10, S11} → S8 → S9 → S12 → S13.
-Phases 1+2 shipped on Live; the forward path now runs by migration phase (P1 ✓ → P2 ✓ → P3 → P4 → P5). S12 + S13 landed under P2: the Sköll clip library, generator, and director are built and wired.
+Phases 1+2 shipped on Live; the forward path now runs by migration phase (P1 ✓ → P2 ✓ → P3 → P4 → P5). P2 voices Sköll's Ask through the shared TTS route (his game-move voice); the prebuilt-clip S12/S13 were reverted, and the ambience layer is deferred (`ttd.md`).
 
 🤖 *Drafted with AI assistance; decisions by Ashley.* ☀️

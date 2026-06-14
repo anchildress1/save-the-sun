@@ -14,6 +14,8 @@ vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
 import { POST } from '$routes/api/voice/tts/+server';
 import { resetTtsWindows, TTS_SESSION_LIMIT } from '$lib/server/voice/rateLimit';
 import { refusalLine } from '$lib/server/oracle/oracle';
+import { skollAskEcho } from '$lib/server/skoll/skoll';
+import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 
 function streamOf(...chunks: string[]) {
 	return (async function* () {
@@ -50,7 +52,23 @@ describe('POST /api/voice/tts', () => {
 		expect(response.status).toBe(200);
 		expect(response.headers.get('content-type')).toContain('application/x-ndjson');
 		expect(await response.text()).toBe('pcm-a\npcm-b\n');
-		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(refusalLine('empty'));
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
+			refusalLine('empty'),
+			ORACLE_VOICE
+		);
+	});
+
+	it('voices Sköll’s Ask from the query in his own voice', async () => {
+		tts.synthesizeStream.mockReturnValueOnce(streamOf('grr'));
+		const query = { axis: 'element', value: 'Fire' };
+
+		const response = await call('wolf', { kind: 'skoll-ask', query });
+
+		expect(response.status).toBe(200);
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
+			skollAskEcho(query as Parameters<typeof skollAskEcho>[0]),
+			SKOLL_VOICE
+		);
 	});
 
 	it('rejects a malformed JSON body with 400 before charging the budget', async () => {
