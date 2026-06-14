@@ -44,9 +44,10 @@ export type VoiceEvent =
 	| { type: 'asleep' }
 	| { type: 'eclipsed' }
 	| { type: 'error'; reason: VoiceErrorReason; notice: string }
-	// Text arrives as incremental fragments; turn boundaries ride the state events. The turn's
-	// end carries one `final` out fragment — the whole assembled line — so the caption can flush
-	// to the complete text even when audio drains (and the turn settles) before the tail fragments.
+	// Text arrives as incremental fragments; turn boundaries ride the state events. One `final` out
+	// fragment fires when `thinking` is entered from the player's input phase (hearing → silence, or
+	// direct()) — that is the true boundary where trailing outputTranscription chunks have settled.
+	// onToolCall also enters `thinking` mid-Oracle-turn (from `speaking`); no `final` fires there.
 	| { type: 'transcript'; direction: 'in' | 'out'; text: string; final?: boolean };
 
 export type VoiceListener = (event: VoiceEvent) => void;
@@ -165,7 +166,8 @@ export function createVoiceSession(): VoiceSession {
 
 	// 'hearing' re-emits every chunk so the medallion corona can track live amplitude.
 	function toState(next: VoiceState): void {
-		const changed = state !== next;
+		const prev = state;
+		const changed = prev !== next;
 		state = next;
 		// R7 clock runs only on the player's turn; hearing arms-if-unset so RMS never resets
 		// it, while a barge-in cutting straight from speaking still gets a fresh clock.
@@ -174,14 +176,24 @@ export function createVoiceSession(): VoiceSession {
 			if (!silenceTimer) restartSilenceClock();
 		} else clearSilenceClock();
 		if (!changed && next !== 'hearing') return;
+		// `final` fires only at the true player→Oracle boundary: silence timer from `hearing`
+		// or a direct() call from `listening`. onToolCall also calls toState('thinking') from
+		// `speaking` mid-Oracle-turn — that is not the boundary where all chunks have settled,
+		// so transcriptOut must keep accumulating until the player's silence fires.
+		if (next === 'thinking' && (prev === 'hearing' || prev === 'listening')) {
+			if (transcriptOut)
+				emit({ type: 'transcript', direction: 'out', text: transcriptOut, final: true });
+			flushTranscriptOut();
+		}
 		if (next === 'hearing') emit({ type: 'hearing', amplitude: lastAmplitude });
 		else emit({ type: next });
 	}
 
 	function teardown(): void {
-		// A mid-turn sleep/failure must not swallow what was already transcribed — but tee only,
-		// never as a UI `final`: the page may have cleared the panel and switched rounds already.
-		flushTranscripts(false);
+		// A mid-turn sleep/failure flushes transcriptIn to /debug but never emits a UI `final` —
+		// the `final` belongs to `thinking`, and teardown skips thinking entirely.
+		flushTranscripts();
+		flushTranscriptOut();
 		generation++;
 		liveReady = false;
 		awaitingDrain = false;
@@ -208,16 +220,23 @@ export function createVoiceSession(): VoiceSession {
 	// socket kills the tee in the same instant, and the diagnostics must not die with it.
 	// Scrubbing lives here, the single sink: SDK error and close strings can embed the session's
 	// ephemeral token in a URL, and the /debug stream is public.
-	function teeDebug(level: 'info' | 'error', message: string, extraToken = ''): void {
+	function teeDebug(
+		level: 'info' | 'error',
+		message: string,
+		extraToken = '',
+		data?: Record<string, unknown>
+	): void {
 		let scrubbed = message;
 		for (const token of new Set([mintedToken, extraToken])) {
 			if (token) scrubbed = scrubbed.split(token).join('[ephemeral-token]');
 		}
+		const body: Record<string, unknown> = { level, message: scrubbed };
+		if (data !== undefined) body.data = data;
 		// keepalive: the final slept/transcript tees fire during page teardown and must survive it.
 		void fetch('/api/voice/debug', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ level, message: scrubbed }),
+			body: JSON.stringify(body),
 			keepalive: true
 		})
 			.then((response) => {
@@ -341,20 +360,21 @@ export function createVoiceSession(): VoiceSession {
 	}
 
 	// Transcripts reach the UI as live fragments (S10's surface); the /debug stream gets one
-	// assembled line per side per turn instead of a fragment flood. On a real turn boundary the out
-	// side also re-emits as one `final` fragment: the streamed fragments can truncate in the UI when
-	// the turn settles mid-stream, so the whole line is replayed once the turn is done. A teardown
-	// (sleep/new round/failure) tees only — `emitFinal: false` — or the prior round's line would land
-	// on the page after it has cleared the panel and switched rounds, persisting a stale caption.
-	function flushTranscripts(emitFinal = true): void {
+	// assembled line per side per turn. The `final` out fragment is deferred to `thinking` (the
+	// true SDK turn boundary) so it always carries the complete assembled text — turnComplete has
+	// no ordering guarantee with outputTranscription, so firing there could emit a partial line.
+	function flushTranscripts(): void {
 		if (transcriptIn) teeDebug('info', `heard: ${transcriptIn}`);
+		transcriptIn = '';
+	}
+
+	// Tee and reset the Oracle's assembled out-transcript. Called at `thinking` (start of next
+	// player turn) and on teardown — the two moments we know trailing chunks have settled.
+	function flushTranscriptOut(): void {
 		if (transcriptOut) {
 			teeDebug('info', `spoke: ${transcriptOut}`);
-			if (emitFinal)
-				emit({ type: 'transcript', direction: 'out', text: transcriptOut, final: true });
+			transcriptOut = '';
 		}
-		transcriptIn = '';
-		transcriptOut = '';
 	}
 
 	function playOracleAudio(parts: Part[]): void {
@@ -400,7 +420,7 @@ export function createVoiceSession(): VoiceSession {
 
 	async function runToolCall(call: FunctionCall, myGeneration: number): Promise<void> {
 		const name = call.name ?? '';
-		teeDebug('info', `tool call: ${name}(${JSON.stringify(call.args ?? {})})`);
+		teeDebug('info', `tool call: ${name}`, '', { args: call.args ?? {} });
 		let response: Record<string, unknown>;
 		try {
 			if (!toolExecutor) throw new Error('no tool executor registered');
@@ -429,7 +449,7 @@ export function createVoiceSession(): VoiceSession {
 			);
 			return;
 		}
-		teeDebug('info', `tool result: ${name} → ${JSON.stringify(response)}`);
+		teeDebug('info', `tool result: ${name}`, '', response);
 		if (state === 'thinking') armThinkingRescue();
 	}
 

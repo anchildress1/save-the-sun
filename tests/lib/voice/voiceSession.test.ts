@@ -431,23 +431,34 @@ describe('voiceSession oracle speech', () => {
 		expect(vs.state).toBe('listening');
 	});
 
-	it('tees one assembled transcript line per side on turnComplete — no fragment flood', () => {
+	it('tees one assembled transcript line per side — heard at turnComplete, spoke when next player turn begins', async () => {
 		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'cast ' } } });
 		callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'the rune' } } });
 		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'It is cast.' } } });
 		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		// heard: tees at turnComplete; spoke: tees at thinking (SDK gives no ordering guarantee
+		// for outputTranscription vs turnComplete, so trailing chunks can arrive after turnComplete).
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
 		const tees = teeBodies();
 		expect(tees.filter((body) => body.includes('heard:'))).toHaveLength(1);
 		expect(tees.join(' ')).toContain('heard: cast the rune');
 		expect(tees.join(' ')).toContain('spoke: It is cast.');
 	});
 
-	it('flushes the whole assembled out line as a final fragment on turnComplete', () => {
+	it('emits a final fragment at thinking — the true boundary where all chunks have settled', async () => {
 		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'It is ' } } });
 		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'cast.' } } });
 		callbacks!.onmessage({ serverContent: { turnComplete: true } });
-		// The streamed fragments, then one authoritative final carrying the complete line — the
-		// caption flush the UI needs when the turn settles before the tail fragments land.
+		// turnComplete fires no final — SDK gives no ordering guarantee for outputTranscription,
+		// so trailing chunks can still arrive. Wait for thinking (next player turn) instead.
+		expect(events.filter((e) => e.type === 'transcript' && e.final)).toEqual([]);
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
 		expect(events).toContainEqual({
 			type: 'transcript',
 			direction: 'out',
@@ -456,8 +467,12 @@ describe('voiceSession oracle speech', () => {
 		});
 	});
 
-	it('a silent turnComplete emits no final out fragment', () => {
+	it('a silent turn emits no final out fragment — neither at turnComplete nor at thinking', async () => {
 		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
 		expect(events.filter((e) => e.type === 'transcript')).toEqual([]);
 	});
 
@@ -468,9 +483,13 @@ describe('voiceSession oracle speech', () => {
 		expect(teed).not.toContain('spoke:');
 	});
 
-	it('a barge-in flushes the cut line to the tee', () => {
+	it('a barge-in tees the cut line when the player finishes their input', async () => {
 		callbacks!.onmessage({ serverContent: { outputTranscription: { text: 'The night holds' } } });
 		callbacks!.onmessage({ serverContent: { interrupted: true } });
+		// spoke: is deferred to thinking so trailing chunks can still land before the tee fires.
+		micChunk!('a', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
 		expect(teeBodies().join(' ')).toContain('spoke: The night holds');
 	});
 
@@ -529,13 +548,13 @@ describe('voiceSession silence timeout (S5)', () => {
 			callbacks!.onmessage({ serverContent: { inputTranscription: { text: 'word ' } } });
 			await vi.advanceTimersByTimeAsync(1_000);
 		}
-		expect(vs.state).toBe('hearing'); // 8s of continuous speech outlives the 5s clock
+		expect(vs.state).toBe('hearing'); // 8 transcript resets keep the clock alive
 		await vi.advanceTimersByTimeAsync(5_000); // then true silence idles it
 		expect(vs.state).toBe('asleep');
 	});
 
 	it('RMS noise never resets the clock — a fan flaring the corona is not recognizable speech', async () => {
-		for (let i = 0; i < 5; i++) {
+		for (let i = 0; i < 10; i++) {
 			micChunk!('hum', 0.5);
 			await vi.advanceTimersByTimeAsync(1_000);
 		}

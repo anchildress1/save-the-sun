@@ -8,8 +8,8 @@
 	let events = $state<DebugEvent[]>(untrack(() => data.events));
 	const sessionId = untrack(() => data.sessionId);
 
-	// Newest first so the latest move is on top during the demo (no scrolling to follow along).
-	const ordered = $derived([...events].reverse());
+	// Chronological order — heard → tool call → result reads naturally top-to-bottom.
+	const ordered = $derived([...events]);
 
 	async function refresh() {
 		try {
@@ -30,9 +30,10 @@
 
 	const ownerClass = (e: DebugEvent) => e.owner.toLowerCase().replace('ö', 'o'); // 'Sköll' → 'skoll'
 	const KIND_LABEL = { input: 'input', llm: 'Gemini AI', deterministic: 'deterministic' } as const;
-	// Raw Gemini I/O is multi-KB per call — collapsed by default so the stream reads as the
-	// parsed turn story; the full request/response is one click away (and one click back).
-	const isRawGemini = (e: DebugEvent) => e.message.startsWith('raw Gemini');
+	// Raw Gemini I/O is multi-KB per call; voice tool calls carry args/results. Both are collapsed
+	// so the stream reads as the parsed turn story — the detail is one click away.
+	const summaryFor = (e: DebugEvent) =>
+		e.message.startsWith('raw Gemini') ? 'full request / response' : 'details';
 </script>
 
 <svelte:head><title>Save the Sun — debug</title></svelte:head>
@@ -48,7 +49,7 @@
 	{#if ordered.length === 0}
 		<p class="empty">No events yet. Play a turn and they appear here.</p>
 	{:else}
-		<ol reversed>
+		<ol>
 			{#each ordered as event (event.seq)}
 				<li class="ev {ownerClass(event)} {event.level}">
 					<div class="head">
@@ -61,14 +62,10 @@
 
 					<p class="msg">{event.message}</p>
 					{#if event.data}
-						{#if isRawGemini(event)}
-							<details class="io">
-								<summary>full request / response</summary>
-								<pre>{pretty(event.data)}</pre>
-							</details>
-						{:else}
+						<details class="io">
+							<summary>{summaryFor(event)}</summary>
 							<pre>{pretty(event.data)}</pre>
-						{/if}
+						</details>
 					{/if}
 				</li>
 			{/each}
@@ -143,6 +140,10 @@
 	}
 	li.engine {
 		border-inline-start-color: var(--engine);
+	}
+	li.error {
+		border-inline-start-color: #e05555;
+		background: #1e1518;
 	}
 	.head {
 		display: flex;

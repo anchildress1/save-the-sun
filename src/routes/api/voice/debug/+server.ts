@@ -6,6 +6,15 @@ import type { RequestHandler } from './$types';
 // here and the log's own 200-event trim.
 const LEVELS = new Set(['info', 'error']);
 const MAX_MESSAGE_CHARS = 300;
+const MAX_DATA_CHARS = 1_000;
+
+function boundData(raw: Record<string, unknown>): Record<string, unknown> {
+	try {
+		return JSON.stringify(raw).length <= MAX_DATA_CHARS ? raw : { _truncated: true };
+	} catch {
+		return { _truncated: true };
+	}
+}
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	let body: unknown;
@@ -14,7 +23,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	} catch {
 		return json({ error: 'Invalid voice debug event.' }, { status: 400 });
 	}
-	const { level, message } = (body ?? {}) as Record<string, unknown>;
+	const { level, message, data } = (body ?? {}) as Record<string, unknown>;
 	if (typeof message !== 'string' || message.length === 0 || !LEVELS.has(level as string)) {
 		return json({ error: 'Invalid voice debug event.' }, { status: 400 });
 	}
@@ -25,7 +34,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		kind: 'llm',
 		part: 'Voice',
 		level: level as 'info' | 'error',
-		message: message.slice(0, MAX_MESSAGE_CHARS)
+		message: message.slice(0, MAX_MESSAGE_CHARS),
+		...(data !== null && typeof data === 'object' && !Array.isArray(data)
+			? { data: boundData(data as Record<string, unknown>) }
+			: {})
 	});
 	return new Response(null, { status: 204 });
 };
