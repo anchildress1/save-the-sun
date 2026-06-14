@@ -1655,23 +1655,24 @@
 		inline-size: 3.1rem;
 		block-size: 1.7rem;
 		padding: 0;
+		/* Restrained: a dark track in both states with a soft gold-dim ring; the thumb is the only
+		   gold, and aged (--gold), never the bright accent — so it sits in the muted palette. */
 		border: 1px solid var(--gold-dim);
 		border-radius: 999px;
-		background: rgba(6, 9, 18, 0.55);
+		background: rgba(6, 9, 18, 0.6);
 		cursor: pointer;
 		transition:
 			background 0.2s ease,
 			border-color 0.2s ease;
 	}
 
-	/* ON: the track lights gold and the thumb has slid to the lit end. */
+	/* ON: only a whisper of warmth in the track — the thumb's position and gold carry the state. */
 	.voice-switch[aria-checked='true'] {
-		background: rgba(217, 169, 74, 0.18);
-		border-color: var(--gold-bright);
+		background: var(--gold-faint);
 	}
 
 	.voice-switch:hover {
-		border-color: var(--gold-bright);
+		border-color: var(--gold);
 	}
 
 	.voice-switch__thumb {
@@ -1683,18 +1684,20 @@
 		inline-size: 1.3rem;
 		block-size: 1.3rem;
 		border-radius: 50%;
-		/* Dim disc when off, bright gold when on; the speaker glyph rides it in dark ink. */
-		background: var(--ink-muted);
-		color: rgba(6, 9, 18, 0.92);
+		/* OFF: a dim slate disc with a light, struck speaker. ON: aged gold with a dark glyph. */
+		background: var(--ink-faint);
+		color: var(--ink);
 		transform: translateY(-50%);
 		transition:
 			inset-inline-start 0.2s ease,
-			background 0.2s ease;
+			background 0.2s ease,
+			color 0.2s ease;
 	}
 
 	.voice-switch[aria-checked='true'] .voice-switch__thumb {
 		inset-inline-start: calc(100% - 1.3rem - 0.16rem);
-		background: var(--gold-bright);
+		background: var(--gold);
+		color: rgba(6, 9, 18, 0.9);
 	}
 
 	.voice-switch__thumb svg {
