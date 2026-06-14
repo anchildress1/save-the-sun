@@ -21,7 +21,7 @@ const mock = vi.hoisted(() => ({
 
 vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
 
-import { synthesizeStream, resetTtsCache } from '$lib/server/voice/tts';
+import { synthesizeStream, isCached, resetTtsCache } from '$lib/server/voice/tts';
 import { ORACLE_VOICE, TTS_MODEL } from '$lib/voice/config';
 
 // A Gemini stream is an async iterable of parts; each part may carry one inline-audio chunk.
@@ -65,6 +65,13 @@ describe('synthesizeStream', () => {
 				speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: ORACLE_VOICE } } }
 			}
 		});
+	});
+
+	it('isCached reports false until a line is synthesized, then true', async () => {
+		sdk.generateContentStream.mockResolvedValueOnce(streamOf('pcm'));
+		expect(isCached('I wake with the fire.')).toBe(false);
+		await collect(synthesizeStream('I wake with the fire.'));
+		expect(isCached('I wake with the fire.')).toBe(true);
 	});
 
 	it('replays a cached clip without a second Gemini call', async () => {

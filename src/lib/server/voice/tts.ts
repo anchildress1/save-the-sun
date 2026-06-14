@@ -10,6 +10,12 @@ import { maskApiKey } from '$lib/server/debug/log';
 
 const cache = new Map<string, string[]>();
 
+/** Whether this exact line is already synthesized — a cached replay costs no Gemini call, so the
+ *  route can serve it without spending a synth-rate-limit slot. */
+export function isCached(text: string): boolean {
+	return cache.has(text);
+}
+
 let client: GoogleGenAI | null = null;
 function ai(apiKey: string): GoogleGenAI {
 	// 3 backoff attempts (408/429/5xx) — the TTS preview model 500s occasionally, and one blip

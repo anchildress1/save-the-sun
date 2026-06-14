@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const tts = vi.hoisted(() => ({ synthesizeStream: vi.fn() }));
-vi.mock('$lib/server/voice/tts', () => ({ synthesizeStream: tts.synthesizeStream }));
+const tts = vi.hoisted(() => ({ synthesizeStream: vi.fn(), isCached: vi.fn(() => false) }));
+vi.mock('$lib/server/voice/tts', () => ({
+	synthesizeStream: tts.synthesizeStream,
+	isCached: tts.isCached
+}));
+
+const mock = vi.hoisted(() => ({
+	env: { GEMINI_API_KEY: 'test-gemini-key' } as { GEMINI_API_KEY?: string }
+}));
+vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
 
 import { POST } from '$routes/api/voice/tts/+server';
 import { resetTtsWindows, TTS_SESSION_LIMIT } from '$lib/server/voice/rateLimit';
@@ -27,6 +35,8 @@ describe('POST /api/voice/tts', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		resetTtsWindows();
+		tts.isCached.mockReturnValue(false);
+		mock.env.GEMINI_API_KEY = 'test-gemini-key';
 		vi.spyOn(console, 'warn').mockImplementation(() => {});
 	});
 
@@ -43,16 +53,7 @@ describe('POST /api/voice/tts', () => {
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(ORACLE_GREETING);
 	});
 
-	it('returns an empty body when synthesis yields nothing', async () => {
-		tts.synthesizeStream.mockReturnValueOnce(streamOf());
-
-		const response = await call('silent', { kind: 'greeting' });
-
-		expect(response.status).toBe(200);
-		expect(await response.text()).toBe('');
-	});
-
-	it('rejects a malformed JSON body with 400', async () => {
+	it('rejects a malformed JSON body with 400 before charging the budget', async () => {
 		const response = await call('bad-json', 'not json{');
 		expect(response.status).toBe(400);
 		expect(tts.synthesizeStream).not.toHaveBeenCalled();
@@ -70,7 +71,28 @@ describe('POST /api/voice/tts', () => {
 		expect(tts.synthesizeStream).not.toHaveBeenCalled();
 	});
 
-	it('rejects requests over the per-session limit with 429 and retry-after', async () => {
+	it('serves a cached line without spending a synth slot or needing the key', async () => {
+		tts.isCached.mockReturnValue(true);
+		mock.env.GEMINI_API_KEY = undefined;
+		tts.synthesizeStream.mockReturnValue(streamOf('cached-pcm'));
+
+		// Drain far past the per-session synth limit — cached replays never charge it.
+		for (let i = 0; i < TTS_SESSION_LIMIT + 5; i++) {
+			expect((await call('cache-fan', { kind: 'greeting' })).status).toBe(200);
+		}
+	});
+
+	it('returns 503 for an uncached line when the key is not configured', async () => {
+		mock.env.GEMINI_API_KEY = undefined;
+
+		const response = await call('keyless', { kind: 'greeting' });
+
+		expect(response.status).toBe(503);
+		expect((await response.json()).error).toBe('Voice is unavailable.');
+		expect(tts.synthesizeStream).not.toHaveBeenCalled();
+	});
+
+	it('rejects an uncached request over the per-session limit with 429 and retry-after', async () => {
 		tts.synthesizeStream.mockReturnValue(streamOf('pcm'));
 		for (let i = 0; i < TTS_SESSION_LIMIT; i++) {
 			expect((await call('greedy', { kind: 'greeting' })).status).toBe(200);
@@ -80,7 +102,6 @@ describe('POST /api/voice/tts', () => {
 
 		expect(response.status).toBe(429);
 		expect(response.headers.get('retry-after')).toBe('60');
-		// The denied request never reaches synthesis.
 		expect(tts.synthesizeStream).toHaveBeenCalledTimes(TTS_SESSION_LIMIT);
 	});
 });

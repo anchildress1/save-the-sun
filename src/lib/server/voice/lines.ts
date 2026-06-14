@@ -21,10 +21,11 @@ const REFUSAL_CLASSES: ReadonlySet<RefusalClass> = new Set([
 	'engine-error'
 ]);
 
-// The runes span 1-6; an out-of-range power Ask still resolves to a truthful No, but voicing an
-// unbounded integer would let a client mint a fresh uncached clip per request. Bound the spoken
-// set — the line still renders as text always; only its audio is gated here.
-const MAX_POWER = 99;
+// Runes span power 1-6, so only that range is ever voiced. An out-of-range power Ask still renders
+// as text and resolves truthfully — bounding the spoken set to the real board keeps the cached clip
+// library small and stops a client minting unbounded uncached clips (cache/key burn).
+const MIN_POWER = 1;
+const MAX_POWER = 6;
 
 export type LineDescriptor =
 	| { kind: 'greeting' }
@@ -44,7 +45,8 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 			if (typeof descriptor.affirmative !== 'boolean') return null;
 			const query = parseQuery(descriptor.query);
 			if (query === null) return null;
-			if (query.axis === 'power' && Math.abs(query.value) > MAX_POWER) return null;
+			if (query.axis === 'power' && (query.value < MIN_POWER || query.value > MAX_POWER))
+				return null;
 			return voiceAnswer(query, descriptor.affirmative);
 		}
 	}

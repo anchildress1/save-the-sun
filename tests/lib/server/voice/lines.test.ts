@@ -47,14 +47,16 @@ describe('composeLine', () => {
 		);
 	});
 
-	it('refuses a power answer outside the spoken bound', () => {
-		expect(
-			composeLine({
-				kind: 'answer',
-				query: { axis: 'power', op: 'eq', value: 100 },
-				affirmative: true
-			})
-		).toBeNull();
+	it('refuses a power answer outside the rune range (1-6)', () => {
+		for (const value of [0, 7, 99]) {
+			expect(
+				composeLine({
+					kind: 'answer',
+					query: { axis: 'power', op: 'eq', value },
+					affirmative: true
+				})
+			).toBeNull();
+		}
 	});
 
 	it('refuses a malformed query', () => {

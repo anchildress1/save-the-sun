@@ -1,7 +1,8 @@
 import { json } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import { claimTtsSlot } from '$lib/server/voice/rateLimit';
 import { composeLine, isLineDescriptor } from '$lib/server/voice/lines';
-import { synthesizeStream } from '$lib/server/voice/tts';
+import { synthesizeStream, isCached } from '$lib/server/voice/tts';
 import type { RequestHandler } from './$types';
 
 const badLine = () => json({ error: 'Unknown voice line.' }, { status: 400 });
@@ -11,14 +12,6 @@ const badLine = () => json({ error: 'Unknown voice line.' }, { status: 400 });
 // sends a descriptor (the "line ID"), never free text: the server composes the exact words from the
 // allow-list, so this route can't be turned into a free arbitrary-text TTS endpoint.
 export const POST: RequestHandler = async ({ request, locals }) => {
-	const verdict = claimTtsSlot(locals.sessionId);
-	if (!verdict.ok) {
-		return json(
-			{ error: 'Too many voice requests. Try again shortly.' },
-			{ status: 429, headers: { 'retry-after': String(verdict.retryAfterSeconds) } }
-		);
-	}
-
 	let body: unknown;
 	try {
 		body = await request.json();
@@ -30,11 +23,26 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	const line = composeLine(body);
 	// A well-shaped descriptor whose values don't compose to an allow-listed line is refused, not
-	// synthesized — the gate is the line, not the request shape.
+	// synthesized — the gate is the line, not the request shape. Validated BEFORE any quota spend so a
+	// flood of malformed/unknown payloads can't exhaust the synth budget.
 	if (line === null) return badLine();
 
-	// NDJSON: one base64 PCM chunk per line. A synth failure ends the stream early — the audio is
-	// best-effort (the panel already carries the text), so there is no mid-stream error status.
+	// A cached line replays from memory — no Gemini call — so it skips both the synth budget and the
+	// key requirement. Only an uncached line costs a synth: gate it, and fail loudly (503, not a silent
+	// empty 200) when voice is unconfigured so a deploy/config failure is visible.
+	if (!isCached(line)) {
+		if (!env.GEMINI_API_KEY) return json({ error: 'Voice is unavailable.' }, { status: 503 });
+		const verdict = claimTtsSlot(locals.sessionId);
+		if (!verdict.ok) {
+			return json(
+				{ error: 'Too many voice requests. Try again shortly.' },
+				{ status: 429, headers: { 'retry-after': String(verdict.retryAfterSeconds) } }
+			);
+		}
+	}
+
+	// NDJSON: one base64 PCM chunk per line. A synth failure mid-stream ends it early — the audio is
+	// best-effort (the panel already carries the text) past this point.
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream<Uint8Array>({
 		async start(controller) {
