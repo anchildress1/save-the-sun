@@ -10,6 +10,7 @@ import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
 import { skollAskEcho } from '$lib/server/skoll/skoll';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { REACTION_LINES } from '$lib/voice/reactionLines';
+import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
 
 describe('composeLine', () => {
 	it('voices every refusal class with the canonical line', () => {
@@ -119,6 +120,19 @@ describe('composeLine', () => {
 		).toBeNull();
 		expect(composeLine({ kind: 'react', line: 'nope' } as unknown as LineDescriptor)).toBeNull();
 	});
+
+	it('voices the fixed cast lines and a wrong cast naming a real board rune', () => {
+		expect(composeLine({ kind: 'cast', result: 'true' })).toBe(CAST_TRUE);
+		expect(composeLine({ kind: 'cast', result: 'falters' })).toBe(CAST_FALTERS);
+		expect(composeLine({ kind: 'cast', result: 'wrong', rune: 'Sowilo' })).toBe(
+			wrongCastLine('Sowilo')
+		);
+	});
+
+	it('refuses a wrong cast that does not name a real board rune', () => {
+		expect(composeLine({ kind: 'cast', result: 'wrong', rune: 'Plastic' })).toBeNull();
+		expect(composeLine({ kind: 'cast', result: 'wrong' })).toBeNull();
+	});
 });
 
 describe('voiceForLine', () => {
@@ -127,6 +141,7 @@ describe('voiceForLine', () => {
 		expect(voiceForLine({ kind: 'refusal', refusal: 'empty' })).toBe(ORACLE_VOICE);
 		expect(voiceForLine({ kind: 'answer', query: {}, affirmative: true })).toBe(ORACLE_VOICE);
 		expect(voiceForLine({ kind: 'react', line: 'human-hex' })).toBe(ORACLE_VOICE);
+		expect(voiceForLine({ kind: 'cast', result: 'true' })).toBe(ORACLE_VOICE);
 	});
 });
 
@@ -151,6 +166,7 @@ describe('isLineDescriptor', () => {
 		expect(isLineDescriptor({ kind: 'answer', query: {}, affirmative: true })).toBe(true);
 		expect(isLineDescriptor({ kind: 'skoll-ask', query: {} })).toBe(true);
 		expect(isLineDescriptor({ kind: 'react', line: 'human-hex' })).toBe(true);
+		expect(isLineDescriptor({ kind: 'cast', result: 'true' })).toBe(true);
 	});
 
 	it('rejects malformed shapes', () => {
@@ -162,5 +178,6 @@ describe('isLineDescriptor', () => {
 		expect(isLineDescriptor({ kind: 'answer', query: {} })).toBe(false);
 		expect(isLineDescriptor({ kind: 'skoll-ask' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'react' })).toBe(false);
+		expect(isLineDescriptor({ kind: 'cast' })).toBe(false);
 	});
 });

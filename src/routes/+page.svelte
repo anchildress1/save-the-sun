@@ -17,6 +17,7 @@
 	} from '$lib/voice/delivery';
 	import type { LineDescriptor } from '$lib/server/voice/lines';
 	import { REACTION_LINES } from '$lib/voice/reactionLines';
+	import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
@@ -49,9 +50,9 @@
 		wolfMoving: 'The wolf is moving. Hold.',
 		riteMoving: 'The rite is moving. Hold.',
 		oracleSilent: "The Oracle falls silent — the rite can't reach Sól.",
-		castFalters: 'The rite falters. The rune slips away.',
-		wrongCast: (name: string) => `${name} is not the one. The night holds.`,
-		runeTrue: 'The rune is true.',
+		castFalters: CAST_FALTERS,
+		wrongCast: wrongCastLine,
+		runeTrue: CAST_TRUE,
 		yourMove: 'Your move.',
 		skollMoves: 'Sköll moves.',
 		wolfStalled: 'The wolf stalls — rouse him.',
@@ -836,13 +837,21 @@
 			});
 			applyState(state);
 			let line: string;
+			let voice: LineDescriptor;
 			if (cast.ok) {
 				line = cast.won ? RITE.runeTrue : RITE.wrongCast(runeName);
+				voice = cast.won
+					? { kind: 'cast', result: 'true' }
+					: { kind: 'cast', result: 'wrong', rune: runeName };
 			} else {
 				console.warn('[ui] Cast rejected by engine:', cast.reason);
 				line = RITE.castFalters;
+				voice = { kind: 'cast', result: 'falters' };
 			}
 			answer = line;
+			// Voice the cast outcome in her voice; keep the handle so a winning cast's end-screen splash
+			// waits for "The rune is true." to be heard (whenDrained). Gated like her answer.
+			answerAudio = liveIdle() ? deliver(voice) : null;
 			return line;
 		} catch (err) {
 			console.error('[ui] Cast dispatch failed:', err);

@@ -135,7 +135,7 @@ Voice never solely carries game information. Every **game move** — an Ask and 
 - [x] The Oracle's spoken answers/refusals render as text in the Answer panel (each is a game move).
 - [x] What the Oracle *heard* (input transcript) is teed to the `/debug` stream, not the rite UI — the answer panel carries the spoken result, and the S8 confirm gate guards a mishear before any destructive action commits.
 - [x] Sköll's Ask — the inference the player must Scry/Hex/Pass — is written on his frame (`skoll-echo`) and voiced in his voice (P2); his winning cast names the `{Rune}` in text.
-- [x] The reaction resolutions (Scry/Hex/Pass, ux-copy §3) are written in the Answer panel and voiced in the Oracle's voice — a `react` line descriptor composed server-side (the scry lines carry the overheard answer).
+- [x] The reaction resolutions (Scry/Hex/Pass, ux-copy §3) and cast outcomes (true / wrong / falters, §4) are written in the Answer panel and voiced in the Oracle's voice — `react` / `cast` line descriptors composed server-side (the scry lines carry the overheard answer; the wrong-cast names a board-validated rune). The end-screen Sól/defeat sequences remain text.
 - [ ] The deferred **ambience** layer (the taunt library) is audio-only by the exemption — no caption, since it carries no game state (`ttd.md`).
 
 **R11 — Output mute.**

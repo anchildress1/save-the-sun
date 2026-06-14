@@ -9,6 +9,8 @@ import { skollAskEcho } from '$lib/server/skoll/skoll';
 import type { RefusalClass } from '$lib/server/oracle/types';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { REACTION_LINES, carriesAnswer, type ReactionLineId } from '$lib/voice/reactionLines';
+import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
+import { runes } from '$lib/board';
 
 const REFUSAL_CLASSES: ReadonlySet<RefusalClass> = new Set([
 	'mixed-type',
@@ -34,7 +36,10 @@ export type LineDescriptor =
 	| { kind: 'skoll-ask'; query: unknown }
 	// A reaction resolution (Scry/Hex/Pass, ux-copy §3): the fixed framing from REACTION_LINES, plus
 	// the overheard answer for the two scry lines (composed from the query, so still server-owned).
-	| { kind: 'react'; line: ReactionLineId; query?: unknown; affirmative?: boolean };
+	| { kind: 'react'; line: ReactionLineId; query?: unknown; affirmative?: boolean }
+	// A cast resolution (ux-copy §4): the true/falters lines are fixed; the wrong line names the rune,
+	// validated against the board so the route still voices only a server-owned line.
+	| { kind: 'cast'; result: 'true' | 'wrong' | 'falters'; rune?: string };
 
 // Bound a power query to the real board (runes are 1-6), shared by the answer and scry composers.
 function powerInRange(query: ReturnType<typeof parseQuery>): boolean {
@@ -75,6 +80,13 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 			const ans = voiceAnswer(query, descriptor.affirmative);
 			// human-scry frames then reveals; skoll-scry reveals then notes he overheard (ux-copy §3).
 			return id === 'human-scry' ? `${framing} ${ans}` : `${ans} ${framing}`;
+		}
+		case 'cast': {
+			if (descriptor.result === 'true') return CAST_TRUE;
+			if (descriptor.result === 'falters') return CAST_FALTERS;
+			// wrong: name only a real board rune (the cast path already canonicalizes to one).
+			const rune = runes.find((r) => r.name === descriptor.rune);
+			return rune ? wrongCastLine(rune.name) : null;
 		}
 	}
 }
@@ -121,6 +133,8 @@ export function isLineDescriptor(value: unknown): value is LineDescriptor {
 			return 'query' in v;
 		case 'react':
 			return typeof v.line === 'string';
+		case 'cast':
+			return typeof v.result === 'string';
 		default:
 			return false;
 	}

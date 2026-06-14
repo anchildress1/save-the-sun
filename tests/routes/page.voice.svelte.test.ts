@@ -2013,3 +2013,34 @@ describe('Save the Sun page — reaction lines voiced (R10)', () => {
 		);
 	});
 });
+
+describe('Save the Sun page — cast lines voiced (R10)', () => {
+	it('voices a winning cast — "The rune is true." in the Oracle’s voice', async () => {
+		const WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 4 };
+		mockAction({ type: 'Cast', cast: { ok: true, won: true, turnConsumed: true }, state: WON });
+		const screen = render(Page, pageProps);
+		await startBoardCast(screen);
+
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'cast', result: 'true' })
+		);
+	});
+
+	it('voices a wrong cast naming the rune', async () => {
+		mockAction({
+			type: 'Cast',
+			cast: { ok: true, won: false, turnConsumed: true },
+			state: HUMAN_TURN
+		});
+		const screen = render(Page, pageProps);
+		await startBoardCast(screen);
+
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({
+				kind: 'cast',
+				result: 'wrong',
+				rune: 'Sowilo'
+			})
+		);
+	});
+});
