@@ -21,6 +21,7 @@ import {
 	deliveryReady,
 	setDeliveryMuted,
 	deliver,
+	whenDrained,
 	resetDelivery
 } from '$lib/voice/delivery';
 
@@ -115,6 +116,51 @@ describe('delivery seam', () => {
 
 		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['first']);
 		expect(audio.speaker.close).toHaveBeenCalledTimes(1);
+	});
+
+	it('whenDrained resolves immediately when nothing is playing', async () => {
+		enableDelivery();
+		audio.speaker.busy = false;
+		await expect(whenDrained(1000)).resolves.toBeUndefined();
+		expect(audio.speaker.onDrained).not.toHaveBeenCalled();
+	});
+
+	it('whenDrained resolves immediately when no speaker is open', async () => {
+		await expect(whenDrained(1000)).resolves.toBeUndefined();
+	});
+
+	it('whenDrained waits for the speaker to drain', async () => {
+		enableDelivery();
+		audio.speaker.busy = true;
+		let drain: () => void = () => {};
+		audio.speaker.onDrained.mockImplementation((cb: () => void) => {
+			drain = cb;
+		});
+
+		let resolved = false;
+		const p = whenDrained(10_000).then(() => {
+			resolved = true;
+		});
+		await Promise.resolve();
+		expect(resolved).toBe(false);
+
+		drain();
+		await p;
+		expect(resolved).toBe(true);
+	});
+
+	it('whenDrained resolves on timeout even if the speaker never drains', async () => {
+		vi.useFakeTimers();
+		try {
+			enableDelivery();
+			audio.speaker.busy = true;
+			audio.speaker.onDrained.mockImplementation(() => {});
+			const p = whenDrained(5000);
+			vi.advanceTimersByTime(5000);
+			await expect(p).resolves.toBeUndefined();
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('applies mute to a live speaker and remembers it for a later one', () => {

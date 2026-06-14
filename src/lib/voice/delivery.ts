@@ -76,6 +76,26 @@ export async function deliver(descriptor: LineDescriptor): Promise<void> {
 	}
 }
 
+/**
+ * Resolve once the speaker has played out everything queued — or after `timeoutMs`, so a stuck or
+ * silent stream never hangs a caller. Resolves immediately when nothing is playing. Used to hold a
+ * full-screen takeover (the end-of-round splash) until her last line has actually been heard.
+ */
+export function whenDrained(timeoutMs: number): Promise<void> {
+	const active = speaker;
+	if (!active || !active.busy) return Promise.resolve();
+	return new Promise((resolve) => {
+		let settled = false;
+		const finish = () => {
+			if (settled) return;
+			settled = true;
+			resolve();
+		};
+		active.onDrained(finish);
+		setTimeout(finish, timeoutMs);
+	});
+}
+
 /** Test isolation only — module state shared across a test file. */
 export function resetDelivery(): void {
 	speaker = null;

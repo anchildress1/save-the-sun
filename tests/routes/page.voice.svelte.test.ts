@@ -55,7 +55,8 @@ const deliveryMock = vi.hoisted(() => ({
 	enableDelivery: vi.fn(),
 	deliveryReady: vi.fn(() => false),
 	setDeliveryMuted: vi.fn(),
-	deliver: vi.fn<(descriptor: { kind: string }) => Promise<void>>(async () => {})
+	deliver: vi.fn<(descriptor: { kind: string }) => Promise<void>>(async () => {}),
+	whenDrained: vi.fn(async () => {})
 }));
 
 vi.mock('$lib/voice/delivery', () => deliveryMock);
@@ -1772,5 +1773,62 @@ describe('Save the Sun page — audio toggle (voice-as-delivery P1)', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByTestId('mute-toggle').click();
 		expect(voiceMock.wake).not.toHaveBeenCalled();
+	});
+
+	it('holds the end-screen splash until her answer audio drains', async () => {
+		const SKOLL_TURN: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		const SKOLL_WON: GameState = {
+			activePlayer: 'Sköll',
+			status: 'won',
+			winner: 'Sköll',
+			turns: 2
+		};
+		let releaseDrain: () => void = () => {};
+		deliveryMock.whenDrained.mockReturnValueOnce(
+			new Promise<void>((resolve) => {
+				releaseDrain = resolve;
+			})
+		);
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String(init?.body ?? '{}'));
+			if (body.type === 'Advance') {
+				// Sköll's move ends the round behind her still-playing answer.
+				return new Response(JSON.stringify({ type: 'Advance', skoll: {}, state: SKOLL_WON }));
+			}
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						query: { axis: 'element', value: 'Sun' },
+						answer: 'Yes. Sól is reaching for a sun rune.',
+						affirmative: true,
+						turnConsumed: true
+					},
+					skollVsYou: { reaction: 'Pass' },
+					state: SKOLL_TURN
+				})
+			);
+		});
+
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('mute-toggle').click(); // audio on
+		await screen.getByLabelText('Ask the Oracle').fill('is it a sun rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+
+		// The round is over, but the splash is withheld while her line is still draining.
+		await vi.waitFor(() => expect(deliveryMock.whenDrained).toHaveBeenCalled());
+		expect(screen.container.querySelector('[data-testid="end-screen"]')).toBeNull();
+
+		releaseDrain();
+		await vi.waitFor(() =>
+			expect(screen.container.querySelector('[data-testid="end-screen"]')).not.toBeNull()
+		);
 	});
 });

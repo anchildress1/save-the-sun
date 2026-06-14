@@ -8,7 +8,7 @@
 	import type { MedallionState } from '$lib/components/medallionState';
 	import { voiceSession, type VoiceEvent, type VoiceToolCall } from '$lib/voice/voiceSession';
 	import { writeMuted } from '$lib/voice/outputMute';
-	import { enableDelivery, setDeliveryMuted, deliver } from '$lib/voice/delivery';
+	import { enableDelivery, setDeliveryMuted, deliver, whenDrained } from '$lib/voice/delivery';
 	import type { LineDescriptor } from '$lib/server/voice/lines';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
@@ -132,9 +132,12 @@
 	let humanWon = $derived(roundOver && winner === 'Human');
 	let skollWon = $derived(roundOver && winner === 'Sköll');
 	let outcomeLine = $derived(humanWon ? RITE.sunCrests : RITE.skollTakes);
-	// The end-screen rite takes over the moment the round resolves (S9). It owns the replay surface, so
-	// the header's own controls fold away while it is up — one "Begin another night" on screen, not two.
-	let showEndScreen = $derived(roundOver);
+	// The end-screen rite takes over when the round resolves (S9). It owns the replay surface, so the
+	// header's own controls fold away while it is up — one "Begin another night" on screen, not two.
+	// Held back (`endHeld`) until the Oracle's last spoken line has drained, so the splash never stomps
+	// her answer mid-sentence when Sköll's winning cast lands right behind it.
+	let endHeld = $state(false);
+	let showEndScreen = $derived(roundOver && !endHeld);
 	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
 	let nightProgress = $derived(
 		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
@@ -230,6 +233,34 @@
 		if (voiceState === 'listening' && (roundOver || (activePlayer === 'Sköll' && !skollAsking))) {
 			voiceSession.sleep();
 		}
+	});
+
+	// The most recent Oracle line's audio (or null when none/text-only). Not reactive — just a handle
+	// the end-screen hold awaits so the splash never preempts her final answer.
+	let answerAudio: Promise<void> | null = null;
+
+	// Hold the end-screen splash until her last line has been heard. Only when audio is on — silent
+	// play resolves instantly. Capped (8s) so a stuck synth can never strand the round on the board.
+	$effect(() => {
+		if (!roundOver || !audioOn) {
+			endHeld = false;
+			return;
+		}
+		endHeld = true;
+		let cancelled = false;
+		(async () => {
+			try {
+				await answerAudio; // let her line finish streaming in...
+			} catch {
+				/* a failed delivery never blocks the splash */
+			}
+			await whenDrained(8000); // ...then play out before the takeover
+		})().finally(() => {
+			if (!cancelled) endHeld = false;
+		});
+		return () => {
+			cancelled = true;
+		};
 	});
 
 	let selectedRune = $derived(
@@ -595,8 +626,9 @@
 			const outcome = await performAsk(question);
 			if (outcome.consumed) askValue = '';
 			// Voice her own line through the delivery seam (server TTS) — mic-independent, so a typed
-			// Ask is spoken whenever audio is on. A no-op when audio is off (no speaker open yet).
-			if (outcome.voice) deliver(outcome.voice);
+			// Ask is spoken whenever audio is on. A no-op when audio is off (no speaker open yet). Keep
+			// the handle so a round that ends on Sköll's next move holds the splash until she's heard.
+			answerAudio = outcome.voice ? deliver(outcome.voice) : null;
 			await advanceSkoll();
 		} finally {
 			pending = false;
