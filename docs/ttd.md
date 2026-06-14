@@ -15,4 +15,4 @@
 - [x] Asking a new question while Sköll's question hangs auto-passes his question and answers the new one _(no need to say "pass" — the ask path resolves his hanging question as a Pass, then dispatches her new Ask; scry/hex still need her word twice)_
 - [ ] Align the badges on the debug view to add Answer for Oracle.
 - [ ] Sort debug view in reverse chronological order
-
+- [ ] Undo the 'don't think' Skoll logic
