@@ -120,6 +120,42 @@ describe('delivery seam', () => {
 		expect(audio.speaker.close).toHaveBeenCalledTimes(1);
 	});
 
+	it('serializes back-to-back deliveries so two lines never interleave their chunks', async () => {
+		// The first line streams one chunk, then waits — so the test can prove the second line has not
+		// started (it is chained behind the first) before releasing the rest.
+		let releaseFirst: () => void = () => {};
+		const firstBody = new ReadableStream<Uint8Array>({
+			async start(controller) {
+				const enc = new TextEncoder();
+				controller.enqueue(enc.encode('her-1\n'));
+				await new Promise<void>((resolve) => {
+					releaseFirst = resolve;
+				});
+				controller.enqueue(enc.encode('her-2\n'));
+				controller.close();
+			}
+		});
+		vi.mocked(fetch)
+			.mockResolvedValueOnce(new Response(firstBody))
+			.mockResolvedValueOnce(ndjsonResponse('his-1', 'his-2'));
+		enableDelivery();
+
+		// Both fire back-to-back (her answer, then his Ask) without awaiting the first.
+		const first = deliver(LINE);
+		const second = deliver(LINE);
+
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('her-1'));
+		// The second line has NOT begun — it is queued behind the first, so only one fetch so far.
+		expect(fetch).toHaveBeenCalledTimes(1);
+		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['her-1']);
+
+		releaseFirst();
+		await Promise.all([first, second]);
+
+		// Her whole line enqueued before his — no interleaving.
+		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['her-1', 'her-2', 'his-1', 'his-2']);
+	});
+
 	it('stopDelivery invalidates an in-flight fetch so late chunks never play', async () => {
 		let releaseSecond: () => void = () => {};
 		const body = new ReadableStream<Uint8Array>({

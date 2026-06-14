@@ -82,18 +82,34 @@ async function pumpAudio(
 	}
 }
 
+// Lines are delivered one at a time, in call order. Two `deliver()`s firing back-to-back (the
+// Oracle's answer, then Sköll's Ask on the same turn) each stream chunks into the ONE shared speaker
+// as they arrive — run concurrently they interleave into the speaker's cumulative cursor, garbling
+// both into a broken-up "competing" mess. Chaining each line behind the previous keeps her whole line
+// enqueued before his begins, so they play in order. A failing line can't wedge the chain (catch).
+let chain: Promise<void> = Promise.resolve();
+
 /**
  * Voice one server-owned line: stream its audio from the TTS route and enqueue each PCM chunk as
- * it arrives, so she starts speaking at the first chunk rather than after the whole clip. A no-op
- * until a gesture has enabled the speaker. Audio is an enhancement layer — the line is already on
- * the panel — so a synth or network failure stays silent rather than surfacing an error.
+ * it arrives, so the speaker starts at the first chunk rather than after the whole clip. Serialized
+ * behind any in-flight line (see {@link chain}). A no-op until a gesture has enabled the speaker.
+ * Audio is an enhancement layer — the line is already on the panel — so a synth or network failure
+ * stays silent rather than surfacing an error.
  */
-export async function deliver(descriptor: LineDescriptor): Promise<void> {
+export function deliver(descriptor: LineDescriptor): Promise<void> {
+	if (!speaker) return Promise.resolve();
+	const run = chain.then(() => streamLine(descriptor));
+	chain = run.catch(() => {});
+	return run;
+}
+
+async function streamLine(descriptor: LineDescriptor): Promise<void> {
 	const active = speaker;
 	if (!active) return;
 	// Snapshot the generation: a stop/disable during the await drops the rest of this stream so a
 	// stale line never plays over a fresh round or a torn-down page.
 	const gen = generation;
+	if (isStale(active, gen)) return; // a stop landed while this line waited its turn in the chain
 	const abort = new AbortController();
 	try {
 		const res = await fetch('/api/voice/tts', {
@@ -132,4 +148,5 @@ export function whenDrained(timeoutMs: number): Promise<void> {
 export function resetDelivery(): void {
 	speaker = null;
 	muted = false;
+	chain = Promise.resolve();
 }
