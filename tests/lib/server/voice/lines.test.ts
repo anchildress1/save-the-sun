@@ -11,6 +11,7 @@ import { skollAskEcho } from '$lib/server/skoll/skoll';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { REACTION_LINES } from '$lib/voice/reactionLines';
 import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
+import { OUTCOME_LINES } from '$lib/voice/outcomeLines';
 
 describe('composeLine', () => {
 	it('voices every refusal class with the canonical line', () => {
@@ -133,6 +134,11 @@ describe('composeLine', () => {
 		expect(composeLine({ kind: 'cast', result: 'wrong', rune: 'Plastic' })).toBeNull();
 		expect(composeLine({ kind: 'cast', result: 'wrong' })).toBeNull();
 	});
+
+	it('voices the outcome beat — the win coda, the loss verse', () => {
+		expect(composeLine({ kind: 'outcome', result: 'win' })).toBe(OUTCOME_LINES.win.coda);
+		expect(composeLine({ kind: 'outcome', result: 'lose' })).toBe(OUTCOME_LINES.lose.verse);
+	});
 });
 
 describe('voiceForLine', () => {
@@ -142,6 +148,9 @@ describe('voiceForLine', () => {
 		expect(voiceForLine({ kind: 'answer', query: {}, affirmative: true })).toBe(ORACLE_VOICE);
 		expect(voiceForLine({ kind: 'react', line: 'human-hex' })).toBe(ORACLE_VOICE);
 		expect(voiceForLine({ kind: 'cast', result: 'true' })).toBe(ORACLE_VOICE);
+		// The outcome splits by who took the day: a win is hers, a loss is his.
+		expect(voiceForLine({ kind: 'outcome', result: 'win' })).toBe(ORACLE_VOICE);
+		expect(voiceForLine({ kind: 'outcome', result: 'lose' })).toBe(SKOLL_VOICE);
 	});
 });
 
@@ -158,6 +167,15 @@ describe('synthPrompt', () => {
 		expect(oracle).toContain('"Speak your question, witch."');
 		expect(skoll.slice(0, 40)).not.toBe(oracle.slice(0, 40)); // different speaker notes
 	});
+
+	it('gives the loss outcome Sköll’s growl, the win the Oracle’s notes', () => {
+		const lose = synthPrompt({ kind: 'outcome', result: 'lose' }, 'The night is everlasting.');
+		const win = synthPrompt({ kind: 'outcome', result: 'win' }, 'The light is yours to keep.');
+		const skollAsk = synthPrompt({ kind: 'skoll-ask', query: {} }, 'x');
+		const oracleAns = synthPrompt({ kind: 'refusal', refusal: 'empty' }, 'x');
+		expect(lose.slice(0, 40)).toBe(skollAsk.slice(0, 40)); // same Sköll direction
+		expect(win.slice(0, 40)).toBe(oracleAns.slice(0, 40)); // same Oracle direction
+	});
 });
 
 describe('isLineDescriptor', () => {
@@ -167,6 +185,7 @@ describe('isLineDescriptor', () => {
 		expect(isLineDescriptor({ kind: 'skoll-ask', query: {} })).toBe(true);
 		expect(isLineDescriptor({ kind: 'react', line: 'human-hex' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'cast', result: 'true' })).toBe(true);
+		expect(isLineDescriptor({ kind: 'outcome', result: 'win' })).toBe(true);
 	});
 
 	it('rejects malformed shapes', () => {

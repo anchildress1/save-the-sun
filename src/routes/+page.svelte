@@ -148,6 +148,17 @@
 	let endHeld = $state(false);
 	let showEndScreen = $derived(roundOver && !endHeld);
 	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
+
+	// Voice the outcome once the splash is up (ux-copy §4): a win in the Oracle's voice, a loss in
+	// Sköll's — so the player hears who took the day. The line is one beat of the splash copy (R10),
+	// queued behind any cast line on the shared speaker. Once per round; reset by a new game.
+	let outcomeVoiced = false;
+	$effect(() => {
+		if (showEndScreen && !outcomeVoiced) {
+			outcomeVoiced = true;
+			if (liveIdle()) void deliver({ kind: 'outcome', result: endOutcome });
+		}
+	});
 	let nightProgress = $derived(
 		turns <= 2 ? RITE.nightHolds : turns <= 5 ? RITE.nightThins : RITE.nightDawn
 	);
@@ -808,6 +819,7 @@
 			skollAsking = false;
 			heldScry = true;
 			heldHex = true;
+			outcomeVoiced = false; // the fresh round re-arms the end-screen outcome voice
 			voiceInvited = false; // a new round re-arms the Oracle's wake invitation
 			// Also cancels an in-flight wake, so a slow first wake can't mark the fresh round invited.
 			voiceSession.sleep();

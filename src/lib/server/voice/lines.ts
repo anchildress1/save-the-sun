@@ -10,6 +10,7 @@ import type { RefusalClass } from '$lib/server/oracle/types';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { REACTION_LINES, carriesAnswer, type ReactionLineId } from '$lib/voice/reactionLines';
 import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
+import { OUTCOME_LINES, VOICED_BEAT, type Outcome } from '$lib/voice/outcomeLines';
 import { runes } from '$lib/board';
 
 const REFUSAL_CLASSES: ReadonlySet<RefusalClass> = new Set([
@@ -39,7 +40,10 @@ export type LineDescriptor =
 	| { kind: 'react'; line: ReactionLineId; query?: unknown; affirmative?: boolean }
 	// A cast resolution (ux-copy §4): the true/falters lines are fixed; the wrong line names the rune,
 	// validated against the board so the route still voices only a server-owned line.
-	| { kind: 'cast'; result: 'true' | 'wrong' | 'falters'; rune?: string };
+	| { kind: 'cast'; result: 'true' | 'wrong' | 'falters'; rune?: string }
+	// The end-screen outcome (ux-copy §4): one beat of the splash copy — the win's coda in the Oracle's
+	// voice, the loss's verse in Sköll's, so the player hears who took the day.
+	| { kind: 'outcome'; result: Outcome };
 
 // Bound a power query to the real board (runes are 1-6), shared by the answer and scry composers.
 function powerInRange(query: ReturnType<typeof parseQuery>): boolean {
@@ -88,12 +92,20 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 			const rune = runes.find((r) => r.name === descriptor.rune);
 			return rune ? wrongCastLine(rune.name) : null;
 		}
+		case 'outcome': {
+			const lines = OUTCOME_LINES[descriptor.result];
+			return lines ? lines[VOICED_BEAT[descriptor.result]] : null;
+		}
 	}
 }
 
-/** Which prebuilt voice speaks a descriptor — Sköll's lines in his voice, everything else the Oracle's. */
+/** Which prebuilt voice speaks a descriptor — Sköll's lines (his Ask, the loss) in his voice,
+ *  everything else the Oracle's. */
 export function voiceForLine(descriptor: LineDescriptor): string {
-	return descriptor.kind === 'skoll-ask' ? SKOLL_VOICE : ORACLE_VOICE;
+	const skoll =
+		descriptor.kind === 'skoll-ask' ||
+		(descriptor.kind === 'outcome' && descriptor.result === 'lose');
+	return skoll ? SKOLL_VOICE : ORACLE_VOICE;
 }
 
 // Director's-notes prompts the TTS model reads as a delivery instruction, speaking only the quoted
@@ -116,7 +128,8 @@ const ORACLE_TTS_DIRECTION =
  * Deterministic, so the route can cache by it.
  */
 export function synthPrompt(descriptor: LineDescriptor, line: string): string {
-	const direction = descriptor.kind === 'skoll-ask' ? SKOLL_TTS_DIRECTION : ORACLE_TTS_DIRECTION;
+	const direction =
+		voiceForLine(descriptor) === SKOLL_VOICE ? SKOLL_TTS_DIRECTION : ORACLE_TTS_DIRECTION;
 	return `${direction}\n\n"${line}"`;
 }
 
@@ -134,6 +147,7 @@ export function isLineDescriptor(value: unknown): value is LineDescriptor {
 		case 'react':
 			return typeof v.line === 'string';
 		case 'cast':
+		case 'outcome':
 			return typeof v.result === 'string';
 		default:
 			return false;

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import dawnSplash from '$lib/assets-webp/banners/dawn-splash.webp?url&no-inline';
 	import defeatSplash from '$lib/assets-webp/banners/defeat-splash.webp?url&no-inline';
+	import { OUTCOME_LINES } from '$lib/voice/outcomeLines';
 
 	// The round's closing rite (ux-copy.md §4): a full-bleed scene with the result stated as a descending
 	// verse — a heavy lead line, then the quieter consequence — closed by a single CTA. `onReplay` starts
@@ -10,21 +11,10 @@
 
 	// Each outcome owns its art, the canonical §4 copy split into lead / verse / coda, and the exact
 	// replay label. The lead is the dialog's accessible name.
+	// Copy is shared with the TTS layer (OUTCOME_LINES) so the splash text and the voiced beat agree.
 	const SCENE = {
-		win: {
-			splash: dawnSplash,
-			lead: 'The rune is true.',
-			verse: 'Sól crests the rim of the world.',
-			coda: 'The offering is made. The longest day breaks — and the light is yours to keep.',
-			replay: 'Begin another night'
-		},
-		lose: {
-			splash: defeatSplash,
-			lead: 'Sköll takes the sun.',
-			verse: 'The longest day never breaks. The night is everlasting.',
-			coda: 'Sól waits in the dark — only the true rune can win her back.',
-			replay: 'Stand against him again'
-		}
+		win: { splash: dawnSplash, ...OUTCOME_LINES.win, replay: 'Begin another night' },
+		lose: { splash: defeatSplash, ...OUTCOME_LINES.lose, replay: 'Stand against him again' }
 	} as const;
 
 	let scene = $derived(SCENE[outcome]);
