@@ -38,6 +38,12 @@ export function disableDelivery(): void {
 	speaker = null;
 }
 
+/** Drop whatever is queued or playing without closing the speaker — a new round abandons the
+ *  previous round's unfinished line so it can't bleed over the fresh one. */
+export function stopDelivery(): void {
+	speaker?.stop();
+}
+
 /**
  * Voice one server-owned line: stream its audio from the TTS route and enqueue each PCM chunk as
  * it arrives, so she starts speaking at the first chunk rather than after the whole clip. A no-op

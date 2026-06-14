@@ -18,6 +18,7 @@ vi.mock('$lib/voice/audio', () => ({ createSpeaker: audio.createSpeaker }));
 import {
 	enableDelivery,
 	disableDelivery,
+	stopDelivery,
 	deliveryReady,
 	setDeliveryMuted,
 	deliver,
@@ -161,6 +162,19 @@ describe('delivery seam', () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+
+	it('stopDelivery drops the queue without closing the speaker', () => {
+		enableDelivery();
+		stopDelivery();
+		expect(audio.speaker.stop).toHaveBeenCalledTimes(1);
+		expect(audio.speaker.close).not.toHaveBeenCalled();
+		expect(deliveryReady()).toBe(true);
+	});
+
+	it('stopDelivery is a no-op with no speaker open', () => {
+		expect(() => stopDelivery()).not.toThrow();
+		expect(audio.speaker.stop).not.toHaveBeenCalled();
 	});
 
 	it('applies mute to a live speaker and remembers it for a later one', () => {

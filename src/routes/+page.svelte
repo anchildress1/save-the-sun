@@ -8,7 +8,13 @@
 	import type { MedallionState } from '$lib/components/medallionState';
 	import { voiceSession, type VoiceEvent, type VoiceToolCall } from '$lib/voice/voiceSession';
 	import { writeMuted } from '$lib/voice/outputMute';
-	import { enableDelivery, setDeliveryMuted, deliver, whenDrained } from '$lib/voice/delivery';
+	import {
+		enableDelivery,
+		disableDelivery,
+		stopDelivery,
+		deliver,
+		whenDrained
+	} from '$lib/voice/delivery';
 	import type { LineDescriptor } from '$lib/server/voice/lines';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
@@ -176,6 +182,10 @@
 		roundStatus = state.status;
 		turns = state.turns;
 		winner = state.winner;
+		// Hold the end-screen the instant the round resolves with audio on, synchronously — otherwise
+		// the splash flashes for one frame before the post-render effect below can catch it. The effect
+		// still owns releasing the hold once her last line has drained.
+		if (state.status === 'won' && audioOn) endHeld = true;
 	}
 
 	// His box shows ONLY his templated question when he Asks, blank otherwise. The cast outcome derives
@@ -248,14 +258,20 @@
 		}
 		endHeld = true;
 		let cancelled = false;
-		(async () => {
-			try {
-				await answerAudio; // let her line finish streaming in...
-			} catch {
-				/* a failed delivery never blocks the splash */
-			}
-			await whenDrained(8000); // ...then play out before the takeover
-		})().finally(() => {
+		const HOLD_CAP_MS = 8000;
+		// Wait for her line to finish streaming in, then drain — but race the whole wait against a hard
+		// cap so a hung fetch/stream (answerAudio never settling) can never strand the splash off-screen.
+		Promise.race([
+			(async () => {
+				try {
+					await answerAudio;
+				} catch {
+					/* a failed delivery never blocks the splash */
+				}
+				await whenDrained(HOLD_CAP_MS);
+			})(),
+			new Promise((resolve) => setTimeout(resolve, HOLD_CAP_MS))
+		]).finally(() => {
 			if (!cancelled) endHeld = false;
 		});
 		return () => {
@@ -374,16 +390,26 @@
 		}
 	}
 
-	// Sound on/off for both voices (P1). Turning it on opens the delivery speaker from this tap —
-	// the gesture browsers require — and unsilences the Live speaker too; turning it off silences
-	// both without dropping any queue (R11: captions keep rendering). Purely a sound switch: it
-	// speaks nothing on its own (no wake greeting — that was a Live-session artifact). Independent
-	// of the mic (medallion).
+	// Sound on/off for both voices (P1). Turning it on opens the delivery speaker from this tap — the
+	// gesture browsers require; turning it off CLOSES it, so an audio-off board never POSTs to the TTS
+	// route. Also gates the Live speaker. Purely a sound switch: it speaks nothing on its own (no wake
+	// greeting — that was a Live-session artifact). Independent of the mic (medallion).
 	function toggleAudio() {
-		audioOn = !audioOn;
-		if (audioOn) enableDelivery(); // must run inside the tap — opens the AudioContext
+		if (!audioOn) {
+			try {
+				enableDelivery(); // must run inside the tap — opens the AudioContext
+			} catch (err) {
+				// Web Audio unsupported, or the browser's AudioContext cap is hit: stay in the silent
+				// fallback rather than claiming audio is on with no speaker behind it.
+				console.error('[ui] could not open the delivery speaker:', err);
+				return;
+			}
+			audioOn = true;
+		} else {
+			audioOn = false;
+			disableDelivery();
+		}
 		writeMuted(!audioOn);
-		setDeliveryMuted(!audioOn);
 		voiceSession.setMuted(!audioOn);
 	}
 
@@ -491,11 +517,11 @@
 		if (voiceState === 'eclipsed' && voiceSession.notice) {
 			voiceNotice = voiceSession.notice;
 		}
-		// Audio is off until a tap opens the delivery speaker (gesture requirement), so both sinks
-		// start silent — a wake before this mount must not play before the player has enabled audio.
+		// Audio is off until a tap opens the delivery speaker (gesture requirement), so the Live sink
+		// starts silent and no delivery speaker exists yet — a wake before this mount can't play before
+		// the player has enabled audio.
 		audioOn = false;
 		voiceSession.setMuted(true);
-		setDeliveryMuted(true);
 		return () => {
 			window.removeEventListener('resize', onReposition);
 			window.removeEventListener('scroll', onReposition, true);
@@ -503,6 +529,9 @@
 			unsubscribeVoice();
 			voiceSession.setToolExecutor(null); // a dead page's game must not answer tool calls
 			voiceSession.sleep(); // never leave the mic streaming with no UI attached
+			// Close the delivery speaker too, or a late TTS response could play into a dead page and
+			// the AudioContext would leak past unmount.
+			disableDelivery();
 		};
 	});
 
@@ -625,10 +654,12 @@
 		try {
 			const outcome = await performAsk(question);
 			if (outcome.consumed) askValue = '';
-			// Voice her own line through the delivery seam (server TTS) — mic-independent, so a typed
-			// Ask is spoken whenever audio is on. A no-op when audio is off (no speaker open yet). Keep
-			// the handle so a round that ends on Sköll's next move holds the splash until she's heard.
-			answerAudio = outcome.voice ? deliver(outcome.voice) : null;
+			// Voice her own line through the delivery seam (server TTS), but only while the Live session
+			// is asleep — if the mic is awake, the Live Oracle owns the audio and a TTS line over it would
+			// break one-voice/mic-isolation. A no-op when audio is off (no speaker). The handle lets a
+			// round that ends on Sköll's next move hold the splash until she's heard.
+			answerAudio =
+				outcome.voice && voiceSession.state === 'asleep' ? deliver(outcome.voice) : null;
 			await advanceSkoll();
 		} finally {
 			pending = false;
@@ -737,6 +768,9 @@
 			voiceInvited = false; // a new round re-arms the Oracle's wake invitation
 			// Also cancels an in-flight wake, so a slow first wake can't mark the fresh round invited.
 			voiceSession.sleep();
+			// Drop any still-playing/queued Oracle line from the round just ended — TTS delivery is
+			// fire-and-forget, so without this a prior answer could bleed over the fresh blank round.
+			stopDelivery();
 			applyState(state);
 			cancelCast();
 			return true;

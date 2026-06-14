@@ -53,8 +53,9 @@ vi.mock('$lib/voice/voiceSession', () => ({
 // page calls it, not that a real AudioContext opens or the TTS route answers.
 const deliveryMock = vi.hoisted(() => ({
 	enableDelivery: vi.fn(),
+	disableDelivery: vi.fn(),
+	stopDelivery: vi.fn(),
 	deliveryReady: vi.fn(() => false),
-	setDeliveryMuted: vi.fn(),
 	deliver: vi.fn<(descriptor: { kind: string }) => Promise<void>>(async () => {}),
 	whenDrained: vi.fn(async () => {})
 }));
@@ -1715,9 +1716,8 @@ describe('Save the Sun page — audio toggle (voice-as-delivery P1)', () => {
 		expect(toggle.element().getAttribute('role')).toBe('switch');
 		await expect.element(toggle).toHaveAttribute('aria-checked', 'false');
 		expect(toggle.element().getAttribute('aria-label')).toBe(UNMUTE_LABEL);
-		// Mount silences both the Live speaker and the delivery seam; no speaker is opened yet.
+		// Mount silences the Live speaker; no delivery speaker is opened until a gesture.
 		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
-		expect(deliveryMock.setDeliveryMuted).toHaveBeenLastCalledWith(true);
 		expect(deliveryMock.enableDelivery).not.toHaveBeenCalled();
 	});
 
@@ -1731,21 +1731,34 @@ describe('Save the Sun page — audio toggle (voice-as-delivery P1)', () => {
 		expect(group.querySelector('[data-testid="mute-toggle"]')!.tagName).toBe('BUTTON');
 	});
 
-	it('turning audio on opens the speaker and unsilences both sinks', async () => {
+	it('turning audio on opens the speaker, off closes it; both gate the Live sink', async () => {
 		const screen = render(Page, pageProps);
 		const toggle = screen.getByTestId('mute-toggle');
 		await toggle.click();
 		// The tap is the gesture that opens the delivery speaker.
 		expect(deliveryMock.enableDelivery).toHaveBeenCalledOnce();
 		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(false);
-		expect(deliveryMock.setDeliveryMuted).toHaveBeenLastCalledWith(false);
 		await expect.element(toggle).toHaveAttribute('aria-checked', 'true');
 		expect(toggle.element().getAttribute('aria-label')).toBe(MUTE_LABEL);
 
 		await toggle.click();
+		// Off closes the speaker (so an audio-off board never POSTs to the TTS route) and mutes Live.
+		expect(deliveryMock.disableDelivery).toHaveBeenCalledOnce();
 		expect(voiceMock.setMuted).toHaveBeenLastCalledWith(true);
-		expect(deliveryMock.setDeliveryMuted).toHaveBeenLastCalledWith(true);
 		await expect.element(toggle).toHaveAttribute('aria-checked', 'false');
+	});
+
+	it('keeps audio on when the speaker fails to open', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		deliveryMock.enableDelivery.mockImplementationOnce(() => {
+			throw new Error('AudioContext blocked');
+		});
+		const screen = render(Page, pageProps);
+		const toggle = screen.getByTestId('mute-toggle');
+		await toggle.click();
+		// The gesture threw — stay in the silent fallback, never claim audio is on with no speaker.
+		await expect.element(toggle).toHaveAttribute('aria-checked', 'false');
+		expect(voiceMock.setMuted).not.toHaveBeenCalledWith(false);
 	});
 
 	it('is a pure sound switch — speaks nothing on its own (no wake greeting)', async () => {
