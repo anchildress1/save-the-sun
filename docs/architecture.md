@@ -225,11 +225,11 @@ sequenceDiagram
     Note over Eng: resolves Sköll's reaction (Scry / Hex / Pass), then the answer
     Eng-->>Interp: outcome — the answer, or Sköll's Hex kills it (no answer)
     Interp-->>Del: resolved line → panel (always) + TTS (if audio on)
-    Note over Eng,Del: Sköll's own moves (Ask, cast, the kill) deliver the same way
-    Eng-->>Del: Sköll line via director → caption (always) + clip (if audio on)
+    Note over Eng,Del: Sköll's own moves (his Ask, the kill) deliver the same way
+    Eng-->>Del: Sköll's Ask → his frame (always) + TTS in his voice (if audio on)
 ```
 
-The Ask reaction is **not** a post-answer event: the engine resolves Sköll's Scry/Hex/Pass *before* the answer (a Hex spends the turn with no answer at all), so the composed line already carries the kill — the delivery layer never speaks an answer ahead of it. Sköll's *own* moves (his Ask, his cast, the kill) are the separate engine-event path.
+The Ask reaction is **not** a post-answer event: the engine resolves Sköll's Scry/Hex/Pass *before* the answer (a Hex spends the turn with no answer at all), so the composed line already carries the kill — the delivery layer never speaks an answer ahead of it. Sköll's *own* Ask is the separate engine-event path; both voices ride the **one** TTS route (a `voice` param), distinguished by their director's-notes — **no separate clip pipeline for game moves**. The prebuilt-clip path is reserved for the deferred ambience layer.
 
 ### What Live becomes (and why this is the right substrate for it)
 
@@ -285,7 +285,7 @@ One row per spec item so nothing is silently dropped — the shipped record (`v2
 | R1 Live session · R2 token endpoint | **Superseded for output** — server TTS endpoint (P1). R2's ephemeral-token/auth boundary and R1's mic lifecycle **return in P5** for the opt-in Live STT link (Constraints) |
 | R4 spoken confirm · R5 cast lockout · R7 silence timeout · Goal 2 barge-in | **Deferred to P5** — mic-path only; no spoken actions exist before the mic returns |
 | R6 medallion control + indicator · S3 | **Repurposed (P3)** — audio-state display + the toggle; the mic-privacy indicator returns with P5 |
-| R8 Sköll voice · R9 mic discipline · S12 · S13 | **Split.** His **game move** (the Ask) **landed (P2)** — voiced via the shared TTS route in his voice, written on his frame. The **ambience** taunt library (R8's prebuilt clips: splash/idle/hunt) is **deferred** — audio-only flavor, no caption (R10). R9 one-speaker holds structurally (Oracle + Sköll share one TTS delivery seam); mic discipline returns with the mic (P5) |
+| R8 Sköll voice · R9 mic discipline · S12 · S13 | **Split.** His **game moves landed** — his Ask (P2) and the **loss outcome** (the end-screen verse) voice via the shared TTS route in his voice. The **ambience** taunt library (R8's prebuilt clips: splash/idle/hunt) is **deferred** — audio-only flavor, no caption (R10). R9 one-speaker holds structurally (Oracle + Sköll share one TTS delivery seam); mic discipline returns with the mic (P5) |
 | S1 · S2 · S4 · S5 | **Shelved (P4)** — Live lifecycle, token endpoint, mic seal, silence clock |
 | S6 wake greeting | **Folds into delivery (P1)** — the round's first spoken line, no wake event |
 | S7 · S8 · S9 | **Engine actions kept; Live tool-call wiring shelved (P4)**; spoken confirm/lockout return in P5 |

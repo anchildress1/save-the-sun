@@ -3,7 +3,7 @@
 > Implementation units for AI agents. Source of truth: `v2-voice-requirements.md`. Refs = requirement IDs there.
 > Config constants: Oracle voice `Gacrux` (verified on Live 2026-06-11 — `Kore` fallback not needed), Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, silence timeout 5000ms.
 >
-> ⚠️ **Delivery model superseded.** Stories S1–S11 shipped a Live-first design now being rearchitected — see [`architecture.md` → Target architecture + Migration plan](./architecture.md#target-architecture--voice-as-delivery-planned). Audio becomes mic-independent server-side TTS delivery; Live is demoted to an opt-in mic adapter. These stories are kept as the shipped record; the forward path is the migration's P1–P5, not the Live story order below. (P1 Oracle TTS delivery and P2 Sköll's game-move voice have **landed** — P2 voices his **Ask** through the shared TTS route, like the Oracle; the prebuilt-clip S12/S13 were tried then reverted in favor of it, and the ambience layer is deferred. P3–P5 remain.)
+> ⚠️ **Delivery model superseded.** Stories S1–S11 shipped a Live-first design now being rearchitected — see [`architecture.md` → Target architecture + Migration plan](./architecture.md#target-architecture--voice-as-delivery-planned). Audio becomes mic-independent server-side TTS delivery; Live is demoted to an opt-in mic adapter. These stories are kept as the shipped record; the forward path is the migration's P1–P5, not the Live story order below. (P1 Oracle TTS delivery and P2 Sköll's game-move voice have **landed**. **Every game move now voices** through the one shared TTS route — Oracle answers/refusals, Sköll's Ask, the Scry/Hex/Pass resolutions, the cast outcomes, and the win/loss — see [Spoken surface](#spoken-surface--voice-as-delivery-p1p2-extensions) below. The prebuilt-clip S12/S13 were tried then reverted in favor of it; the ambience layer is deferred. P3–P5 remain.)
 
 ---
 
@@ -122,6 +122,19 @@ His **Ask** is now voiced through the shared TTS route in his voice (migration P
 - Depends: S2, S12
 
 ---
+
+## Spoken surface — voice-as-delivery (P1–P2 extensions) 🔊
+
+Every **game move** (R10) is composed server-side, allow-listed (`src/lib/server/voice/lines.ts`), and voiced through the one `deliver()` seam — text always, audio when on. One TTS route serves both voices (a `voice` param), and each line is wrapped in its speaker's director's-notes (`synthPrompt`) so the model voices it in character.
+
+- [x] Oracle answers + refusals — `answer` / `refusal` descriptors (P1)
+- [x] Sköll's Ask — `skoll-ask`, his voice, recomposed server-side from the parked `query` (P2)
+- [x] Reaction resolutions (Scry / Hex / Pass, both sides) — `react` descriptor, shared `reactionLines.ts`; the scry lines carry the overheard answer. Voiced in the Oracle's voice
+- [x] Cast outcomes (true / wrong / falters) — `cast` descriptor, shared `castLines.ts`; the wrong-cast names a board-validated rune. Oracle's voice
+- [x] End-screen outcome — `outcome` descriptor, shared `outcomeLines.ts`: a **win in the Oracle's voice** (victory coda), a **loss in Sköll's** (night-everlasting verse)
+- [x] Director's-notes per voice — Sköll a deep gravelly growl, the Oracle a brisk reverent weight; tuned by ear 2026-06-14
+- [x] Serialized delivery — lines chain on the one shared speaker, so two never interleave (her answer, then his Ask)
+- [ ] Deferred (`ttd.md`): Sköll's winning cast (dynamic `{Rune}`), the audio-only ambience taunt layer, voicing the full Sól victory sequence (only one beat is voiced today)
 
 ## Order 🧭
 

@@ -3,7 +3,7 @@
 > Save the Sun — talk to the Oracle, hear the wolf answer.
 > Status: Draft v1 · 2026-06-10
 >
-> ⚠️ **Delivery model superseded.** The Live-first design here shipped (S1–S11) but is being rearchitected — see [`architecture.md` → Target architecture: voice as delivery](./architecture.md#target-architecture--voice-as-delivery-planned) and its migration plan. Live is demoted to an optional, opt-in mic adapter; audio moves to mic-independent server-side TTS delivery shared by the Oracle and Sköll. **R1** (Live session) and **R2** (Live-token endpoint) are superseded; **Goal 2** (real-time barge-in) and **R4/R5/R7** (spoken confirmation, cast lockout, silence timeout) defer to the opt-in mic; the delivery-agnostic ones still hold (R3 parity, R10 everything-written, R11 output mute). The architecture doc's **requirement-fate table** maps every item.
+> ⚠️ **Delivery model superseded.** The Live-first design here shipped (S1–S11) but is being rearchitected — see [`architecture.md` → Target architecture: voice as delivery](./architecture.md#target-architecture--voice-as-delivery-planned) and its migration plan. Live is demoted to an optional, opt-in mic adapter; audio moves to mic-independent server-side TTS delivery shared by the Oracle and Sköll. **R1** (Live session) and **R2** (Live-token endpoint) are superseded; **Goal 2** (real-time barge-in) and **R4/R5/R7** (spoken confirmation, cast lockout, silence timeout) defer to the opt-in mic; the delivery-agnostic ones still hold (R3 parity, R10 every-game-move-written, R11 output mute). **Every game move now voices** through the shared TTS route — answers, refusals, Sköll's Ask, the Scry/Hex/Pass resolutions, the cast outcomes, and the win/loss (R8, R10). The architecture doc's **requirement-fate table** maps every item.
 
 ---
 
@@ -29,14 +29,14 @@ The game's core loop—Ask, Hex, Scry, Pass, Cast—runs entirely on buttons and
 
 ## Decisions Locked 🔒
 
-> ⚠️ Superseded by the [voice rearchitecture](./architecture.md#target-architecture--voice-as-delivery-planned): **Oracle voice channel** (Live API → server-side interpret + TTS delivery), **Mic activation** (the medallion becomes the audio toggle; the mic is optional and deferred to the opt-in Live adapter), **Auth** (the Live-token endpoint gives way to a server TTS endpoint), and **Voiced answers** (no awake session — audio is a delivery channel). The Sköll-clip channel, output mute, captions, and turn-parity rows stand.
+> ⚠️ Superseded by the [voice rearchitecture](./architecture.md#target-architecture--voice-as-delivery-planned): **Oracle voice channel** (Live API → server-side interpret + TTS delivery), **Sköll voice channel** (his *game moves* now use the same shared TTS route, not a clip library — prebuilt clips are reserved for the deferred ambience layer), **Mic activation** (the medallion becomes the audio toggle; the mic is optional and deferred to the opt-in Live adapter), **Auth** (the Live-token endpoint gives way to a server TTS endpoint), and **Voiced answers** (no awake session — audio is a delivery channel). Output mute, captions, and turn-parity rows stand.
 
 | Decision | Choice |
 |---|---|
 | Oracle voice channel | Gemini Live API, one session, client-to-server WebSocket |
 | Oracle voice | `Gacrux` (mature) — swappable, single config value |
-| Sköll voice channel | Pre-generated Gemini TTS clip library, played locally |
-| Sköll voice | `Algieba` (smooth) — swappable, regenerate library to change |
+| Sköll voice channel | _superseded_ — his game moves use the shared server TTS route (a `voice` param); prebuilt clips reserved for the deferred ambience layer |
+| Sköll voice | `Algieba` — swappable, single config value (`SKOLL_VOICE`) |
 | TTS model | `gemini-3.1-flash-tts-preview` |
 | Auth | Ephemeral tokens minted by the existing Cloud Run server; API key stays in Google Secret Manager and never reaches the browser |
 | Mic activation | The eclipse medallion is the control: tap to wake, tap to sleep. A small mic glyph is etched into the medallion while asleep for discoverability. One tap satisfies the browser gesture requirement for mic + audio |
@@ -162,8 +162,9 @@ Voice never solely carries game information. Every **game move** — an Ask and 
 ## Open Questions ❓
 
 - ~~**Gacrux on Live** (engineering)~~ **Resolved 2026-06-11 (S2):** Gacrux verified working on `gemini-3.1-flash-live-preview` against the real API (audio + transcripts returned). No Kore fallback needed; the voice is the single `ORACLE_VOICE` constant in `src/lib/voice/config.ts`.
-- ~~**Sköll script** (Ashley)~~ **Drafted 2026-06-11:** spoken taunt library lives in `ux-copy.md` §2 (trigger buckets + variants), pending approval. R8 generation unblocks on approval.
-- **Taunt detection rules** (engineering): keyword list vs. lightweight intent check on transcripts for routing to the wolf. Resolve during implementation.
+- ~~**Sköll script** (Ashley)~~ **Approved + tightened 2026-06-14:** his *game-move* lines (the Ask, later his cast) voice through the shared TTS route; the taunt buckets (`ux-copy.md` §2) are reserved for the deferred audio-only ambience layer.
+- ~~**Sköll voice** (Ashley)~~ **Picked by ear 2026-06-14:** `Algieba` over `Charon`; both voices shaped by per-speaker director's-notes (`synthPrompt`) and pace-tuned.
+- **Taunt detection rules** (engineering): keyword list vs. lightweight intent check on transcripts for routing to the wolf. Deferred with the ambience layer to P5 (needs a spoken input).
 - **Live session limits** (engineering): confirm session duration limits and whether session resumption is needed for long games. Resolve during implementation.
 
 ## Timeline Considerations 🗓️
