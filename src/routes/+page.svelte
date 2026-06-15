@@ -83,6 +83,8 @@
 		// run — never shown in the panel, since no move was made.
 		wolfAsking: 'His question hangs — scry, hex, or pass.',
 		noReactionWindow: 'Sköll asks nothing to scry, hex, or pass.',
+		// A spoken reply to Sköll's question the model couldn't read as a reaction — ask again, spend nothing.
+		reactUnclear: 'Scry, hex, or pass — or let his question stand.',
 		scrySpent: 'Your scrying is spent for the night.',
 		hexSpent: 'Your hex is spent for the night.',
 		riteDone: 'The longest day is decided — begin anew.',
@@ -128,6 +130,14 @@
 	const ONBOARDED_KEY = 'save-the-sun:onboarded';
 	let showOnboarding = $state(false);
 	let onboardingStart = $state<'title' | 'tour'>('title');
+
+	// A spoken reply to Sköll's question, classified server-side; `unclear` matches no reaction.
+	type SpokenReaction = 'scry' | 'hex' | 'pass' | 'unclear';
+	const SPOKEN_REACTION: Record<'scry' | 'hex' | 'pass', ReactionChoice> = {
+		scry: 'Scry',
+		hex: 'Hex',
+		pass: 'Pass'
+	};
 
 	// A round can resume on Sköll's parked Ask, so the prompt + the human's still-held charges hydrate
 	// from the load (the window lives server-side). The engine stays authoritative, so they can't over-grant.
@@ -386,24 +396,25 @@
 	}
 
 	async function finishHold() {
+		// Whether a reaction is owed is decided at release: a held reply while Sköll's question hangs
+		// is a scry/hex/pass, not an Ask. Captured before the async read so it can't drift mid-call.
+		const reacting = skollAsking;
 		medalState = 'thinking';
-		let heard = '';
 		try {
 			const clip = await stopRecording();
-			if (clip) heard = await transcribeUtterance(clip.wavBase64);
+			if (clip && reacting) {
+				await respondReaction(await classifyReactionUtterance(clip.wavBase64));
+			} else if (clip) {
+				// Dispatch straight to the engine — the spoken words never fill the typing box (the
+				// transcribe route tees what was heard to /debug for mishear diagnosis).
+				const question = (await transcribeUtterance(clip.wavBase64)).trim();
+				if (question !== '') await runAsk(question, false);
+			}
 		} catch (err) {
 			console.error('[ui] push-to-talk failed:', err);
 		}
-		const question = heard.trim();
-		if (question === '') {
-			if (medalState === 'thinking') medalState = 'idle';
-			return;
-		}
-		// Dispatch straight to the engine — the spoken words never fill the typing box (the transcribe
-		// route tees what was heard to /debug for mishear diagnosis).
-		await runAsk(question, false);
-		// If no line played (audio off, or a silent turn), settle the medallion ourselves; a delivered
-		// line already drove it to speaking → idle via onDeliveryEvent.
+		// If no line played (audio off, a silent turn, a guard), settle the medallion ourselves; a
+		// delivered line already drove it to speaking → idle via onDeliveryEvent.
 		if (medalState === 'thinking') medalState = 'idle';
 	}
 
@@ -419,6 +430,48 @@
 			return ((await res.json()) as { text?: string }).text ?? '';
 		} catch {
 			return '';
+		}
+	}
+
+	// Classify a held reply to Sköll's hanging question into a reaction; `unclear` on any failure, so
+	// a misheard or dropped call never silently spends a one-use charge.
+	async function classifyReactionUtterance(wavBase64: string): Promise<SpokenReaction> {
+		try {
+			const res = await fetch('/api/voice/transcribe', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ wavBase64, mode: 'reaction' })
+			});
+			if (!res.ok) return 'unclear';
+			return ((await res.json()) as { choice?: SpokenReaction }).choice ?? 'unclear';
+		} catch {
+			return 'unclear';
+		}
+	}
+
+	// Run a spoken reaction through the same dispatch the prompt buttons use. Guards mirror the
+	// buttons: a spent scry/hex is refused (not silently passed), and an unread reply asks again
+	// rather than guessing — only the pass is free, and nothing is staked on a mishear.
+	async function respondReaction(choice: SpokenReaction) {
+		// The window may have closed (a board click) or a move may be mid-flight while we classified.
+		if (!skollAsking || pending) return;
+		if (choice === 'unclear') {
+			answer = RITE.reactUnclear;
+			return;
+		}
+		if (choice === 'scry' && !heldScry) {
+			answer = RITE.scrySpent;
+			return;
+		}
+		if (choice === 'hex' && !heldHex) {
+			answer = RITE.hexSpent;
+			return;
+		}
+		pending = true;
+		try {
+			await performReact(SPOKEN_REACTION[choice]);
+		} finally {
+			pending = false;
 		}
 	}
 

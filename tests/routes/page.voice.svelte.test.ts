@@ -375,3 +375,69 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 			.toHaveTextContent('I scent a fire rune on her.');
 	});
 });
+
+describe('Save the Sun page — spoken reaction to Sköll', () => {
+	const reactionProps = (held = { Scry: true, Hex: true }) => ({
+		...pageProps,
+		data: { ...pageProps.data, pendingReaction: { echo: 'I scent fire on her.', held } }
+	});
+
+	// In reaction mode the transcribe route returns a classified choice; /api/action runs a React.
+	function mockReaction(choice: string, skollReaction: object = {}) {
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const url = String(input);
+			if (url === '/api/voice/transcribe') {
+				const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+				return new Response(JSON.stringify(body.mode === 'reaction' ? { choice } : { text: '' }));
+			}
+			if (url === '/api/action') {
+				return new Response(JSON.stringify({ type: 'React', state: HUMAN_TURN, skollReaction }));
+			}
+			return new Response('{}');
+		});
+	}
+
+	async function holdRelease(screen: ReturnType<typeof render>) {
+		press(screen);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		release(screen);
+	}
+
+	it('classifies a held reply as a reaction (not an Ask) and dispatches it', async () => {
+		mockReaction('hex', { hexed: true });
+		const screen = render(Page, reactionProps());
+		await holdRelease(screen);
+
+		await vi.waitFor(() =>
+			expect(actionBodies()).toContainEqual({ type: 'React', player: 'Human', reaction: 'Hex' })
+		);
+		// No Ask was dispatched — the hanging question got a reaction, not the unparseable refusal.
+		expect(actionBodies().some((b) => b.type === 'Ask')).toBe(false);
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent("You close the Oracle's lips; his turn dies with the question.");
+	});
+
+	it('an unclear reply asks again and spends nothing', async () => {
+		mockReaction('unclear');
+		const screen = render(Page, reactionProps());
+		await holdRelease(screen);
+
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Scry, hex, or pass — or let his question stand.');
+		expect(actionBodies()).toHaveLength(0); // no React, no Ask
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('refuses a spoken scry whose charge is spent — never silently passes', async () => {
+		mockReaction('scry');
+		const screen = render(Page, reactionProps({ Scry: false, Hex: true }));
+		await holdRelease(screen);
+
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Your scrying is spent for the night.');
+		expect(actionBodies()).toHaveLength(0);
+	});
+});

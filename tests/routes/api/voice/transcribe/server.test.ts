@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const stt = vi.hoisted(() => ({ transcribe: vi.fn() }));
-vi.mock('$lib/server/voice/transcribe', () => ({ transcribe: stt.transcribe }));
+const stt = vi.hoisted(() => ({ transcribe: vi.fn(), classifyReaction: vi.fn() }));
+vi.mock('$lib/server/voice/transcribe', () => ({
+	transcribe: stt.transcribe,
+	classifyReaction: stt.classifyReaction
+}));
 
 const mock = vi.hoisted(() => ({
 	env: { GEMINI_API_KEY: 'test-gemini-key' } as { GEMINI_API_KEY?: string }
@@ -38,6 +41,24 @@ describe('POST /api/voice/transcribe', () => {
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ text: 'is it a fire rune' });
 		expect(stt.transcribe).toHaveBeenCalledExactlyOnceWith('UklGRg==');
+	});
+
+	it('classifies a reaction in reaction mode', async () => {
+		stt.classifyReaction.mockResolvedValueOnce('hex');
+
+		const response = await call('react', { wavBase64: 'UklGRg==', mode: 'reaction' });
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ choice: 'hex' });
+		expect(stt.classifyReaction).toHaveBeenCalledExactlyOnceWith('UklGRg==');
+		expect(stt.transcribe).not.toHaveBeenCalled();
+	});
+
+	it('rejects an unknown mode with 400', async () => {
+		const response = await call('bad-mode', { wavBase64: 'UklGRg==', mode: 'shout' });
+		expect(response.status).toBe(400);
+		expect(stt.transcribe).not.toHaveBeenCalled();
+		expect(stt.classifyReaction).not.toHaveBeenCalled();
 	});
 
 	it('rejects a malformed JSON body with 400 before charging the budget', async () => {
