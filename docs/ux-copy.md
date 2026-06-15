@@ -151,7 +151,7 @@ Templated. **Both verdicts restate the trait**—`Yes. Sól is reaching for {val
 | Asks for the secret | "That is Sól's to keep until you name it." |
 | Prompt poking / override | "I answer the longest day, not you." |
 | Negated Ask ("is it not fire?") | "I speak of what is, not what is not." |
-| Unparseable / not a question | "Ask of element, power, light, or hue." |
+| Unparseable / not a question | "That is no sign I can read." |
 | Empty submit | "Speak your question, witch." |
 
 ## 2. Sköll
