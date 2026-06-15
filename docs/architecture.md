@@ -10,24 +10,25 @@ How Save the Sun is wired: a Svelte 5 browser, SvelteKit routes, a deterministic
 
 ## System overview
 
-The browser drives three surfaces (the board page, the voice session, the medallion). All game truth lives server-side, per session, in memory. Gemini sits behind the routes — never the browser, except the Live socket (opened with a single-use ephemeral token).
+The browser drives three surfaces (the board page, the push-to-talk recorder, the medallion). All game truth lives server-side, per session, in memory. Gemini sits behind the routes — the browser never holds the key.
 
 ```mermaid
 flowchart TB
     accTitle: Save the Sun system overview
-    accDescr: The browser talks to SvelteKit routes, which call the in-memory server core and the Gemini API. The engine referees the round; Gemini interprets Asks, plays Sköll, and voices the Oracle.
+    accDescr: The browser talks to SvelteKit routes, which call the in-memory server core and the Gemini API. The engine referees the round; Gemini interprets Asks, plays Sköll, transcribes push-to-talk audio, and voices the Oracle and Sköll.
 
     subgraph Browser["Browser"]
         Page["+page.svelte<br/>board, controls, view-state"]
-        Voice["voiceSession.ts<br/>Live mic + tool loop"]
-        Medallion["EclipseMedallion<br/>wake / sleep"]
+        Rec["recorder.ts<br/>push-to-talk WAV"]
+        Medallion["EclipseMedallion<br/>hold to speak"]
+        Del["delivery.ts<br/>shared TTS speaker"]
     end
 
     subgraph Routes["SvelteKit routes"]
         Action["POST /api/action<br/>Ask / Cast / React / Advance"]
         NewGame["POST /api/new-game"]
-        Token["POST /api/voice/token"]
-        VDebug["POST /api/voice/debug"]
+        Transcribe["POST /api/voice/transcribe"]
+        TTS["POST /api/voice/tts"]
         Debug["GET /api/debug"]
         DebugPage["GET /debug"]
     end
@@ -39,29 +40,29 @@ flowchart TB
         Log["debug/log.ts<br/>per-session event stream"]
     end
 
-    Gemini["Gemini API<br/>Live voice — gemini-3.1-flash-live-preview<br/>oracle + Sköll — gemini-3.5-flash"]
+    Gemini["Gemini API<br/>transcribe + TTS — gemini-3.x-flash<br/>oracle + Sköll — gemini-3.5-flash"]
 
     Page --> Action
     Page --> NewGame
-    Medallion --> Voice
-    Voice --> Token
-    Voice --> VDebug
-    Voice -.tool calls.-> Page
+    Medallion --> Rec
+    Rec --> Transcribe
+    Transcribe -.text.-> Page
+    Page --> Del
+    Del --> TTS
     DebugPage --> Debug
 
     Action --> Engine
     Action --> Sköll
     Action --> Oracle
     NewGame --> Engine
-    Token --> Gemini
+    Transcribe --> Gemini
+    TTS --> Gemini
     Sköll --> Gemini
     Oracle --> Gemini
-    Voice -.Live socket.-> Gemini
 
     Engine --> Log
     Sköll --> Log
     Oracle --> Log
-    VDebug --> Log
     Debug --> Log
 ```
 
@@ -115,13 +116,13 @@ sequenceDiagram
 
 ---
 
-## Voice — input (the Live mic) and output (delivery)
+## Voice — input (push-to-talk) and output (delivery)
 
-Voice is two decoupled layers. **Output** is mic-independent: every game move is composed server-side and voiced through one TTS route and a shared speaker, so the board speaks whether or not the mic is on. **Input** is the optional Live mic, reached through the medallion. The board buttons and the text box play fully without either.
+Voice is two decoupled layers. **Output** is mic-independent: every game move is composed server-side and voiced through one TTS route and a shared speaker, so the board speaks whether or not the mic is on. **Input** is push-to-talk: hold the medallion (or hold `Space`) to record an Ask, release to send. There is no real-time session — one held recording per Ask, turn-based like the text box. The board buttons and the text box play fully without the mic.
 
 ### Output — delivery
 
-Every game move (R10) is composed server-side, allow-listed (`src/lib/server/voice/lines.ts`), and voiced through one `deliver()` seam (`src/lib/voice/delivery.ts`): written to its panel or frame **always**, and played through the shared TTS speaker **when audio is on**. One `POST /api/voice/tts` route serves both characters via a `voice` param, each line wrapped in its speaker\'s director\'s-notes (`synthPrompt`) so the model voices it in character — Sköll a deep gravelly growl, the Oracle a brisk reverent weight.
+Every game move (R10) is composed server-side, allow-listed (`src/lib/server/voice/lines.ts`), and voiced through one `deliver()` seam (`src/lib/voice/delivery.ts`): written to its panel or frame **always**, and played through the shared TTS speaker **when audio is on**. One `POST /api/voice/tts` route serves both characters via a `voice` param, each line wrapped in its speaker's director's-notes (`synthPrompt`) so the model voices it in character — Sköll a deep gravelly growl, the Oracle a brisk reverent weight.
 
 ```mermaid
 sequenceDiagram
@@ -142,62 +143,43 @@ sequenceDiagram
     Del-->>Panel: plays alongside the written line
 ```
 
-- **Server-owned, allow-listed.** The route voices only known line IDs (engine outcomes, the pre-engine refusals and guards), never arbitrary client text, so it can\'t be spammed for free TTS. The finite templated lines are cached.
-- **Both voices, one route.** The Oracle\'s answers, refusals, reaction resolutions, and cast outcomes are hers; **Sköll\'s Ask and the loss outcome are his**. A win speaks in the Oracle\'s voice (the victory coda), a loss in Sköll\'s (the night-everlasting verse), so the player hears who took the day.
+- **Server-owned, allow-listed.** The route voices only known line IDs (engine outcomes, the pre-engine refusals and guards), never arbitrary client text, so it can't be spammed for free TTS. The finite templated lines are cached.
+- **Both voices, one route.** The Oracle's answers, refusals, reaction resolutions, and cast outcomes are hers; **Sköll's Ask and the loss outcome are his**. A win speaks in the Oracle's voice (the victory coda), a loss in Sköll's (the night-everlasting verse), so the player hears who took the day.
 - **Mic-independent.** Output rides this seam regardless of the mic; the output-mute control (below) silences it without touching the captions.
-- **Deferred** (`ttd.md`): Sköll\'s winning cast voiced (the dynamic `{Rune}`, once it rides the `Advance` wire) and the audio-only ambience taunt layer (`ux-copy.md` section 2).
+- **Deferred** (`ttd.md`): Sköll's winning cast voiced (the dynamic `{Rune}`, once it rides the `Advance` wire) and the audio-only ambience taunt layer (`ux-copy.md` section 2).
 
-### Input — the Live mic (optional)
+### Input — push-to-talk (optional)
 
-A medallion wake mints a single-use token, connects the Gemini Live session, and hands the model declared tools. When the model calls one, the page executor runs it through the **same engine dispatch as the buttons**, then voices the result line back. The board and text box never depend on this being alive.
+Holding the medallion (or `Space`) records a short utterance; releasing sends it to `POST /api/voice/transcribe`, which transcribes it server-side via Gemini and returns the text. The page then runs that text through the **exact same Ask pipeline as the text box** — interpret → engine → delivery — so a spoken Ask and a typed Ask are identical past transcription. The mic opens once (one permission prompt); the board and text box never depend on it.
 
 ```mermaid
 sequenceDiagram
-    accTitle: Voice input - Live session and tool-call loop
-    accDescr: A medallion wake mints a token, connects the Gemini Live session, and the model calls game tools that the page executor runs through the same engine dispatch as the buttons, then voices the result.
+    accTitle: Voice input - push-to-talk to a transcribed Ask
+    accDescr: Holding the medallion or Space records a WAV; release posts it to the transcribe route, which returns text; the page runs that text through the same Ask pipeline as the typed box.
 
-    participant Medallion as EclipseMedallion
-    participant Voice as voiceSession.ts
-    participant Token as POST /api/voice/token
-    participant Live as Gemini Live
-    participant Exec as executeVoiceTool (page)
+    participant Medallion as EclipseMedallion / Space
+    participant Rec as recorder.ts (WAV)
+    participant STT as POST /api/voice/transcribe
+    participant Page as +page.svelte (submitAsk)
     participant Action as POST /api/action
 
-    Medallion->>Voice: wake()
-    Voice->>Token: mint ephemeral token (single use)
-    Token-->>Voice: token
-    Voice->>Live: connect (LIVE_MODEL, persona, tools)
-    Live-->>Voice: setupComplete - listening
-
-    Note over Voice,Action: model calls a tool
-    Live->>Voice: toolCall ask / scry / hex / pass / cast_rune
-    Voice->>Exec: executeVoiceTool(call)
-
-    alt scry / hex / cast_rune - confident reading (confidence > 0.5)
-        Note right of Exec: gate steps aside - the move executes on the first call
-    else unsure - S8 confirmation gate
-        Exec-->>Voice: confirmation question (arm, await spoken reply)
-        Note right of Exec: confirming call executes only after the player speaks
-    end
-
-    Note right of Exec: S9 cast lockout outranks every guard while a cast is in flight
-
-    Exec->>Action: same engine dispatch as the buttons
-    Action-->>Exec: outcome state
-    Exec-->>Voice: outcome line
-    Voice->>Live: sendToolResponse(outcome)
-    Live-->>Voice: voices the result
+    Medallion->>Rec: hold = startRecording
+    Medallion->>Rec: release = stopRecording -> WAV
+    Rec->>STT: { wavBase64 }
+    STT-->>Page: { text }
+    Page->>Action: Ask (same dispatch as the typed box)
+    Action-->>Page: oracle answer -> delivery
 ```
 
-- The browser only ever holds the **ephemeral** token; the real `GEMINI_API_KEY` stays server-side, masked at the debug sink.
-- **S8 gate** - `scry`, `hex`, `cast_rune` are destructive (a one-night charge or the whole round). The model scores each call with a `confidence` (0-1) for how surely it read her words; above `0.5` the executor skips the gate and the move lands on the first call (no confirmation echo). At or below it - or with no confidence at all - the first call only arms a confirmation and asks again. Client-authoritative: while the gate holds, nothing reaches the engine until the player has spoken since arming.
-- **S9 lockout** - while a cast is in flight (`casting`), the executor seals: the lockout outranks every guard and the gate.
-- A denied or absent mic seals the session into the terminal `eclipsed` state and is never re-prompted; the button game is never affected.
+- **Server-side key, allow-listed surface.** The browser sends only audio; `GEMINI_API_KEY` stays server-side (masked at the debug sink). The transcribe route is rate-limited per session and globally, like the TTS route.
+- **Ask only.** The spoken path produces an Ask; Hex / Scry / Pass / Cast stay on the board buttons (which keep their own cast confirmation). With no spoken destructive moves there is no spoken confirmation gate or cast lockout.
+- **Turn-based.** A held recording is one request/response — no socket, no silence timeout, no barge-in. `Space` is the talk key everywhere except inside a text field (where it types); buttons keep Enter for keyboard activation.
+- A denied or absent mic seals the medallion into the inert `denied` state (one quiet notice, never re-prompted); the button + text game is untouched.
 
 ### Controls
 
-- **Eclipse medallion** - the click on/off voice control (tap to wake the mic, tap to sleep) and the living indicator. All animation is the Oracle alive: the corona breathes while listening, flares with the player\'s voice while hearing, and pulses while she speaks. **When Sköll speaks the disc deepens toward total eclipse with an ember rim** - the sun devoured - so the speaker reads by brightness and shape, never color alone. Reduced motion swaps the pulses for static glow intensities. Each state carries an ARIA label and a polite live-region announcement.
-- **Output mute** - a separate toggle that silences both voices while their captions keep arriving in the panel. Set-and-forget, persists for the session (R11), independent of the mic: muting is not sleeping.
+- **Eclipse medallion** — the push-to-talk control (hold to record, release to ask — pointer or `Space`) and the living indicator: idle when ready, a flaring corona while recording, the rune ring orbiting while the utterance is transcribed, and the corona pulsing while a line plays. **When Sköll speaks the disc deepens toward total eclipse with an ember rim** — the sun devoured — so the speaker reads by brightness and shape, never color alone. Reduced motion swaps the pulses for static glow intensities. Each state carries an ARIA label and a polite live-region announcement.
+- **Output mute** — a separate toggle that silences both voices while their captions keep arriving in the panel. Set-and-forget, persists for the session (R11), independent of the mic: muting is not sleeping.
 
 ## Session & state lifecycle
 

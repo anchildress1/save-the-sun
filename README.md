@@ -99,7 +99,7 @@ flowchart LR
 
 The engine holds the secret rune and referees every turn; Gemini only ever interprets language and plays the wolf. The board order, the round token, and the secret live server-side per session — a reload resumes, a new game reshuffles.
 
-Deeper diagrams — turn flow, the voice Live + tool-call loop, and the session lifecycle — live in [`docs/architecture.md`](docs/architecture.md).
+Deeper diagrams — turn flow, the push-to-talk + delivery voice loop, and the session lifecycle — live in [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
@@ -175,7 +175,7 @@ Local secrets live in `.env` (gitignored). Deployed, the key rides Google Secret
 
 ## What's Next
 
-- **v2 — the Oracle speaks:** the Oracle and Sköll are _voiced_ — every line is text in the panel and, with audio on, spoken via Gemini TTS. Hands-free voice input (speak your Ask, interrupt her) is an opt-in layer on top. Design in [`docs/architecture.md`](docs/architecture.md#voice--input-the-live-mic-and-output-delivery).
+- **v2 — the Oracle speaks:** the Oracle and Sköll are _voiced_ — every line is text in the panel and, with audio on, spoken via Gemini TTS. Voice input is an opt-in push-to-talk layer on top: hold the medallion (or `Space`) to speak your Ask, release to send. Design in [`docs/architecture.md`](docs/architecture.md#voice--input-push-to-talk-and-output-delivery).
 - Sköll escalation taunts wired to how close he is.
 
 ---

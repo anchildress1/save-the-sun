@@ -1,9 +1,9 @@
 # Save the Sun — v2 Implementation Checklist (Voice Story Order) 🎫
 
 > Implementation units for AI agents. Source of truth: `v2-voice-requirements.md`. Refs = requirement IDs there.
-> Config constants: Oracle voice `Gacrux` (verified on Live 2026-06-11 — `Kore` fallback not needed), Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, silence timeout 5000ms.
+> Config constants: Oracle voice `Gacrux`, Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, transcription model `gemini-3.5-flash`.
 >
-> **Two voice layers** — see [`architecture.md`](./architecture.md#voice--input-the-live-mic-and-output-delivery). Stories S1–S11 are the shipped record of the **Live mic** input path (the medallion wakes/sleeps it). On top sits **mic-independent TTS delivery** for output: **every game move now voices** through one shared TTS route — Oracle answers/refusals, Sköll's Ask, the Scry/Hex/Pass resolutions, the cast outcomes, and the win/loss — text always, audio when on, with or without the mic (see [Spoken surface](#spoken-surface--voice-as-delivery) below). The prebuilt-clip S12/S13 were tried then reverted in favor of that route; the audio-only ambience layer is deferred.
+> **Two voice layers** — see [`architecture.md`](./architecture.md#voice--input-push-to-talk-and-output-delivery). **Output** is mic-independent TTS delivery: **every game move voices** through one shared TTS route — Oracle answers/refusals, Sköll's Ask, the Scry/Hex/Pass resolutions, the cast outcomes, and the win/loss — text always, audio when on (see [Spoken surface](#spoken-surface--voice-as-delivery) below). **Input is push-to-talk** (hold the medallion or `Space` → transcribe → the same Ask pipeline as the typed box), Ask-only and turn-based. The original Live-mic stories below (S1–S2 token/session, S4–S6 mic seal/silence/invite, S7–S9 Live tool-call wiring) are the **retired** record — that path was removed; the medallion is now hold-to-record (S3 reworked) and the prebuilt-clip S12/S13 were reverted in favor of the shared TTS route (the audio-only ambience layer is deferred).
 
 ---
 

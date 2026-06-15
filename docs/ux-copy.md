@@ -327,35 +327,28 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 | Round resolved—header tag beside the celestial body (full resolution line lives in the Oracle panel, §4) | human win (moon → risen sun): **"Sól crests the rim of the world."** · Sköll win (moon holds): **"Sköll takes the sun."** |
 | Cast armed (player believes one remains) | **"Cast?"** |
 
-### Eclipse medallion (voice control)
+### Eclipse medallion (push-to-talk control)
 
-The medallion is a labeled button: its accessible name carries the state plus what a tap does. The announcement column is the polite live-region line for transitions a player must never miss—mic privacy and who holds the fire; hearing/thinking stay quiet (still "listening" to a listener). Visual states live in `v2-voice-requirements.md` R6.
+The medallion is the push-to-talk control: **hold** it (or hold `Space`) to record an Ask, release to send. Its accessible name carries the state plus the hold affordance; the announcement column is the polite live-region line for each transition. Visual states live in `v2-voice-requirements.md` R6.
 
 | State | Button label | Announced |
 |---|---|---|
-| Asleep | **"The voice sleeps. Wake the Oracle."** | "The voice sleeps." |
-| Eclipsed (mic denied or absent — sealed for the session, tap inert, no action tail) | **"The voice is sealed. The rite continues by hand."** | "The voice is sealed." |
-| Waking (tap → listening: permission, token, connect) | **"The Oracle stirs. Silence the voice."** | "The Oracle stirs." |
-| Listening | **"The Oracle listens. Silence the voice."** | "The Oracle listens." |
-| Hearing speech | **"The Oracle hears you. Silence the voice."** | — |
-| Thinking | **"The Oracle considers. Silence the voice."** | — |
-| Oracle speaking | **"The Oracle speaks. Silence the voice."** | "The Oracle speaks." |
-| Sköll speaking | **"Sköll speaks. Silence the voice."** | "Sköll speaks." |
+| Idle (ready — hold to speak) | **"Hold to speak to the Oracle."** | "Ready to hear you." |
+| Recording (held) | **"Listening — release to ask."** | "Listening." |
+| Thinking (transcribing + asking) | **"The Oracle considers your words."** | "The Oracle considers." |
+| Oracle speaking | **"The Oracle speaks."** | "The Oracle speaks." |
+| Sköll speaking | **"Sköll speaks."** | "Sköll speaks." |
+| Denied (mic denied or absent — sealed for the session, inert) | **"The voice is sealed. The rite continues by hand."** | "The voice is sealed." |
 
-Voice failure notices (emitted by the session client, shown as one quiet line by the medallion—never in the Oracle's answer frame, which is her voiced surface):
+A denied or absent mic shows one quiet notice by the medallion (never in the Oracle's answer frame) and is final for the session (R1) — the medallion seals into the inert `denied` state and never re-prompts:
 
 | Failure | Notice |
 |---|---|
-| Token mint | "The fire does not carry your voice tonight. The rite continues by hand." |
-| Mic permission | "The fire cannot hear you. The rite continues by hand." |
-| No mic / dead audio | "No voice reaches the fire. The rite continues by hand." |
-| Socket drop | "The Oracle's voice falters. The rite continues by hand." |
-
-Mic permission and no-mic failures are final for the session (R1): the medallion seals into the eclipsed state, the notice stays, and no second permission prompt ever fires. Token, socket, and dead-audio failures stay retryable by tapping again.
+| Mic denied / no device | "The fire cannot hear you. The rite continues by hand." |
 
 ### Output mute (voice control)
 
-A second control beside the medallion: a toggle button (`aria-pressed`) that silences both voices while their words keep arriving in the panel. Distinct from the medallion — muting is not sleeping; the session stays awake and the mic stays open. The preference persists for the session (R11).
+A second control beside the medallion: a toggle button (`aria-pressed`) that silences both voices while their words keep arriving in the panel. Independent of the mic. The preference persists for the session (R11).
 
 | State | Button label (accessible name) |
 |---|---|
