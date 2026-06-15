@@ -47,6 +47,22 @@
 		onHoldEnd();
 	}
 
+	// Keyboard hold-to-record: when the medallion is focused, Space/Enter drive the hold directly.
+	// The native button would fire a click on keyup; we preventDefault and run the press-and-hold
+	// gesture instead, so a keyboard user records for exactly as long as they hold the key.
+	function keyDown(event: KeyboardEvent) {
+		if (event.key !== ' ' && event.key !== 'Enter') return;
+		event.preventDefault();
+		if (sealed || event.repeat || holding) return;
+		holding = true;
+		onHoldStart();
+	}
+	function keyUp(event: KeyboardEvent) {
+		if (event.key !== ' ' && event.key !== 'Enter') return;
+		event.preventDefault();
+		end();
+	}
+
 	// The strip loads at idle, never against the LCP fetch — the perf gate holds the line.
 	// Until it lands the glow layers carry the medallion alone.
 	let stripUrl = $state('');
@@ -76,6 +92,9 @@
 		onpointerup={end}
 		onpointerleave={end}
 		onpointercancel={end}
+		onkeydown={keyDown}
+		onkeyup={keyUp}
+		onblur={end}
 		oncontextmenu={(e) => e.preventDefault()}
 	>
 		<span class="visual" aria-hidden="true">

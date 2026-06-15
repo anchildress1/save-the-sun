@@ -79,6 +79,29 @@ describe('EclipseMedallion — hold-to-record button (R6)', () => {
 		expect(button.getAttribute('aria-disabled')).toBe('true');
 	});
 
+	it('holds while Space is held on the focused medallion, releasing on keyup', () => {
+		const { button, onHoldStart, onHoldEnd } = renderMedallion('idle');
+		button.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+		expect(onHoldStart).toHaveBeenCalledOnce();
+		// A key repeat while held must not re-fire the hold.
+		button.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, repeat: true }));
+		expect(onHoldStart).toHaveBeenCalledOnce();
+		button.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
+		expect(onHoldEnd).toHaveBeenCalledOnce();
+	});
+
+	it('ignores keys that are not the talk keys', () => {
+		const { button, onHoldStart } = renderMedallion('idle');
+		button.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+		expect(onHoldStart).not.toHaveBeenCalled();
+	});
+
+	it('refuses a keyboard hold while denied', () => {
+		const { button, onHoldStart } = renderMedallion('denied');
+		button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+		expect(onHoldStart).not.toHaveBeenCalled();
+	});
+
 	it('hides every visual layer from assistive tech — the label is the whole story', () => {
 		const { button } = renderMedallion('idle');
 		expect(layer(button, '.visual').getAttribute('aria-hidden')).toBe('true');

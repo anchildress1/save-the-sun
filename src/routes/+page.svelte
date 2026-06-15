@@ -581,18 +581,19 @@
 		// promise a hold the recorder will refuse.
 		if (recorderSealed()) medalState = 'denied';
 
-		// Push-to-talk on the keyboard: hold Space anywhere to record, release to ask. Inside a text
-		// field Space types normally; otherwise it's the talk key (preventDefault stops page scroll and
-		// focused-button activation — buttons keep Enter). Key-repeat must not re-fire the hold.
-		function isTypingTarget(el: EventTarget | null): boolean {
+		// Push-to-talk on the keyboard: hold Space over the page chrome to record, release to ask. When
+		// focus is on a control that uses Space itself — a button, link, the Ask field, the focused
+		// medallion (which runs its own hold) — Space must reach it, so we stand down and let the
+		// native activation through. Key-repeat must not re-fire the hold.
+		function ownsSpace(el: EventTarget | null): boolean {
 			const node = el as HTMLElement | null;
-			return (
-				!!node &&
-				(node.tagName === 'INPUT' || node.tagName === 'TEXTAREA' || node.isContentEditable)
-			);
+			if (!node) return false;
+			if (node.isContentEditable) return true;
+			if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(node.tagName)) return true;
+			return node.getAttribute('role') === 'button';
 		}
 		function onKeyDown(e: KeyboardEvent) {
-			if (e.code !== 'Space' || isTypingTarget(document.activeElement)) return;
+			if (e.code !== 'Space' || ownsSpace(document.activeElement)) return;
 			// preventDefault on EVERY Space keydown, including auto-repeats while held — otherwise the
 			// repeat events scroll the page. Only the first (non-repeat) press starts the hold.
 			e.preventDefault();
@@ -600,7 +601,7 @@
 			void startHold();
 		}
 		function onKeyUp(e: KeyboardEvent) {
-			if (e.code !== 'Space' || isTypingTarget(document.activeElement)) return;
+			if (e.code !== 'Space' || ownsSpace(document.activeElement)) return;
 			e.preventDefault();
 			void endHold();
 		}

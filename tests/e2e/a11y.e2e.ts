@@ -16,6 +16,9 @@ const seedOnboarded = (page: Page) =>
 	page.addInitScript((key) => {
 		try {
 			localStorage.setItem(key, '1');
+			// Audio defaults on; mute it for the a11y sweeps so the end-screen isn't held by the
+			// voice splash-drain timing (these test the DOM, not playback — voice is unit-tested).
+			sessionStorage.setItem('save-the-sun:muted', 'true');
 		} catch {
 			/* storage blocked — the title shows instead; the title sweeps cover that path */
 		}
@@ -254,7 +257,7 @@ test.describe('a11y — the whole round is keyboard-operable with a visible focu
 		// The eclipse medallion is the only voice control — it must carry the same gold outline.
 		// (Activation semantics live in the component suite; here the full theme CSS is loaded,
 		// so a missing --gold-bright would silently void the ring and this assertion catches it.)
-		const medallion = page.getByRole('button', { name: 'The voice sleeps. Wake the Oracle.' });
+		const medallion = page.getByRole('button', { name: 'Hold to speak to the Oracle.' });
 		await medallion.focus();
 		const medallionOutline = await medallion.evaluate((el) => {
 			const s = getComputedStyle(el);
