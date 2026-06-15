@@ -4,6 +4,25 @@ import Page from '$routes/+page.svelte';
 import { VIEW_STATE_KEY } from '$lib/viewState';
 import type { GameState } from '$lib/server/engine/actions';
 
+// These tests are about the board, the Ask flow, and the end-screen — not voice. Mock the audio
+// layer so it stays inert: no real AudioContext, no TTS fetch, drains instantly (the voice surface
+// has its own suite in page.voice.svelte.test.ts).
+vi.mock('$lib/voice/delivery', () => ({
+	enableDelivery: vi.fn(),
+	disableDelivery: vi.fn(),
+	stopDelivery: vi.fn(),
+	deliver: vi.fn(async () => {}),
+	whenDrained: vi.fn(async () => {}),
+	deliveryReady: vi.fn(() => false),
+	subscribeDelivery: () => () => {}
+}));
+vi.mock('$lib/voice/recorder', () => ({
+	startRecording: vi.fn(async () => ({ ok: true })),
+	stopRecording: vi.fn(async () => null),
+	recorderSealed: vi.fn(() => null),
+	closeRecorder: vi.fn()
+}));
+
 const ONBOARDED_KEY = 'save-the-sun:onboarded';
 
 // Full page props (data normally comes from +page.server.ts). A fixed seed keeps the
@@ -854,7 +873,7 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		// Sowilo is rune id 1 — seed it crossed under the round the load will report.
 		localStorage.setItem(
 			VIEW_KEY,
-			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: '', voiceInvited: false })
+			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: '' })
 		);
 		const screen = render(Page, pageProps);
 		await expect
@@ -868,8 +887,7 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 			JSON.stringify({
 				roundId: 'test-round',
 				crossings: [],
-				answer: 'No. Sól is not reaching for a fire rune.',
-				voiceInvited: false
+				answer: 'No. Sól is not reaching for a fire rune.'
 			})
 		);
 		const screen = render(Page, pageProps);
@@ -883,7 +901,7 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		// win was never voiced client-side before the reload) must not blank it back out.
 		localStorage.setItem(
 			VIEW_KEY,
-			JSON.stringify({ roundId: 'test-round', crossings: [], answer: '', voiceInvited: false })
+			JSON.stringify({ roundId: 'test-round', crossings: [], answer: '' })
 		);
 		const screen = render(Page, propsWith(HUMAN_WON));
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rune is true.');
@@ -896,8 +914,7 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 			JSON.stringify({
 				roundId: 'a-stale-round',
 				crossings: [1],
-				answer: 'stale line',
-				voiceInvited: false
+				answer: 'stale line'
 			})
 		);
 		const screen = render(Page, pageProps);
@@ -923,7 +940,7 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		// A stale record from the prior round, plus a new-game response that mints a new token.
 		localStorage.setItem(
 			VIEW_KEY,
-			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: 'old', voiceInvited: false })
+			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: 'old' })
 		);
 		stubFetch(async (url) => {
 			if (url.includes('/api/new-game'))
@@ -1054,8 +1071,7 @@ describe('Save the Sun page — Sköll turn reload reconcile', () => {
 			JSON.stringify({
 				roundId: 'test-round',
 				crossings: [],
-				answer: 'No. Sól is not reaching for a fire rune.',
-				voiceInvited: false
+				answer: 'No. Sól is not reaching for a fire rune.'
 			})
 		);
 		const spy = respond({});

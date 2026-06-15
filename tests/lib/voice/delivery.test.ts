@@ -23,10 +23,19 @@ import {
 	setDeliveryMuted,
 	deliver,
 	whenDrained,
-	resetDelivery
+	subscribeDelivery,
+	resetDelivery,
+	type DeliveryEvent
 } from '$lib/voice/delivery';
 
 const LINE = { kind: 'refusal', refusal: 'empty' } as const;
+
+// The drain handler delivery registers at enable() — calling it simulates the speaker running dry.
+const fireDrain = () => {
+	const handler = audio.speaker.onDrained.mock.calls.at(-1)?.[0];
+	if (!handler) throw new Error('delivery never registered an onDrained handler');
+	handler();
+};
 
 // A streaming TTS response: NDJSON, one base64 chunk per line.
 function ndjsonResponse(...chunks: string[]) {
@@ -225,7 +234,6 @@ describe('delivery seam', () => {
 		enableDelivery();
 		audio.speaker.busy = false;
 		await expect(whenDrained(1000)).resolves.toBeUndefined();
-		expect(audio.speaker.onDrained).not.toHaveBeenCalled();
 	});
 
 	it('whenDrained resolves immediately when no speaker is open', async () => {
@@ -235,10 +243,6 @@ describe('delivery seam', () => {
 	it('whenDrained waits for the speaker to drain', async () => {
 		enableDelivery();
 		audio.speaker.busy = true;
-		let drain: () => void = () => {};
-		audio.speaker.onDrained.mockImplementation((cb: () => void) => {
-			drain = cb;
-		});
 
 		let resolved = false;
 		const p = whenDrained(10_000).then(() => {
@@ -247,7 +251,7 @@ describe('delivery seam', () => {
 		await Promise.resolve();
 		expect(resolved).toBe(false);
 
-		drain();
+		fireDrain();
 		await p;
 		expect(resolved).toBe(true);
 	});
@@ -257,7 +261,6 @@ describe('delivery seam', () => {
 		try {
 			enableDelivery();
 			audio.speaker.busy = true;
-			audio.speaker.onDrained.mockImplementation(() => {});
 			const p = whenDrained(5000);
 			vi.advanceTimersByTime(5000);
 			await expect(p).resolves.toBeUndefined();
@@ -288,5 +291,82 @@ describe('delivery seam', () => {
 		enableDelivery();
 		// The reopened speaker starts muted from the remembered preference.
 		expect(audio.createSpeaker).toHaveBeenLastCalledWith(true);
+	});
+});
+
+describe('delivery speaking events', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		resetDelivery();
+		audio.speaker.busy = false;
+		vi.stubGlobal('fetch', vi.fn());
+	});
+
+	afterEach(() => vi.unstubAllGlobals());
+
+	function collect(): DeliveryEvent[] {
+		const events: DeliveryEvent[] = [];
+		subscribeDelivery((e) => events.push(e));
+		return events;
+	}
+
+	const speaking = (events: DeliveryEvent[]) => events.filter((e) => e.type === 'speaking');
+
+	it("emits the Oracle's voice when her line begins, idle when it drains", async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm-a'));
+		enableDelivery();
+		const events = collect();
+
+		await deliver(LINE); // refusal → her voice
+		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }]);
+
+		fireDrain();
+		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }, { type: 'idle' }]);
+	});
+
+	it("emits Sköll's voice for his Ask and the loss outcome", async () => {
+		vi.mocked(fetch).mockImplementation(async () => ndjsonResponse('pcm-a'));
+		enableDelivery();
+		const events = collect();
+
+		await deliver({ kind: 'skoll-ask', query: { axis: 'power', value: 3 } });
+		await deliver({ kind: 'outcome', result: 'win' });
+		await deliver({ kind: 'outcome', result: 'lose' });
+		expect(speaking(events)).toEqual([
+			{ type: 'speaking', voice: 'skoll' },
+			{ type: 'speaking', voice: 'oracle' },
+			{ type: 'speaking', voice: 'skoll' }
+		]);
+	});
+
+	it('stays idle when a line produces no audio', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 400 }));
+		enableDelivery();
+		const events = collect();
+
+		await deliver(LINE);
+		expect(events).toEqual([]);
+	});
+
+	it('settles to idle on stopDelivery and disableDelivery', async () => {
+		vi.mocked(fetch).mockResolvedValue(ndjsonResponse('pcm-a'));
+		enableDelivery();
+		const events = collect();
+
+		await deliver(LINE);
+		stopDelivery();
+		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }, { type: 'idle' }]);
+	});
+
+	it('unsubscribes cleanly — a dropped listener hears nothing more', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm-a'));
+		enableDelivery();
+		const events: DeliveryEvent[] = [];
+		const off = subscribeDelivery((e) => events.push(e));
+
+		await deliver(LINE);
+		off();
+		fireDrain();
+		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }]);
 	});
 });

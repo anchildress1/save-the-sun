@@ -6,15 +6,22 @@
 	import EndScreen from '$lib/components/EndScreen.svelte';
 	import EclipseMedallion from '$lib/components/EclipseMedallion.svelte';
 	import type { MedallionState } from '$lib/components/medallionState';
-	import { voiceSession, type VoiceEvent, type VoiceToolCall } from '$lib/voice/voiceSession';
-	import { writeMuted } from '$lib/voice/outputMute';
+	import { readMuted, writeMuted } from '$lib/voice/outputMute';
 	import {
 		enableDelivery,
 		disableDelivery,
 		stopDelivery,
 		deliver,
-		whenDrained
+		whenDrained,
+		subscribeDelivery,
+		type DeliveryEvent
 	} from '$lib/voice/delivery';
+	import {
+		startRecording,
+		stopRecording,
+		recorderSealed,
+		closeRecorder
+	} from '$lib/voice/recorder';
 	import type { LineDescriptor } from '$lib/server/voice/lines';
 	import { REACTION_LINES } from '$lib/voice/reactionLines';
 	import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
@@ -101,10 +108,12 @@
 		askHintPending: 'The rite is moving. Hold, then ask.',
 		askHintWolf: 'Sköll is moving. Hold, then ask.',
 		askHintOver: 'The rite is over.',
-		// Output mute (S11): the toggle's accessible name carries the action plus the reassurance
+		// Output mute (R11): the toggle's accessible name carries the action plus the reassurance
 		// that nothing is lost — the words still arrive in the panel.
 		muteVoices: 'Silence the voices. Their words still appear in writing.',
-		unmuteVoices: 'Let the voices be heard.'
+		unmuteVoices: 'Let the voices be heard.',
+		// Push-to-talk (R1): a denied or absent mic seals the medallion; the rite goes on by hand.
+		micDenied: 'The fire cannot hear you. The rite continues by hand.'
 	};
 
 	let castMode = $state(false);
@@ -155,14 +164,11 @@
 	let outcomeVoiced = false;
 	$effect(() => {
 		// Flip the once-guard only when audio is on — so if audio is off when the splash lands, a later
-		// toggle-on can still voice the outcome. The loss verse is Sköll's, so it rides the mic-held
-		// path (never dropped while the Live mic is mid-turn); the win coda is the Oracle's, same path.
+		// toggle-on can still voice the outcome. The loss verse is voiced in Sköll's voice, the win coda
+		// in the Oracle's; the medallion follows from the delivery event (onDeliveryEvent).
 		if (showEndScreen && !outcomeVoiced && audioOn) {
 			outcomeVoiced = true;
-			void voiceWithMicHeld(
-				{ kind: 'outcome', result: endOutcome },
-				endOutcome === 'lose' ? 'skoll-speaking' : null
-			);
+			void deliver({ kind: 'outcome', result: endOutcome });
 		}
 	});
 	let nightProgress = $derived(
@@ -252,17 +258,8 @@
 		// Skip while Sköll is stalled: that's a transient error line whose companion `skollStalled`
 		// (and its retry button) isn't persisted, and onMount re-drives his move anyway — so keep the
 		// last good line in storage instead of resuming a dead-end error the engine has moved past.
-		const snapshot = { crossings: [...crossings], answer, voiceInvited };
+		const snapshot = { crossings: [...crossings], answer };
 		if (restored && !skollStalled) writeViewState(roundId, snapshot);
-	});
-
-	// Board-driven gate: sleep the session whenever the game hands off to Sköll or ends while the
-	// mic is live. The onVoiceEvent handler catches this at the next `listening` event; this effect
-	// catches it when the session is already listening and no new voice event arrives.
-	$effect(() => {
-		if (voiceState === 'listening' && (roundOver || (activePlayer === 'Sköll' && !skollAsking))) {
-			voiceSession.sleep();
-		}
 	});
 
 	// The most recent Oracle line's audio (or null when none/text-only). Not reactive — just a handle
@@ -272,7 +269,10 @@
 	// Hold the end-screen splash until her last line has been heard. Only when audio is on — silent
 	// play resolves instantly. Capped (8s) so a stuck synth can never strand the round on the board.
 	$effect(() => {
-		if (!roundOver || !audioOn) {
+		// Only hold when a line is actually in flight (answerAudio set this session) — a resumed or
+		// text-only win has nothing to wait for, so the splash shows at once. (answerAudio is a plain
+		// handle, not reactive; the effect re-runs on roundOver/audioOn, by when it's set.)
+		if (!roundOver || !audioOn || answerAudio === null) {
 			endHeld = false;
 			return;
 		}
@@ -303,117 +303,28 @@
 		selectedTargetId === null ? null : (runes.find((r) => r.id === selectedTargetId) ?? null)
 	);
 
-	// The medallion mirrors the voice session. Its state is a superset of VoiceState:
-	// 'skoll-speaking' arrives from delivery, never from the session itself. The failure
-	// notice renders by the medallion — not in the Oracle's answer frame, which is her voiced
-	// surface and persists across reloads; a transient voice failure must do neither.
-	let voiceState = $state<MedallionState>('asleep');
-	let voiceAmplitude = $state(0);
+	// The medallion is the push-to-talk control: 'recording' while held, 'thinking' while the held
+	// utterance is transcribed and asked, the spoken voice while a line plays (driven by delivery),
+	// 'denied' if the mic is sealed, else 'idle'. No Live session — one held recording per Ask.
+	let medalState = $state<MedallionState>('idle');
+	// One quiet line when the mic is denied/absent; the button game is unaffected.
 	let voiceNotice = $state('');
-	// Per round, persisted with the view (S6): the invitation speaks once per game, not per tap.
-	let voiceInvited = $state(false);
-	// Audio on/off (voice-as-delivery, P1): the one toggle that gates both voices. Off by default —
-	// audio stays silent until a tap opens the delivery speaker (browsers block an AudioContext
-	// outside a user gesture). The captions/panel render regardless; this only governs sound.
+	// Audio output on/off (voice-as-delivery). Off until the toggle opens the delivery speaker (a
+	// gesture). Independent of the mic: you can hold to ask with audio off and read the answer.
 	let audioOn = $state(false);
 
-	// S8: the armed confirmation for a gated tool call (scry, hex, cast_rune). `heard` flips when
-	// the player speaks after arming — the confirming call is refused without it, so the model can
-	// never execute both phases in one breath. `spoke` flips on the Oracle's first turn since
-	// arming (the confirmation question itself); a second turn while it is set means the exchange
-	// ended without the call (a decline), so the gate disarms.
-	let voiceConfirm: { name: string; rune?: string; heard: boolean; spoke: boolean } | null = null;
-
-	// S9 (R5): true only while a cast's engine round-trip is in flight — board- or voice-made.
-	// The executor rejects every voiced command for this window; nothing can cancel the cast
-	// itself (barge-in only stops her audio, and the session never aborts a running executor).
-	let casting = false;
-
-	function onVoiceEvent(event: VoiceEvent) {
-		switch (event.type) {
-			case 'hearing':
-				voiceState = 'hearing';
-				voiceAmplitude = event.amplitude;
-				break;
-			// Eclipsed (S4): terminal mic seal. The medallion renders it inert and the session
-			// refuses further wakes; the notice set by the preceding error stays for the session.
-			case 'asleep':
-			case 'eclipsed':
-				voiceState = event.type;
-				voiceAmplitude = 0;
-				// Silence timeout, sleep tap, or the seal: the exchange is over, nothing executes (R4).
-				voiceConfirm = null;
-				break;
-			case 'waking':
-				voiceState = 'waking';
-				// Cleared as the retry STARTS, not on success: a stale failure line under a stirring
-				// medallion contradicts it, and an identical re-failure must re-announce (same string
-				// assigned over itself is no change — no narration).
-				voiceNotice = '';
-				break;
-			case 'listening':
-				// A no-audio model turn can settle straight from thinking to listening. If the
-				// player already answered the confirmation and no matching tool call landed, it
-				// was a decline or drift — do not leave the destructive gate armed.
-				if (voiceConfirm?.spoke && voiceConfirm.heard) voiceConfirm = null;
-				voiceState = event.type;
-				// Sleep when it's not the human's input moment: round over, or Sköll's advance
-				// phase (his ask window is the one exception — human still needs to react).
-				if (roundOver || (activePlayer === 'Sköll' && !skollAsking)) voiceSession.sleep();
-				break;
-			case 'thinking':
-				voiceState = event.type;
-				break;
-			case 'speaking':
-				// Guarded by the mirror so only a fresh speaking TURN counts — the session never
-				// re-emits an unchanged state, but the gate must not hang on that subtlety.
-				if (voiceConfirm && voiceState !== 'speaking') {
-					if (voiceConfirm.spoke) voiceConfirm = null;
-					else voiceConfirm.spoke = true;
-				}
-				voiceState = event.type;
-				break;
-			case 'error':
-				voiceNotice = event.notice;
-				// The session emits asleep (or eclipsed, for mic failures) right after every error,
-				// but settle locally too — a medallion stranded in waking would promise a
-				// silence-tap it can't honor.
-				voiceState = 'asleep';
-				voiceAmplitude = 0;
-				voiceConfirm = null;
-				break;
-			case 'transcript':
-				if (event.direction === 'in') {
-					// The player spoke since arming — the gate may accept the confirming call (S8).
-					// The input transcript itself is debug-only; it is not surfaced in the rite UI.
-					if (voiceConfirm) voiceConfirm.heard = true;
-				}
-				// out-transcript is audio-only; answer is set by the tool executor (engine truth)
-				break;
-			default:
-				event satisfies never; // a new S10/S13 event type must be handled, not dropped
+	// Drive the medallion's voice from delivery playback: a line begins → its speaker; the queue
+	// drains → back to idle (unless a hold/transcribe is mid-flight, which owns the state then).
+	function onDeliveryEvent(event: DeliveryEvent) {
+		if (event.type === 'speaking') {
+			medalState = event.voice === 'skoll' ? 'skoll-speaking' : 'speaking';
+		} else if (medalState === 'speaking' || medalState === 'skoll-speaking') {
+			medalState = 'idle';
 		}
 	}
 
-	// Waking counts as awake: a tap during the permission+token+connect stretch reaches sleep(),
-	// which cancels the pending wake — it is never silently dropped.
-	async function toggleVoice() {
-		if (voiceSession.state !== 'asleep') {
-			voiceSession.sleep();
-			return;
-		}
-		const invitation = !voiceInvited;
-		await voiceSession.wake({ invitation });
-		// Marked only after the wake lands: a failed or canceled first wake re-invites next tap.
-		if (invitation && voiceSession.state !== 'asleep' && voiceSession.state !== 'eclipsed') {
-			voiceInvited = true;
-		}
-	}
-
-	// Sound on/off for both voices (P1). Turning it on opens the delivery speaker from this tap — the
-	// gesture browsers require; turning it off CLOSES it, so an audio-off board never POSTs to the TTS
-	// route. Also gates the Live speaker. Purely a sound switch: it speaks nothing on its own (no wake
-	// greeting — that was a Live-session artifact). Independent of the mic (medallion).
+	// Audio output toggle (the mute control). Turning it on opens the delivery speaker from this tap
+	// — the gesture browsers require; off closes it so an audio-off board never POSTs to the TTS route.
 	function toggleAudio() {
 		if (!audioOn) {
 			try {
@@ -430,7 +341,64 @@
 			disableDelivery();
 		}
 		writeMuted(!audioOn);
-		voiceSession.setMuted(!audioOn);
+	}
+
+	// Push-to-talk (R1/R6). Hold the medallion (or Space) to record; the mic opens on first hold (one
+	// prompt). A denial/absent mic seals it for the session — the medallion goes inert and the rite
+	// continues by hand. Recording is independent of audio output: you can ask with the sound off.
+	async function startHold() {
+		if (recorderSealed()) {
+			medalState = 'denied';
+			return;
+		}
+		if (medalState === 'recording' || medalState === 'thinking') return; // already mid-turn
+		const verdict = await startRecording();
+		if (!verdict.ok) {
+			medalState = 'denied';
+			voiceNotice = RITE.micDenied;
+			return;
+		}
+		medalState = 'recording';
+	}
+
+	// Release: stop recording, transcribe the utterance, and run it as a normal Ask. A failed/empty
+	// transcription degrades to nothing (no turn spent), never throws.
+	async function endHold() {
+		if (medalState !== 'recording') return;
+		medalState = 'thinking';
+		let heard = '';
+		try {
+			const clip = await stopRecording();
+			if (clip) heard = await transcribeUtterance(clip.wavBase64);
+		} catch (err) {
+			console.error('[ui] push-to-talk failed:', err);
+		}
+		const question = heard.trim();
+		if (question === '') {
+			if (medalState === 'thinking') medalState = 'idle';
+			return;
+		}
+		// Dispatch straight to the engine — the spoken words never fill the typing box (the transcribe
+		// route tees what was heard to /debug for mishear diagnosis).
+		await runAsk(question, false);
+		// If no line played (audio off, or a silent turn), settle the medallion ourselves; a delivered
+		// line already drove it to speaking → idle via onDeliveryEvent.
+		if (medalState === 'thinking') medalState = 'idle';
+	}
+
+	// POST the held WAV to the transcribe route; empty string on any failure (degrade, never throw).
+	async function transcribeUtterance(wavBase64: string): Promise<string> {
+		try {
+			const res = await fetch('/api/voice/transcribe', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ wavBase64 })
+			});
+			if (!res.ok) return '';
+			return ((await res.json()) as { text?: string }).text ?? '';
+		} catch {
+			return '';
+		}
 	}
 
 	// Build the descriptor for the Oracle's own spoken line (answer or refusal) so the delivery
@@ -448,60 +416,11 @@
 		return { kind: 'skoll-ask', query };
 	}
 
-	// The Oracle's own lines may only go out via TTS when the Live session is genuinely idle (asleep
-	// or listening) — any other state means Live is or is about to be voicing her, and a server line
-	// would collide. (Sköll is never in the Live session — see voiceSkoll.)
-	function liveIdle(): boolean {
-		return voiceSession.state === 'asleep' || voiceSession.state === 'listening';
-	}
-
-	// Cap the mic-hold so a stuck or silent clip can never strand the mic paused.
-	const MIC_HELD_CAP_MS = 8000;
-
-	async function deliverWithMedallion(line: LineDescriptor, state: MedallionState | null = null) {
-		if (state) voiceState = state;
-		try {
-			await deliver(line);
-			await whenDrained(MIC_HELD_CAP_MS);
-		} finally {
-			if (state && voiceState === state) voiceState = voiceSession.state;
-		}
-	}
-
-	// Voice a line that lives on the delivery speaker while the Live mic may be awake (R9 mic
-	// discipline). The Oracle's Live audio and a delivery clip are two separate outputs, so with the
-	// mic awake we wait for her line to drain (whenSettled), hold the mic (so the clip isn't heard as
-	// input or talked over), play it, then resume. Mic asleep ⇒ one speaker, no discipline needed.
-	// A no-op when audio is off (deliver no-ops without a speaker).
-	async function voiceWithMicHeld(line: LineDescriptor, state: MedallionState | null = null) {
-		if (!audioOn) return;
-		if (voiceSession.state === 'asleep' || voiceSession.state === 'eclipsed') {
-			void deliverWithMedallion(line, state);
-			return;
-		}
-		await voiceSession.whenSettled(); // let her Live audio finish before this plays
-		voiceSession.hold();
-		try {
-			await deliverWithMedallion(line, state);
-		} finally {
-			voiceSession.resume();
-		}
-	}
-
-	// Sköll's Ask and the loss outcome are voiced in his voice — never via the Oracle's Live session,
-	// so they ride the mic-held path above rather than the liveIdle gate her own lines use.
-	function voiceSkoll(query: unknown) {
-		return voiceWithMicHeld(skollVoice(query), 'skoll-speaking');
-	}
-
 	// Return type is derived from the action's `type`, so a caller can't request a
 	// mismatched result shape.
 	async function dispatch<T extends GameAction['type']>(
 		action: Extract<GameAction, { type: T }>
 	): Promise<ActionResponse<T>> {
-		// Any engine action — typed, clicked, or voiced — supersedes a pending confirmation (S8):
-		// the board moved on, so a stale armed gate must never carry into a later exchange.
-		voiceConfirm = null;
 		const res = await fetch('/api/action', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -531,9 +450,9 @@
 			applyState(state);
 			applySkoll(skoll);
 			// His Ask is a game move (R10) — written on his frame and voiced in his own voice through the
-			// same delivery seam as the Oracle. He is never in the Live session, so voiceSkoll holds the
-			// mic around his line (R9) instead of dropping it whenever Live is mid-turn.
-			if (skoll?.asks) void voiceSkoll(skoll.asks.query);
+			// same delivery seam as the Oracle (a no-op when audio is off). The medallion shows
+			// 'skoll-speaking' from the delivery event while it plays.
+			if (skoll?.asks) void deliver(skollVoice(skoll.asks.query));
 			// A Sköll win deliberately leaves the Oracle's last voiced line in place (the answer, and
 			// his Scry note when he overheard it) — that line is the WHY of the loss, and the end
 			// screen already owns the "Sköll takes the sun" text. Never double it into the panel.
@@ -568,7 +487,6 @@
 			restoreCrossed = saved.crossings;
 			crossings = saved.crossings;
 			if (saved.answer) answer = saved.answer;
-			voiceInvited = saved.voiceInvited;
 		}
 		restored = true;
 		// Storage can throw (private mode) — first-run is the safe default, so show it then.
@@ -583,31 +501,77 @@
 		}
 		window.addEventListener('resize', onReposition);
 		window.addEventListener('scroll', onReposition, true);
-		const unsubscribeVoice = voiceSession.subscribe(onVoiceEvent);
-		// S7: the model's tool calls run against this page's game. Registered before any wake can
-		// happen (the medallion renders with this mount), so a call can never find no executor.
-		voiceSession.setToolExecutor(executeVoiceTool);
-		// The session is a module singleton and the eclipse seal (S4) survives unmount — a remount
-		// must adopt the live state, or the medallion would promise a wake the session will refuse.
-		voiceState = voiceSession.state;
-		if (voiceState === 'eclipsed' && voiceSession.notice) {
-			voiceNotice = voiceSession.notice;
+		// The medallion mirrors who delivery is voicing (speaking / idle).
+		const unsubscribeDelivery = subscribeDelivery(onDeliveryEvent);
+		// A denied mic is sealed at the module level — a remount must adopt it, or the medallion would
+		// promise a hold the recorder will refuse.
+		if (recorderSealed()) medalState = 'denied';
+
+		// Push-to-talk on the keyboard: hold Space anywhere to record, release to ask. Inside a text
+		// field Space types normally; otherwise it's the talk key (preventDefault stops page scroll and
+		// focused-button activation — buttons keep Enter). Key-repeat must not re-fire the hold.
+		function isTypingTarget(el: EventTarget | null): boolean {
+			const node = el as HTMLElement | null;
+			return (
+				!!node &&
+				(node.tagName === 'INPUT' || node.tagName === 'TEXTAREA' || node.isContentEditable)
+			);
 		}
-		// Audio is off until a tap opens the delivery speaker (gesture requirement), so the Live sink
-		// starts silent and no delivery speaker exists yet — a wake before this mount can't play before
-		// the player has enabled audio.
-		audioOn = false;
-		voiceSession.setMuted(true);
+		function onKeyDown(e: KeyboardEvent) {
+			if (e.code !== 'Space' || isTypingTarget(document.activeElement)) return;
+			// preventDefault on EVERY Space keydown, including auto-repeats while held — otherwise the
+			// repeat events scroll the page. Only the first (non-repeat) press starts the hold.
+			e.preventDefault();
+			if (e.repeat) return;
+			void startHold();
+		}
+		function onKeyUp(e: KeyboardEvent) {
+			if (e.code !== 'Space' || isTypingTarget(document.activeElement)) return;
+			e.preventDefault();
+			void endHold();
+		}
+		// Tabbing/clicking away mid-hold must end the recording, or it would hang in 'recording'.
+		function onBlur() {
+			void endHold();
+		}
+		window.addEventListener('keydown', onKeyDown);
+		window.addEventListener('keyup', onKeyUp);
+		window.addEventListener('blur', onBlur);
+
+		// Audio output is ON by default (honoring a session mute the player set). The delivery speaker
+		// still needs a user gesture to open (browsers block an AudioContext otherwise), so prime it on
+		// the first interaction — a tap or key press — then the listener retires.
+		audioOn = !readMuted();
+		let audioPrimed = false;
+		function primeAudio() {
+			if (audioPrimed) return;
+			audioPrimed = true;
+			window.removeEventListener('pointerdown', primeAudio);
+			window.removeEventListener('keydown', primeAudio);
+			if (!audioOn) return;
+			try {
+				enableDelivery();
+			} catch (err) {
+				console.error('[ui] could not open the delivery speaker:', err);
+			}
+		}
+		window.addEventListener('pointerdown', primeAudio);
+		window.addEventListener('keydown', primeAudio);
+
 		return () => {
 			window.removeEventListener('resize', onReposition);
 			window.removeEventListener('scroll', onReposition, true);
+			window.removeEventListener('keydown', onKeyDown);
+			window.removeEventListener('keyup', onKeyUp);
+			window.removeEventListener('blur', onBlur);
+			window.removeEventListener('pointerdown', primeAudio);
+			window.removeEventListener('keydown', primeAudio);
 			clearTimeout(aiNoteHideTimer); // don't let a scheduled hide fire after teardown
-			unsubscribeVoice();
-			voiceSession.setToolExecutor(null); // a dead page's game must not answer tool calls
-			voiceSession.sleep(); // never leave the mic streaming with no UI attached
-			// Close the delivery speaker too, or a late TTS response could play into a dead page and
-			// the AudioContext would leak past unmount.
+			unsubscribeDelivery();
+			// Close the delivery speaker and release the mic, or a late response could play into a dead
+			// page and the AudioContexts would leak past unmount.
 			disableDelivery();
+			closeRecorder();
 		};
 	});
 
@@ -731,6 +695,24 @@
 		}
 	}
 
+	// One Ask path for the typed field and the spoken (push-to-talk) route. `fromTyped` clears the
+	// input box on a consumed turn; the spoken route never touches the box — its words went to the
+	// engine, and the box is for typing (the heard text is teed to /debug instead).
+	async function runAsk(question: string, fromTyped: boolean) {
+		pending = true;
+		try {
+			const outcome = await performAsk(question);
+			if (fromTyped && outcome.consumed) askValue = '';
+			// Voice her own line through the delivery seam (server TTS); a no-op when audio is off (no
+			// speaker). The handle lets a round that ends on Sköll's next move hold the splash until
+			// she's heard.
+			answerAudio = outcome.voice ? deliver(outcome.voice) : null;
+			await advanceSkoll();
+		} finally {
+			pending = false;
+		}
+	}
+
 	async function submitAsk() {
 		const question = askValue.trim();
 		if (question === '') {
@@ -738,19 +720,7 @@
 			answer = RITE.emptyAsk;
 			return;
 		}
-		pending = true;
-		try {
-			const outcome = await performAsk(question);
-			if (outcome.consumed) askValue = '';
-			// Voice her own line through the delivery seam (server TTS) — but only while the Live session
-			// is idle (liveIdle); any other state means Live is or is about to be voicing and a TTS line
-			// would collide. A no-op when audio is off (no speaker). The handle lets a round that ends on
-			// Sköll's next move hold the splash until she's heard.
-			answerAudio = outcome.voice && liveIdle() ? deliver(outcome.voice) : null;
-			await advanceSkoll();
-		} finally {
-			pending = false;
-		}
+		await runAsk(question, true);
 	}
 
 	// Never throws — see performAsk.
@@ -788,9 +758,8 @@
 				voice = { kind: 'react', line: 'human-pass' };
 			}
 			answer = line;
-			// Voice the resolution in the Oracle's voice (her panel), gated like her answer — a no-op
-			// when audio is off, and silent while Live is mid-turn so a TTS line can't collide.
-			if (liveIdle()) void deliver(voice);
+			// Voice the resolution in the Oracle's voice (her panel) — a no-op when audio is off.
+			void deliver(voice);
 			return line;
 		} catch (err) {
 			console.error('[ui] React dispatch failed:', err);
@@ -865,9 +834,6 @@
 			heldScry = true;
 			heldHex = true;
 			outcomeVoiced = false; // the fresh round re-arms the end-screen outcome voice
-			voiceInvited = false; // a new round re-arms the Oracle's wake invitation
-			// Also cancels an in-flight wake, so a slow first wake can't mark the fresh round invited.
-			voiceSession.sleep();
 			// Drop any still-playing/queued Oracle line from the round just ended — TTS delivery is
 			// fire-and-forget, so without this a prior answer could bleed over the fresh blank round.
 			stopDelivery();
@@ -885,7 +851,6 @@
 
 	// Never throws — see performAsk.
 	async function performCast(runeName: string): Promise<string> {
-		casting = true;
 		try {
 			const { cast, state } = await dispatch({
 				type: 'Cast',
@@ -907,17 +872,14 @@
 			}
 			answer = line;
 			// Voice the cast outcome in her voice; keep the handle so a winning cast's end-screen splash
-			// waits for "The rune is true." to be heard (whenDrained). Gated like her answer.
-			answerAudio = liveIdle() ? deliver(voice) : null;
+			// waits for "The rune is true." to be heard (whenDrained). A no-op when audio is off.
+			answerAudio = deliver(voice);
 			return line;
 		} catch (err) {
 			console.error('[ui] Cast dispatch failed:', err);
 			answer = RITE.castFalters;
 			return RITE.castFalters;
 		} finally {
-			// Released here, not in the callers: the lockout covers exactly the cast dispatch.
-			// The wolf's follow-on move falls under the ordinary pending guard.
-			casting = false;
 			cancelCast();
 		}
 	}
@@ -931,133 +893,6 @@
 		} finally {
 			pending = false;
 		}
-	}
-
-	// S7: the model's five declared actions land here — the SAME dispatch the buttons use, so a
-	// voiced move and a clicked move are indistinguishable to the engine. The returned line is
-	// the tool result the Oracle voices; guard lines report a move the board would not offer
-	// (its button disabled or target missing) without touching the panel.
-	const REACTION_TOOLS: Record<string, ReactionChoice> = { scry: 'Scry', hex: 'Hex', pass: 'Pass' };
-
-	// Above this, the model's reading of her words is sure enough that the gate steps aside and
-	// the move executes on the first call — no confirmation echo (the player tired of being read
-	// back to). At or below it, the two-phase gate holds.
-	const CONFIDENCE_FLOOR = 0.5;
-	// `confidence` is model-supplied, so only a finite reading inside the documented 0–1 band may
-	// skip the safety gate. Anything malformed — missing, non-number, NaN, Infinity, or out of
-	// range — reads as no certainty and falls back to the two-phase confirmation.
-	function confident(args: Record<string, unknown>): boolean {
-		const c = args.confidence;
-		return typeof c === 'number' && Number.isFinite(c) && c > CONFIDENCE_FLOOR && c <= 1;
-	}
-
-	// S8 (R4): scry, hex, and cast_rune are destructive — scry and hex spend the night's single
-	// use, a cast stakes the round. Unless the model is confident it read her words right (above),
-	// they execute only through a spoken confirmation exchange, and the gate is client-authoritative:
-	// the first call only arms it and hands back the question to voice; nothing the model sends can
-	// reach the engine until the player has spoken since arming.
-	// Returns the question while the gate holds, null once confirmed (or skipped on confidence).
-	function gateDestructive(armed: typeof voiceConfirm, name: string, rune?: string): string | null {
-		if (armed && armed.name === name && armed.rune === rune && armed.heard) return null;
-		// Not armed, an unheard double-call, or a different target: (re-)arm and ask again.
-		voiceConfirm = { name, rune, heard: false, spoke: false };
-		if (name === 'scry') return RITE.confirmScry;
-		return name === 'hex' ? RITE.confirmHex : RITE.confirmCast(rune ?? '');
-	}
-
-	async function executeVoiceTool({ name, args }: VoiceToolCall): Promise<string> {
-		// The armed exchange survives only into its own clean confirming call: any other outcome —
-		// a different tool, a guard line, an unknown rune — means the reply went elsewhere, and a
-		// stale affirmation must never carry over to execute a later call.
-		const armed = voiceConfirm;
-		voiceConfirm = null;
-		// Confidence skips the gate only on a CLEAN call. Once a confirmation is armed, defer to the
-		// gate — it alone judges whether the player has spoken (heard). This blocks the batched
-		// self-confirm: the Live client can fire calls together, so the model could arm a gate then
-		// stake the round with a high-confidence call in the same breath; while an exchange stands,
-		// confidence can't jump it (R4).
-		const confirmArmed = armed !== null;
-		// S9 (R5): the cast lockout outranks every guard and the gate — checked after the
-		// capture above so the armed exchange still dies, but before anything else can answer.
-		if (casting) return RITE.castSacred;
-		if (name === 'ask') {
-			const question = typeof args.question === 'string' ? args.question.trim() : '';
-			if (question === '') return RITE.emptyAsk;
-			if (pending) return RITE.riteMoving;
-			// Rejection guards run BEFORE the lock+finally: a refused ask must dispatch nothing —
-			// not even the trailing Advance. Only when his question hangs (the implicit pass) or it
-			// is plainly her turn do we enter the sequence that posts Sköll's follow-on move.
-			if (!skollAsking && !canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
-			// Lock before the implicit pass: the Live dispatcher fires batched calls without
-			// awaiting and the reaction prompt stays live until skollAsking clears, so the whole
-			// pass→ask→advance sequence must hold the single-action guard or a second move races it.
-			pending = true;
-			try {
-				// Asking a new question while his question hangs IS the pass: let his stand (React Pass
-				// hands the turn back to her), then her ask lands. She never has to say "pass". A failed
-				// pass leaves skollAsking set and the turn with him — bail with its line, not the ask,
-				// so the spoken result matches the panel instead of misreporting "the wolf is moving".
-				if (skollAsking) {
-					await performReact('Pass');
-					if (skollAsking) return RITE.oracleSilent;
-				}
-				return (await performAsk(question)).line;
-			} finally {
-				// Not awaited: the tool result must reach the model now, not after the wolf's move.
-				// pending holds until his move settles — the same lock window the buttons get.
-				void advanceSkoll().finally(() => {
-					pending = false;
-				});
-			}
-		}
-		// Own-property check: the name is model input, and `in` would let inherited keys
-		// (toString, __proto__) fall through to a garbage React dispatch.
-		if (Object.hasOwn(REACTION_TOOLS, name)) {
-			if (pending) return RITE.riteMoving;
-			if (!skollAsking) return RITE.noReactionWindow;
-			// A spent charge is no move: the server would resolve a chargeless Scry/Hex as a Pass,
-			// silently letting his question stand. The button disables for this; the voice path must
-			// refuse it too, or a confident "scry him" passes by accident.
-			if (name === 'scry' && !heldScry) return RITE.scrySpent;
-			if (name === 'hex' && !heldHex) return RITE.hexSpent;
-			// Guards first: confirming a move the board doesn't offer would be an empty promise.
-			// Scry and hex both gate — each is the night's one use; only the pass is free. A
-			// confident reading skips the gate (no echo), unless a confirmation is already armed.
-			if ((name === 'scry' || name === 'hex') && (!confident(args) || confirmArmed)) {
-				const question = gateDestructive(armed, name);
-				if (question) return question;
-			}
-			pending = true;
-			try {
-				return await performReact(REACTION_TOOLS[name]);
-			} finally {
-				pending = false;
-			}
-		}
-		if (name === 'cast_rune') {
-			const spoken = typeof args.rune === 'string' ? args.rune.trim() : '';
-			if (spoken === '') return RITE.chooseTarget;
-			const rune = runes.find((r) => r.name.toLowerCase() === spoken.toLowerCase());
-			if (!rune) return RITE.unknownRune(spoken);
-			if (pending) return RITE.riteMoving;
-			if (skollAsking) return RITE.wolfAsking;
-			if (!canAct) return roundOver ? RITE.riteDone : RITE.wolfMoving;
-			// Confirmation is per-target: a different rune re-arms and asks again (S8). A confident
-			// reading skips the gate, unless a confirmation is already armed.
-			if (!confident(args) || confirmArmed) {
-				const question = gateDestructive(armed, 'cast_rune', rune.name);
-				if (question) return question;
-			}
-			pending = true;
-			try {
-				return await performCast(rune.name);
-			} finally {
-				void advanceSkoll().finally(() => {
-					pending = false;
-				});
-			}
-		}
-		throw new Error(`unknown tool: ${name}`);
 	}
 </script>
 
@@ -1183,10 +1018,10 @@
 
 		<aside class="oracle-panel">
 			<div class="voice-stack">
-				<!-- One labeled group for the Oracle's two controls: wake/sleep (medallion) and output
-				     mute. Both are native buttons, so Tab moves between them and Enter/Space fire. -->
+				<!-- The Oracle's two controls: the medallion (hold to speak — pointer, or hold Space) and
+				     the output-mute switch. Both are native buttons; Tab reaches each. -->
 				<div class="voice-controls" role="group" aria-label="Oracle voice controls">
-					<EclipseMedallion state={voiceState} amplitude={voiceAmplitude} onToggle={toggleVoice} />
+					<EclipseMedallion state={medalState} onHoldStart={startHold} onHoldEnd={endHold} />
 					<button
 						class="voice-switch"
 						type="button"

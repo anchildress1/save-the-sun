@@ -1,39 +1,42 @@
 // Pure medallion state -> presentation mappings, kept framework-free so the completeness
 // of every state is unit-testable outside the Svelte component (the runeVisuals.ts pattern).
+//
+// The medallion is the push-to-talk control: hold it (or hold Space) to record an Ask, release to
+// send. Its states cover the hold-to-record lifecycle plus who is being voiced on delivery.
 
-import type { VoiceState } from '$lib/voice/voiceSession';
 import type { RuneName } from './runeVisuals';
 
-/** Display union: every session voice state plus Sköll's playback, driven by the S13 director. */
-export type MedallionState = VoiceState | 'skoll-speaking';
+/** Push-to-talk display states: idle (ready), recording (holding), thinking (transcribe + Ask),
+ *  the two delivered voices, and denied (mic sealed shut for the session). */
+export type MedallionState =
+	| 'idle'
+	| 'recording'
+	| 'thinking'
+	| 'speaking'
+	| 'skoll-speaking'
+	| 'denied';
 
-// Canonical copy: docs/ux-copy.md §6 (eclipse medallion). State first, then what a tap does.
-// Readonly via `as const` (compile-time): TS-guarded code can't fork them from the canon.
+// Canonical copy: docs/ux-copy.md §6 (eclipse medallion). The label carries the state plus the
+// hold-to-record affordance. Readonly via `as const` so TS-guarded code can't fork the canon.
 export const MEDALLION_LABEL = {
-	asleep: 'The voice sleeps. Wake the Oracle.',
-	// Eclipsed is sealed (S4): no action tail — a tap does nothing, and the label must not promise one.
-	eclipsed: 'The voice is sealed. The rite continues by hand.',
-	waking: 'The Oracle stirs. Silence the voice.',
-	listening: 'The Oracle listens. Silence the voice.',
-	hearing: 'The Oracle hears you. Silence the voice.',
-	thinking: 'The Oracle considers. Silence the voice.',
-	speaking: 'The Oracle speaks. Silence the voice.',
-	'skoll-speaking': 'Sköll speaks. Silence the voice.'
+	idle: 'Hold to speak to the Oracle.',
+	recording: 'Listening — release to ask.',
+	thinking: 'The Oracle considers your words.',
+	speaking: 'The Oracle speaks.',
+	'skoll-speaking': 'Sköll speaks.',
+	// Sealed: a denied or absent mic. No hold affordance — the rite goes on by hand.
+	denied: 'The voice is sealed. The rite continues by hand.'
 } as const satisfies Record<MedallionState, string>;
 
-// Polite live-region lines for the transitions a player must never miss: mic privacy and who
-// holds the fire. null = stay quiet (hearing/thinking are still "listening" to a listener,
-// and announcing every utterance would drown the screen reader in chatter).
+// Polite live-region lines for each transition — the indicator is small and changes are infrequent.
 export const MEDALLION_ANNOUNCEMENT = {
-	asleep: 'The voice sleeps.',
-	eclipsed: 'The voice is sealed.',
-	waking: 'The Oracle stirs.',
-	listening: 'The Oracle listens.',
-	hearing: null,
-	thinking: null,
+	idle: 'Ready to hear you.',
+	recording: 'Listening.',
+	thinking: 'The Oracle considers.',
 	speaking: 'The Oracle speaks.',
-	'skoll-speaking': 'Sköll speaks.'
-} as const satisfies Record<MedallionState, string | null>;
+	'skoll-speaking': 'Sköll speaks.',
+	denied: 'The voice is sealed.'
+} as const satisfies Record<MedallionState, string>;
 
 // Rim glyphs (decorative, reused card assets per R6). Ansuz leads — the rune of the spoken word.
 export const RING_RUNES: readonly RuneName[] = [
@@ -52,36 +55,18 @@ export const RING_RUNES: readonly RuneName[] = [
 export const SPRITE_LEVELS = 12;
 const SPRITE_PEAK_LEVEL = SPRITE_LEVELS - 1;
 
-/** Glow level for a state; hearing maps mic flare with the asset's own volume formula.
- * Looping states (listening/speaking/sköll) ping-pong the strip in CSS — their value here
- * is the frozen level reduced motion falls back to. */
-export function spriteLevel(state: MedallionState, flare = 0): number {
+/** Glow level for a state. Looping states (recording/speaking/sköll) ping-pong the strip in CSS —
+ * their value here is the frozen level reduced motion falls back to. */
+export function spriteLevel(state: MedallionState): number {
 	switch (state) {
-		case 'asleep':
-		case 'eclipsed':
+		case 'denied':
 			return 0;
-		case 'waking':
-			return 2;
-		case 'hearing':
-			return Math.min(
-				SPRITE_PEAK_LEVEL,
-				Math.floor(Math.min(1, Math.max(0, flare)) * SPRITE_LEVELS)
-			);
+		case 'idle':
 		case 'thinking':
-		case 'listening':
 			return 4;
+		case 'recording':
 		case 'speaking':
 		case 'skoll-speaking':
 			return SPRITE_PEAK_LEVEL;
 	}
-}
-
-// Mic RMS at which the corona reads fully flared; conversational speech peaks well below 1.0 raw.
-const FLARE_FULL_RMS = 0.3;
-
-/** Corona flare level (0..1) from a raw mic RMS amplitude. Garbage in (NaN/negative) reads as
- * silence and over-scale readings clamp to full — CSS never sees an out-of-range value. */
-export function flareLevel(amplitude: number): number {
-	if (Number.isNaN(amplitude) || amplitude <= 0) return 0;
-	return Math.min(1, amplitude / FLARE_FULL_RMS);
 }

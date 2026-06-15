@@ -19,38 +19,35 @@ describe('viewState — round-trip', () => {
 	it('reads back exactly what was written for the same round', () => {
 		writeViewState(ROUND, {
 			crossings: [3, 7, 11],
-			answer: 'No. Sól is not reaching for fire.',
-			voiceInvited: true
+			answer: 'No. Sól is not reaching for fire.'
 		});
 		expect(readViewState(ROUND)).toEqual({
 			crossings: [3, 7, 11],
-			answer: 'No. Sól is not reaching for fire.',
-			voiceInvited: true
+			answer: 'No. Sól is not reaching for fire.'
 		});
 	});
 
 	it('stamps the round id into the single record so a new round overwrites it', () => {
-		writeViewState(ROUND, { crossings: [1], answer: 'a', voiceInvited: false });
-		writeViewState('round-xyz', { crossings: [2], answer: 'b', voiceInvited: true });
+		writeViewState(ROUND, { crossings: [1], answer: 'a' });
+		writeViewState('round-xyz', { crossings: [2], answer: 'b' });
 		// One key, last write wins — the prior round's data is gone, not accumulated.
 		expect(readViewState(ROUND)).toBeNull();
 		expect(readViewState('round-xyz')).toEqual({
 			crossings: [2],
-			answer: 'b',
-			voiceInvited: true
+			answer: 'b'
 		});
 	});
 });
 
 describe('viewState — round scoping', () => {
 	it('returns null when the stored record belongs to a different round', () => {
-		writeViewState(ROUND, { crossings: [5], answer: 'stale', voiceInvited: false });
+		writeViewState(ROUND, { crossings: [5], answer: 'stale' });
 		// A fresh secret means a different token — the stale view must not resume onto it.
 		expect(readViewState('a-different-round')).toBeNull();
 	});
 
 	it('returns null and writes nothing when the round id is empty', () => {
-		writeViewState('', { crossings: [1], answer: 'x', voiceInvited: false });
+		writeViewState('', { crossings: [1], answer: 'x' });
 		expect(localStorage.getItem(KEY)).toBeNull();
 		expect(readViewState('')).toBeNull();
 	});
@@ -65,23 +62,19 @@ describe('viewState — malformed records', () => {
 		{ label: 'not JSON', raw: 'not-json{' },
 		{
 			label: 'crossings not an array',
-			raw: JSON.stringify({ roundId: ROUND, crossings: 5, answer: 'a', voiceInvited: false })
+			raw: JSON.stringify({ roundId: ROUND, crossings: 5, answer: 'a' })
 		},
 		{
 			label: 'a non-number crossing',
-			raw: JSON.stringify({ roundId: ROUND, crossings: ['x'], answer: 'a', voiceInvited: false })
+			raw: JSON.stringify({ roundId: ROUND, crossings: ['x'], answer: 'a' })
 		},
 		{
 			label: 'answer not a string',
-			raw: JSON.stringify({ roundId: ROUND, crossings: [], answer: 7, voiceInvited: false })
-		},
-		{
-			label: 'voiceInvited not a boolean (a pre-S6 record)',
-			raw: JSON.stringify({ roundId: ROUND, crossings: [], answer: 'a' })
+			raw: JSON.stringify({ roundId: ROUND, crossings: [], answer: 7 })
 		},
 		{
 			label: 'roundId missing',
-			raw: JSON.stringify({ crossings: [], answer: 'a', voiceInvited: false })
+			raw: JSON.stringify({ crossings: [], answer: 'a' })
 		},
 		{ label: 'a bare null', raw: 'null' }
 	])('returns null for $label rather than throwing', ({ raw }) => {
@@ -103,8 +96,6 @@ describe('viewState — storage failure degrades, never throws', () => {
 		vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
 			throw new DOMException('quota');
 		});
-		expect(() =>
-			writeViewState(ROUND, { crossings: [1], answer: 'a', voiceInvited: false })
-		).not.toThrow();
+		expect(() => writeViewState(ROUND, { crossings: [1], answer: 'a' })).not.toThrow();
 	});
 });

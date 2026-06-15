@@ -16,8 +16,6 @@ export interface ViewState {
 	crossings: number[];
 	/** The single Oracle line currently voiced in the Rite panel. */
 	answer: string;
-	/** Whether the Oracle has spoken her wake invitation this round — a reload resumes silent. */
-	voiceInvited: boolean;
 }
 
 function isViewRecord(value: unknown): value is ViewState & { roundId: string } {
@@ -26,7 +24,6 @@ function isViewRecord(value: unknown): value is ViewState & { roundId: string } 
 	return (
 		typeof record.roundId === 'string' &&
 		typeof record.answer === 'string' &&
-		typeof record.voiceInvited === 'boolean' &&
 		Array.isArray(record.crossings) &&
 		record.crossings.every((id) => typeof id === 'number')
 	);
@@ -42,8 +39,7 @@ export function readViewState(roundId: string): ViewState | null {
 		if (!isViewRecord(parsed) || parsed.roundId !== roundId) return null;
 		return {
 			crossings: parsed.crossings,
-			answer: parsed.answer,
-			voiceInvited: parsed.voiceInvited
+			answer: parsed.answer
 		};
 	} catch {
 		return null; // unparseable or storage unavailable — degrade to no restore

@@ -1,5 +1,4 @@
 import { render } from 'vitest-browser-svelte';
-import { userEvent } from 'vitest/browser';
 import { describe, it, expect, vi } from 'vitest';
 import EclipseMedallion from '$lib/components/EclipseMedallion.svelte';
 import {
@@ -9,21 +8,18 @@ import {
 } from '$lib/components/medallionState';
 
 // The browser context runs with reducedMotion: 'reduce' (vite.config.ts), so every assertion
-// here describes the reduced-motion contract: static glow intensities, no pulse/orbit.
+// here describes the reduced-motion contract: static glow intensities, no pulse.
 
-// Derived from the source mapping so a seventh state can't ship untested here;
-// medallionState.test.ts pins the union's exact membership.
+// Derived from the source mapping so a new state can't ship untested here.
 const ALL_STATES = Object.keys(MEDALLION_LABEL) as MedallionState[];
 
-// Scoped to the render's own container: several tests mount more than one medallion, and a
-// page-wide testid locator would trip strict mode on the second mount.
-const renderMedallion = (state: MedallionState, amplitude = 0, onToggle = vi.fn()) => {
-	const screen = render(EclipseMedallion, { state, amplitude, onToggle });
+const renderMedallion = (state: MedallionState, onHoldStart = vi.fn(), onHoldEnd = vi.fn()) => {
+	const screen = render(EclipseMedallion, { state, onHoldStart, onHoldEnd });
 	const button = screen.container.querySelector<HTMLButtonElement>(
 		'[data-testid="eclipse-medallion"]'
 	);
 	if (!button) throw new Error('medallion did not render');
-	return { screen, button, onToggle };
+	return { screen, button, onHoldStart, onHoldEnd };
 };
 
 const layer = (button: HTMLElement, selector: string) => {
@@ -32,7 +28,12 @@ const layer = (button: HTMLElement, selector: string) => {
 	return el;
 };
 
-describe('EclipseMedallion — labeled button (R6)', () => {
+const press = (button: HTMLElement) =>
+	button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+const release = (button: HTMLElement) =>
+	button.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+
+describe('EclipseMedallion — hold-to-record button (R6)', () => {
 	it.each(ALL_STATES.map((state) => ({ state })))(
 		'is a button labeled for the $state state',
 		async ({ state }) => {
@@ -44,53 +45,42 @@ describe('EclipseMedallion — labeled button (R6)', () => {
 	);
 
 	it('is a non-submitting button carrying its state as data for styling', () => {
-		const { button } = renderMedallion('listening');
+		const { button } = renderMedallion('idle');
 		expect(button.type).toBe('button');
-		expect(button.dataset.voiceState).toBe('listening');
+		expect(button.dataset.voiceState).toBe('idle');
 	});
 
-	it('fires onToggle once per tap', async () => {
-		const { screen, onToggle } = renderMedallion('asleep');
-		await screen.getByTestId('eclipse-medallion').click();
-		expect(onToggle).toHaveBeenCalledOnce();
+	it('fires onHoldStart on press and onHoldEnd on release', () => {
+		const { button, onHoldStart, onHoldEnd } = renderMedallion('idle');
+		press(button);
+		expect(onHoldStart).toHaveBeenCalledOnce();
+		expect(onHoldEnd).not.toHaveBeenCalled();
+		release(button);
+		expect(onHoldEnd).toHaveBeenCalledOnce();
 	});
 
-	it.each([
-		{ key: 'Enter', press: '{Enter}' },
-		{ key: 'Space', press: ' ' }
-	])('wakes from the keyboard — $key fires onToggle like a tap', async ({ press }) => {
-		const { button, onToggle } = renderMedallion('asleep');
-		button.focus();
-		await userEvent.keyboard(press);
-		expect(onToggle).toHaveBeenCalledOnce();
+	it('ends the hold if the pointer leaves the disc mid-press', () => {
+		const { button, onHoldEnd } = renderMedallion('idle');
+		press(button);
+		button.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true, pointerId: 1 }));
+		expect(onHoldEnd).toHaveBeenCalledOnce();
 	});
 
-	it('swallows keyboard activation while eclipsed — the seal holds without a pointer too (S4)', async () => {
-		const { button, onToggle } = renderMedallion('eclipsed');
-		button.focus();
-		await userEvent.keyboard('{Enter}');
-		await userEvent.keyboard(' ');
-		expect(onToggle).not.toHaveBeenCalled();
+	it('a stray release with no matching press does nothing', () => {
+		const { button, onHoldEnd } = renderMedallion('idle');
+		release(button);
+		expect(onHoldEnd).not.toHaveBeenCalled();
 	});
 
-	it('swallows the tap while eclipsed — the seal is inert whatever the page wires in (S4)', async () => {
-		const { screen, button, onToggle } = renderMedallion('eclipsed');
-		// force: aria-disabled makes Playwright refuse the click, but a real pointer still lands —
-		// the guard under test is the component's own.
-		await screen.getByTestId('eclipse-medallion').click({ force: true });
-		expect(onToggle).not.toHaveBeenCalled();
+	it('refuses the hold while denied — the seal is inert', () => {
+		const { button, onHoldStart } = renderMedallion('denied');
+		press(button);
+		expect(onHoldStart).not.toHaveBeenCalled();
 		expect(button.getAttribute('aria-disabled')).toBe('true');
 	});
 
-	it('stays an enabled-but-inert button while eclipsed — focusable so the label can explain', () => {
-		const { button } = renderMedallion('eclipsed');
-		// disabled would drop it from the tab order; the sealed state must remain discoverable.
-		expect(button.disabled).toBe(false);
-		expect(getComputedStyle(button).cursor).toBe('default');
-	});
-
 	it('hides every visual layer from assistive tech — the label is the whole story', () => {
-		const { button } = renderMedallion('hearing', 0.2);
+		const { button } = renderMedallion('idle');
 		expect(layer(button, '.visual').getAttribute('aria-hidden')).toBe('true');
 		const ringRunes = button.querySelectorAll('img.ring-rune');
 		expect(ringRunes).toHaveLength(8);
@@ -99,62 +89,46 @@ describe('EclipseMedallion — labeled button (R6)', () => {
 });
 
 describe('EclipseMedallion — state visuals', () => {
-	it('etches the mic glyph while asleep; the Sköll eclipse stays hidden', () => {
-		const { button } = renderMedallion('asleep');
-		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('1');
+	it('etches the mic glyph while idle; the Sköll eclipse stays hidden', () => {
+		const { button } = renderMedallion('idle');
+		expect(Number(getComputedStyle(layer(button, '.mic-glyph')).opacity)).toBeGreaterThan(0);
 		expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('0');
-		// The strike is the eclipse seal's mark — it must never bleed into ordinary sleep.
+		// The strike is the denied seal's mark — it must never bleed into ordinary idle.
 		expect(getComputedStyle(layer(button, '.mic-strike')).display).toBe('none');
 	});
 
-	it('strikes the dimmed glyph while eclipsed — a shape signal that this is the seal, not sleep (S4)', () => {
-		const { button } = renderMedallion('eclipsed');
+	it('strikes the dimmed glyph while denied — a shape signal that this is the seal', () => {
+		const { button } = renderMedallion('denied');
 		expect(getComputedStyle(layer(button, '.mic-strike')).display).not.toBe('none');
 		const glyphOpacity = Number(getComputedStyle(layer(button, '.mic-glyph')).opacity);
 		expect(glyphOpacity).toBeGreaterThan(0);
 		expect(glyphOpacity).toBeLessThan(1);
 	});
 
-	it('kindles the corona while waking — pending, not asleep', () => {
-		const { button } = renderMedallion('waking');
-		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('0');
-		// Brighter than the asleep corona (base 0.08), or waking is indistinguishable from asleep.
-		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.08);
-	});
-
-	it('unveils the disc on listening — no mic glyph, corona lit', () => {
-		const { button } = renderMedallion('listening');
-		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('0');
-		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.2);
+	it('flares the corona while recording — the rite is hearing you', () => {
+		const { button } = renderMedallion('recording');
+		// Brighter than the idle breath, so recording reads as active capture.
+		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.4);
 	});
 
 	it('deepens the disc toward eclipse only while Sköll speaks — a brightness signal, not color alone', () => {
 		const { button } = renderMedallion('skoll-speaking');
-		// The dark overlay swallows the disc (the sun devoured) — visible only in this state.
 		expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('1');
-		// The ember palette swap rides the same state, but the deepening eclipse is the color-blind signal.
 		expect(getComputedStyle(button).getPropertyValue('--corona-rgb').trim()).toBe('200, 71, 63');
 	});
 
-	it('hides the eclipse overlay in every Oracle-side state', () => {
-		for (const state of ALL_STATES.filter((s) => s !== 'skoll-speaking')) {
-			const { button } = renderMedallion(state);
-			expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('0');
-		}
-	});
-
-	it('keeps the gold palette for every Oracle-side state', () => {
+	it('keeps the gold palette and hides the eclipse for every Oracle-side state', () => {
 		for (const state of ALL_STATES.filter((s) => s !== 'skoll-speaking')) {
 			const { button } = renderMedallion(state);
 			expect(getComputedStyle(button).getPropertyValue('--corona-rgb').trim()).toBe('217, 169, 74');
+			expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('0');
 		}
 	});
 });
 
 describe('EclipseMedallion — voice level strip disc', () => {
 	it('renders the level strip as the disc art once the page goes idle', async () => {
-		const { button } = renderMedallion('asleep');
-		// Deferred off the critical path (perf gate) — it must still arrive, idle or not.
+		const { button } = renderMedallion('idle');
 		await vi.waitFor(
 			() =>
 				expect(layer(button, '.disc').style.backgroundImage).toContain('voice-medallion-levels'),
@@ -163,14 +137,12 @@ describe('EclipseMedallion — voice level strip disc', () => {
 	});
 
 	it.each([
-		{ state: 'asleep' as const, amplitude: 0, level: '0' },
-		{ state: 'eclipsed' as const, amplitude: 0, level: '0' },
-		{ state: 'waking' as const, amplitude: 0, level: '2' },
-		{ state: 'hearing' as const, amplitude: 0.15, level: '6' },
-		{ state: 'hearing' as const, amplitude: 0.3, level: '11' },
-		{ state: 'speaking' as const, amplitude: 0, level: '11' }
-	])('points $state (amp $amplitude) at strip level $level', ({ state, amplitude, level }) => {
-		const { button } = renderMedallion(state, amplitude);
+		{ state: 'denied' as const, level: '0' },
+		{ state: 'idle' as const, level: '4' },
+		{ state: 'recording' as const, level: '11' },
+		{ state: 'speaking' as const, level: '11' }
+	])('points $state at strip level $level', ({ state, level }) => {
+		const { button } = renderMedallion(state);
 		expect(button.style.getPropertyValue('--sprite-level')).toBe(level);
 	});
 
@@ -178,108 +150,43 @@ describe('EclipseMedallion — voice level strip disc', () => {
 		const { button } = renderMedallion('speaking');
 		const disc = getComputedStyle(layer(button, '.disc'));
 		expect(disc.backgroundSize).toBe(`${SPRITE_LEVELS * 100}% 100%`);
-		// Peak level resolves to the strip's last frame; asleep to its first.
 		expect(disc.backgroundPosition).toBe('100% 0%');
-		const asleep = renderMedallion('asleep');
-		expect(getComputedStyle(layer(asleep.button, '.disc')).backgroundPosition).toBe('0% 0%');
-	});
-
-	it('loads the strip through the setTimeout fallback when requestIdleCallback is missing', async () => {
-		const original = window.requestIdleCallback;
-		// @ts-expect-error -- removing the API entirely; stubbing undefined won't beat `in window`
-		delete window.requestIdleCallback;
-		try {
-			const { button } = renderMedallion('asleep');
-			await vi.waitFor(
-				() =>
-					expect(layer(button, '.disc').style.backgroundImage).toContain('voice-medallion-levels'),
-				{ timeout: 3000 }
-			);
-		} finally {
-			window.requestIdleCallback = original;
-		}
-	});
-
-	it('freezes the playback loop under reduced motion — the static level stands in', () => {
-		for (const state of ['listening', 'speaking', 'skoll-speaking'] as const) {
-			const { button } = renderMedallion(state);
-			expect(getComputedStyle(layer(button, '.disc')).animationName).toBe('none');
-		}
-	});
-});
-
-describe('EclipseMedallion — amplitude flare (hearing)', () => {
-	it.each([
-		{ label: 'half-scale speech', amplitude: 0.15, flare: '0.5' },
-		{ label: 'an over-scale amplitude clamped to full', amplitude: 5, flare: '1' },
-		{ label: 'a negative amplitude clamped to silence', amplitude: -2, flare: '0' },
-		{ label: 'NaN read as silence', amplitude: Number.NaN, flare: '0' }
-	])('drives --flare from $label', ({ amplitude, flare }) => {
-		const { button } = renderMedallion('hearing', amplitude);
-		expect(button.style.getPropertyValue('--flare')).toBe(flare);
+		const denied = renderMedallion('denied');
+		expect(getComputedStyle(layer(denied.button, '.disc')).backgroundPosition).toBe('0% 0%');
 	});
 });
 
 describe('EclipseMedallion — reduced motion (R6)', () => {
 	it.each([
-		{ state: 'listening' as const, selector: '.corona', why: 'breathing pulse' },
+		{ state: 'idle' as const, selector: '.corona', why: 'breathing pulse' },
+		{ state: 'recording' as const, selector: '.corona', why: 'recording pulse' },
 		{ state: 'speaking' as const, selector: '.corona', why: 'voice pulse' },
 		{ state: 'skoll-speaking' as const, selector: '.corona', why: 'ember pulse' },
-		{ state: 'thinking' as const, selector: '.rune-ring', why: 'ring orbit' }
+		{ state: 'speaking' as const, selector: '.disc', why: 'playback loop' }
 	])('replaces the $why with a static glow in the $state state', ({ state, selector }) => {
 		const { button } = renderMedallion(state);
-		const el = layer(button, selector);
-		expect(getComputedStyle(el).animationName).toBe('none');
-	});
-
-	it('pins the hearing flare to a static intensity — amplitude must not move the glow', () => {
-		const loud = renderMedallion('hearing', 0.3);
-		const quiet = renderMedallion('hearing', 0.01);
-		const loudCorona = getComputedStyle(layer(loud.button, '.corona'));
-		const quietCorona = getComputedStyle(layer(quiet.button, '.corona'));
-		expect(loudCorona.opacity).toBe(quietCorona.opacity);
-		expect(loudCorona.transform).toBe('none');
-	});
-
-	it('ignites the rim runes on hearing — brighter than their listening rest', () => {
-		const hearing = renderMedallion('hearing', 0.2);
-		const listening = renderMedallion('listening');
-		const ignited = Number(getComputedStyle(layer(hearing.button, '.ring-rune')).opacity);
-		const resting = Number(getComputedStyle(layer(listening.button, '.ring-rune')).opacity);
-		expect(ignited).toBeGreaterThan(resting);
+		expect(getComputedStyle(layer(button, selector)).animationName).toBe('none');
 	});
 });
 
 describe('EclipseMedallion — state announcements', () => {
-	it('announces the privacy-critical transitions and holds quiet through an exchange', async () => {
+	it('announces each state via a polite status region', async () => {
 		const screen = render(EclipseMedallion, {
-			state: 'asleep' as MedallionState,
-			amplitude: 0,
-			onToggle: vi.fn()
+			state: 'idle' as MedallionState,
+			onHoldStart: vi.fn(),
+			onHoldEnd: vi.fn()
 		});
 		const status = screen.getByTestId('medallion-status');
-		await expect.element(status).toHaveTextContent('The voice sleeps.');
+		await expect.element(status).toHaveTextContent('Ready to hear you.');
 
-		await screen.rerender({ state: 'listening' });
-		await expect.element(status).toHaveTextContent('The Oracle listens.');
-
-		// hearing and thinking are still "listening" to the player — the line must hold steady.
-		await screen.rerender({ state: 'hearing', amplitude: 0.2 });
-		await expect.element(status).toHaveTextContent('The Oracle listens.');
-		await screen.rerender({ state: 'thinking' });
-		await expect.element(status).toHaveTextContent('The Oracle listens.');
+		await screen.rerender({ state: 'recording' });
+		await expect.element(status).toHaveTextContent('Listening.');
 
 		await screen.rerender({ state: 'speaking' });
 		await expect.element(status).toHaveTextContent('The Oracle speaks.');
 		await screen.rerender({ state: 'skoll-speaking' });
 		await expect.element(status).toHaveTextContent('Sköll speaks.');
-		await screen.rerender({ state: 'asleep' });
-		await expect.element(status).toHaveTextContent('The voice sleeps.');
-	});
 
-	it('narrates politely — a status region, never an interrupting alert', () => {
-		const { screen } = renderMedallion('asleep');
-		const status = screen.getByTestId('medallion-status').element();
-		expect(status.getAttribute('role')).toBe('status');
+		expect(status.element().getAttribute('role')).toBe('status');
 	});
 });
