@@ -312,6 +312,8 @@
 	// Audio output on/off (voice-as-delivery). Off until the toggle opens the delivery speaker (a
 	// gesture). Independent of the mic: you can hold to ask with audio off and read the answer.
 	let audioOn = $state(false);
+	let holdWanted = false;
+	let holdSetupPending = false;
 
 	// Drive the medallion's voice from delivery playback: a line begins → its speaker; the queue
 	// drains → back to idle (unless a hold/transcribe is mid-flight, which owns the state then).
@@ -351,11 +353,21 @@
 			medalState = 'denied';
 			return;
 		}
-		if (medalState === 'recording' || medalState === 'thinking') return; // already mid-turn
+		if (holdWanted || holdSetupPending || medalState === 'recording' || medalState === 'thinking') {
+			return;
+		}
+		holdWanted = true;
+		holdSetupPending = true;
 		const verdict = await startRecording();
+		holdSetupPending = false;
 		if (!verdict.ok) {
+			holdWanted = false;
 			medalState = 'denied';
 			voiceNotice = RITE.micDenied;
+			return;
+		}
+		if (!holdWanted) {
+			await finishHold();
 			return;
 		}
 		medalState = 'recording';
@@ -364,7 +376,13 @@
 	// Release: stop recording, transcribe the utterance, and run it as a normal Ask. A failed/empty
 	// transcription degrades to nothing (no turn spent), never throws.
 	async function endHold() {
-		if (medalState !== 'recording') return;
+		if (!holdWanted && !holdSetupPending && medalState !== 'recording') return;
+		holdWanted = false;
+		if (holdSetupPending || medalState !== 'recording') return;
+		await finishHold();
+	}
+
+	async function finishHold() {
 		medalState = 'thinking';
 		let heard = '';
 		try {

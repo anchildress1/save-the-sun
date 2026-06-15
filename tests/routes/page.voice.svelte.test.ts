@@ -149,6 +149,30 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 		expect(screen.container.querySelector<HTMLInputElement>('#oracle-ask')!.value).toBe('');
 	});
 
+	it('honors a release that happens before mic setup finishes', async () => {
+		let finishSetup: (value: { ok: true }) => void = () => {};
+		recorderMock.startRecording.mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					finishSetup = resolve;
+				})
+		);
+		const screen = render(Page, pageProps);
+
+		press(screen);
+		release(screen);
+		expect(recorderMock.stopRecording).not.toHaveBeenCalled();
+
+		finishSetup({ ok: true });
+		await vi.waitFor(() => expect(recorderMock.stopRecording).toHaveBeenCalledOnce());
+		await vi.waitFor(() =>
+			expect(actionBodies()).toContainEqual(
+				expect.objectContaining({ type: 'Ask', question: 'is it a fire rune' })
+			)
+		);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
 	it('hold Space anywhere records; release asks — the same path as a tap', async () => {
 		const screen = render(Page, pageProps);
 		holdSpace();
