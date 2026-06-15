@@ -13,6 +13,11 @@ export const GLOBAL_LIMIT = 60;
 export const TTS_SESSION_LIMIT = 20;
 export const TTS_GLOBAL_LIMIT = 200;
 
+// Push-to-talk transcription: every held utterance is a Gemini call (no cache), so cap it near
+// minting — a legit player asks a handful of times a minute.
+export const STT_SESSION_LIMIT = 15;
+export const STT_GLOBAL_LIMIT = 120;
+
 interface Window {
 	count: number;
 	start: number;
@@ -81,6 +86,7 @@ function createLimiter(label: string, sessionLimit: number, globalLimit: number)
 
 const mint = createLimiter('token-mint', SESSION_LIMIT, GLOBAL_LIMIT);
 const tts = createLimiter('TTS', TTS_SESSION_LIMIT, TTS_GLOBAL_LIMIT);
+const transcribe = createLimiter('transcribe', STT_SESSION_LIMIT, STT_GLOBAL_LIMIT);
 
 /** Claim one token-mint slot for the session; a denial consumes nothing. */
 export const claimMintSlot = mint.claim;
@@ -91,3 +97,8 @@ export const resetMintWindows = mint.reset;
 export const claimTtsSlot = tts.claim;
 /** Test isolation only — the windows are module state shared across a test file. */
 export const resetTtsWindows = tts.reset;
+
+/** Claim one push-to-talk transcription slot for the session; a denial consumes nothing. */
+export const claimTranscribeSlot = transcribe.claim;
+/** Test isolation only — the windows are module state shared across a test file. */
+export const resetTranscribeWindows = transcribe.reset;
