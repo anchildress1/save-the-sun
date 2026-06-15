@@ -114,11 +114,11 @@ The original S12 (a prebuilt clip library) was built then **reverted**. Two reas
 
 His **Ask** is now voiced through the shared TTS route in his voice, not a clip director.
 
-- [x] His Ask (a game move) is voiced + written — `skoll-ask` line descriptor (`lines.ts`) recomposes his line server-side from the parked `query` via `skollAskEcho`; `tts.ts` voices it in `SKOLL_VOICE`; the page delivers it through the same `deliver()` seam as the Oracle. If the Live mic is awake, the page waits for the Oracle to settle, holds mic forwarding, voices him, then resumes. Written on his frame (`skoll-echo`, R10).
+- [x] His Ask (a game move) is voiced + written — `skoll-ask` line descriptor (`lines.ts`) recomposes his line server-side from the parked `query` via `skollAskEcho`; `tts.ts` voices it in `SKOLL_VOICE`; the page delivers it through the same `deliver()` seam as the Oracle. Written on his frame (`skoll-echo`, R10).
 - [x] One speaker at a time — structural: Oracle + Sköll share the one TTS delivery seam, so his line serializes after hers, never overlapping (R9).
 - [~] His winning cast (a game move naming `{Rune}`) — **deferred**: voice it the same way once the rune rides the `Advance` wire, with a caption (`ttd.md`).
 - [~] Taunt/address detection → wolf, idle/hunt ambience triggers — **deferred** with the ambience layer (taunt needs a spoken input; idle is a client timer).
-- [x] Mic discipline during Sköll playback — his line lives on the delivery speaker, so the page waits for her Live line to drain (`voiceSession.whenSettled`), holds the mic (`hold()` pauses forwarding **and** the R7 clock), plays his line, then `resume()`s. No token mint, no reconnect; the loss outcome (his voice) rides the same path.
+- [x] Mic discipline during Sköll playback — retired with Live. Sköll and the Oracle now share the one delivery speaker, so their lines serialize through `deliver()`; the medallion mirrors the active speaker from delivery events. No socket, token mint, or mic-forwarding pause exists in the push-to-talk path.
 - Depends: S2, S12
 
 ---

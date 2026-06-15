@@ -124,8 +124,8 @@ His voice is `Algieba` (distinct from the Oracle's `Gacrux`). His lines split by
 - [ ] **Ambience as prebuilt clips** (deferred): the taunt buckets (`ux-copy.md` §2 — splash open, idle, hunt mood) ship later as static clips played as-is, **audio-only** (no caption, per the revised R10 — ambience carries no game state). Build-time generation, runtime playback only, zero per-game calls. The taunt-address bucket needs a spoken input → returns with the mic (P5).
 
 **R9 — One speaker; mic discipline.**
-- [x] One speaker at a time: Sköll never speaks over the Oracle. With the mic asleep both voices ride the **same** delivery speaker, serialized. With the mic awake the Oracle is on the Live speaker and Sköll on delivery, so the page waits for her Live line to drain (`voiceSession.whenSettled`) before his plays.
-- [x] Given a Sköll line is playing, mic audio to the Oracle session is paused — `voiceSession.hold()` stops forwarding mic chunks (and pauses the R7 clock) for the duration, then `resume()`; the socket stays open, no token mint.
+- [x] One speaker at a time: Sköll never speaks over the Oracle. Both voices ride the **same** delivery speaker, serialized through `deliver()`.
+- [x] Given a Sköll line is playing, mic audio to an Oracle Live session is no longer relevant — Live was retired. Push-to-talk records only while held, then sends a finished utterance for transcription; playback is delivery-only.
 
 **R10 — Every game move is written.** *(revised 2026-06-14.)*
 Voice never solely carries game information. Every **game move** — an Ask and its answer, a reaction (Scry/Hex/Pass), a cast and its outcome, a win or loss — renders as text regardless of audio. **Ambience is exempt**: atmospheric Sköll voice (the splash open, idle waiting, the closing-hunt mood) carries no game state, so it is **audio-only flavor and does not caption**. The test is *information, not who speaks*: if a line tells you what happened in the rite, it is written; if it only sets mood, it may be heard and not seen.
