@@ -1813,3 +1813,66 @@ describe('voiceSession output mute (S11)', () => {
 		expect(speaker.setMuted).not.toHaveBeenCalled();
 	});
 });
+
+describe('voiceSession mic discipline (R9)', () => {
+	beforeEach(async () => {
+		await awaken();
+		events = [];
+	});
+
+	it('hold() stops forwarding mic chunks; resume() restores it', () => {
+		vs.hold();
+		micChunk!('YmFzZTY0', 0.5);
+		expect(liveSession.sendRealtimeInput).not.toHaveBeenCalled();
+		// Held also means no hearing transition — the wolf's clip must not read as the player.
+		expect(vs.state).toBe('listening');
+
+		vs.resume();
+		micChunk!('YmFzZTY0', 0.5);
+		expect(liveSession.sendRealtimeInput).toHaveBeenCalledTimes(1);
+	});
+
+	it('whenSettled resolves immediately while listening', async () => {
+		expect(vs.state).toBe('listening');
+		await expect(vs.whenSettled()).resolves.toBeUndefined();
+	});
+
+	it('whenSettled waits for an in-flight turn to settle back to listening', async () => {
+		micChunk!('a', 0.5);
+		micChunk!('b', 0.001);
+		await vi.advanceTimersByTimeAsync(800);
+		expect(vs.state).toBe('thinking');
+
+		let settled = false;
+		void vs.whenSettled().then(() => {
+			settled = true;
+		});
+		await Promise.resolve();
+		expect(settled).toBe(false);
+
+		// Her turn completes with no audio pending → settles to listening.
+		callbacks!.onmessage({ serverContent: { turnComplete: true } });
+		await Promise.resolve();
+		expect(vs.state).toBe('listening');
+		expect(settled).toBe(true);
+	});
+
+	it('a hold does not survive teardown — the next wake starts forwarding', async () => {
+		vs.hold();
+		vs.sleep();
+		await awaken();
+		micChunk!('YmFzZTY0', 0.5);
+		expect(liveSession.sendRealtimeInput).toHaveBeenCalledTimes(1);
+	});
+
+	it('hold() pauses the R7 silence clock; resume() restarts it (S5/R9)', async () => {
+		// awaken left the session listening with the 5s clock running.
+		vs.hold();
+		await vi.advanceTimersByTimeAsync(5000);
+		expect(vs.state).toBe('listening'); // held — the wolf's line never idles the session
+
+		vs.resume();
+		await vi.advanceTimersByTimeAsync(5000);
+		expect(vs.state).toBe('asleep'); // a fresh window fired once the player's turn resumed
+	});
+});

@@ -20,6 +20,9 @@ const voiceMock = vi.hoisted(() => {
 		setToolExecutor: vi.fn(),
 		direct: vi.fn(),
 		setMuted: vi.fn(),
+		hold: vi.fn(),
+		resume: vi.fn(),
+		whenSettled: vi.fn(async () => {}),
 		emit(event: unknown) {
 			for (const listener of listeners) listener(event);
 		}
@@ -33,6 +36,9 @@ vi.mock('$lib/voice/voiceSession', () => ({
 		setToolExecutor: voiceMock.setToolExecutor,
 		direct: voiceMock.direct,
 		setMuted: voiceMock.setMuted,
+		hold: voiceMock.hold,
+		resume: voiceMock.resume,
+		whenSettled: voiceMock.whenSettled,
 		get state() {
 			return voiceMock.state;
 		},
@@ -1297,7 +1303,7 @@ describe('Save the Sun page — destructive confirmation gate (S8)', () => {
 		render(Page, reactProps);
 		await executor()({ name: 'hex', args: {} });
 		const outcome = await executor()({ name: 'pass', args: {} });
-		expect(outcome).toBe('You hold your hand; I give Sköll his answer.');
+		expect(outcome).toBe('You stay your hand; Sköll gets his answer.');
 		expect(actionBodies()).toEqual([{ type: 'React', player: 'Human', reaction: 'Pass' }]);
 	});
 
@@ -1942,7 +1948,48 @@ describe('Save the Sun page — Sköll voiced via TTS (rework)', () => {
 			.toHaveTextContent('I scent a fire rune on her.');
 	});
 
-	it('writes his Ask but does not voice it while the Live session is mid-turn (not idle)', async () => {
+	it('holds the mic and voices his Ask once the Live session settles (R9)', async () => {
+		const SKOLL_TURN: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		let releaseDrain: () => void = () => {};
+		deliveryMock.whenDrained.mockReturnValueOnce(
+			new Promise<void>((resolve) => {
+				releaseDrain = resolve;
+			})
+		);
+		mockAskThenSkollAsk(SKOLL_TURN);
+		// Mic awake: he lives on the delivery speaker, so the page waits for her line to drain
+		// (whenSettled), holds the mic, plays his line, then resumes — never dropped.
+		voiceMock.state = 'listening';
+
+		const screen = render(Page, pageProps);
+		const medallion = screen.getByTestId('eclipse-medallion');
+		await screen.getByTestId('mute-toggle').click(); // audio on
+		await screen.getByLabelText('Ask the Oracle').fill('is it a sun rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+
+		await expect
+			.element(screen.getByTestId('skoll-echo'))
+			.toHaveTextContent('I scent a fire rune on her.'); // written (R10)
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'skoll-ask', query: ASK_QUERY })
+		);
+		// The mic was held for his line and resumed after — the Oracle never hears the wolf.
+		expect(voiceMock.whenSettled).toHaveBeenCalled();
+		expect(voiceMock.hold).toHaveBeenCalled();
+		await expect.element(medallion).toHaveAttribute('data-voice-state', 'skoll-speaking');
+		expect(voiceMock.resume).not.toHaveBeenCalled();
+
+		releaseDrain();
+		await vi.waitFor(() => expect(voiceMock.resume).toHaveBeenCalled());
+		await expect.element(medallion).toHaveAttribute('data-voice-state', 'listening');
+	});
+
+	it('voices his Ask directly when the mic is asleep — no hold needed (one speaker)', async () => {
 		const SKOLL_TURN: GameState = {
 			activePlayer: 'Sköll',
 			status: 'active',
@@ -1950,17 +1997,17 @@ describe('Save the Sun page — Sköll voiced via TTS (rework)', () => {
 			turns: 1
 		};
 		mockAskThenSkollAsk(SKOLL_TURN);
-		// A non-idle Live state: a TTS line would collide, so his Ask is not voiced (gated by liveIdle).
-		voiceMock.state = 'speaking';
+		// voiceMock.state defaults to 'asleep'.
 
 		const screen = render(Page, pageProps);
+		await screen.getByTestId('mute-toggle').click(); // audio on, mic asleep
 		await screen.getByLabelText('Ask the Oracle').fill('is it a sun rune?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
 
-		await expect
-			.element(screen.getByTestId('skoll-echo'))
-			.toHaveTextContent('I scent a fire rune on her.'); // still written (R10)
-		expect(deliveryMock.deliver).not.toHaveBeenCalledWith({ kind: 'skoll-ask', query: ASK_QUERY });
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'skoll-ask', query: ASK_QUERY })
+		);
+		expect(voiceMock.hold).not.toHaveBeenCalled();
 	});
 });
 
@@ -2048,14 +2095,24 @@ describe('Save the Sun page — cast lines voiced (R10)', () => {
 describe('Save the Sun page — outcome voiced (R10)', () => {
 	it('voices the win outcome in the Oracle’s voice once the splash shows', async () => {
 		const WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 4 };
+		let releaseOutcomeDrain: () => void = () => {};
+		deliveryMock.whenDrained.mockResolvedValueOnce(undefined).mockReturnValueOnce(
+			new Promise<void>((resolve) => {
+				releaseOutcomeDrain = resolve;
+			})
+		);
 		mockAction({ type: 'Cast', cast: { ok: true, won: true, turnConsumed: true }, state: WON });
 		const screen = render(Page, pageProps);
+		const medallion = screen.getByTestId('eclipse-medallion');
 		await screen.getByTestId('mute-toggle').click(); // audio on
 		await startBoardCast(screen);
 
 		await vi.waitFor(() =>
 			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'outcome', result: 'win' })
 		);
+		await expect.element(medallion).not.toHaveAttribute('data-voice-state', 'skoll-speaking');
+		releaseOutcomeDrain();
+		await expect.element(medallion).toHaveAttribute('data-voice-state', 'asleep');
 	});
 
 	it('does not voice the outcome while audio is off (the once-guard stays armed)', async () => {
@@ -2074,6 +2131,12 @@ describe('Save the Sun page — outcome voiced (R10)', () => {
 			winner: 'Sköll',
 			turns: 5
 		};
+		let releaseOutcomeDrain: () => void = () => {};
+		deliveryMock.whenDrained.mockResolvedValueOnce(undefined).mockReturnValueOnce(
+			new Promise<void>((resolve) => {
+				releaseOutcomeDrain = resolve;
+			})
+		);
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
 			const body = JSON.parse(String(init?.body ?? '{}'));
@@ -2096,12 +2159,19 @@ describe('Save the Sun page — outcome voiced (R10)', () => {
 			);
 		});
 		const screen = render(Page, pageProps);
+		const medallion = screen.getByTestId('eclipse-medallion');
 		await screen.getByTestId('mute-toggle').click(); // audio on
 		await screen.getByLabelText('Ask the Oracle').fill('is it a sun rune?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
 
 		await vi.waitFor(() =>
 			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'outcome', result: 'lose' })
+		);
+		await expect.element(medallion).toHaveAttribute('data-voice-state', 'skoll-speaking');
+
+		releaseOutcomeDrain();
+		await vi.waitFor(() =>
+			expect(medallion.element().getAttribute('data-voice-state')).toBe('asleep')
 		);
 	});
 });

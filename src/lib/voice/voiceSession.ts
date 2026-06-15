@@ -80,6 +80,16 @@ export interface VoiceSession {
 	/** Output mute (R11): silence the Oracle's audio while captions, mic, and the state machine
 	 * carry on. Persists across wake/sleep; a speaker opened while muted starts silent. */
 	setMuted(muted: boolean): void;
+	/** Mic discipline during Sköll playback (R9): stop forwarding mic audio on the still-open
+	 * socket so the wolf's line can play without the Oracle hearing it or starting a turn over it.
+	 * No token mint, no reconnect — {@link resume} undoes it. A no-op while asleep/eclipsed. */
+	hold(): void;
+	/** Undo {@link hold}: resume forwarding mic audio. */
+	resume(): void;
+	/** Resolve once the session is settled — listening, asleep, or eclipsed (i.e. no Oracle turn
+	 * in flight) — so a caller can wait for her line to finish before playing over it. Resolves
+	 * immediately when already settled. */
+	whenSettled(): Promise<void>;
 	readonly state: VoiceState;
 	readonly notice: string | null;
 	readonly muted: boolean;
@@ -119,6 +129,11 @@ export function createVoiceSession(): VoiceSession {
 	let speaker: Speaker | null = null;
 	// Survives wake/sleep so a muted player stays muted across every resume this session.
 	let muted = false;
+	// Mic discipline (R9): while held, captured mic chunks are not forwarded to Live — the wolf's
+	// line plays without the Oracle hearing it. The socket stays open; resume() lifts it.
+	let micPaused = false;
+	// Resolved when the session next settles (listening/asleep/eclipsed) — see whenSettled.
+	const settledWaiters = new Set<() => void>();
 	let lastAmplitude = 0;
 	let awaitingDrain = false;
 	let hearingQuietTimer: ReturnType<typeof setTimeout> | null = null;
@@ -175,6 +190,11 @@ export function createVoiceSession(): VoiceSession {
 		const prev = state;
 		const changed = prev !== next;
 		state = next;
+		// Settled = no Oracle turn in flight, so whenSettled() callers (the wolf's line) can play.
+		if (next === 'listening' || next === 'asleep' || next === 'eclipsed') {
+			for (const waiter of settledWaiters) waiter();
+			settledWaiters.clear();
+		}
 		// R7 clock runs only on the player's turn; hearing arms-if-unset so RMS never resets
 		// it, while a barge-in cutting straight from speaking still gets a fresh clock.
 		if (next === 'listening') restartSilenceClock();
@@ -203,6 +223,7 @@ export function createVoiceSession(): VoiceSession {
 		generation++;
 		liveReady = false;
 		awaitingDrain = false;
+		micPaused = false; // a held session that tears down must not resume paused
 		lastAmplitude = 0;
 		clearTimers();
 		sendFailureTeed = false;
@@ -292,6 +313,9 @@ export function createVoiceSession(): VoiceSession {
 
 	function onMicChunk(base64Pcm: string, amplitude: number): void {
 		if (!liveReady || !session) return;
+		// Held for a Sköll line (R9): keep capturing for the UI, but don't forward to Live so his
+		// clip can't be heard as input or start an Oracle turn over it.
+		if (micPaused) return;
 		lastAmplitude = amplitude;
 		try {
 			session.sendRealtimeInput({
@@ -712,6 +736,25 @@ export function createVoiceSession(): VoiceSession {
 		setMuted(next: boolean) {
 			muted = next;
 			speaker?.setMuted(next);
+		},
+		hold() {
+			// Only meaningful with a live mic; harmless otherwise.
+			if (!liveReady) return;
+			micPaused = true;
+			// Pause the R7 clock: the wolf's line playing is not the player's silence, so it must not
+			// idle the session out from under his turn.
+			clearSilenceClock();
+		},
+		resume() {
+			micPaused = false;
+			// Back on the player's turn — give them a fresh silence window.
+			if (state === 'listening' || state === 'hearing') restartSilenceClock();
+		},
+		whenSettled() {
+			if (state === 'listening' || state === 'asleep' || state === 'eclipsed') {
+				return Promise.resolve();
+			}
+			return new Promise<void>((resolve) => settledWaiters.add(resolve));
 		},
 		get state() {
 			return state;

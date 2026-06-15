@@ -154,11 +154,15 @@
 	// queued behind any cast line on the shared speaker. Once per round; reset by a new game.
 	let outcomeVoiced = false;
 	$effect(() => {
-		// Flip the once-guard only when the line is actually delivered (audio on + Live idle) — so if
-		// audio is off when the splash lands, a later toggle-on can still voice the outcome.
-		if (showEndScreen && !outcomeVoiced && audioOn && liveIdle()) {
+		// Flip the once-guard only when audio is on — so if audio is off when the splash lands, a later
+		// toggle-on can still voice the outcome. The loss verse is Sköll's, so it rides the mic-held
+		// path (never dropped while the Live mic is mid-turn); the win coda is the Oracle's, same path.
+		if (showEndScreen && !outcomeVoiced && audioOn) {
 			outcomeVoiced = true;
-			void deliver({ kind: 'outcome', result: endOutcome });
+			void voiceWithMicHeld(
+				{ kind: 'outcome', result: endOutcome },
+				endOutcome === 'lose' ? 'skoll-speaking' : null
+			);
 		}
 	});
 	let nightProgress = $derived(
@@ -300,7 +304,7 @@
 	);
 
 	// The medallion mirrors the voice session. Its state is a superset of VoiceState:
-	// 'skoll-speaking' arrives with the director, never from the session itself. The failure
+	// 'skoll-speaking' arrives from delivery, never from the session itself. The failure
 	// notice renders by the medallion — not in the Oracle's answer frame, which is her voiced
 	// surface and persists across reloads; a transient voice failure must do neither.
 	let voiceState = $state<MedallionState>('asleep');
@@ -444,10 +448,50 @@
 		return { kind: 'skoll-ask', query };
 	}
 
-	// A TTS line may only go out when the Live session is genuinely idle (asleep or listening) — any
-	// other state means Live is or is about to be voicing, and a server line would collide.
+	// The Oracle's own lines may only go out via TTS when the Live session is genuinely idle (asleep
+	// or listening) — any other state means Live is or is about to be voicing her, and a server line
+	// would collide. (Sköll is never in the Live session — see voiceSkoll.)
 	function liveIdle(): boolean {
 		return voiceSession.state === 'asleep' || voiceSession.state === 'listening';
+	}
+
+	// Cap the mic-hold so a stuck or silent clip can never strand the mic paused.
+	const MIC_HELD_CAP_MS = 8000;
+
+	async function deliverWithMedallion(line: LineDescriptor, state: MedallionState | null = null) {
+		if (state) voiceState = state;
+		try {
+			await deliver(line);
+			await whenDrained(MIC_HELD_CAP_MS);
+		} finally {
+			if (state && voiceState === state) voiceState = voiceSession.state;
+		}
+	}
+
+	// Voice a line that lives on the delivery speaker while the Live mic may be awake (R9 mic
+	// discipline). The Oracle's Live audio and a delivery clip are two separate outputs, so with the
+	// mic awake we wait for her line to drain (whenSettled), hold the mic (so the clip isn't heard as
+	// input or talked over), play it, then resume. Mic asleep ⇒ one speaker, no discipline needed.
+	// A no-op when audio is off (deliver no-ops without a speaker).
+	async function voiceWithMicHeld(line: LineDescriptor, state: MedallionState | null = null) {
+		if (!audioOn) return;
+		if (voiceSession.state === 'asleep' || voiceSession.state === 'eclipsed') {
+			void deliverWithMedallion(line, state);
+			return;
+		}
+		await voiceSession.whenSettled(); // let her Live audio finish before this plays
+		voiceSession.hold();
+		try {
+			await deliverWithMedallion(line, state);
+		} finally {
+			voiceSession.resume();
+		}
+	}
+
+	// Sköll's Ask and the loss outcome are voiced in his voice — never via the Oracle's Live session,
+	// so they ride the mic-held path above rather than the liveIdle gate her own lines use.
+	function voiceSkoll(query: unknown) {
+		return voiceWithMicHeld(skollVoice(query), 'skoll-speaking');
 	}
 
 	// Return type is derived from the action's `type`, so a caller can't request a
@@ -487,10 +531,9 @@
 			applyState(state);
 			applySkoll(skoll);
 			// His Ask is a game move (R10) — written on his frame and voiced in his own voice through the
-			// same delivery seam as the Oracle (the server recomposes his line from the query, so the
-			// route still voices only server-owned text). Gated to an idle Live session like her answer;
-			// deliver() itself no-ops when audio is off (no speaker), so no needless synth then.
-			if (skoll?.asks && liveIdle()) void deliver(skollVoice(skoll.asks.query));
+			// same delivery seam as the Oracle. He is never in the Live session, so voiceSkoll holds the
+			// mic around his line (R9) instead of dropping it whenever Live is mid-turn.
+			if (skoll?.asks) void voiceSkoll(skoll.asks.query);
 			// A Sköll win deliberately leaves the Oracle's last voiced line in place (the answer, and
 			// his Scry note when he overheard it) — that line is the WHY of the loss, and the end
 			// screen already owns the "Sköll takes the sun" text. Never double it into the panel.

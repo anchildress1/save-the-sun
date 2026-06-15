@@ -175,7 +175,7 @@ Local secrets live in `.env` (gitignored). Deployed, the key rides Google Secret
 
 ## What's Next
 
-- **v2 — the Oracle speaks:** the Oracle and Sköll are _voiced_ — every line is text in the panel and, with audio on, spoken via Gemini TTS. Hands-free voice input (speak your Ask, interrupt her) is an opt-in layer on top. Design + migration in [`docs/architecture.md`](docs/architecture.md#target-architecture--voice-as-delivery-planned).
+- **v2 — the Oracle speaks:** the Oracle and Sköll are _voiced_ — every line is text in the panel and, with audio on, spoken via Gemini TTS. Hands-free voice input (speak your Ask, interrupt her) is an opt-in layer on top. Design in [`docs/architecture.md`](docs/architecture.md#voice--input-the-live-mic-and-output-delivery).
 - Sköll escalation taunts wired to how close he is.
 
 ---

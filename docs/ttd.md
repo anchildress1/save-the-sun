@@ -1,7 +1,5 @@
 # Things to Do
 
-- [ ] Voice rearchitecture — Live monolith → layered TTS delivery (Live demoted to an opt-in mic adapter). Plan + phases P1–P5 in [`architecture.md`](architecture.md#migration-plan--live-monolith--layered-delivery).
-
 - [x] Fix bug that page order refreshes on reload, even though game state remains _(S8.5: crossings + the voiced Oracle line persist across a reload, keyed by rune id; the board order itself now also holds — `boardSeed` is minted per round and stable across refreshes)_
 - [x] Optimize image download and caching on the server to load faster
 - [x] Ensure DEV is allowed for embed to CloudRun
@@ -17,6 +15,6 @@
 - [ ] Sort debug view in reverse chronological order
 - [ ] Undo the 'don't think' Skoll logic
 - [ ] Oracle spoken flair — dynamic/dramatized TTS lines; drop the preset allow-list for a server-authored-line gate (so she can surprise without the endpoint becoming free arbitrary-text TTS)
-- [ ] Sköll ambience layer (deferred) — the taunt library in `ux-copy.md` §2 (splash open, idle, hunt mood, reactions, defeat exit) as **audio-only** prebuilt clips (no caption, per revised R10). Lines approved + tightened; clip pipeline + context triggers are future work. The taunt-address bucket needs a spoken input → P5 (the mic).
+- [ ] Sköll ambience layer (deferred) — the taunt library in `ux-copy.md` §2 (splash open, idle, hunt mood, reactions, defeat exit) as **audio-only** prebuilt clips (no caption, per revised R10). Lines approved + tightened; clip pipeline + context triggers are future work. The taunt-address bucket needs a spoken input (the mic).
 - [ ] Voice Sköll's winning cast — a game move (names `{Rune}`), currently text-only. Voice it the same way as his Ask: carry the cast rune on the `Advance` wire, add a `skoll-cast` line descriptor (server recomposes from the rune), deliver via the TTS seam; caption it (R10).
 - [ ] Voice the full end-screen sequence — today the win/loss splash voices one beat (`outcome` descriptor: win coda, loss verse). The other beats (lead/verse for the win, lead/coda for the loss) stay text. Voice the staged sequence if the single beat feels thin; Sól still has no own voice (her line rides the Oracle's).

@@ -233,7 +233,7 @@ _The defeat line plays after Sól's victory sequence resolves — never over her
 - "Count them again, slower."
 - "The fire burns while you stare."
 
-**The witch taunts him (routed by detection — P5, needs the mic)**
+**The witch taunts him (routed by detection — needs the mic)**
 
 - "Bold words from prey."
 - "Save your breath for dawn."
@@ -260,7 +260,7 @@ One-use reactions, **not cards**—no deck, no hand. Both trigger on an **Ask**;
 **Interrupt prompt:** buttons **"Scry"** · **"Hex"** · **"Pass"**. The **"Sköll asks. Answer it?"** heading is **not displayed** in v1—it survives only as the buttons' accessibility group label (`aria-label`); the visible reaction-prompt copy is deferred to a v2 reaction-UI redesign.
 - **You Scry:** "You lean into the dark; his answer is yours."
 - **You Hex:** "You close the Oracle's lips; his turn dies with the question."
-- **You pass:** "You hold your hand; I give Sköll his answer." _(the Oracle answers his question — the old "let him answer" wrongly implied Sköll does the answering)_
+- **You pass:** "You stay your hand; Sköll gets his answer." _(the Oracle answers his question — Sköll only receives it)_
 
 ### Sköll uses a reaction (on your Ask)
 
@@ -328,8 +328,6 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 | Cast armed (player believes one remains) | **"Cast?"** |
 
 ### Eclipse medallion (voice control)
-
-> ⚠️ Control semantics are being rearchitected — see [`architecture.md` → voice as delivery](./architecture.md#target-architecture--voice-as-delivery-planned). The medallion's wake/sleep + mic-gating below is the shipped Live behavior; under the migration it becomes the audio on/off toggle and the mic is optional. **The labels and announcements in this table are reworked as part of P3** — "Wake the Oracle," "The Oracle listens," "Silence the voice," and the mic-denied/eclipsed states describe mic behavior P3–P4 won't have. The Oracle's *spoken-line* copy elsewhere (her answers, guards, confirmations) stands unchanged.
 
 The medallion is a labeled button: its accessible name carries the state plus what a tap does. The announcement column is the polite live-region line for transitions a player must never miss—mic privacy and who holds the fire; hearing/thinking stay quiet (still "listening" to a listener). Visual states live in `v2-voice-requirements.md` R6.
 

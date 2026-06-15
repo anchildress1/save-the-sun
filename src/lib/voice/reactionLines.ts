@@ -6,7 +6,7 @@
 export const REACTION_LINES = {
 	'human-scry': 'You lean into the dark; his answer is yours.',
 	'human-hex': "You close the Oracle's lips; his turn dies with the question.",
-	'human-pass': 'You hold your hand; I give Sköll his answer.',
+	'human-pass': 'You stay your hand; Sköll gets his answer.',
 	'skoll-hex': 'Sköll silences the Oracle; your question dies.',
 	'skoll-scry': 'Sköll listened at the threshold — the answer is his too.'
 } as const;

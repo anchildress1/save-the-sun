@@ -99,10 +99,10 @@ describe('EclipseMedallion — labeled button (R6)', () => {
 });
 
 describe('EclipseMedallion — state visuals', () => {
-	it('etches the mic glyph while asleep; the wolf stays hidden', () => {
+	it('etches the mic glyph while asleep; the Sköll eclipse stays hidden', () => {
 		const { button } = renderMedallion('asleep');
 		expect(getComputedStyle(layer(button, '.mic-glyph')).opacity).toBe('1');
-		expect(getComputedStyle(layer(button, '.wolf-eyes')).opacity).toBe('0');
+		expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('0');
 		// The strike is the eclipse seal's mark — it must never bleed into ordinary sleep.
 		expect(getComputedStyle(layer(button, '.mic-strike')).display).toBe('none');
 	});
@@ -128,12 +128,19 @@ describe('EclipseMedallion — state visuals', () => {
 		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.2);
 	});
 
-	it('opens the wolf eyes only while Sköll speaks — a shape signal, not color alone', () => {
+	it('deepens the disc toward eclipse only while Sköll speaks — a brightness signal, not color alone', () => {
 		const { button } = renderMedallion('skoll-speaking');
-		expect(getComputedStyle(layer(button, '.wolf-eyes')).opacity).toBe('1');
-		expect(button.querySelectorAll('.eye')).toHaveLength(2);
-		// The ember palette swap rides the same state, but the eyes are the color-blind signal.
+		// The dark overlay swallows the disc (the sun devoured) — visible only in this state.
+		expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('1');
+		// The ember palette swap rides the same state, but the deepening eclipse is the color-blind signal.
 		expect(getComputedStyle(button).getPropertyValue('--corona-rgb').trim()).toBe('200, 71, 63');
+	});
+
+	it('hides the eclipse overlay in every Oracle-side state', () => {
+		for (const state of ALL_STATES.filter((s) => s !== 'skoll-speaking')) {
+			const { button } = renderMedallion(state);
+			expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('0');
+		}
 	});
 
 	it('keeps the gold palette for every Oracle-side state', () => {

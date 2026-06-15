@@ -69,6 +69,9 @@
 				<!-- The disc renders the 12-level volume strip (docs/ui-image-resources.md): static
 				     level per state, flare-indexed on hearing, ping-pong loop while a voice plays. -->
 				<span class="disc" style={stripUrl ? `background-image: url(${stripUrl})` : ''}></span>
+				<!-- Sköll speaking: the disc darkens toward total eclipse with an ember rim — the sun
+				     devoured. A brightness/shape signal, never color alone. -->
+				<span class="eclipse-shadow"></span>
 				<span class="rune-ring">
 					{#each RING_RUNES as name, i (name)}
 						<img
@@ -89,10 +92,6 @@
 					<line x1="10.5" y1="23" x2="17.5" y2="23" />
 					<line class="mic-strike" x1="7" y1="5" x2="21" y2="23" />
 				</svg>
-				<span class="wolf-eyes">
-					<span class="eye eye--left"></span>
-					<span class="eye eye--right"></span>
-				</span>
 			</span>
 		</span>
 	</button>
@@ -122,7 +121,7 @@
 		cursor: pointer;
 	}
 
-	/* Ember palette is never the only Sköll signal — the wolf's eyes open below. */
+	/* Ember palette is never the only Sköll signal — the disc deepens to eclipse below. */
 	.medallion[data-voice-state='skoll-speaking'] {
 		--corona-rgb: 200, 71, 63;
 	}
@@ -184,9 +183,31 @@
 		animation: sprite-level 0.75s steps(12, jump-none) infinite alternate;
 	}
 
-	/* Ember shift for the wolf — paired with the eyes below, never the only signal. */
+	/* Ember shift for the wolf — paired with the deepening eclipse below, never the only signal. */
 	.medallion[data-voice-state='skoll-speaking'] .disc {
 		filter: hue-rotate(-40deg) saturate(1.25);
+	}
+
+	/* Sköll speaking: a dark overlay swallows the disc center (the sun devoured) while an inset
+	   ember rim glows — a brightness + shape signal, so the state never reads by color alone.
+	   Hidden in every other state. */
+	.eclipse-shadow {
+		position: absolute;
+		inset: 0;
+		border-radius: 50%;
+		background: radial-gradient(
+			circle,
+			rgba(3, 3, 8, 0.92) 36%,
+			rgba(3, 3, 8, 0.55) 60%,
+			transparent 78%
+		);
+		box-shadow: inset 0 0 12px 2px rgba(200, 71, 63, 0.9);
+		opacity: 0;
+		transition: opacity 0.3s ease;
+	}
+
+	.medallion[data-voice-state='skoll-speaking'] .eclipse-shadow {
+		opacity: 1;
 	}
 
 	@keyframes sprite-level {
@@ -307,36 +328,6 @@
 	.medallion[data-voice-state='speaking'] .corona,
 	.medallion[data-voice-state='skoll-speaking'] .corona {
 		animation: corona-pulse 1.15s ease-in-out infinite;
-	}
-
-	/* Sköll: eyes open at the disc edge — a shape signal, independent of the ember color. */
-	.wolf-eyes {
-		opacity: 0;
-		transition: opacity 0.25s ease;
-	}
-
-	.medallion[data-voice-state='skoll-speaking'] .wolf-eyes {
-		opacity: 1;
-	}
-
-	.eye {
-		position: absolute;
-		top: 22%;
-		width: 0.85rem;
-		height: 0.4rem;
-		background: #ff7a5e;
-		box-shadow: 0 0 6px rgba(255, 122, 94, 0.9);
-		border-radius: 50% 50% 50% 50% / 75% 75% 25% 25%;
-	}
-
-	.eye--left {
-		left: 22%;
-		transform: rotate(-14deg);
-	}
-
-	.eye--right {
-		left: 58%;
-		transform: rotate(14deg);
 	}
 
 	@keyframes corona-breathe {

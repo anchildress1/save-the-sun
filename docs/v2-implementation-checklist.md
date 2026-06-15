@@ -3,7 +3,7 @@
 > Implementation units for AI agents. Source of truth: `v2-voice-requirements.md`. Refs = requirement IDs there.
 > Config constants: Oracle voice `Gacrux` (verified on Live 2026-06-11 — `Kore` fallback not needed), Sköll voice `Algieba`, TTS model `gemini-3.1-flash-tts-preview`, silence timeout 5000ms.
 >
-> ⚠️ **Delivery model superseded.** Stories S1–S11 shipped a Live-first design now being rearchitected — see [`architecture.md` → Target architecture + Migration plan](./architecture.md#target-architecture--voice-as-delivery-planned). Audio becomes mic-independent server-side TTS delivery; Live is demoted to an opt-in mic adapter. These stories are kept as the shipped record; the forward path is the migration's P1–P5, not the Live story order below. (P1 Oracle TTS delivery and P2 Sköll's game-move voice have **landed**. **Every game move now voices** through the one shared TTS route — Oracle answers/refusals, Sköll's Ask, the Scry/Hex/Pass resolutions, the cast outcomes, and the win/loss — see [Spoken surface](#spoken-surface--voice-as-delivery-p1p2-extensions) below. The prebuilt-clip S12/S13 were tried then reverted in favor of it; the ambience layer is deferred. P3–P5 remain.)
+> **Two voice layers** — see [`architecture.md`](./architecture.md#voice--input-the-live-mic-and-output-delivery). Stories S1–S11 are the shipped record of the **Live mic** input path (the medallion wakes/sleeps it). On top sits **mic-independent TTS delivery** for output: **every game move now voices** through one shared TTS route — Oracle answers/refusals, Sköll's Ask, the Scry/Hex/Pass resolutions, the cast outcomes, and the win/loss — text always, audio when on, with or without the mic (see [Spoken surface](#spoken-surface--voice-as-delivery) below). The prebuilt-clip S12/S13 were tried then reverted in favor of that route; the audio-only ambience layer is deferred.
 
 ---
 
@@ -35,8 +35,8 @@ Client module owning the Live API WebSocket lifecycle: connect with ephemeral to
 Medallion at top of Oracle panel = voice toggle + state display. Static art, animated glow layers only.
 
 - [x] Tap toggles wake/sleep via S2 API
-- [x] States driven by S2 events: asleep (partial eclipse + etched mic glyph), listening (corona breathing), hearing (corona flares with mic amplitude, rim runes ignite), thinking (rune ring orbits), oracle-speaking (corona pulses, pure animation — no output level feed by agreement), sköll-speaking (ember red + wolf eyes open at disc edge; state prop ready, driven by S13)
-- [x] State never communicated by color alone (sköll = color + eyes shape)
+- [x] States driven by S2 events: asleep (partial eclipse + etched mic glyph), listening (corona breathing), hearing (corona flares with mic amplitude, rim runes ignite), thinking (rune ring orbits), oracle-speaking (corona pulses, pure animation — no output level feed by agreement), sköll-speaking (ember red + the disc deepens toward total eclipse with an ember rim — the sun devoured)
+- [x] State never communicated by color alone (sköll = ember color + the deepening eclipse, a brightness/shape signal)
 - [x] `prefers-reduced-motion`: static glow intensities, no pulse/orbit
 - [x] ARIA labels per state; medallion is a labeled button (+ polite live-region announcements)
 - [x] New asset: voice medallion level strip (12 frames @128px, 43K — spec + regeneration in `ui-image-resources.md`); the disc renders it per state with flare-indexed and ping-pong playback. Rim runes reuse existing rune glyph assets via CSS transforms ✓
@@ -112,23 +112,23 @@ The original S12 (a prebuilt clip library) was built then **reverted**. Two reas
 
 ### S13 — Director module (R8, R9) — _superseded by TTS game-move voicing_
 
-His **Ask** is now voiced through the shared TTS route in his voice (migration P2), not a clip director.
+His **Ask** is now voiced through the shared TTS route in his voice, not a clip director.
 
-- [x] His Ask (a game move) is voiced + written — `skoll-ask` line descriptor (`lines.ts`) recomposes his line server-side from the parked `query` via `skollAskEcho`; `tts.ts` voices it in `SKOLL_VOICE`; the page delivers it through the same `deliver()` seam as the Oracle, gated on an idle Live session. Written on his frame (`skoll-echo`, R10).
+- [x] His Ask (a game move) is voiced + written — `skoll-ask` line descriptor (`lines.ts`) recomposes his line server-side from the parked `query` via `skollAskEcho`; `tts.ts` voices it in `SKOLL_VOICE`; the page delivers it through the same `deliver()` seam as the Oracle. If the Live mic is awake, the page waits for the Oracle to settle, holds mic forwarding, voices him, then resumes. Written on his frame (`skoll-echo`, R10).
 - [x] One speaker at a time — structural: Oracle + Sköll share the one TTS delivery seam, so his line serializes after hers, never overlapping (R9).
 - [~] His winning cast (a game move naming `{Rune}`) — **deferred**: voice it the same way once the rune rides the `Advance` wire, with a caption (`ttd.md`).
-- [~] Taunt/address detection → wolf, idle/hunt ambience triggers — **deferred** with the ambience layer (taunt needs a spoken input → P5; idle is a client timer).
-- [~] Mic discipline during Sköll playback, medallion sköll-speaking — return with the ambience layer / the mic (P5).
+- [~] Taunt/address detection → wolf, idle/hunt ambience triggers — **deferred** with the ambience layer (taunt needs a spoken input; idle is a client timer).
+- [x] Mic discipline during Sköll playback — his line lives on the delivery speaker, so the page waits for her Live line to drain (`voiceSession.whenSettled`), holds the mic (`hold()` pauses forwarding **and** the R7 clock), plays his line, then `resume()`s. No token mint, no reconnect; the loss outcome (his voice) rides the same path.
 - Depends: S2, S12
 
 ---
 
-## Spoken surface — voice-as-delivery (P1–P2 extensions) 🔊
+## Spoken surface — voice-as-delivery 🔊
 
-Every **game move** (R10) is composed server-side, allow-listed (`src/lib/server/voice/lines.ts`), and voiced through the one `deliver()` seam — text always, audio when on. One TTS route serves both voices (a `voice` param), and each line is wrapped in its speaker's director's-notes (`synthPrompt`) so the model voices it in character.
+Every **game move** (R10) is composed server-side, allow-listed (`src/lib/server/voice/lines.ts`), and voiced through the one `deliver()` seam — text always, audio when on. One TTS route serves both voices (a `voice` param), and each line is wrapped in its speaker's director's-notes (`synthPrompt`) so the model voices it in character. Mic-independent: the board voices its moves with or without the Live mic.
 
-- [x] Oracle answers + refusals — `answer` / `refusal` descriptors (P1)
-- [x] Sköll's Ask — `skoll-ask`, his voice, recomposed server-side from the parked `query` (P2)
+- [x] Oracle answers + refusals — `answer` / `refusal` descriptors
+- [x] Sköll's Ask — `skoll-ask`, his voice, recomposed server-side from the parked `query`
 - [x] Reaction resolutions (Scry / Hex / Pass, both sides) — `react` descriptor, shared `reactionLines.ts`; the scry lines carry the overheard answer. Voiced in the Oracle's voice
 - [x] Cast outcomes (true / wrong / falters) — `cast` descriptor, shared `castLines.ts`; the wrong-cast names a board-validated rune. Oracle's voice
 - [x] End-screen outcome — `outcome` descriptor, shared `outcomeLines.ts`: a **win in the Oracle's voice** (victory coda), a **loss in Sköll's** (night-everlasting verse)
@@ -139,6 +139,6 @@ Every **game move** (R10) is composed server-side, allow-listed (`src/lib/server
 ## Order 🧭
 
 S1 → S2 → {S3, S6, S7} → {S4, S5, S10, S11} → S8 → S9 → S12 → S13.
-Phases 1+2 shipped on Live; the forward path now runs by migration phase (P1 ✓ → P2 ✓ → P3 → P4 → P5). P2 voices Sköll's Ask through the shared TTS route (his game-move voice); the prebuilt-clip S12/S13 were reverted, and the ambience layer is deferred (`ttd.md`).
+The voice surface settled into two decoupled layers (see [`architecture.md`](./architecture.md#voice--input-the-live-mic-and-output-delivery)): the **Live mic** for input (the medallion wakes/sleeps it) and **mic-independent TTS delivery** for output (every game move voiced, the Oracle and Sköll on one shared route). The prebuilt-clip S12/S13 were reverted in favor of that route; the audio-only ambience layer is deferred (`ttd.md`).
 
 🤖 *Drafted with AI assistance; decisions by Ashley.* ☀️
