@@ -38,6 +38,7 @@ type DeliveryEvent = { type: 'speaking'; voice: 'oracle' | 'skoll' } | { type: '
 const emitDelivery = (event: DeliveryEvent) => deliveryMock.emit(event);
 
 const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
+const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 4 };
 const pageProps = {
 	data: { boardSeed: 0, roundId: 'test-round', state: HUMAN_TURN, pendingReaction: null },
 	params: {},
@@ -255,6 +256,30 @@ describe('Save the Sun page — audio output toggle', () => {
 		await vi.waitFor(() => expect(deliveryMock.enableDelivery).toHaveBeenCalled());
 	});
 
+	it('falls back to off when first-gesture speaker priming fails, then allows a toggle retry', async () => {
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		deliveryMock.enableDelivery.mockImplementationOnce(() => {
+			throw new Error('AudioContext blocked');
+		});
+		const screen = render(Page, pageProps);
+		const toggle = screen.getByTestId('mute-toggle');
+
+		try {
+			window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+			await expect.element(toggle).toHaveAttribute('aria-checked', 'false');
+			expect(errorSpy).toHaveBeenCalledWith(
+				'[ui] could not open the delivery speaker:',
+				expect.any(Error)
+			);
+
+			await toggle.click();
+			expect(deliveryMock.enableDelivery).toHaveBeenCalledTimes(2);
+			await expect.element(toggle).toHaveAttribute('aria-checked', 'true');
+		} finally {
+			errorSpy.mockRestore();
+		}
+	});
+
 	it('stays off when the session was muted, and the toggle mutes/unmutes', async () => {
 		sessionStorage.setItem('save-the-sun:muted', 'true');
 		const screen = render(Page, pageProps);
@@ -272,6 +297,23 @@ describe('Save the Sun page — audio output toggle', () => {
 });
 
 describe('Save the Sun page — game moves voiced via delivery', () => {
+	it('waits for a real speaker before spending a resumed outcome voice', async () => {
+		const screen = render(Page, {
+			...pageProps,
+			data: { ...pageProps.data, state: HUMAN_WON }
+		});
+
+		await vi.waitFor(() =>
+			expect(screen.container.querySelector('[data-testid="end-screen"]')).not.toBeNull()
+		);
+		expect(deliveryMock.deliver).not.toHaveBeenCalled();
+
+		window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'outcome', result: 'win' })
+		);
+	});
+
 	it('voices her answer through the delivery seam with her line descriptor', async () => {
 		const screen = render(Page, pageProps);
 		await screen.getByTestId('mute-toggle').click(); // audio on

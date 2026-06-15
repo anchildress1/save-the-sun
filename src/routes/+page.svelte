@@ -163,10 +163,10 @@
 	// queued behind any cast line on the shared speaker. Once per round; reset by a new game.
 	let outcomeVoiced = false;
 	$effect(() => {
-		// Flip the once-guard only when audio is on — so if audio is off when the splash lands, a later
-		// toggle-on can still voice the outcome. The loss verse is voiced in Sköll's voice, the win coda
-		// in the Oracle's; the medallion follows from the delivery event (onDeliveryEvent).
-		if (showEndScreen && !outcomeVoiced && audioOn) {
+		// Flip the once-guard only when the speaker is open — so a resumed/won round cannot spend
+		// its outcome voice before the browser gesture unlocks audio. The loss verse is voiced in
+		// Sköll's voice, the win coda in the Oracle's; the medallion follows from the delivery event.
+		if (showEndScreen && !outcomeVoiced && audioOn && audioReady) {
 			outcomeVoiced = true;
 			void deliver({ kind: 'outcome', result: endOutcome });
 		}
@@ -309,9 +309,10 @@
 	let medalState = $state<MedallionState>('idle');
 	// One quiet line when the mic is denied/absent; the button game is unaffected.
 	let voiceNotice = $state('');
-	// Audio output on/off (voice-as-delivery). Off until the toggle opens the delivery speaker (a
-	// gesture). Independent of the mic: you can hold to ask with audio off and read the answer.
+	// Audio preference + speaker readiness (voice-as-delivery). The preference can be on before the
+	// browser lets us open an AudioContext; delivery should spend one-shot lines only once ready.
 	let audioOn = $state(false);
+	let audioReady = $state(false);
 	let holdWanted = false;
 	let holdSetupPending = false;
 
@@ -338,8 +339,10 @@
 				return;
 			}
 			audioOn = true;
+			audioReady = true;
 		} else {
 			audioOn = false;
+			audioReady = false;
 			disableDelivery();
 		}
 		writeMuted(!audioOn);
@@ -569,8 +572,11 @@
 			if (!audioOn) return;
 			try {
 				enableDelivery();
+				audioReady = true;
 			} catch (err) {
 				console.error('[ui] could not open the delivery speaker:', err);
+				audioOn = false;
+				audioReady = false;
 			}
 		}
 		window.addEventListener('pointerdown', primeAudio);
