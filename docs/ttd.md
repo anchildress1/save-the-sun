@@ -13,7 +13,7 @@
 - [x] Asking a new question while Sköll's question hangs auto-passes his question and answers the new one _(no need to say "pass" — the ask path resolves his hanging question as a Pass, then dispatches her new Ask; scry/hex still need her word twice)_
 - [ ] Align the badges on the debug view to add Answer for Oracle.
 - [ ] Sort debug view in reverse chronological order
-- [ ] Undo the 'don't think' Skoll logic
+- [ ] Undo the 'don't think' Sköll logic — live wolf (MINIMAL thinking, temp 1) doesn't converge (150+ turn games); raise thinking/lower temp + force a cast at ≤2 candidates.
 - [ ] Oracle spoken flair — dynamic/dramatized TTS lines; drop the preset allow-list for a server-authored-line gate (so she can surprise without the endpoint becoming free arbitrary-text TTS)
 - [ ] Sköll ambience layer (deferred) — the taunt library in `ux-copy.md` §2 (splash open, idle, hunt mood, reactions, defeat exit) as **audio-only** prebuilt clips (no caption, per revised R10). Lines approved + tightened; clip pipeline + context triggers are future work. The taunt-address bucket needs a spoken input (the mic).
 - [ ] Voice Sköll's winning cast — a game move (names `{Rune}`), currently text-only. Voice it the same way as his Ask: carry the cast rune on the `Advance` wire, add a `skoll-cast` line descriptor (server recomposes from the rune), deliver via the TTS seam; caption it (R10).
