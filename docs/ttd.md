@@ -19,4 +19,5 @@
 - [ ] Voice Sköll's winning cast — a game move (names `{Rune}`), currently text-only. Voice it the same way as his Ask: carry the cast rune on the `Advance` wire, add a `skoll-cast` line descriptor (server recomposes from the rune), deliver via the TTS seam; caption it (R10).
 - [ ] Voice the full end-screen sequence — today the win/loss splash voices one beat (`outcome` descriptor: win coda, loss verse). The other beats (lead/verse for the win, lead/coda for the loss) stay text. Voice the staged sequence if the single beat feels thin; Sól still has no own voice (her line rides the Oracle's).
 - [ ] Sync the medallion pulse to the voice — drive the disc/corona from real output level (AnalyserNode → RMS), not a fixed CSS loop.
+- [ ] Release the mic between holds — push-to-talk keeps the MediaStream live all session (Chrome shows continuous mic use); stop tracks on release, re-acquire on hold.
 - [x] Spoken Hex/Scry/Pass — a held reply while Sköll's question hangs is classified server-side (transcribe `mode: 'reaction'`) into scry/hex/pass; unclear or a spent charge is refused, never silently passed.
