@@ -329,6 +329,11 @@
 	// Drive the medallion's voice from delivery playback: a line begins → its speaker; the queue
 	// drains → back to idle (unless a hold/transcribe is mid-flight, which owns the state then).
 	function onDeliveryEvent(event: DeliveryEvent) {
+		// A live hold owns the medallion. A queued line (her answer finishing, his Ask beginning) can
+		// emit 'speaking' while the player has already started a new hold — letting it overwrite
+		// 'recording' would strand endHold (which finishes only from 'recording'), losing the utterance
+		// and leaving the mic live. The hold restores the medallion itself on release.
+		if (holdWanted || holdSetupPending) return;
 		if (event.type === 'speaking') {
 			medalState = event.voice === 'skoll' ? 'skoll-speaking' : 'speaking';
 		} else if (medalState === 'speaking' || medalState === 'skoll-speaking') {
@@ -406,9 +411,11 @@
 				await respondReaction(await classifyReactionUtterance(clip.wavBase64));
 			} else if (clip) {
 				// Dispatch straight to the engine — the spoken words never fill the typing box (the
-				// transcribe route tees what was heard to /debug for mishear diagnosis).
+				// transcribe route tees what was heard to /debug for mishear diagnosis). Mirror the typed
+				// box's gate (canAct/pending/castMode), re-checked after the async read: a hold that began
+				// during Sköll's turn must not land an Ask once the lock frees and steal the next turn.
 				const question = (await transcribeUtterance(clip.wavBase64)).trim();
-				if (question !== '') await runAsk(question, false);
+				if (question !== '' && canAct && !pending && !castMode) await runAsk(question, false);
 			}
 		} catch (err) {
 			console.error('[ui] push-to-talk failed:', err);
@@ -418,15 +425,32 @@
 		if (medalState === 'thinking') medalState = 'idle';
 	}
 
-	// POST the held WAV to the transcribe route; empty string on any failure (degrade, never throw).
-	async function transcribeUtterance(wavBase64: string): Promise<string> {
+	// A hung transcribe fetch would strand the medallion in 'thinking' and block every later hold, so
+	// each read is bounded — on timeout the AbortController trips and the call degrades like any failure.
+	const TRANSCRIBE_TIMEOUT_MS = 15_000;
+
+	async function postUtterance(body: object): Promise<Response | null> {
+		const abort = new AbortController();
+		const timer = setTimeout(() => abort.abort(), TRANSCRIBE_TIMEOUT_MS);
 		try {
-			const res = await fetch('/api/voice/transcribe', {
+			return await fetch('/api/voice/transcribe', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ wavBase64 })
+				body: JSON.stringify(body),
+				signal: abort.signal
 			});
-			if (!res.ok) return '';
+		} catch {
+			return null;
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+
+	// POST the held WAV to the transcribe route; empty string on any failure (degrade, never throw).
+	async function transcribeUtterance(wavBase64: string): Promise<string> {
+		const res = await postUtterance({ wavBase64 });
+		if (!res?.ok) return '';
+		try {
 			return ((await res.json()) as { text?: string }).text ?? '';
 		} catch {
 			return '';
@@ -436,13 +460,9 @@
 	// Classify a held reply to Sköll's hanging question into a reaction; `unclear` on any failure, so
 	// a misheard or dropped call never silently spends a one-use charge.
 	async function classifyReactionUtterance(wavBase64: string): Promise<SpokenReaction> {
+		const res = await postUtterance({ wavBase64, mode: 'reaction' });
+		if (!res?.ok) return 'unclear';
 		try {
-			const res = await fetch('/api/voice/transcribe', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ wavBase64, mode: 'reaction' })
-			});
-			if (!res.ok) return 'unclear';
 			return ((await res.json()) as { choice?: SpokenReaction }).choice ?? 'unclear';
 		} catch {
 			return 'unclear';
@@ -613,10 +633,12 @@
 		window.addEventListener('keyup', onKeyUp);
 		window.addEventListener('blur', onBlur);
 
-		// Audio output is ON by default (honoring a session mute the player set). The delivery speaker
-		// still needs a user gesture to open (browsers block an AudioContext otherwise), so prime it on
-		// the first interaction — a tap or key press — then the listener retires.
-		audioOn = !readMuted();
+		// Audio output is ON by default (honoring a session mute the player set), EXCEPT under
+		// prefers-reduced-motion — the PRD's reduced tier (R9) keeps audio muted. The player can still
+		// opt in via the toggle. The delivery speaker still needs a user gesture to open (browsers block
+		// an AudioContext otherwise), so prime it on the first interaction — tap or key — then retire.
+		const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		audioOn = !readMuted() && !reducedMotion;
 		let audioPrimed = false;
 		function primeAudio() {
 			if (audioPrimed) return;

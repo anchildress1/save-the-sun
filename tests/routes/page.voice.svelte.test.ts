@@ -90,6 +90,23 @@ const holdSpace = () =>
 const releaseSpace = () =>
 	window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Space', bubbles: true }));
 
+// The browser context runs reducedMotion:'reduce' (vite.config.ts), so by default audio is muted
+// (PRD R9). The auto-prime-on-first-gesture path is a non-reduced-motion behavior, so the tests that
+// exercise it stub matchMedia to report motion allowed. RuneGrid reads the same query for its GSAP
+// entrance; flipping it just lets that animation run (cleared via clearProps), which these tests
+// don't assert on.
+const allowMotion = () =>
+	vi.stubGlobal('matchMedia', (query: string) => ({
+		matches: false,
+		media: query,
+		onchange: null,
+		addEventListener: () => {},
+		removeEventListener: () => {},
+		addListener: () => {},
+		removeListener: () => {},
+		dispatchEvent: () => false
+	}));
+
 const actionBodies = () =>
 	vi
 		.mocked(fetch)
@@ -248,6 +265,7 @@ describe('Save the Sun page — delivery drives the medallion voice', () => {
 
 describe('Save the Sun page — audio output toggle', () => {
 	it('is on by default; the speaker opens on the first gesture', async () => {
+		allowMotion();
 		const screen = render(Page, pageProps);
 		await expect.element(screen.getByTestId('mute-toggle')).toHaveAttribute('aria-checked', 'true');
 		// No gesture yet — the AudioContext is not opened until one arrives.
@@ -256,7 +274,22 @@ describe('Save the Sun page — audio output toggle', () => {
 		await vi.waitFor(() => expect(deliveryMock.enableDelivery).toHaveBeenCalled());
 	});
 
+	it('defaults to muted under reduced motion — no auto-prime (PRD R9)', async () => {
+		// The browser context is reducedMotion:'reduce', so this is the unstubbed default path.
+		const screen = render(Page, pageProps);
+		await expect
+			.element(screen.getByTestId('mute-toggle'))
+			.toHaveAttribute('aria-checked', 'false');
+		window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+		// A reduced-motion session never auto-opens the speaker — audio stays muted until opted in.
+		await expect
+			.element(screen.getByTestId('mute-toggle'))
+			.toHaveAttribute('aria-checked', 'false');
+		expect(deliveryMock.enableDelivery).not.toHaveBeenCalled();
+	});
+
 	it('falls back to off when first-gesture speaker priming fails, then allows a toggle retry', async () => {
+		allowMotion();
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		deliveryMock.enableDelivery.mockImplementationOnce(() => {
 			throw new Error('AudioContext blocked');
@@ -298,6 +331,7 @@ describe('Save the Sun page — audio output toggle', () => {
 
 describe('Save the Sun page — game moves voiced via delivery', () => {
 	it('waits for a real speaker before spending a resumed outcome voice', async () => {
+		allowMotion();
 		const screen = render(Page, {
 			...pageProps,
 			data: { ...pageProps.data, state: HUMAN_WON }
