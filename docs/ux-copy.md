@@ -151,7 +151,7 @@ Templated. **Both verdicts restate the trait**—`Yes. Sól is reaching for {val
 | Asks for the secret | "That is Sól's to keep until you name it." |
 | Prompt poking / override | "I answer the longest day, not you." |
 | Negated Ask ("is it not fire?") | "I speak of what is, not what is not." |
-| Unparseable / not a question | "Ask of element, power, light, or hue." |
+| Unparseable / not a question | "That is no sign I can read." |
 | Empty submit | "Speak your question, witch." |
 
 ## 2. Sköll
@@ -233,7 +233,7 @@ _The defeat line plays after Sól's victory sequence resolves — never over her
 - "Count them again, slower."
 - "The fire burns while you stare."
 
-**The witch taunts him (routed by detection — P5, needs the mic)**
+**The witch taunts him (routed by detection — needs the mic)**
 
 - "Bold words from prey."
 - "Save your breath for dawn."
@@ -260,7 +260,7 @@ One-use reactions, **not cards**—no deck, no hand. Both trigger on an **Ask**;
 **Interrupt prompt:** buttons **"Scry"** · **"Hex"** · **"Pass"**. The **"Sköll asks. Answer it?"** heading is **not displayed** in v1—it survives only as the buttons' accessibility group label (`aria-label`); the visible reaction-prompt copy is deferred to a v2 reaction-UI redesign.
 - **You Scry:** "You lean into the dark; his answer is yours."
 - **You Hex:** "You close the Oracle's lips; his turn dies with the question."
-- **You pass:** "You hold your hand; I give Sköll his answer." _(the Oracle answers his question — the old "let him answer" wrongly implied Sköll does the answering)_
+- **You pass:** "You stay your hand; Sköll gets his answer." _(the Oracle answers his question — Sköll only receives it)_
 
 ### Sköll uses a reaction (on your Ask)
 
@@ -327,37 +327,28 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 | Round resolved—header tag beside the celestial body (full resolution line lives in the Oracle panel, §4) | human win (moon → risen sun): **"Sól crests the rim of the world."** · Sköll win (moon holds): **"Sköll takes the sun."** |
 | Cast armed (player believes one remains) | **"Cast?"** |
 
-### Eclipse medallion (voice control)
+### Eclipse medallion (push-to-talk control)
 
-> ⚠️ Control semantics are being rearchitected — see [`architecture.md` → voice as delivery](./architecture.md#target-architecture--voice-as-delivery-planned). The medallion's wake/sleep + mic-gating below is the shipped Live behavior; under the migration it becomes the audio on/off toggle and the mic is optional. **The labels and announcements in this table are reworked as part of P3** — "Wake the Oracle," "The Oracle listens," "Silence the voice," and the mic-denied/eclipsed states describe mic behavior P3–P4 won't have. The Oracle's *spoken-line* copy elsewhere (her answers, guards, confirmations) stands unchanged.
-
-The medallion is a labeled button: its accessible name carries the state plus what a tap does. The announcement column is the polite live-region line for transitions a player must never miss—mic privacy and who holds the fire; hearing/thinking stay quiet (still "listening" to a listener). Visual states live in `v2-voice-requirements.md` R6.
+The medallion is the push-to-talk control: **hold** it (or hold `Space`) to record an Ask, release to send. Its accessible name carries the state plus the hold affordance; the announcement column is the polite live-region line for each transition. Visual states live in `v2-voice-requirements.md` R6.
 
 | State | Button label | Announced |
 |---|---|---|
-| Asleep | **"The voice sleeps. Wake the Oracle."** | "The voice sleeps." |
-| Eclipsed (mic denied or absent — sealed for the session, tap inert, no action tail) | **"The voice is sealed. The rite continues by hand."** | "The voice is sealed." |
-| Waking (tap → listening: permission, token, connect) | **"The Oracle stirs. Silence the voice."** | "The Oracle stirs." |
-| Listening | **"The Oracle listens. Silence the voice."** | "The Oracle listens." |
-| Hearing speech | **"The Oracle hears you. Silence the voice."** | — |
-| Thinking | **"The Oracle considers. Silence the voice."** | — |
-| Oracle speaking | **"The Oracle speaks. Silence the voice."** | "The Oracle speaks." |
-| Sköll speaking | **"Sköll speaks. Silence the voice."** | "Sköll speaks." |
+| Idle (ready — hold to speak) | **"Hold to speak to the Oracle."** | "Ready to hear you." |
+| Recording (held) | **"Listening — release to ask."** | "Listening." |
+| Thinking (transcribing + asking) | **"The Oracle considers your words."** | "The Oracle considers." |
+| Oracle speaking | **"The Oracle speaks."** | "The Oracle speaks." |
+| Sköll speaking | **"Sköll speaks."** | "Sköll speaks." |
+| Denied (mic denied or absent — sealed for the session, inert) | **"The voice is sealed. The rite continues by hand."** | "The voice is sealed." |
 
-Voice failure notices (emitted by the session client, shown as one quiet line by the medallion—never in the Oracle's answer frame, which is her voiced surface):
+A denied or absent mic shows one quiet notice by the medallion (never in the Oracle's answer frame) and is final for the session (R1) — the medallion seals into the inert `denied` state and never re-prompts:
 
 | Failure | Notice |
 |---|---|
-| Token mint | "The fire does not carry your voice tonight. The rite continues by hand." |
-| Mic permission | "The fire cannot hear you. The rite continues by hand." |
-| No mic / dead audio | "No voice reaches the fire. The rite continues by hand." |
-| Socket drop | "The Oracle's voice falters. The rite continues by hand." |
-
-Mic permission and no-mic failures are final for the session (R1): the medallion seals into the eclipsed state, the notice stays, and no second permission prompt ever fires. Token, socket, and dead-audio failures stay retryable by tapping again.
+| Mic denied / no device | "The fire cannot hear you. The rite continues by hand." |
 
 ### Output mute (voice control)
 
-A second control beside the medallion: a toggle button (`aria-pressed`) that silences both voices while their words keep arriving in the panel. Distinct from the medallion — muting is not sleeping; the session stays awake and the mic stays open. The preference persists for the session (R11).
+A second control beside the medallion: a toggle button (`aria-pressed`) that silences both voices while their words keep arriving in the panel. Independent of the mic. The preference persists for the session (R11).
 
 | State | Button label (accessible name) |
 |---|---|

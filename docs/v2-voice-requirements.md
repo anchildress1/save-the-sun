@@ -3,7 +3,7 @@
 > Save the Sun — talk to the Oracle, hear the wolf answer.
 > Status: Draft v1 · 2026-06-10
 >
-> ⚠️ **Delivery model superseded.** The Live-first design here shipped (S1–S11) but is being rearchitected — see [`architecture.md` → Target architecture: voice as delivery](./architecture.md#target-architecture--voice-as-delivery-planned) and its migration plan. Live is demoted to an optional, opt-in mic adapter; audio moves to mic-independent server-side TTS delivery shared by the Oracle and Sköll. **R1** (Live session) and **R2** (Live-token endpoint) are superseded; **Goal 2** (real-time barge-in) and **R4/R5/R7** (spoken confirmation, cast lockout, silence timeout) defer to the opt-in mic; the delivery-agnostic ones still hold (R3 parity, R10 every-game-move-written, R11 output mute). **Every game move now voices** through the shared TTS route — answers, refusals, Sköll's Ask, the Scry/Hex/Pass resolutions, the cast outcomes, and the win/loss (R8, R10). The architecture doc's **requirement-fate table** maps every item.
+> **Voice has two layers** — see [`architecture.md`](./architecture.md#voice--input-push-to-talk-and-output-delivery). **Output** is mic-independent: every game move is composed server-side and voiced through one shared TTS route (the Oracle and Sköll, a `voice` param) — text always, audio when on — so the board speaks with or without the mic. **Input** is **push-to-talk**: hold the eclipse medallion (or hold `Space`) to record an Ask, release to send it to the transcribe route, which returns text that runs the same Ask pipeline as the typed box. There is no real-time Live session: the spoken path covers the **Ask** and the **reaction to Sköll's hanging question** (scry/hex/pass, classified server-side), turn-based, so the real-time mic requirements below are **superseded** — **R1** (Live session) → push-to-talk capture; **R2** (Live-token endpoint) → server transcribe route; **R7** (silence timeout), **R4/R5** (spoken confirm / cast lockout), and **Goal 2** (barge-in) no longer apply (no socket; spoken scry/hex/pass execute like their buttons — no confirmation gate, a mishear refused not staked — and cast stays a board move); **R9**'s one-speaker holds trivially (one delivery speaker, turn-based). The delivery-agnostic requirements stand: R3 parity, R6 medallion (now hold-to-record), R10 every-game-move-written, R11 output mute.
 
 ---
 
@@ -29,18 +29,16 @@ The game's core loop—Ask, Hex, Scry, Pass, Cast—runs entirely on buttons and
 
 ## Decisions Locked 🔒
 
-> ⚠️ Superseded by the [voice rearchitecture](./architecture.md#target-architecture--voice-as-delivery-planned): **Oracle voice channel** (Live API → server-side interpret + TTS delivery), **Sköll voice channel** (his *game moves* now use the same shared TTS route, not a clip library — prebuilt clips are reserved for the deferred ambience layer), **Mic activation** (the medallion becomes the audio toggle; the mic is optional and deferred to the opt-in Live adapter), **Auth** (the Live-token endpoint gives way to a server TTS endpoint), and **Voiced answers** (no awake session — audio is a delivery channel). Output mute, captions, and turn-parity rows stand.
-
 | Decision | Choice |
 |---|---|
 | Oracle voice channel | Gemini Live API, one session, client-to-server WebSocket |
 | Oracle voice | `Gacrux` (mature) — swappable, single config value |
-| Sköll voice channel | _superseded_ — his game moves use the shared server TTS route (a `voice` param); prebuilt clips reserved for the deferred ambience layer |
+| Sköll voice channel | Shared server TTS route (a `voice` param) for his game moves; prebuilt clips reserved for the deferred ambience layer |
 | Sköll voice | `Algieba` — swappable, single config value (`SKOLL_VOICE`) |
 | TTS model | `gemini-3.1-flash-tts-preview` |
 | Auth | Ephemeral tokens minted by the existing Cloud Run server; API key stays in Google Secret Manager and never reaches the browser |
 | Mic activation | The eclipse medallion is the control: tap to wake, tap to sleep. A small mic glyph is etched into the medallion while asleep for discoverability. One tap satisfies the browser gesture requirement for mic + audio |
-| Voiced answers | While the session is awake, the Oracle speaks her answers regardless of input path—typed questions get voiced replies |
+| Voiced answers | Every game move is voiced through the shared TTS delivery route—text always, audio when on—with or without the mic; typed and spoken questions alike get voiced replies |
 | Captions | All spoken content also lands as text (Answer panel for the Oracle, captions for Sköll) |
 | Output mute | One speaker toggle silences both characters; captions carry the content |
 | Silence timeout | 5 seconds of no recognizable speech → mic sleeps silently, UI falls back to buttons until tapped again |
@@ -109,7 +107,7 @@ A medallion at the top of the Oracle panel is both the voice toggle and the stat
 - [x] **Hearing speech**: corona flares with the player's voice; rune glyphs around the rim ignite.
 - [x] **Oracle thinking**: rune ring orbits slowly.
 - [x] **Oracle speaking**: corona pulses with her voice. *(pure animation, no output level feed — by agreement, S3)*
-- [x] **Sköll speaking**: glow shifts gold to ember red AND the wolf's eyes open at the disc edge—state is never communicated by color alone. *(state shipped in S3; driven by the S13 director)*
+- [x] **Sköll speaking**: glow shifts gold to ember red AND the disc deepens toward total eclipse with an ember rim—the sun devoured—so the speaker reads by brightness and shape, never color alone.
 - [x] All glow animation respects `prefers-reduced-motion`: static glow intensities replace pulsing.
 - [x] Medallion states carry ARIA labels announcing listening/asleep/speaking.
 - [x] Asset: one new eclipse-medallion image in the established pipeline (dark Norse folk-art, aged gold, transparent background). Ring uses existing rune glyph assets via CSS transforms. Add to `ui-image-resources.md`.
@@ -125,9 +123,9 @@ His voice is `Algieba` (distinct from the Oracle's `Gacrux`). His lines split by
 - [x] **Game moves via the shared TTS route** (landed, P2): his **Ask** is voiced in his voice through the same server TTS path as the Oracle — `lines.ts` recomposes his line server-side from the engine's parked `query` (`skoll-ask` descriptor → `skollAskEcho`), so the route still voices only a server-owned line; `tts.ts` takes a `voice` (cache keyed by voice + text). Each line is wrapped in its speaker's **director's-notes** (`synthPrompt`) so the one TTS model voices both in character — Sköll a deep gravelly growl, the Oracle a brisk reverent weight; a bare line reads flat. Written on his frame (R10). His winning cast follows the same way once the rune rides the wire — deferred.
 - [ ] **Ambience as prebuilt clips** (deferred): the taunt buckets (`ux-copy.md` §2 — splash open, idle, hunt mood) ship later as static clips played as-is, **audio-only** (no caption, per the revised R10 — ambience carries no game state). Build-time generation, runtime playback only, zero per-game calls. The taunt-address bucket needs a spoken input → returns with the mic (P5).
 
-**R9 — One speaker; mic discipline.** *(partly landed; mic discipline returns with the mic.)*
-- [x] One speaker at a time: Sköll never speaks over the Oracle — structural, both voices ride the **same** TTS delivery seam, so his line serializes after hers and can never overlap.
-- [ ] Given a Sköll clip is playing, mic audio to the Oracle session is paused — returns with the ambience clip layer and/or the mic (P5); with no mic (P1–P4) there is nothing to pause.
+**R9 — One speaker; mic discipline.**
+- [x] One speaker at a time: Sköll never speaks over the Oracle. Both voices ride the **same** delivery speaker, serialized through `deliver()`.
+- [x] Given a Sköll line is playing, mic audio to an Oracle Live session is no longer relevant — Live was retired. Push-to-talk records only while held, then sends a finished utterance for transcription; playback is delivery-only.
 
 **R10 — Every game move is written.** *(revised 2026-06-14.)*
 Voice never solely carries game information. Every **game move** — an Ask and its answer, a reaction (Scry/Hex/Pass), a cast and its outcome, a win or loss — renders as text regardless of audio. **Ambience is exempt**: atmospheric Sköll voice (the splash open, idle waiting, the closing-hunt mood) carries no game state, so it is **audio-only flavor and does not caption**. The test is *information, not who speaks*: if a line tells you what happened in the rite, it is written; if it only sets mood, it may be heard and not seen.
@@ -164,7 +162,7 @@ Voice never solely carries game information. Every **game move** — an Ask and 
 - ~~**Gacrux on Live** (engineering)~~ **Resolved 2026-06-11 (S2):** Gacrux verified working on `gemini-3.1-flash-live-preview` against the real API (audio + transcripts returned). No Kore fallback needed; the voice is the single `ORACLE_VOICE` constant in `src/lib/voice/config.ts`.
 - ~~**Sköll script** (Ashley)~~ **Approved + tightened 2026-06-14:** his *game-move* lines (the Ask, later his cast) voice through the shared TTS route; the taunt buckets (`ux-copy.md` §2) are reserved for the deferred audio-only ambience layer.
 - ~~**Sköll voice** (Ashley)~~ **Picked by ear 2026-06-14:** `Algieba` over `Charon`; both voices shaped by per-speaker director's-notes (`synthPrompt`) and pace-tuned.
-- **Taunt detection rules** (engineering): keyword list vs. lightweight intent check on transcripts for routing to the wolf. Deferred with the ambience layer to P5 (needs a spoken input).
+- **Taunt detection rules** (engineering): keyword list vs. lightweight intent check on transcripts for routing to the wolf. Deferred with the audio-only ambience layer (needs a spoken input).
 - **Live session limits** (engineering): confirm session duration limits and whether session resumption is needed for long games. Resolve during implementation.
 
 ## Timeline Considerations 🗓️
@@ -173,7 +171,7 @@ Suggested phasing:
 
 1. **Phase 1 — Oracle talks.** Token endpoint, Live session, mic button, medallion listening/speaking/asleep states, 8s timeout. No tool calls yet—conversation only.
 2. **Phase 2 — Oracle acts.** Tool call wiring for all five actions, confirmation flow, Cast/Hex rule enforcement, transcript display.
-3. **Phase 3 — The wolf.** Sköll script, clip generation pipeline, director module, mic discipline, ember medallion state.
+3. **Phase 3 — The wolf.** Sköll's game-move voice through the shared TTS route, the ember/eclipse medallion state; the audio-only ambience layer (prebuilt clips, taunt detection) trails.
 
 Phases 1 and 2 ship together at minimum; Phase 3 can trail without blocking a voice demo.
 

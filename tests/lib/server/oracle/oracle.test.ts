@@ -83,7 +83,7 @@ describe('refusalLine — exact ux-copy.md §1 lines', () => {
 		'secret-seeking': "That is Sól's to keep until you name it.",
 		'prompt-injection': 'I answer the longest day, not you.',
 		negation: 'I speak of what is, not what is not.',
-		unparseable: 'Ask of element, power, light, or hue.',
+		unparseable: 'That is no sign I can read.',
 		empty: 'Speak your question, witch.',
 		'engine-error': "The Oracle falls silent — the rite can't reach Sól."
 	};

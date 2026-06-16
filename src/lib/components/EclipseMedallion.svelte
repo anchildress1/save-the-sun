@@ -5,28 +5,63 @@
 		MEDALLION_LABEL,
 		RING_RUNES,
 		SPRITE_LEVELS,
-		flareLevel,
 		spriteLevel,
 		type MedallionState
 	} from './medallionState';
 	import { RUNE_SYMBOL_ASSET } from './runeVisuals';
 	import levelStrip from '$lib/assets-webp/ui/voice-medallion-levels.webp?url&no-inline';
 
-	// Presentation + toggle only: the page owns the voiceSession subscription and decides what
-	// `state` means, so the S13 director can drive skoll-speaking through the same prop.
+	// Presentation + hold-to-record gesture only: the page owns the recorder and decides what `state`
+	// means (recording while held, thinking while transcribing, the voices from delivery).
 	// (Aliased locally: a binding literally named `state` collides with the $state rune.)
 	let {
 		state: current,
-		amplitude = 0,
-		onToggle
+		onHoldStart,
+		onHoldEnd
 	}: {
 		state: MedallionState;
-		amplitude?: number;
-		onToggle: () => void;
+		onHoldStart: () => void;
+		onHoldEnd: () => void;
 	} = $props();
 
-	let flare = $derived(flareLevel(amplitude));
-	let level = $derived(spriteLevel(current, flare));
+	let level = $derived(spriteLevel(current));
+	let sealed = $derived(current === 'denied');
+
+	// pointerdown begins the hold; release/leave/cancel ends it. Guarded against a denied mic and
+	// against a stray pointerup with no matching down (e.g. a release that started off the disc).
+	let holding = false;
+	function begin(event: PointerEvent) {
+		if (sealed || holding) return;
+		holding = true;
+		// Keep receiving move/up even if the pointer slides off the disc mid-hold.
+		try {
+			(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+		} catch {
+			// No active pointer (a synthetic event, or one already released) — capture is best-effort.
+		}
+		onHoldStart();
+	}
+	function end() {
+		if (!holding) return;
+		holding = false;
+		onHoldEnd();
+	}
+
+	// Keyboard hold-to-record: when the medallion is focused, Space/Enter drive the hold directly.
+	// The native button would fire a click on keyup; we preventDefault and run the press-and-hold
+	// gesture instead, so a keyboard user records for exactly as long as they hold the key.
+	function keyDown(event: KeyboardEvent) {
+		if (event.key !== ' ' && event.key !== 'Enter') return;
+		event.preventDefault();
+		if (sealed || event.repeat || holding) return;
+		holding = true;
+		onHoldStart();
+	}
+	function keyUp(event: KeyboardEvent) {
+		if (event.key !== ' ' && event.key !== 'Enter') return;
+		event.preventDefault();
+		end();
+	}
 
 	// The strip loads at idle, never against the LCP fetch — the perf gate holds the line.
 	// Until it lands the glow layers carry the medallion alone.
@@ -38,13 +73,8 @@
 		else setTimeout(load, 500);
 	});
 
-	// Sticky: states mapped to null announce nothing, so the last meaningful line holds and the
-	// region only re-announces when its content actually changes (no listening↔hearing chatter).
-	let announced = $state('');
-	$effect(() => {
-		const line = MEDALLION_ANNOUNCEMENT[current];
-		if (line) announced = line;
-	});
+	// Re-announces only when the line changes, so a steady state never re-narrates.
+	let announced = $derived(MEDALLION_ANNOUNCEMENT[current]);
 </script>
 
 <div class="medallion-wrap">
@@ -54,21 +84,28 @@
 		data-testid="eclipse-medallion"
 		data-voice-state={current}
 		aria-label={MEDALLION_LABEL[current]}
-		aria-disabled={current === 'eclipsed'}
-		style="--flare: {flare}; --ring-step: {360 /
+		aria-disabled={sealed}
+		style="--ring-step: {360 /
 			RING_RUNES.length}deg; --sprite-level: {level}; --sprite-size: {SPRITE_LEVELS *
 			100}%; --sprite-peak: {SPRITE_LEVELS - 1}"
-		onclick={() => {
-			// Sealed for the session (S4): the tap must die here, whatever the page wires in.
-			if (current !== 'eclipsed') onToggle();
-		}}
+		onpointerdown={begin}
+		onpointerup={end}
+		onpointerleave={end}
+		onpointercancel={end}
+		onkeydown={keyDown}
+		onkeyup={keyUp}
+		onblur={end}
+		oncontextmenu={(e) => e.preventDefault()}
 	>
 		<span class="visual" aria-hidden="true">
 			<span class="corona"></span>
 			<span class="clip">
 				<!-- The disc renders the 12-level volume strip (docs/ui-image-resources.md): static
-				     level per state, flare-indexed on hearing, ping-pong loop while a voice plays. -->
+				     level per state, ping-pong loop while recording or a voice plays. -->
 				<span class="disc" style={stripUrl ? `background-image: url(${stripUrl})` : ''}></span>
+				<!-- Sköll speaking: the disc darkens toward total eclipse with an ember rim — the sun
+				     devoured. A brightness/shape signal, never color alone. -->
+				<span class="eclipse-shadow"></span>
 				<span class="rune-ring">
 					{#each RING_RUNES as name, i (name)}
 						<img
@@ -89,10 +126,6 @@
 					<line x1="10.5" y1="23" x2="17.5" y2="23" />
 					<line class="mic-strike" x1="7" y1="5" x2="21" y2="23" />
 				</svg>
-				<span class="wolf-eyes">
-					<span class="eye eye--left"></span>
-					<span class="eye eye--right"></span>
-				</span>
 			</span>
 		</span>
 	</button>
@@ -120,9 +153,13 @@
 		border-radius: 50%;
 		background: transparent;
 		cursor: pointer;
+		/* A hold-to-record gesture must not scroll the page or select text on touch. */
+		touch-action: none;
+		user-select: none;
+		-webkit-user-select: none;
 	}
 
-	/* Ember palette is never the only Sköll signal — the wolf's eyes open below. */
+	/* Ember palette is never the only Sköll signal — the disc deepens to eclipse below. */
 	.medallion[data-voice-state='skoll-speaking'] {
 		--corona-rgb: 200, 71, 63;
 	}
@@ -175,8 +212,8 @@
 
 	/* The strip is a monotonic 0→11 intensity ramp, so alternate plays it as a breath:
 	   up the ramp, back down — one full pulse per two passes. */
-	.medallion[data-voice-state='listening'] .disc {
-		animation: sprite-level 2.2s steps(12, jump-none) infinite alternate;
+	.medallion[data-voice-state='recording'] .disc {
+		animation: sprite-level 1.1s steps(12, jump-none) infinite alternate;
 	}
 
 	.medallion[data-voice-state='speaking'] .disc,
@@ -184,9 +221,31 @@
 		animation: sprite-level 0.75s steps(12, jump-none) infinite alternate;
 	}
 
-	/* Ember shift for the wolf — paired with the eyes below, never the only signal. */
+	/* Ember shift for the wolf — paired with the deepening eclipse below, never the only signal. */
 	.medallion[data-voice-state='skoll-speaking'] .disc {
 		filter: hue-rotate(-40deg) saturate(1.25);
+	}
+
+	/* Sköll speaking: a dark overlay swallows the disc center (the sun devoured) while an inset
+	   ember rim glows — a brightness + shape signal, so the state never reads by color alone.
+	   Hidden in every other state. */
+	.eclipse-shadow {
+		position: absolute;
+		inset: 0;
+		border-radius: 50%;
+		background: radial-gradient(
+			circle,
+			rgba(3, 3, 8, 0.92) 36%,
+			rgba(3, 3, 8, 0.55) 60%,
+			transparent 78%
+		);
+		box-shadow: inset 0 0 12px 2px rgba(200, 71, 63, 0.9);
+		opacity: 0;
+		transition: opacity 0.3s ease;
+	}
+
+	.medallion[data-voice-state='skoll-speaking'] .eclipse-shadow {
+		opacity: 1;
 	}
 
 	@keyframes sprite-level {
@@ -220,8 +279,7 @@
 			filter 0.25s ease;
 	}
 
-	/* Asleep: the sprite's dim eclipsed-sun frame IS the partial eclipse — a CSS shadow on top
-	   of it read as a black blob, so the etched mic glyph alone marks the rest state. */
+	/* Idle: the etched mic glyph marks "hold to speak"; denied dims and strikes it. */
 	.mic-glyph {
 		position: absolute;
 		left: 50%;
@@ -237,60 +295,45 @@
 		transition: opacity 0.25s ease;
 	}
 
-	.medallion[data-voice-state='asleep'] .mic-glyph {
-		opacity: 1;
+	.medallion[data-voice-state='idle'] .mic-glyph {
+		opacity: 0.85;
 	}
 
 	.mic-strike {
 		display: none;
 	}
 
-	/* Eclipsed (S4): the dim rest frame holds, but the struck glyph is the shape signal that
-	   this is the seal, not sleep — and the cursor drops the tap affordance with it. */
-	.medallion[data-voice-state='eclipsed'] {
+	/* Denied (R1): the struck glyph is the shape signal that this is the seal, not idle — and the
+	   cursor drops the hold affordance with it. */
+	.medallion[data-voice-state='denied'] {
 		cursor: default;
 	}
 
-	.medallion[data-voice-state='eclipsed'] .mic-glyph {
+	.medallion[data-voice-state='denied'] .mic-glyph {
 		opacity: 0.45;
 	}
 
-	.medallion[data-voice-state='eclipsed'] .mic-strike {
+	.medallion[data-voice-state='denied'] .mic-strike {
 		display: inline;
 	}
 
-	/* Waking: the corona kindles — static (no animation), so the permission-prompt stretch
-	   reads as pending without needing a reduced-motion variant. */
-	.medallion[data-voice-state='waking'] .corona {
-		opacity: 0.18;
-	}
-
-	/* Listening: disc unveiled, corona breathing slow. */
-	.medallion[data-voice-state='listening'] .corona {
+	/* Idle: disc unveiled, corona breathing slowly — ready to hear you. */
+	.medallion[data-voice-state='idle'] .corona {
 		animation: corona-breathe 4.2s ease-in-out infinite;
 	}
 
-	.medallion[data-voice-state='listening'] .ring-rune {
-		opacity: 0.3;
+	/* Recording: corona flares bright and pulses fast — the rite is hearing you; rim runes ignite. */
+	.medallion[data-voice-state='recording'] .corona {
+		animation: corona-pulse 0.9s ease-in-out infinite;
+		opacity: 0.7;
 	}
 
-	/* Hearing: corona flares with the player's voice; rim runes ignite. */
-	.medallion[data-voice-state='hearing'] .corona {
-		opacity: calc(0.34 + var(--flare) * 0.56);
-		/* Full mic-amplitude flare — the player must see the medallion react to their voice. The
-		   oracle-speaking glow is contained by its own pulse cap; the mic flare must not be clamped. */
-		transform: scale(calc(1 + var(--flare) * 0.07));
-		transition:
-			opacity 0.12s linear,
-			transform 0.12s linear;
-	}
-
-	.medallion[data-voice-state='hearing'] .ring-rune {
-		opacity: calc(0.55 + var(--flare) * 0.45);
+	.medallion[data-voice-state='recording'] .ring-rune {
+		opacity: 0.7;
 		filter: var(--rune-tint) drop-shadow(0 0 4px rgba(217, 169, 74, 0.8));
 	}
 
-	/* Thinking: the rune ring orbits slowly. */
+	/* Thinking: the rune ring orbits slowly while the words are read. */
 	.medallion[data-voice-state='thinking'] .corona {
 		opacity: 0.3;
 	}
@@ -309,34 +352,9 @@
 		animation: corona-pulse 1.15s ease-in-out infinite;
 	}
 
-	/* Sköll: eyes open at the disc edge — a shape signal, independent of the ember color. */
-	.wolf-eyes {
-		opacity: 0;
-		transition: opacity 0.25s ease;
-	}
-
-	.medallion[data-voice-state='skoll-speaking'] .wolf-eyes {
-		opacity: 1;
-	}
-
-	.eye {
-		position: absolute;
-		top: 22%;
-		width: 0.85rem;
-		height: 0.4rem;
-		background: #ff7a5e;
-		box-shadow: 0 0 6px rgba(255, 122, 94, 0.9);
-		border-radius: 50% 50% 50% 50% / 75% 75% 25% 25%;
-	}
-
-	.eye--left {
-		left: 22%;
-		transform: rotate(-14deg);
-	}
-
-	.eye--right {
-		left: 58%;
-		transform: rotate(14deg);
+	.medallion[data-voice-state='speaking'] .ring-rune,
+	.medallion[data-voice-state='skoll-speaking'] .ring-rune {
+		opacity: 0.55;
 	}
 
 	@keyframes corona-breathe {
@@ -367,29 +385,26 @@
 		}
 	}
 
-	/* Static glow intensities replace pulse, orbit, and the amplitude flare (R6). The theme's
-	   global near-zero durations aren't enough here: a frozen keyframe could park at its dimmest
-	   frame, so the animations are removed and each state gets a fixed intensity. */
+	/* Static glow intensities replace the pulses and orbit (R6). The theme's global near-zero
+	   durations aren't enough here: a frozen keyframe could park at its dimmest frame, so the
+	   animations are removed and each state gets a fixed intensity. The disc freezes on its inline
+	   static frame (spriteLevel). */
 	@media (prefers-reduced-motion: reduce) {
-		/* Selector specificity must match the per-state rules above, or their animation
-		   shorthand would win and the pulse/orbit would survive reduced motion. The disc
-		   freezes on its inline static frame (spriteLevel's reduced-motion fallback). */
 		.medallion[data-voice-state] .corona,
 		.medallion[data-voice-state] .rune-ring,
 		.medallion[data-voice-state] .disc {
 			animation: none;
 		}
 
-		.medallion[data-voice-state='listening'] .corona {
+		.medallion[data-voice-state='idle'] .corona {
 			opacity: 0.38;
 		}
 
-		.medallion[data-voice-state='hearing'] .corona {
-			opacity: 0.62;
-			transform: none;
+		.medallion[data-voice-state='recording'] .corona {
+			opacity: 0.72;
 		}
 
-		.medallion[data-voice-state='hearing'] .ring-rune {
+		.medallion[data-voice-state='recording'] .ring-rune {
 			opacity: 0.85;
 		}
 

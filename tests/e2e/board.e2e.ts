@@ -264,7 +264,7 @@ test.describe('the live board (past the title screen)', () => {
 		await expect(page.getByRole('button', { name: 'Pass' })).toBeVisible();
 		await page.getByRole('button', { name: 'Pass' }).click({ trial: true });
 		await page.getByRole('button', { name: 'Pass' }).click();
-		await expect(page.getByTestId('answer')).toContainText('You hold your hand');
+		await expect(page.getByTestId('answer')).toContainText('You stay your hand');
 	});
 
 	test('refuses an empty Ask without dispatching', async ({ page }) => {

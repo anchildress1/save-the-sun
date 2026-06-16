@@ -4,21 +4,18 @@ import {
 	MEDALLION_LABEL,
 	RING_RUNES,
 	SPRITE_LEVELS,
-	flareLevel,
 	spriteLevel,
 	type MedallionState
 } from '$lib/components/medallionState';
 import { RUNE_SYMBOL_ASSET } from '$lib/components/runeVisuals';
 
 const ALL_STATES: MedallionState[] = [
-	'asleep',
-	'eclipsed',
-	'waking',
-	'listening',
-	'hearing',
+	'idle',
+	'recording',
 	'thinking',
 	'speaking',
-	'skoll-speaking'
+	'skoll-speaking',
+	'denied'
 ];
 
 describe('MEDALLION_LABEL', () => {
@@ -29,16 +26,12 @@ describe('MEDALLION_LABEL', () => {
 		}
 	});
 
-	it('invites the wake action only while asleep — every awake state offers silence', () => {
-		expect(MEDALLION_LABEL.asleep).toContain('Wake');
-		for (const state of ALL_STATES.filter((s) => s !== 'asleep' && s !== 'eclipsed')) {
-			expect(MEDALLION_LABEL[state]).toContain('Silence the voice');
-		}
+	it('offers the hold-to-speak affordance while idle', () => {
+		expect(MEDALLION_LABEL.idle).toContain('Hold');
 	});
 
-	it('promises no action while eclipsed — the seal is permanent and a tap does nothing (S4)', () => {
-		expect(MEDALLION_LABEL.eclipsed).not.toContain('Wake');
-		expect(MEDALLION_LABEL.eclipsed).not.toContain('Silence');
+	it('promises no hold while denied — the seal is inert', () => {
+		expect(MEDALLION_LABEL.denied).not.toContain('Hold');
 	});
 
 	it('names the speaker unambiguously when someone holds the fire', () => {
@@ -48,17 +41,13 @@ describe('MEDALLION_LABEL', () => {
 });
 
 describe('MEDALLION_ANNOUNCEMENT', () => {
-	it('announces the privacy-critical states and stays quiet inside a live exchange', () => {
+	it('announces every state transition with a non-empty line', () => {
 		expect(Object.keys(MEDALLION_ANNOUNCEMENT).sort()).toEqual([...ALL_STATES].sort());
-		// Mic on/off and who speaks must announce; hearing/thinking are still "listening".
-		expect(MEDALLION_ANNOUNCEMENT.asleep).toBeTruthy();
-		expect(MEDALLION_ANNOUNCEMENT.eclipsed).toBeTruthy(); // the seal is a mic-privacy state — named
-		expect(MEDALLION_ANNOUNCEMENT.waking).toBeTruthy(); // the mic is being opened — never silent
-		expect(MEDALLION_ANNOUNCEMENT.listening).toBeTruthy();
-		expect(MEDALLION_ANNOUNCEMENT.speaking).toBeTruthy();
-		expect(MEDALLION_ANNOUNCEMENT['skoll-speaking']).toBeTruthy();
-		expect(MEDALLION_ANNOUNCEMENT.hearing).toBeNull();
-		expect(MEDALLION_ANNOUNCEMENT.thinking).toBeNull();
+		for (const state of ALL_STATES) {
+			expect(MEDALLION_ANNOUNCEMENT[state].length).toBeGreaterThan(0);
+		}
+		expect(MEDALLION_ANNOUNCEMENT.speaking).toContain('Oracle');
+		expect(MEDALLION_ANNOUNCEMENT['skoll-speaking']).toContain('Sköll');
 	});
 });
 
@@ -75,60 +64,21 @@ describe('RING_RUNES', () => {
 describe('spriteLevel', () => {
 	it('keeps every state inside the strip', () => {
 		for (const state of ALL_STATES) {
-			for (const flare of [0, 0.5, 1]) {
-				const level = spriteLevel(state, flare);
-				expect(Number.isInteger(level)).toBe(true);
-				expect(level).toBeGreaterThanOrEqual(0);
-				expect(level).toBeLessThan(SPRITE_LEVELS);
-			}
+			const level = spriteLevel(state);
+			expect(Number.isInteger(level)).toBe(true);
+			expect(level).toBeGreaterThanOrEqual(0);
+			expect(level).toBeLessThan(SPRITE_LEVELS);
 		}
 	});
 
 	it.each([
-		{ state: 'asleep' as const, level: 0 },
-		{ state: 'eclipsed' as const, level: 0 },
-		{ state: 'waking' as const, level: 2 },
-		{ state: 'listening' as const, level: 4 },
+		{ state: 'denied' as const, level: 0 },
+		{ state: 'idle' as const, level: 4 },
 		{ state: 'thinking' as const, level: 4 },
+		{ state: 'recording' as const, level: 11 },
 		{ state: 'speaking' as const, level: 11 },
 		{ state: 'skoll-speaking' as const, level: 11 }
 	])('rests $state on level $level', ({ state, level }) => {
 		expect(spriteLevel(state)).toBe(level);
-	});
-
-	// The mapping is the asset's own manifest formula: min(11, floor(volume01 * 12)).
-	it.each([
-		{ label: 'silence', flare: 0, level: 0 },
-		{ label: 'a whisper', flare: 0.1, level: 1 },
-		{ label: 'low speech', flare: 0.2, level: 2 },
-		{ label: 'half flare', flare: 0.5, level: 6 },
-		{ label: 'full flare', flare: 1, level: 11 },
-		{ label: 'a negative flare clamped to the dim end', flare: -1, level: 0 },
-		{ label: 'an over-range flare clamped to the peak', flare: 2, level: 11 }
-	])('climbs the hearing ramp with $label', ({ flare, level }) => {
-		expect(spriteLevel('hearing', flare)).toBe(level);
-	});
-});
-
-describe('flareLevel', () => {
-	it.each([
-		{ label: 'silence', amplitude: 0, expected: 0 },
-		{ label: 'half-scale speech', amplitude: 0.15, expected: 0.5 },
-		{ label: 'full-scale speech', amplitude: 0.3, expected: 1 },
-		{ label: 'louder than full scale', amplitude: 0.6, expected: 1 },
-		{ label: 'raw RMS ceiling', amplitude: 1, expected: 1 },
-		{ label: 'a negative amplitude', amplitude: -0.4, expected: 0 },
-		{ label: 'NaN from a broken feed', amplitude: Number.NaN, expected: 0 },
-		{ label: 'Infinity from a broken feed', amplitude: Number.POSITIVE_INFINITY, expected: 1 }
-	])('maps $label to a flare of $expected', ({ amplitude, expected }) => {
-		expect(flareLevel(amplitude)).toBeCloseTo(expected, 10);
-	});
-
-	it('never escapes the 0..1 range CSS expects', () => {
-		for (const amplitude of [-1e9, -0.0001, 0.0001, 0.299, 0.301, 1e9]) {
-			const flare = flareLevel(amplitude);
-			expect(flare).toBeGreaterThanOrEqual(0);
-			expect(flare).toBeLessThanOrEqual(1);
-		}
 	});
 });
