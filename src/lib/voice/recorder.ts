@@ -36,13 +36,10 @@ let setupGen = 0;
 function classify(err: unknown): RecorderFailure {
 	if (err instanceof DOMException) {
 		if (err.name === 'NotAllowedError' || err.name === 'SecurityError') return 'denied';
-		if (
-			err.name === 'NotFoundError' ||
-			err.name === 'OverconstrainedError' ||
-			err.name === 'NotReadableError'
-		) {
-			return 'no-device';
-		}
+		// No device / unsatisfiable constraints are terminal for the session.
+		if (err.name === 'NotFoundError' || err.name === 'OverconstrainedError') return 'no-device';
+		// NotReadableError is an OS/hardware error (mic busy, transiently blocked) — often clears on a
+		// later attempt, so it stays in the retryable 'audio' bucket rather than sealing the session.
 	}
 	return 'audio';
 }

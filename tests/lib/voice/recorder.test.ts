@@ -112,7 +112,7 @@ describe('recorder — permission/device failures seal the session (R1)', () => 
 		{ name: 'NotAllowedError', reason: 'denied' },
 		{ name: 'SecurityError', reason: 'denied' },
 		{ name: 'NotFoundError', reason: 'no-device' },
-		{ name: 'NotReadableError', reason: 'no-device' }
+		{ name: 'OverconstrainedError', reason: 'no-device' }
 	])('classifies $name as $reason and seals', async ({ name, reason }) => {
 		getUserMedia.mockRejectedValueOnce(new DOMException('nope', name));
 		expect(await startRecording()).toEqual({ ok: false, reason });
@@ -122,14 +122,18 @@ describe('recorder — permission/device failures seal the session (R1)', () => 
 		expect(getUserMedia).toHaveBeenCalledTimes(1);
 	});
 
-	it('does NOT seal on a transient audio error — a later hold retries the mic', async () => {
-		getUserMedia.mockRejectedValueOnce(new DOMException('busy', 'AbortError'));
-		expect(await startRecording()).toEqual({ ok: false, reason: 'audio' });
-		expect(recorderSealed()).toBeNull();
-		// The next hold re-prompts and can succeed.
-		expect(await startRecording()).toEqual({ ok: true });
-		expect(getUserMedia).toHaveBeenCalledTimes(2);
-	});
+	it.each(['AbortError', 'NotReadableError'])(
+		'does NOT seal on a transient %s — a later hold retries the mic',
+		async (name) => {
+			// NotReadableError is an OS/hardware "device busy" error that often clears — retryable, not sealed.
+			getUserMedia.mockRejectedValueOnce(new DOMException('busy', name));
+			expect(await startRecording()).toEqual({ ok: false, reason: 'audio' });
+			expect(recorderSealed()).toBeNull();
+			// The next hold re-prompts and can succeed.
+			expect(await startRecording()).toEqual({ ok: true });
+			expect(getUserMedia).toHaveBeenCalledTimes(2);
+		}
+	);
 
 	it('closes the AudioContext (not just the track) when worklet setup fails — no leak', async () => {
 		class FailingCtx extends FakeAudioContext {
