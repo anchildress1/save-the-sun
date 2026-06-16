@@ -233,6 +233,78 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 		expect(input.disabled).toBe(false);
 	});
 
+	it('a transient mic failure returns to idle with a retry notice — not sealed', async () => {
+		recorderMock.startRecording.mockResolvedValueOnce({ ok: false, reason: 'audio' });
+		const screen = render(Page, pageProps);
+		press(screen);
+		// 'audio' is retryable: the medallion stays usable rather than dropping to the inert 'denied'.
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+		await expect
+			.element(screen.getByTestId('voice-notice'))
+			.toHaveTextContent('The fire flickered. Hold again to speak.');
+	});
+
+	it('ends a page-level Space hold on keyup even after focus moves to a control', async () => {
+		const screen = render(Page, pageProps);
+		(document.activeElement as HTMLElement | null)?.blur();
+		holdSpace(); // started from page chrome
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		// Focus moves into the Ask field mid-hold; the release must still end the recording.
+		screen.container.querySelector<HTMLInputElement>('#oracle-ask')!.focus();
+		releaseSpace();
+		await vi.waitFor(() => expect(recorderMock.stopRecording).toHaveBeenCalled());
+	});
+
+	it('drops a stale clip when an intervening action moved the turn', async () => {
+		// Hold the transcription open so an intervening typed Ask can land (and advance the turn) first.
+		let finishTranscribe: (text: string) => void = () => {};
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const url = String(input);
+			if (url === '/api/voice/transcribe') {
+				return new Promise<Response>((resolve) => {
+					finishTranscribe = (text) => resolve(new Response(JSON.stringify({ text })));
+				});
+			}
+			if (url === '/api/action') {
+				const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+				if (body.type === 'Advance') {
+					return new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN }));
+				}
+				// A typed Ask consumes the turn — turns advances, making the in-flight spoken clip stale.
+				return new Response(
+					JSON.stringify({
+						type: 'Ask',
+						oracle: {
+							ok: true,
+							query: { axis: 'element', value: 'Fire' },
+							answer: ASK_ANSWER,
+							affirmative: false,
+							turnConsumed: true
+						},
+						skollVsYou: { reaction: 'Pass' },
+						state: { ...HUMAN_TURN, turns: 5 }
+					})
+				);
+			}
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		press(screen);
+		release(screen);
+		await vi.waitFor(() => expect(recorderMock.stopRecording).toHaveBeenCalled());
+		// A typed Ask lands first and advances the turn.
+		await screen.getByLabelText('Ask the Oracle').fill('typed question?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		// Wait for the typed answer to render — proof its state (turns advanced) has been applied.
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent(ASK_ANSWER);
+		// The spoken transcript returns stale — it must NOT be dispatched into the moved turn.
+		finishTranscribe('stale spoken clip');
+		await vi.waitFor(() => expect(medallion(screen)).toHaveAttribute('data-voice-state', 'idle'));
+		expect(actionBodies().some((b) => b.type === 'Ask' && b.question === 'stale spoken clip')).toBe(
+			false
+		);
+	});
+
 	it('adopts an already-sealed mic at mount — a remount must not promise a hold', async () => {
 		recorderMock.recorderSealed.mockReturnValue('denied');
 		const screen = render(Page, pageProps);
@@ -345,6 +417,43 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 		window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
 		await vi.waitFor(() =>
 			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'outcome', result: 'win' })
+		);
+	});
+
+	it('queues a Sköll Ask resumed before the speaker opens, voicing it on the first gesture', async () => {
+		allowMotion(); // audio defaults on
+		const ASK_QUERY = { axis: 'element', value: 'Fire' };
+		const SKOLL_TURN: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (body.type === 'Advance') {
+				return new Response(
+					JSON.stringify({
+						type: 'Advance',
+						skoll: { asks: { echo: 'I scent fire on her.', query: ASK_QUERY } },
+						state: SKOLL_TURN
+					})
+				);
+			}
+			return new Response('{}');
+		});
+		// Resume on Sköll's turn: onMount re-drives his Advance before any gesture opens the speaker.
+		const screen = render(Page, { ...pageProps, data: { ...pageProps.data, state: SKOLL_TURN } });
+		await expect
+			.element(screen.getByTestId('skoll-echo'))
+			.toHaveTextContent('I scent fire on her.');
+		// deliver() is a no-op until the speaker exists — the Ask is held, not spent.
+		expect(deliveryMock.deliver).not.toHaveBeenCalled();
+
+		window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'skoll-ask', query: ASK_QUERY })
 		);
 	});
 

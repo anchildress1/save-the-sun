@@ -115,7 +115,9 @@
 		muteVoices: 'Silence the voices. Their words still appear in writing.',
 		unmuteVoices: 'Let the voices be heard.',
 		// Push-to-talk (R1): a denied or absent mic seals the medallion; the rite goes on by hand.
-		micDenied: 'The fire cannot hear you. The rite continues by hand.'
+		micDenied: 'The fire cannot hear you. The rite continues by hand.',
+		// A transient mic failure (not sealed) — the player can hold again to retry.
+		micRetry: 'The fire flickered. Hold again to speak.'
 	};
 
 	let castMode = $state(false);
@@ -276,6 +278,21 @@
 	// the end-screen hold awaits so the splash never preempts her final answer.
 	let answerAudio: Promise<void> | null = null;
 
+	// A Sköll Ask generated before the speaker is open (a reload that resumes on his turn re-drives his
+	// move in onMount, before the first gesture) is held here and voiced once audio is ready, so it
+	// isn't spent into a no-op deliver() and lost while audio is on.
+	let pendingSkollVoice: LineDescriptor | null = null;
+	function voiceSkollAsk(descriptor: LineDescriptor) {
+		if (audioReady) void deliver(descriptor);
+		else if (audioOn) pendingSkollVoice = descriptor;
+	}
+	function flushPendingVoice() {
+		if (pendingSkollVoice && audioReady) {
+			void deliver(pendingSkollVoice);
+			pendingSkollVoice = null;
+		}
+	}
+
 	// Hold the end-screen splash until her last line has been heard. Only when audio is on — silent
 	// play resolves instantly. Capped (8s) so a stuck synth can never strand the round on the board.
 	$effect(() => {
@@ -355,9 +372,11 @@
 			}
 			audioOn = true;
 			audioReady = true;
+			flushPendingVoice(); // a resumed Sköll Ask held before audio was on now voices
 		} else {
 			audioOn = false;
 			audioReady = false;
+			pendingSkollVoice = null; // muted: drop the held line rather than voice it on a later unmute
 			disableDelivery();
 		}
 		writeMuted(!audioOn);
@@ -380,8 +399,15 @@
 		holdSetupPending = false;
 		if (!verdict.ok) {
 			holdWanted = false;
-			medalState = 'denied';
-			voiceNotice = RITE.micDenied;
+			if (verdict.reason === 'audio') {
+				// Transient (the recorder didn't seal it) — return to idle so the player can retry; the
+				// 'denied' state would make the medallion inert and lock out a mic that still works.
+				medalState = 'idle';
+				voiceNotice = RITE.micRetry;
+			} else {
+				medalState = 'denied';
+				voiceNotice = RITE.micDenied;
+			}
 			return;
 		}
 		if (!holdWanted) {
@@ -404,18 +430,26 @@
 		// Whether a reaction is owed is decided at release: a held reply while Sköll's question hangs
 		// is a scry/hex/pass, not an Ask. Captured before the async read so it can't drift mid-call.
 		const reacting = skollAsking;
+		// Snapshot the round + turn at release. Transcription is async and doesn't reserve the turn, so
+		// an intervening typed Ask, reaction, cast, or new game could land first — `fresh()` drops the
+		// now-stale clip instead of replaying it into a later round/turn.
+		const token = `${roundId}:${turns}`;
+		const fresh = () => `${roundId}:${turns}` === token;
 		medalState = 'thinking';
 		try {
 			const clip = await stopRecording();
 			if (clip && reacting) {
-				await respondReaction(await classifyReactionUtterance(clip.wavBase64));
+				const choice = await classifyReactionUtterance(clip.wavBase64);
+				if (fresh()) await respondReaction(choice);
 			} else if (clip) {
 				// Dispatch straight to the engine — the spoken words never fill the typing box (the
 				// transcribe route tees what was heard to /debug for mishear diagnosis). Mirror the typed
 				// box's gate (canAct/pending/castMode), re-checked after the async read: a hold that began
 				// during Sköll's turn must not land an Ask once the lock frees and steal the next turn.
 				const question = (await transcribeUtterance(clip.wavBase64)).trim();
-				if (question !== '' && canAct && !pending && !castMode) await runAsk(question, false);
+				if (question !== '' && fresh() && canAct && !pending && !castMode) {
+					await runAsk(question, false);
+				}
 			}
 		} catch (err) {
 			console.error('[ui] push-to-talk failed:', err);
@@ -546,7 +580,7 @@
 			// His Ask is a game move (R10) — written on his frame and voiced in his own voice through the
 			// same delivery seam as the Oracle (a no-op when audio is off). The medallion shows
 			// 'skoll-speaking' from the delivery event while it plays.
-			if (skoll?.asks) void deliver(skollVoice(skoll.asks.query));
+			if (skoll?.asks) voiceSkollAsk(skollVoice(skoll.asks.query));
 			// A Sköll win deliberately leaves the Oracle's last voiced line in place (the answer, and
 			// his Scry note when he overheard it) — that line is the WHY of the loss, and the end
 			// screen already owns the "Sköll takes the sun" text. Never double it into the panel.
@@ -612,21 +646,30 @@
 			if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(node.tagName)) return true;
 			return node.getAttribute('role') === 'button';
 		}
+		// Once a page-level Space press starts a hold it OWNS that hold until keyup — even if focus moves
+		// to the Ask field or a button mid-hold. Keying the keyup off live focus would skip endHold and
+		// strand the recorder in 'recording'.
+		let spaceHeldByPage = false;
 		function onKeyDown(e: KeyboardEvent) {
-			if (e.code !== 'Space' || ownsSpace(document.activeElement)) return;
+			if (e.code !== 'Space') return;
+			// A focused control that uses Space owns it — unless we already started a page-level hold.
+			if (!spaceHeldByPage && ownsSpace(document.activeElement)) return;
 			// preventDefault on EVERY Space keydown, including auto-repeats while held — otherwise the
 			// repeat events scroll the page. Only the first (non-repeat) press starts the hold.
 			e.preventDefault();
-			if (e.repeat) return;
+			if (e.repeat || spaceHeldByPage) return;
+			spaceHeldByPage = true;
 			void startHold();
 		}
 		function onKeyUp(e: KeyboardEvent) {
-			if (e.code !== 'Space' || ownsSpace(document.activeElement)) return;
+			if (e.code !== 'Space' || !spaceHeldByPage) return;
 			e.preventDefault();
+			spaceHeldByPage = false;
 			void endHold();
 		}
 		// Tabbing/clicking away mid-hold must end the recording, or it would hang in 'recording'.
 		function onBlur() {
+			spaceHeldByPage = false;
 			void endHold();
 		}
 		window.addEventListener('keydown', onKeyDown);
@@ -649,6 +692,7 @@
 			try {
 				enableDelivery();
 				audioReady = true;
+				flushPendingVoice(); // a resumed Sköll Ask held before the speaker opened now voices
 			} catch (err) {
 				console.error('[ui] could not open the delivery speaker:', err);
 				audioOn = false;
