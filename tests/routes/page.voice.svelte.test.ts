@@ -583,4 +583,52 @@ describe('Save the Sun page — spoken reaction to Sköll', () => {
 			.toHaveTextContent('Your scrying is spent for the night.');
 		expect(actionBodies()).toHaveLength(0);
 	});
+
+	it('a hold begun during the question never becomes an Ask if a button closes the window mid-hold', async () => {
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const url = String(input);
+			if (url === '/api/voice/transcribe') {
+				const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+				// Ask-mode would surface a question (the misclassification bug); reaction-mode a choice.
+				return new Response(
+					JSON.stringify(body.mode === 'reaction' ? { choice: 'scry' } : { text: 'is it fire' })
+				);
+			}
+			if (url === '/api/action') {
+				const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+				if (body.type === 'React') {
+					return new Response(
+						JSON.stringify({ type: 'React', state: { ...HUMAN_TURN, turns: 1 }, skollReaction: {} })
+					);
+				}
+				return new Response(
+					JSON.stringify({
+						type: 'Ask',
+						oracle: {
+							ok: true,
+							query: { axis: 'element', value: 'Fire' },
+							answer: ASK_ANSWER,
+							affirmative: false,
+							turnConsumed: true
+						},
+						skollVsYou: { reaction: 'Pass' },
+						state: HUMAN_TURN
+					})
+				);
+			}
+			return new Response('{}');
+		});
+		const screen = render(Page, reactionProps());
+		press(screen); // reaction intent fixed at the press — Sköll is asking
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		// A button answers (and closes) the question before the hold is released.
+		await screen.getByRole('button', { name: 'Hex' }).click();
+		await vi.waitFor(() =>
+			expect(actionBodies()).toContainEqual({ type: 'React', player: 'Human', reaction: 'Hex' })
+		);
+		release(screen);
+		await vi.waitFor(() => expect(medallion(screen)).toHaveAttribute('data-voice-state', 'idle'));
+		// The held clip stays a (now-stale) reaction — it never lands an Ask in the moved turn.
+		expect(actionBodies().some((b) => b.type === 'Ask')).toBe(false);
+	});
 });

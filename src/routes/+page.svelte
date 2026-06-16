@@ -342,6 +342,11 @@
 	let audioReady = $state(false);
 	let holdWanted = false;
 	let holdSetupPending = false;
+	// The hold's intent is fixed at PRESS, not release: whether Sköll's question hung then (reaction vs
+	// Ask) and the round/turn at that moment. A button reaction or any action during the hold then
+	// changes the live state but not these — so the clip resolves as what the player meant, or drops.
+	let holdReacting = false;
+	let holdToken = '';
 
 	// Drive the medallion's voice from delivery playback: a line begins → its speaker; the queue
 	// drains → back to idle (unless a hold/transcribe is mid-flight, which owns the state then).
@@ -393,6 +398,9 @@
 		if (holdWanted || holdSetupPending || medalState === 'recording' || medalState === 'thinking') {
 			return;
 		}
+		// Fix the hold's intent + freshness at the moment of the press.
+		holdReacting = skollAsking;
+		holdToken = `${roundId}:${turns}`;
 		holdWanted = true;
 		holdSetupPending = true;
 		const verdict = await startRecording();
@@ -427,13 +435,11 @@
 	}
 
 	async function finishHold() {
-		// Whether a reaction is owed is decided at release: a held reply while Sköll's question hangs
-		// is a scry/hex/pass, not an Ask. Captured before the async read so it can't drift mid-call.
-		const reacting = skollAsking;
-		// Snapshot the round + turn at release. Transcription is async and doesn't reserve the turn, so
-		// an intervening typed Ask, reaction, cast, or new game could land first — `fresh()` drops the
-		// now-stale clip instead of replaying it into a later round/turn.
-		const token = `${roundId}:${turns}`;
+		// Intent + freshness were fixed at the press (holdReacting/holdToken), not here: a button reaction
+		// or any action taken DURING the hold can't reclassify a held scry/hex/pass into an Ask, and the
+		// stale clip is dropped rather than replayed into the moved turn.
+		const reacting = holdReacting;
+		const token = holdToken;
 		const fresh = () => `${roundId}:${turns}` === token;
 		medalState = 'thinking';
 		try {
