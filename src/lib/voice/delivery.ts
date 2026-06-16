@@ -101,6 +101,12 @@ export function deliveryReady(): boolean {
 	return speaker !== null;
 }
 
+/** Current output level (RMS, 0–1) of the open speaker, or 0 when none — the medallion polls this
+ *  each frame to pulse with the voice instead of a fixed CSS loop. */
+export function currentLevel(): number {
+	return speaker?.level() ?? 0;
+}
+
 /**
  * Silence/unsilence delivered audio without dropping the queue (R11): captions are untouched.
  * Remembered for a speaker opened later, so the preference survives across enable/disable.

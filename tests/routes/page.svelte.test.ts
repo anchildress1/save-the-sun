@@ -14,6 +14,7 @@ vi.mock('$lib/voice/delivery', () => ({
 	deliver: vi.fn(async () => {}),
 	whenDrained: vi.fn(async () => {}),
 	deliveryReady: vi.fn(() => false),
+	currentLevel: vi.fn(() => 0),
 	subscribeDelivery: () => () => {}
 }));
 vi.mock('$lib/voice/recorder', () => ({

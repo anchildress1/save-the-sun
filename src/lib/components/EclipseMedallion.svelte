@@ -16,16 +16,47 @@
 	// (Aliased locally: a binding literally named `state` collides with the $state rune.)
 	let {
 		state: current,
+		getLevel,
 		onHoldStart,
 		onHoldEnd
 	}: {
 		state: MedallionState;
+		// Live output level (RMS 0–1) sampled each frame while a voice plays — drives the disc/corona
+		// pulse from the real audio envelope instead of a fixed CSS loop. Absent → static fallback.
+		getLevel?: () => number;
 		onHoldStart: () => void;
 		onHoldEnd: () => void;
 	} = $props();
 
-	let level = $derived(spriteLevel(current));
 	let sealed = $derived(current === 'denied');
+	const isSpeaking = (s: MedallionState) => s === 'speaking' || s === 'skoll-speaking';
+
+	// The live output envelope (RMS 0–1), polled each frame while a voice plays and motion is allowed.
+	// Reset to 0 otherwise, so a non-speaking or reduced-motion medallion falls back to spriteLevel.
+	let liveLevel = $state(0);
+	let reducedMotion = $state(false);
+	let pulsing = $derived(isSpeaking(current) && !reducedMotion && getLevel !== undefined);
+
+	// Disc frame: the live envelope mapped onto the 0–11 strip while pulsing; the state's fixed frame
+	// otherwise. Corona level (0–1) drives the speaking-state glow's opacity/scale from the same source.
+	let level = $derived(
+		pulsing ? Math.round(liveLevel * (SPRITE_LEVELS - 1)) : spriteLevel(current)
+	);
+	let coronaLevel = $derived(pulsing ? liveLevel : 0);
+
+	// Poll the speaker's level each animation frame while a voice plays — the disc/corona then pulse
+	// to the real envelope. Stops the moment the state leaves speaking (or motion is reduced).
+	$effect(() => {
+		if (!pulsing) {
+			liveLevel = 0;
+			return;
+		}
+		let raf = requestAnimationFrame(function tick() {
+			liveLevel = getLevel!();
+			raf = requestAnimationFrame(tick);
+		});
+		return () => cancelAnimationFrame(raf);
+	});
 
 	// pointerdown begins the hold; release/leave/cancel ends it. Guarded against a denied mic and
 	// against a stray pointerup with no matching down (e.g. a release that started off the disc).
@@ -71,6 +102,15 @@
 		// The timeout bounds a page that never goes idle — the art must still arrive.
 		if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 1500 });
 		else setTimeout(load, 500);
+
+		// Honor prefers-reduced-motion for the JS-driven pulse too (the CSS @media only covers the
+		// loops): when reduced, the live level is ignored and the disc/corona hold their static frame.
+		const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+		if (!motion) return;
+		reducedMotion = motion.matches;
+		const onChange = (e: MediaQueryListEvent) => (reducedMotion = e.matches);
+		motion.addEventListener('change', onChange);
+		return () => motion.removeEventListener('change', onChange);
 	});
 
 	// Re-announces only when the line changes, so a steady state never re-narrates.
@@ -87,7 +127,7 @@
 		aria-disabled={sealed}
 		style="--ring-step: {360 /
 			RING_RUNES.length}deg; --sprite-level: {level}; --sprite-size: {SPRITE_LEVELS *
-			100}%; --sprite-peak: {SPRITE_LEVELS - 1}"
+			100}%; --sprite-peak: {SPRITE_LEVELS - 1}; --corona-level: {coronaLevel}"
 		onpointerdown={begin}
 		onpointerup={end}
 		onpointerleave={end}
@@ -216,10 +256,9 @@
 		animation: sprite-level 1.1s steps(12, jump-none) infinite alternate;
 	}
 
-	.medallion[data-voice-state='speaking'] .disc,
-	.medallion[data-voice-state='skoll-speaking'] .disc {
-		animation: sprite-level 0.75s steps(12, jump-none) infinite alternate;
-	}
+	/* Speaking: the disc frame is driven by the live output level (--sprite-level, set per frame from
+	   RMS in script) — no CSS loop, so the strip pulses with the actual voice. Reduced motion holds
+	   the static frame (the live level isn't sampled then). */
 
 	/* Ember shift for the wolf — paired with the deepening eclipse below, never the only signal. */
 	.medallion[data-voice-state='skoll-speaking'] .disc {
@@ -346,10 +385,13 @@
 		opacity: 0.55;
 	}
 
-	/* Speaking: the corona pulses — gold for the Oracle, ember for the wolf. */
+	/* Speaking: the corona swells with the live output level (--corona-level, RMS per frame) — gold
+	   for the Oracle, ember for the wolf — instead of a fixed pulse loop. At rest (level 0) it sits at
+	   its base glow; a loud beat brightens and grows it. Reduced motion pins it static (@media below). */
 	.medallion[data-voice-state='speaking'] .corona,
 	.medallion[data-voice-state='skoll-speaking'] .corona {
-		animation: corona-pulse 1.15s ease-in-out infinite;
+		opacity: calc(0.34 + var(--corona-level, 0) * 0.5);
+		transform: scale(calc(1 + var(--corona-level, 0) * 0.04));
 	}
 
 	.medallion[data-voice-state='speaking'] .ring-rune,
@@ -411,6 +453,7 @@
 		.medallion[data-voice-state='speaking'] .corona,
 		.medallion[data-voice-state='skoll-speaking'] .corona {
 			opacity: 0.7;
+			transform: none;
 		}
 	}
 

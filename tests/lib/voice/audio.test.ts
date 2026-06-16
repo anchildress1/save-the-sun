@@ -15,6 +15,16 @@ interface FakeGain {
 	connect: ReturnType<typeof vi.fn>;
 }
 
+class FakeAnalyser {
+	fftSize = 2048;
+	connect = vi.fn();
+	// Test-controlled byte time-domain data; 128 = silence (the midpoint).
+	timeData: number[] = [];
+	getByteTimeDomainData(out: Uint8Array): void {
+		for (let i = 0; i < out.length; i++) out[i] = this.timeData[i] ?? 128;
+	}
+}
+
 class FakeAudioContext {
 	static instances: FakeAudioContext[] = [];
 	sampleRate: number;
@@ -24,6 +34,7 @@ class FakeAudioContext {
 	close = vi.fn(async () => {});
 	sources: FakeSource[] = [];
 	gains: FakeGain[] = [];
+	analysers: FakeAnalyser[] = [];
 
 	constructor(options: { sampleRate: number }) {
 		this.sampleRate = options.sampleRate;
@@ -34,6 +45,12 @@ class FakeAudioContext {
 		const gain: FakeGain = { gain: { value: 1 }, connect: vi.fn() };
 		this.gains.push(gain);
 		return gain;
+	}
+
+	createAnalyser(): FakeAnalyser {
+		const analyser = new FakeAnalyser();
+		this.analysers.push(analyser);
+		return analyser;
 	}
 
 	createBuffer(_channels: number, length: number, rate: number) {
@@ -81,10 +98,22 @@ describe('createSpeaker', () => {
 		expect(first.start).toHaveBeenCalledExactlyOnceWith(1);
 		expect(second.start).toHaveBeenCalledExactlyOnceWith(1 + 2 / SPEAKER_SAMPLE_RATE);
 		expect([...first.buffer!.getChannelData(0)]).toEqual([0.5, -0.5]);
-		// Sources feed the master gain (the mute seam); the master alone reaches the output.
+		// Sources → analyser (pre-mute tap for the medallion) → master gain (mute seam) → output.
 		const master = context.gains[0];
-		expect(first.connect).toHaveBeenCalledExactlyOnceWith(master);
+		const analyser = context.analysers[0];
+		expect(first.connect).toHaveBeenCalledExactlyOnceWith(analyser);
+		expect(analyser.connect).toHaveBeenCalledExactlyOnceWith(master);
 		expect(master.connect).toHaveBeenCalledExactlyOnceWith(context.destination);
+	});
+
+	it('reports output level as RMS in [0, 1] — 0 at silence, near 1 at full swing', () => {
+		const speaker = createSpeaker();
+		const analyser = FakeAudioContext.instances[0].analysers[0];
+		// All midpoint bytes (128) → silence → RMS 0.
+		expect(speaker.level()).toBe(0);
+		// A full-swing wave around the midpoint → RMS near 1.
+		analyser.timeData = Array.from({ length: analyser.fftSize }, (_, i) => (i % 2 ? 255 : 0));
+		expect(speaker.level()).toBeGreaterThan(0.9);
 	});
 
 	it('starts silent when created muted and restores full gain on unmute', () => {

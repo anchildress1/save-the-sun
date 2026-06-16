@@ -15,6 +15,7 @@ const deliveryMock = vi.hoisted(() => {
 		stopDelivery: vi.fn(),
 		deliver: vi.fn<(descriptor: { kind: string }) => Promise<void>>(async () => {}),
 		whenDrained: vi.fn(async () => {}),
+		currentLevel: vi.fn(() => 0),
 		subscribeDelivery(listener: (event: unknown) => void) {
 			listeners.add(listener);
 			return () => listeners.delete(listener);

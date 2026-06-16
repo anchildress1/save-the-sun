@@ -14,6 +14,7 @@
 		deliver,
 		whenDrained,
 		subscribeDelivery,
+		currentLevel,
 		type DeliveryEvent
 	} from '$lib/voice/delivery';
 	import {
@@ -1182,7 +1183,12 @@
 				<!-- The Oracle's two controls: the medallion (hold to speak — pointer, or hold Space) and
 				     the output-mute switch. Both are native buttons; Tab reaches each. -->
 				<div class="voice-controls" role="group" aria-label="Oracle voice controls">
-					<EclipseMedallion state={medalState} onHoldStart={startHold} onHoldEnd={endHold} />
+					<EclipseMedallion
+						state={medalState}
+						getLevel={currentLevel}
+						onHoldStart={startHold}
+						onHoldEnd={endHold}
+					/>
 					<button
 						class="voice-switch"
 						type="button"
