@@ -322,11 +322,13 @@ async function playSkollIfActive(
 	geminiEvents(sessionId, part);
 	const crossedThisMove = [...skoll.crossed].filter((id) => !before.has(id));
 
-	// llm when Gemini decided, deterministic + warn when the floor did (so a fallback stands out).
+	// llm when Gemini decided; deterministic when the floor did (a failure fallback OR the guard's
+	// forced cast). A genuine fallback warns so it stands out; the guard cast is normal play (info).
 	const floored = out.source === 'floor';
+	const deterministic = floored || out.source === 'guard';
 	logEvent(sessionId, {
 		owner: 'Sköll',
-		kind: floored ? 'deterministic' : 'llm',
+		kind: deterministic ? 'deterministic' : 'llm',
 		part,
 		level: floored ? 'warn' : 'info',
 		message: out.kind === 'cast' ? `casts ${out.runeName}` : out.echo,

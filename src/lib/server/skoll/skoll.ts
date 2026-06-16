@@ -18,7 +18,7 @@ import {
 	type ReactionChoice,
 	type ReactionOutcome
 } from '$lib/server/engine/reactions';
-import { chooseFloorMove, type EarnedFact } from './floor';
+import { chooseFloorMove, liveCandidates, type EarnedFact } from './floor';
 
 /** Sköll's private, per-round memory. Holds no secret and no read of the human's crossings. */
 export interface SkollState {
@@ -111,7 +111,11 @@ export interface RawSkollDecision {
 export type SkollDecide = (payload: SkollPayload) => Promise<RawSkollDecision>;
 
 export type SkollMove = { kind: 'ask'; query: Query } | { kind: 'cast'; runeName: string };
-export type SkollSource = 'gemini' | 'floor';
+// 'gemini' — his decision stood. 'floor' — Gemini failed (threw/illegal/malformed) and the
+// deterministic fallback played. 'guard' — Gemini's play legitimately cornered the board to ≤2 and
+// the convergence guard forced the closing cast; NOT a failure, so the live corpus counts it as real
+// play (apart from a 'floor' fallback, which taints live evidence).
+export type SkollSource = 'gemini' | 'floor' | 'guard';
 
 export type SkollOutcome =
 	| { kind: 'cast'; source: SkollSource; reasoning: string; runeName: string; result: CastResult }
@@ -264,10 +268,18 @@ async function planMove(
 	rng: () => number
 ): Promise<{ move: SkollMove } & SkollDecision> {
 	const payload = buildPayload(state);
+	// Set when Gemini's play cornered the board to ≤2 and the guard forced the cast — distinct from a
+	// genuine failure floor, so the live corpus can count it as real play (see SkollSource).
+	let guardForced = false;
 	try {
 		const raw = await decide(payload);
 		const move = validateMove(raw);
-		if (move) {
+		// Convergence guard (server-authoritative): once only one or two runes can still be the secret,
+		// he MUST cast. A model that keeps asking there is the non-convergence the floor never had —
+		// drop the ask and let the floor name one of the survivors (it casts at ≤2), so the round closes
+		// near the target window no matter how the model plays.
+		const corneredAsk = move?.kind === 'ask' && liveCandidates(state.facts).length <= 2;
+		if (move && !corneredAsk) {
 			for (const id of legalCrossOffs(raw.crossOff)) state.crossed.add(id);
 			if (dev && state.crossed.size)
 				console.debug(`[skoll] sheet: ${[...state.crossed].join(',')}`);
@@ -278,13 +290,22 @@ async function planMove(
 				reasoning: raw.reasoning?.trim() || summarizePayload(payload)
 			};
 		}
-		console.warn(`[skoll] illegal/malformed decision, floor fires: ${JSON.stringify(raw)}`);
+		if (corneredAsk) {
+			guardForced = true;
+			console.warn('[skoll] ask refused at ≤2 live candidates — forcing the cast');
+		} else {
+			console.warn(`[skoll] illegal/malformed decision, floor fires: ${JSON.stringify(raw)}`);
+		}
 	} catch (err) {
 		console.error('[skoll] Gemini decision failed, floor fires:', err);
 	}
 	// The floor doesn't reason — the demo shows the earned-only state it played from instead.
 	const floor = chooseFloorMove(state.facts, asked(state), rng);
-	return { move: floor, source: 'floor', reasoning: summarizePayload(payload) };
+	return {
+		move: floor,
+		source: guardForced ? 'guard' : 'floor',
+		reasoning: summarizePayload(payload)
+	};
 }
 
 /** Already-asked queries — the answers he holds; the floor excludes them as redundant. */

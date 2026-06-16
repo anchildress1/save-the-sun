@@ -27,9 +27,12 @@ export interface SimResult {
 	secret: string;
 	turns: number;
 	won: boolean;
-	/** Moves that fell back to the floor (decider threw or returned an illegal move). The floor-only
-	 *  sweep expects this to equal `turns`; a live run uses it to reject floor-contaminated proof. */
+	/** Moves that fell back to the floor because the decider FAILED (threw / illegal / malformed). The
+	 *  floor-only sweep expects this to equal `turns`; a live run uses it to reject contaminated proof. */
 	floorMoves: number;
+	/** Moves where the ≤2 convergence guard forced the closing cast — Gemini's play cornered the
+	 *  board, so this is real live play, not a failure. Counted apart from `floorMoves`. */
+	guardMoves: number;
 }
 
 // A decider that always rejects, so planMove always drops to the deterministic floor. This is how the
@@ -80,6 +83,7 @@ export async function playFloorGame(
 	const secret = selectSecret(seed);
 	let turns = 0;
 	let floorMoves = 0;
+	let guardMoves = 0;
 
 	for (let move = 0; move < MAX_MOVES; move++) {
 		// The human seat takes no action in self-play — hand the turn straight to Sköll.
@@ -88,12 +92,14 @@ export async function playFloorGame(
 		const out = await takeSkollTurn(engine, state, decide, state.rng);
 		turns += 1;
 		if (out.source === 'floor') floorMoves += 1;
+		else if (out.source === 'guard') guardMoves += 1;
 
 		if (out.kind === 'cast') {
 			// An illegal cast (unknown rune, out of turn, round over) is a harness regression, not play.
 			if (!out.result.ok)
 				throw new Error(`harness: illegal cast (${out.result.reason}) on seed ${seed}`);
-			if (out.result.won) return { seed, secret: secret.name, turns, won: true, floorMoves };
+			if (out.result.won)
+				return { seed, secret: secret.name, turns, won: true, floorMoves, guardMoves };
 			// A legal-but-wrong cast is real self-play slack; takeSkollTurn already ruled the rune out.
 			continue;
 		}
@@ -104,7 +110,7 @@ export async function playFloorGame(
 
 	// Unreachable from truthful play (a wrong cast can't recur, so the trait space bounds the loop);
 	// the cap only guards against a logic regression turning into a hang.
-	return { seed, secret: secret.name, turns, won: false, floorMoves };
+	return { seed, secret: secret.name, turns, won: false, floorMoves, guardMoves };
 }
 
 /** Aggregate self-play metrics across a contiguous seed sweep `[startSeed, startSeed + games)`. */
@@ -137,8 +143,9 @@ export async function simulateFloor(games: number, startSeed = 1): Promise<SimMe
 	};
 }
 
-/** Run `fn` with console.error/warn silenced — the floor's expected "Gemini failed" noise. */
-async function withQuietConsole<T>(fn: () => Promise<T>): Promise<T> {
+/** Run `fn` with console.error/warn silenced — the floor's expected "Gemini failed" / guard noise.
+ *  Exported so the live runner can wrap each game and keep its per-seed result lines clean. */
+export async function withQuietConsole<T>(fn: () => Promise<T>): Promise<T> {
 	const { error, warn } = console;
 	console.error = () => {};
 	console.warn = () => {};

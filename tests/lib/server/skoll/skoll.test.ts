@@ -238,6 +238,26 @@ describe('takeSkollTurn — Gemini plays, engine referees', () => {
 		expect(engine.winner).toBe('Sköll');
 	});
 
+	it('forces a cast at ≤2 live candidates, overriding an ask Gemini still wants', async () => {
+		const engine = skollsTurn();
+		// One rune can still be the secret — the convergence guard must override the ask so the round
+		// closes instead of letting him keep narrowing a field of one.
+		const state: SkollState = {
+			...freshSkollState(SEED),
+			facts: [{ query: { axis: 'rune', value: 'Sowilo' }, answer: true }]
+		};
+		const out = await takeSkollTurn(
+			engine,
+			state,
+			decideAsk({ axis: 'fill', value: 'Light' }),
+			mulberry32(1)
+		);
+		expect(out.kind).toBe('cast'); // not the ask Gemini returned
+		expect(out.source).toBe('guard'); // forced by the ≤2 guard, distinct from a failure floor
+		if (out.kind === 'cast') expect(out.runeName).toBe('Sowilo');
+		expect(engine.reactionWindow).toBeNull(); // a cast — no Ask window opened
+	});
+
 	it('falls to the floor on an illegal/malformed decision', async () => {
 		const engine = skollsTurn();
 		const decide: SkollDecide = vi.fn(async () => ({ kind: 'ask', query: { axis: 'nonsense' } }));

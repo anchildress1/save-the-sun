@@ -7,6 +7,13 @@
 // keep him playing DOWN to a ~12-year-old: hunches, one clue at a time, no probability math, no
 // reach for the best split (a smarter model would only over-optimize, so escalating tiers is the
 // wrong lever — Flash-Lite would be the move if anything, not Pro).
+//
+// Two levers hold his wins in the 7.5–9 window. Thinking stays MINIMAL so he never optimizes his way
+// to a fast win (raising it to LOW overshot — ~5–6 turn wins, too sharp). Temperature paces the rest:
+// the old non-convergence (150+ turn games) was temp 1's rambling, NOT low thinking, so the ≤2 cast
+// guard (skoll.ts forces the closing cast once one or two runes remain) backstops the tail and frees
+// the temperature to be tuned for pace alone — 0.7, loose enough to narrow as hunch-y and suboptimally
+// as the floor (which sits in-window). Tune it against `node scripts/skoll-sim.mjs --live`.
 
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
@@ -164,8 +171,12 @@ export const decideSkollMove: SkollDecide = async (payload: SkollPayload) => {
 				responseMimeType: 'application/json',
 				responseSchema: RESPONSE_SCHEMA,
 				// MINIMAL keeps him from reasoning his way to the optimal play — he reacts, he doesn't solve.
+				// Temperature paces him: at 0.4 he narrowed too sharply (live mean ~6.4, under the window);
+				// 0.7 loosens his asks toward the floor's hunch-y suboptimal narrowing so his wins land in
+				// 7.5–9. Higher is safe now — the ≤2 cast guard (skoll.ts) forces the close, so the old
+				// temp-1 rambling can't run away (that non-convergence was pre-guard).
 				thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-				temperature: 1
+				temperature: 0.7
 			}
 		});
 		// Tee the raw I/O for the debug view — the actual thing the model received and returned.
@@ -212,8 +223,10 @@ export const decideSkollReaction: SkollReactionDecide = async (view: SkollReacti
 				systemInstruction: REACTION_INSTRUCTION,
 				responseMimeType: 'application/json',
 				responseSchema: REACTION_SCHEMA,
+				// Same as the move: minimal thinking + a calmer temperature (was 1) so Pass stays the common
+				// answer (the prompt's intent) instead of a coin-flip that over-spends his one Scry/Hex.
 				thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-				temperature: 1
+				temperature: 0.4
 			}
 		});
 		captureGemini({ label: 'reaction', request, response });

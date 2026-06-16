@@ -42,6 +42,23 @@ describe('playFloorGame', () => {
 		expect(alwaysAsk).toHaveBeenCalled();
 	});
 
+	it('counts a guard-forced cast apart from a failure floor (real play, not a fallback)', async () => {
+		const seed = 1;
+		const secret = selectSecret(seed).name;
+		const state = freshSkollState(skollSeedFor(seed));
+		// Pin the live set to the true secret, then feed a decider that only ever asks — the ≤2 guard
+		// must force the closing cast, recorded as a guard move (real play) with no failure floor.
+		state.facts.push({ query: { axis: 'rune', value: secret }, answer: true });
+		const alwaysAsk = vi.fn(async () => ({
+			kind: 'ask' as const,
+			query: { axis: 'element' as const, value: 'Fire' }
+		}));
+		const r = await playFloorGame(seed, new GameEngine(seed), state, alwaysAsk);
+		expect(r.won).toBe(true);
+		expect(r.guardMoves).toBe(1); // the guard named the survivor
+		expect(r.floorMoves).toBe(0); // Gemini never failed
+	});
+
 	it('throws on an illegal Cast (engine rejects) — a harness invariant breach, not silent', async () => {
 		// Pre-collapse the state to a lone candidate so the very first floor move is a Cast, then point
 		// it at a round-over engine that rejects the cast — the sim must throw, not loop or record junk.

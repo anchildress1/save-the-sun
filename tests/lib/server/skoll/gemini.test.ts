@@ -12,7 +12,7 @@ const sdk = vi.hoisted(() => {
 
 vi.mock('@google/genai', () => ({
 	GoogleGenAI: sdk.GoogleGenAI,
-	ThinkingLevel: { MINIMAL: 'MINIMAL' },
+	ThinkingLevel: { MINIMAL: 'MINIMAL', LOW: 'LOW', MEDIUM: 'MEDIUM', HIGH: 'HIGH' },
 	Type: {
 		ARRAY: 'ARRAY',
 		INTEGER: 'INTEGER',
@@ -55,7 +55,7 @@ describe('Gemini Sköll adapter', () => {
 				config: expect.objectContaining({
 					responseMimeType: 'application/json',
 					thinkingConfig: { thinkingLevel: 'MINIMAL' },
-					temperature: 1
+					temperature: 0.7
 				})
 			})
 		);
@@ -79,7 +79,7 @@ describe('Gemini Sköll adapter', () => {
 				config: expect.objectContaining({
 					responseMimeType: 'application/json',
 					thinkingConfig: { thinkingLevel: 'MINIMAL' },
-					temperature: 1
+					temperature: 0.4
 				})
 			})
 		);

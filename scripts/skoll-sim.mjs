@@ -90,9 +90,8 @@ registerHooks({
 	}
 });
 
-const { simulateFloor, playFloorGame, median, skollSeedFor, BOARD_SIZE } = await import(
-	pathToFileURL(path.join(LIB, 'server', 'skoll', 'sim.ts')).href
-);
+const { simulateFloor, playFloorGame, withQuietConsole, median, skollSeedFor, BOARD_SIZE } =
+	await import(pathToFileURL(path.join(LIB, 'server', 'skoll', 'sim.ts')).href);
 
 const TARGET = { lo: 7.5, hi: 9 };
 const LIVE_MARKER_START = '<!-- LIVE:START -->';
@@ -158,59 +157,83 @@ async function runLive(games) {
 	);
 
 	console.log(
-		`Live Gemini wolf — ${games} real games (seeds 1–${games}); every move is one Gemini decision\n`
+		`Live Gemini wolf — ${games} real games (seeds 1–${games}), real Gemini every move\n`
 	);
 	const runs = [];
-	let totalDecisions = 0;
-	let totalFloored = 0;
+	// One clean row per game. Columns: turns-to-win, the Gemini decisions that drove the narrowing, the
+	// ≤2 guard casts that closed it, and any failure floors. Headers spaced to match the padded rows.
+	console.log('  seed   result   turns   gemini   guard   floor   secret');
+	console.log('  ────   ──────   ─────   ──────   ─────   ─────   ──────');
 	for (let seed = 1; seed <= games; seed++) {
-		// One decideSkollMove invocation per Sköll move (the SDK may retry a decision internally, so
-		// this is a decision count, not a raw network-call count). A decision that throws or returns an
-		// illegal move floors inside takeSkollTurn — r.floorMoves catches that so a degraded run can't
-		// masquerade as live evidence.
+		// One decideSkollMove invocation per Sköll move (the SDK may retry a decision internally, so this
+		// is a decision count, not a raw network-call count). A decision that throws or returns an illegal
+		// move floors inside takeSkollTurn — r.floorMoves catches that so a degraded run can't masquerade
+		// as live evidence. Each game is wrapped to silence the guard/failure console noise so the rows
+		// below read clean; the counts (guard/floor) carry that signal instead.
 		// Engine seed = `seed` (so the secret + per-run label stay reproducible); Sköll gets an
 		// independent decorrelated seed, mirroring production's two separate randomSeed() calls so the
 		// opening hunch handed to Gemini isn't coupled to selectSecret(seed).
-		const r = await playFloorGame(
-			seed,
-			new GameEngine(seed),
-			freshSkollState(skollSeedFor(seed)),
-			decideSkollMove
+		const r = await withQuietConsole(() =>
+			playFloorGame(
+				seed,
+				new GameEngine(seed),
+				freshSkollState(skollSeedFor(seed)),
+				decideSkollMove
+			)
 		);
-		const decisions = r.turns;
-		totalDecisions += decisions;
-		totalFloored += r.floorMoves;
+		// A guard-forced cast is the deterministic floor naming the lone survivor after Gemini's own play
+		// cornered the board — real live play, but not a Gemini *decision*, so it's excluded from the count.
+		const decisions = r.turns - r.guardMoves;
 		runs.push({ ...r, decisions });
+		const cell = (n, w) => String(n).padStart(w);
 		console.log(
-			`  seed ${String(seed).padStart(2)} → ${r.won ? 'win ' : 'LOSS'} in ${String(r.turns).padStart(2)} turns (${decisions} decisions${r.floorMoves ? `, ${r.floorMoves} floored` : ''})  [secret: ${r.secret}]`
+			`  ${cell(seed, 4)}   ${(r.won ? 'win' : 'LOSS').padEnd(6)}   ${cell(r.turns, 5)}   ${cell(decisions, 6)}   ${cell(r.guardMoves, 5)}   ${cell(r.floorMoves, 5)}   ${r.secret}`
 		);
 	}
 
-	// The live section's whole claim is "real Gemini, every move." A move that fell back to the floor
-	// (API down, quota, malformed/illegal output) breaks that claim, so refuse to record it as proof.
-	if (totalFloored > 0) {
+	// A game with a floored move (Gemini threw / returned an illegal move) is contaminated evidence, so
+	// it's EXCLUDED from the recorded stats — floor play never masquerades as Gemini. But one transient
+	// hiccup must not throw the whole run away: the clean games still count, and only an all-floored run
+	// (nothing clean to record) is a hard failure.
+	const clean = runs.filter((r) => r.floorMoves === 0);
+	const excluded = runs.filter((r) => r.floorMoves > 0);
+	if (clean.length === 0) {
 		console.error(
-			`\n--live floored ${totalFloored} move(s): Gemini failed or returned an illegal move. ` +
-				`Refusing to record floor play as live evidence — re-run when the API is healthy.`
+			'\n--live: every game floored — Gemini failed throughout. Nothing clean to record; re-run when the API is healthy.'
 		);
 		process.exit(1);
 	}
+	if (excluded.length > 0) {
+		console.log(
+			`\n  excluded ${excluded.length} contaminated game(s) — Gemini floored mid-game (seed ${excluded.map((r) => r.seed).join(', ')}); the ${clean.length} clean games below stand.`
+		);
+	}
 
-	const wins = runs.filter((r) => r.won);
+	const wins = clean.filter((r) => r.won);
 	const turns = wins.map((r) => r.turns).sort((a, b) => a - b);
 	const mean = turns.length ? turns.reduce((a, t) => a + t, 0) / turns.length : 0;
 	const inWindow = mean >= TARGET.lo && mean <= TARGET.hi;
+	const range = turns.length ? `${turns[0]}–${turns.at(-1)}` : '—';
+	const cleanDecisions = clean.reduce((a, r) => a + r.decisions, 0);
+	const cleanGuarded = clean.reduce((a, r) => a + r.guardMoves, 0);
 	console.log(
-		`\n  live: ${wins.length}/${games} wins, mean ${mean.toFixed(2)} turns, ${totalDecisions} Gemini decisions — ${inWindow ? 'WITHIN' : 'OUT OF'} window\n`
+		`\n  ${wins.length}/${clean.length} clean wins · mean ${mean.toFixed(2)} turns (range ${range}) · ${cleanDecisions} gemini decisions · ${cleanGuarded} guard casts`
+	);
+	console.log(
+		`  pacing  ${mean.toFixed(2)} vs target ${TARGET.lo}–${TARGET.hi}  →  ${inWindow ? 'WITHIN window ✅' : 'OUT OF window ❌'}\n`
 	);
 
+	// The corpus records the CLEAN games only (contaminated ones are shown in the run log above but never
+	// counted), so the recorded evidence is pure Gemini play.
 	return renderLive({
-		runs,
-		games,
+		runs: clean,
+		recorded: clean.length,
+		excluded: excluded.length,
 		wins: wins.length,
 		mean,
 		median: median(turns),
-		totalDecisions,
+		totalDecisions: cleanDecisions,
+		totalGuarded: cleanGuarded,
 		inWindow
 	});
 }
@@ -228,11 +251,21 @@ function preserveLiveSection() {
 	return '## Live wolf testing\n\n_No live run recorded yet. Run `node scripts/skoll-sim.mjs --live` locally (needs a key)._';
 }
 
-function renderLive({ runs, games, wins, mean, median, totalDecisions, inWindow }) {
+function renderLive({
+	runs,
+	recorded,
+	excluded,
+	wins,
+	mean,
+	median,
+	totalDecisions,
+	totalGuarded,
+	inWindow
+}) {
 	const rows = runs
 		.map(
 			(r) =>
-				`| ${r.seed} | ${r.secret} | ${r.turns} | ${r.won ? 'win ✅' : 'loss ❌'} | ${r.decisions} |`
+				`| ${r.seed} | ${r.secret} | ${r.turns} | ${r.won ? 'win ✅' : 'loss ❌'} | ${r.decisions} | ${r.guardMoves} |`
 		)
 		.join('\n');
 	const turnsList = runs.filter((r) => r.won).map((r) => r.turns);
@@ -245,12 +278,14 @@ The deterministic floor above is the CI proxy. This section is the **real thing*
 floor, one Gemini decision per move. Run locally with a \`GEMINI_API_KEY\` — never in CI, which has no key.
 Regenerate with \`node scripts/skoll-sim.mjs --live [games]\`.
 
-**How it was tested.** For each seed 1–${games}: a fresh \`GameEngine\` and \`freshSkollState\` (production
-path), the human seat passes, and Sköll plays every move via \`decideSkollMove\` against the live API. The
-engine resolves each Ask/Cast truthfully and reports the win. **Every Sköll move is one Gemini decision**
-(the SDK may retry a decision internally, so this counts decisions, not raw network calls). A decision
-that throws or returns an illegal move would fall back to the floor — the run is **rejected** if any move
-floors, so every move recorded here is a real Gemini decision.
+**How it was tested.** A fresh \`GameEngine\` and \`freshSkollState\` per seed (production path), the human
+seat passes, and Sköll plays every move via \`decideSkollMove\` against the live API. The engine resolves
+each Ask/Cast truthfully and reports the win. **Every Sköll move is one Gemini decision — except the
+closing cast on a game where his own play cornered the board to one or two runes, where the ≤2 convergence
+guard names the survivor.** That guard cast is counted separately (a *guard-forced cast*), not as a Gemini
+decision, because the model wanted to ask, not cast. A decision that instead *throws or returns an illegal
+move* falls back to the deterministic floor — any game with such a floor is **excluded** from the figures
+below${excluded ? ` (**${excluded} excluded this run**)` : ''}, so every recorded game is pure Gemini play.
 
 **The bar.** A run is a *win* only when Sköll casts the true rune (the engine's verdict, never the
 model's claim). Pacing target: **mean turns-to-win in ${TARGET.lo}–${TARGET.hi}** — beatable by a
@@ -258,10 +293,12 @@ competent human, still a real threat. Turns-to-win counts Sköll's own moves (As
 
 | metric | value |
 | --- | --- |
-| live games (seeds 1–${games}) | ${games} |
-| wins | ${wins}/${games} (${((wins / games) * 100).toFixed(1)}%) |
+| games recorded (clean) | ${recorded} |
+| excluded (Gemini floored) | ${excluded} |
+| wins | ${wins}/${recorded} (${recorded ? ((wins / recorded) * 100).toFixed(1) : '0.0'}%) |
 | **total Gemini decisions** | **${totalDecisions}** |
-| mean decisions / game | ${(totalDecisions / games).toFixed(1)} |
+| guard-forced casts | ${totalGuarded} |
+| mean decisions / game | ${recorded ? (totalDecisions / recorded).toFixed(1) : '0.0'} |
 | mean turns-to-win | **${mean.toFixed(2)}** |
 | median turns-to-win | ${median} |
 | min / max turns | ${min} / ${max} |
@@ -269,8 +306,8 @@ competent human, still a real threat. Turns-to-win counts Sköll's own moves (As
 
 ### Per-run results (proof)
 
-| seed | secret | turns-to-win | result | gemini decisions |
-| --- | --- | --- | --- | --- |
+| seed | secret | turns-to-win | result | gemini decisions | guard cast |
+| --- | --- | --- | --- | --- | --- |
 ${rows}`;
 }
 
