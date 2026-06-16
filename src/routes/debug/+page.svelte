@@ -8,8 +8,9 @@
 	let events = $state<DebugEvent[]>(untrack(() => data.events));
 	const sessionId = untrack(() => data.sessionId);
 
-	// Chronological order — heard → tool call → result reads naturally top-to-bottom.
-	const ordered = $derived([...events]);
+	// Reverse chronological — the newest event sits at the top so a live, screen-shared log doesn't
+	// scroll out of view as it grows. seq still labels the original order.
+	const ordered = $derived([...events].reverse());
 
 	async function refresh() {
 		try {

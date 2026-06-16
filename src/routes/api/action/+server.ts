@@ -270,9 +270,20 @@ async function askWithSkollReaction(
 		engine.passTurn(); // her question dies; her turn is spent with no answer
 	} else {
 		oracle = answerAsk(engine, 'Human', prepared.query, prepared.paraphrase);
-		// A Scry lets Sköll overhear her answer — his earned fact.
-		if (vs.scried && oracle.ok)
-			skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
+		if (oracle.ok) {
+			// A Scry lets Sköll overhear her answer — his earned fact.
+			if (vs.scried) skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
+			// Her spoken reply, owned by the Oracle — distinct from the Engine's verdict of the same
+			// truth below, and absent when she's hexed silent (mirrors what the voice route delivers).
+			logEvent(sessionId, {
+				owner: 'Oracle',
+				kind: 'deterministic',
+				part: 'Answer',
+				level: 'info',
+				message: `answers: ${oracle.answer}`,
+				data: { affirmative: oracle.affirmative }
+			});
+		}
 	}
 
 	let truth: string;
