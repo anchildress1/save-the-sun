@@ -20,4 +20,7 @@
 - [ ] Voice the full end-screen sequence — today the win/loss splash voices one beat (`outcome` descriptor: win coda, loss verse). The other beats (lead/verse for the win, lead/coda for the loss) stay text. Voice the staged sequence if the single beat feels thin; Sól still has no own voice (her line rides the Oracle's).
 - [ ] Sync the medallion pulse to the voice — drive the disc/corona from real output level (AnalyserNode → RMS), not a fixed CSS loop.
 - [ ] Release the mic between holds — push-to-talk keeps the MediaStream live all session (Chrome shows continuous mic use); stop tracks on release, re-acquire on hold.
+- [ ] Bound the action/advance/new-game fetches — `dispatch()`, Advance, and `/api/new-game` have no timeout, so a hung request strands `pending` (controls locked); add an AbortController like the transcribe path.
+- [ ] Idle-timeout the TTS delivery stream — `/api/voice/tts` aborts on stop but a stream that stalls without a chunk can wedge the delivery chain; bound the read so it can't hang later `deliver()` calls.
+- [ ] Verify the WAV transcribe payload against the live Gemini API — the one piece unit tests can't prove (Gemini accepting `audio/wav` end-to-end).
 - [x] Spoken Hex/Scry/Pass — a held reply while Sköll's question hangs is classified server-side (transcribe `mode: 'reaction'`) into scry/hex/pass; unclear or a spent charge is refused, never silently passed.
