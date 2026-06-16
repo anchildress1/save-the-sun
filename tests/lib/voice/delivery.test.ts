@@ -129,6 +129,40 @@ describe('delivery seam', () => {
 		expect(audio.speaker.close).toHaveBeenCalledTimes(1);
 	});
 
+	it('aborts the in-flight TTS fetch on stop — a stalled read cannot wedge the chain', async () => {
+		let capturedSignal: AbortSignal | undefined;
+		let releaseSecond: () => void = () => {};
+		const body = new ReadableStream<Uint8Array>({
+			async start(controller) {
+				const enc = new TextEncoder();
+				controller.enqueue(enc.encode('first\n'));
+				await new Promise<void>((resolve) => {
+					releaseSecond = resolve;
+				});
+				controller.enqueue(enc.encode('second\n'));
+				controller.close();
+			}
+		});
+		vi.mocked(fetch).mockImplementationOnce((_url, init) => {
+			capturedSignal = (init as RequestInit)?.signal ?? undefined;
+			return Promise.resolve(new Response(body));
+		});
+		enableDelivery();
+
+		const inflight = deliver(LINE);
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first'));
+		expect(capturedSignal?.aborted).toBe(false);
+
+		// In real fetch this aborts the body stream and unblocks the pending read; here we assert the
+		// mechanism (the controller is reachable from stop) that the old code lacked.
+		stopDelivery();
+		expect(capturedSignal?.aborted).toBe(true);
+
+		releaseSecond();
+		await inflight;
+		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['first']);
+	});
+
 	it('serializes back-to-back deliveries so two lines never interleave their chunks', async () => {
 		// The first line streams one chunk, then waits — so the test can prove the second line has not
 		// started (it is chained behind the first) before releasing the rest.

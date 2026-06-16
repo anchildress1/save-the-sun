@@ -26,6 +26,14 @@ const listeners = new Set<DeliveryListener>();
 let speakingVoice: DeliveryVoice | null = null;
 // whenDrained() callers — resolved together when the speaker runs dry (or a stop/disable empties it).
 const drainWaiters = new Set<() => void>();
+// In-flight TTS fetches, reachable so stop/disable can abort a read that's stalled mid-stream —
+// otherwise the bumped generation only takes effect on the next chunk, wedging the chain.
+const activeFetches = new Set<AbortController>();
+
+function abortActiveFetches(): void {
+	for (const controller of activeFetches) controller.abort();
+	activeFetches.clear();
+}
 
 function emit(event: DeliveryEvent): void {
 	for (const listener of listeners) {
@@ -105,6 +113,7 @@ export function setDeliveryMuted(next: boolean): void {
 /** Close the speaker and drop it; a later {@link enableDelivery} reopens one. */
 export function disableDelivery(): void {
 	generation++; // invalidate any in-flight deliver() so its late chunks never reach a new speaker
+	abortActiveFetches(); // cut a stalled read now, not on its next (maybe-never) chunk
 	speaker?.close();
 	speaker = null;
 	goIdle();
@@ -116,6 +125,7 @@ export function disableDelivery(): void {
  *  fresh one even if its TTS response is still arriving. */
 export function stopDelivery(): void {
 	generation++;
+	abortActiveFetches(); // cut a stalled read now, not on its next (maybe-never) chunk
 	speaker?.stop();
 	goIdle();
 	flushDrainWaiters(); // stop() does not fire onDrained — release waiters here
@@ -195,6 +205,7 @@ async function streamLine(
 	// enqueued — whether that happened while it waited its turn or mid-stream below.
 	if (isStale(active, gen)) return;
 	const abort = new AbortController();
+	activeFetches.add(abort);
 	try {
 		const res = await fetch('/api/voice/tts', {
 			method: 'POST',
@@ -205,6 +216,8 @@ async function streamLine(
 		if (res.ok && res.body) await pumpAudio(res.body, active, gen, voice, abort);
 	} catch {
 		/* network failure or abort — the panel already carries the line; stay silent */
+	} finally {
+		activeFetches.delete(abort);
 	}
 }
 
@@ -221,11 +234,13 @@ export function whenDrained(timeoutMs: number): Promise<void> {
 		const finish = () => {
 			if (settled) return;
 			settled = true;
+			clearTimeout(timer); // an early drain shouldn't leave the fallback timer pending
 			drainWaiters.delete(finish);
 			resolve();
 		};
+		// finish only reads `timer` when it runs (after this line), so the const reference is safe.
+		const timer = setTimeout(finish, timeoutMs);
 		drainWaiters.add(finish);
-		setTimeout(finish, timeoutMs);
 	});
 }
 
@@ -237,4 +252,5 @@ export function resetDelivery(): void {
 	speakingVoice = null;
 	listeners.clear();
 	drainWaiters.clear();
+	activeFetches.clear();
 }
