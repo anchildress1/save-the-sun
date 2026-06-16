@@ -19,6 +19,7 @@ vi.mock('$lib/voice/delivery', () => ({
 vi.mock('$lib/voice/recorder', () => ({
 	startRecording: vi.fn(async () => ({ ok: true })),
 	stopRecording: vi.fn(async () => null),
+	releaseRecorder: vi.fn(),
 	recorderSealed: vi.fn(() => null),
 	closeRecorder: vi.fn()
 }));

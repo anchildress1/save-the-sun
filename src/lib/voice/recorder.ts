@@ -1,6 +1,8 @@
 // Push-to-talk capture. Hold to record, release to get a WAV (PCM16 mono @ 16kHz) the transcribe
-// route accepts. The mic is opened once (one permission prompt) and reused; a denial is remembered
-// so the rite never re-prompts. WAV is used over MediaRecorder because Gemini reliably accepts it.
+// route accepts. The mic stream is acquired per hold and released on let-go (so Chrome's in-use
+// indicator clears between holds); the AudioContext + worklet are built once and kept alive so a
+// re-acquire pays only getUserMedia, never the worklet load. A denial is remembered so the rite
+// never re-prompts. WAV is used over MediaRecorder because Gemini reliably accepts it.
 
 import { MIC_SAMPLE_RATE } from './config';
 
@@ -24,6 +26,7 @@ registerProcessor('pcm-tap', PcmTapProcessor);
 
 let context: AudioContext | null = null;
 let stream: MediaStream | null = null;
+let source: MediaStreamAudioSourceNode | null = null;
 let node: AudioWorkletNode | null = null;
 let buffers: Float32Array[] = [];
 let recording = false;
@@ -44,10 +47,11 @@ function classify(err: unknown): RecorderFailure {
 	return 'audio';
 }
 
-// Opens the mic + worklet once, lazily inside the hold gesture (browsers need one for audio).
+// Lazily inside the hold gesture (browsers need one for audio): acquire the mic stream, then build
+// the tap onto the kept-alive AudioContext (created + worklet-loaded on first hold, reused after).
 async function ensureMic(): Promise<RecorderResult> {
 	if (sealed) return { ok: false, reason: sealed };
-	if (node && context) return { ok: true };
+	if (stream && node && context) return { ok: true };
 	// Snapshot the teardown generation: if closeRecorder runs while we're awaiting below, the late
 	// resources are released here instead of being stored onto an unmounted page.
 	const gen = setupGen;
@@ -68,38 +72,52 @@ async function ensureMic(): Promise<RecorderResult> {
 		for (const track of media.getTracks()) track.stop();
 		return { ok: false, reason: 'audio' };
 	}
+	// The context + worklet are built once and survive a release; only a fresh context loads the
+	// module (re-adding 'pcm-tap' to a live context throws). createdCtx tracks that fresh build so a
+	// teardown that wins the race closes only what this call opened.
 	let createdCtx: AudioContext | null = null;
 	try {
-		const ctx = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
-		createdCtx = ctx;
-		void ctx.resume();
-		const url = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'text/javascript' }));
-		try {
-			await ctx.audioWorklet.addModule(url);
-		} finally {
-			URL.revokeObjectURL(url);
+		let ctx = context;
+		if (!ctx) {
+			ctx = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
+			createdCtx = ctx;
+			void ctx.resume();
+			const url = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'text/javascript' }));
+			try {
+				await ctx.audioWorklet.addModule(url);
+			} finally {
+				URL.revokeObjectURL(url);
+			}
+			// Teardown may have won while the worklet module loaded — release everything, store nothing.
+			if (tornDown()) {
+				for (const track of media.getTracks()) track.stop();
+				void ctx.close();
+				return { ok: false, reason: 'audio' };
+			}
 		}
-		const source = ctx.createMediaStreamSource(media);
+		const src = ctx.createMediaStreamSource(media);
 		const tap = new AudioWorkletNode(ctx, 'pcm-tap');
 		tap.port.onmessage = (event: MessageEvent<Float32Array>) => {
 			if (recording) buffers.push(event.data);
 		};
-		source.connect(tap);
+		src.connect(tap);
 		// An unconnected node is not guaranteed to be pulled by the graph; the worklet stays silent.
 		tap.connect(ctx.destination);
-		// Teardown may have won while the worklet module loaded — release everything, store nothing.
 		if (tornDown()) {
 			for (const track of media.getTracks()) track.stop();
-			void ctx.close();
+			src.disconnect();
+			tap.disconnect();
+			if (createdCtx) void createdCtx.close();
 			return { ok: false, reason: 'audio' };
 		}
 		context = ctx;
 		stream = media;
+		source = src;
 		node = tap;
 		return { ok: true };
 	} catch (err) {
-		// Setup is retryable (not sealed), so release BOTH the tracks and the context — a leaked
-		// AudioContext per retry would eventually hit the browser's cap and break all audio.
+		// Setup is retryable (not sealed), so release the tracks and any context THIS call created — a
+		// leaked AudioContext per retry would eventually hit the browser's cap and break all audio.
 		for (const track of media.getTracks()) track.stop();
 		void createdCtx?.close();
 		return { ok: false, reason: classify(err) };
@@ -185,15 +203,24 @@ function bytesToBase64(bytes: Uint8Array): string {
 	return btoa(binary);
 }
 
-/** Release the mic entirely (page teardown). A later start re-opens it. */
-export function closeRecorder(): void {
-	setupGen++; // a setup mid-flight will see this and discard the resources it's about to acquire
+/** Release the mic stream on hold release, stopping its tracks so Chrome's in-use indicator clears.
+ *  The AudioContext + worklet stay alive, so the next hold re-acquires with only a getUserMedia. */
+export function releaseRecorder(): void {
 	recording = false;
 	buffers = [];
 	node?.disconnect();
 	node = null;
+	source?.disconnect();
+	source = null;
 	for (const track of stream?.getTracks() ?? []) track.stop();
 	stream = null;
+}
+
+/** Release the mic entirely (page teardown), including the kept-alive context. A later start
+ *  rebuilds everything. */
+export function closeRecorder(): void {
+	setupGen++; // a setup mid-flight will see this and discard the resources it's about to acquire
+	releaseRecorder();
 	void context?.close();
 	context = null;
 }

@@ -19,6 +19,7 @@
 	import {
 		startRecording,
 		stopRecording,
+		releaseRecorder,
 		recorderSealed,
 		closeRecorder
 	} from '$lib/voice/recorder';
@@ -444,6 +445,9 @@
 		medalState = 'thinking';
 		try {
 			const clip = await stopRecording();
+			// Drop the mic the instant the clip is assembled — before the transcribe round-trip — so
+			// Chrome's in-use indicator clears on release, not at the end of the turn.
+			releaseRecorder();
 			if (clip && reacting) {
 				const choice = await classifyReactionUtterance(clip.wavBase64);
 				if (fresh()) await respondReaction(choice);
