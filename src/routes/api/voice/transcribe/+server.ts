@@ -20,6 +20,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ error: 'Bad request.' }, { status: 400 });
 	}
 
+	// A bare JSON `null` / non-object parses fine but would throw on destructure — treat it as a 400.
+	if (typeof body !== 'object' || body === null) {
+		return json({ error: 'Bad request.' }, { status: 400 });
+	}
 	const { wavBase64, mode } = body as { wavBase64?: unknown; mode?: unknown };
 	if (
 		typeof wavBase64 !== 'string' ||

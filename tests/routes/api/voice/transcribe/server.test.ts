@@ -67,6 +67,12 @@ describe('POST /api/voice/transcribe', () => {
 		expect(stt.transcribe).not.toHaveBeenCalled();
 	});
 
+	it('rejects a bare JSON null with 400 instead of throwing a 500', async () => {
+		const response = await call('null-body', 'null');
+		expect(response.status).toBe(400);
+		expect(stt.transcribe).not.toHaveBeenCalled();
+	});
+
 	it.each([
 		{ label: 'missing wav', body: {} },
 		{ label: 'empty wav', body: { wavBase64: '' } },
