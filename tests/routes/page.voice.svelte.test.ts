@@ -518,6 +518,51 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 			.element(screen.getByTestId('skoll-echo'))
 			.toHaveTextContent('I scent a fire rune on her.');
 	});
+
+	it("voices Sköll's winning cast through the delivery seam when his Advance casts", async () => {
+		const ASK_QUERY = { axis: 'element', value: 'Fire' };
+		const ACTIVE_TURN: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		const WON_TURN: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 2 };
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (body.type === 'Advance') {
+				return new Response(
+					JSON.stringify({
+						type: 'Advance',
+						skoll: { casts: { echo: 'I name it. Sowilo.', rune: 'Sowilo' } },
+						state: WON_TURN
+					})
+				);
+			}
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						query: ASK_QUERY,
+						answer: ASK_ANSWER,
+						affirmative: false,
+						turnConsumed: true
+					},
+					skollVsYou: { reaction: 'Pass' },
+					state: ACTIVE_TURN
+				})
+			);
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('mute-toggle').click(); // audio on
+		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'skoll-cast', rune: 'Sowilo' })
+		);
+	});
 });
 
 describe('Save the Sun page — spoken reaction to Sköll', () => {

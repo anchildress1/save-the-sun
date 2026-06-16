@@ -69,7 +69,7 @@ function goIdle(): void {
 // Mirrors the server's voiceForLine (lines.ts) — kept client-side so the indicator never pulls
 // server code into the bundle. Sköll's Ask and the loss outcome are his; everything else hers.
 function speakerFor(descriptor: LineDescriptor): DeliveryVoice {
-	if (descriptor.kind === 'skoll-ask') return 'skoll';
+	if (descriptor.kind === 'skoll-ask' || descriptor.kind === 'skoll-cast') return 'skoll';
 	if (descriptor.kind === 'outcome' && descriptor.result === 'lose') return 'skoll';
 	return 'oracle';
 }

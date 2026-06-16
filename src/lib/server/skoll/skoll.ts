@@ -202,6 +202,13 @@ function skollPowerLine(op: PowerOp, n: number): string {
 	}
 }
 
+/** Sköll's winning cast in his own voice — he names the rune as the night closes (ux-copy.md §2,
+ *  the winning-cast bucket). A game move, voiced through the shared TTS route like his Ask; only his
+ *  *winning* cast carries a line (a wrong cast just hands the turn back). */
+export function skollCastEcho(runeName: string): string {
+	return `I name it. ${runeName}.`;
+}
+
 /** Sköll's Ask in his own voice — first-person, predatory, naming the sign the human judges for
  *  Scry/Hex (ux-copy.md §2). NOT the Oracle's third-person paraphrase. Exported so a page load can
  *  rehydrate the interrupt prompt when a round resumes on his parked Ask. */

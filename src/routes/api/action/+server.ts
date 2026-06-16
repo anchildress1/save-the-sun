@@ -16,6 +16,7 @@ import {
 	takeSkollTurn,
 	resolveSkollAsk,
 	reactToHumanAsk,
+	skollCastEcho,
 	type SkollOutcome,
 	type SkollState
 } from '$lib/server/skoll/skoll';
@@ -109,10 +110,14 @@ function geminiEvents(sessionId: string, movePart: TurnPart): void {
 	}
 }
 
-// His templated Ask is surfaced for the human to react to; a Cast carries no flavor line. The query
-// rides along so the client can voice the Ask through the TTS route (server recomposes the line).
+// His templated Ask is surfaced for the human to react to; his WINNING cast rides along too so the
+// client can voice it (server recomposes from the rune). A wrong cast carries no line — it just hands
+// the turn back. Both lines are recomposed server-side, never replayed from client text.
 function describeTurn(out: SkollOutcome): SkollTurn {
-	return out.kind === 'ask' ? { asks: { echo: out.echo, query: out.query } } : {};
+	if (out.kind === 'ask') return { asks: { echo: out.echo, query: out.query } };
+	if (castWon(out.result))
+		return { casts: { echo: skollCastEcho(out.runeName), rune: out.runeName } };
+	return {};
 }
 
 // Validation is pure and runs before the lock; everything touching shared engine/Sköll memory runs

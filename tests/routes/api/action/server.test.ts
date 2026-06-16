@@ -186,12 +186,13 @@ describe('POST /api/action', () => {
 		}
 	});
 
-	it('ends the round in defeat when Sköll casts true on Advance', async () => {
+	it('ends the round in defeat when Sköll casts true on Advance, carrying his cast to voice', async () => {
 		skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
 		await ask();
 		const data = await json(await advance());
-		// The defeat is engine truth in the turn state, not a Sköll flavor line.
-		expect(data.skoll).toEqual({});
+		// The defeat is engine truth in the turn state; his winning cast also rides the wire so the
+		// client can voice it (a game move, R10) — the rune for the server to recompose, the echo as text.
+		expect(data.skoll).toEqual({ casts: { echo: `I name it. ${SECRET}.`, rune: SECRET } });
 		expect(data.state).toMatchObject({ status: 'won', winner: 'Sköll' });
 	});
 

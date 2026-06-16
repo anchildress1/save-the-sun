@@ -234,6 +234,11 @@
 		if (skoll.asks) {
 			skollEcho = skoll.asks.echo;
 			skollAsking = true;
+		} else if (skoll.casts) {
+			// His winning cast is a written game move (R10) — his box shows the line he speaks as the
+			// night closes; the end screen rises behind it once it's been heard.
+			skollEcho = skoll.casts.echo;
+			skollAsking = false;
 		} else {
 			skollEcho = '';
 			skollAsking = false;
@@ -591,9 +596,11 @@
 			// same delivery seam as the Oracle (a no-op when audio is off). The medallion shows
 			// 'skoll-speaking' from the delivery event while it plays.
 			if (skoll?.asks) voiceSkollAsk(skollVoice(skoll.asks.query));
-			// A Sköll win deliberately leaves the Oracle's last voiced line in place (the answer, and
-			// his Scry note when he overheard it) — that line is the WHY of the loss, and the end
-			// screen already owns the "Sköll takes the sun" text. Never double it into the panel.
+			// His winning cast is voiced in his own voice through the same seam (server recomposes from
+			// the rune). The handle holds the end-screen splash until his line is heard (whenDrained),
+			// then the outcome verse follows. A Sköll win still leaves the Oracle's last voiced answer in
+			// the panel (the WHY of the loss); his cast line shows in HIS box, never doubled into hers.
+			else if (skoll?.casts) answerAudio = deliver({ kind: 'skoll-cast', rune: skoll.casts.rune });
 			skollStalled = false;
 		} catch (err) {
 			// A failed Advance leaves the turn with Sköll, so the controls stay locked. Surface an

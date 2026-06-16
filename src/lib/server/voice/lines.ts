@@ -5,7 +5,7 @@
 
 import { parseQuery } from '$lib/server/engine/queries';
 import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
-import { skollAskEcho } from '$lib/server/skoll/skoll';
+import { skollAskEcho, skollCastEcho } from '$lib/server/skoll/skoll';
 import type { RefusalClass } from '$lib/server/oracle/types';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { REACTION_LINES, carriesAnswer, type ReactionLineId } from '$lib/voice/reactionLines';
@@ -35,6 +35,9 @@ export type LineDescriptor =
 	// Sköll's Ask (a game move, R10): his first-person line composed from the same query the engine
 	// parked, so the route still voices only a server-owned line — never arbitrary client text.
 	| { kind: 'skoll-ask'; query: unknown }
+	// Sköll's winning cast (a game move, R10): his line composed from the rune he named, validated
+	// against the board so the route still voices only a server-owned line — just in his voice.
+	| { kind: 'skoll-cast'; rune: unknown }
 	// A reaction resolution (Scry/Hex/Pass, ux-copy §3): the fixed framing from REACTION_LINES, plus
 	// the overheard answer for the two scry lines (composed from the query, so still server-owned).
 	| { kind: 'react'; line: ReactionLineId; query?: unknown; affirmative?: boolean }
@@ -100,6 +103,11 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 			const query = validBoardQuery(descriptor.query);
 			return query ? skollAskEcho(query) : null;
 		}
+		case 'skoll-cast': {
+			// Name only a real board rune (the cast path already canonicalizes to one).
+			const match = runes.find((r) => r.name === descriptor.rune);
+			return match ? skollCastEcho(match.name) : null;
+		}
 		case 'react':
 			return composeReact(descriptor.line, descriptor.query, descriptor.affirmative);
 		case 'cast':
@@ -114,6 +122,7 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 export function voiceForLine(descriptor: LineDescriptor): string {
 	const skoll =
 		descriptor.kind === 'skoll-ask' ||
+		descriptor.kind === 'skoll-cast' ||
 		(descriptor.kind === 'outcome' && descriptor.result === 'lose');
 	return skoll ? SKOLL_VOICE : ORACLE_VOICE;
 }
@@ -154,6 +163,8 @@ export function isLineDescriptor(value: unknown): value is LineDescriptor {
 			return 'query' in v && 'affirmative' in v;
 		case 'skoll-ask':
 			return 'query' in v;
+		case 'skoll-cast':
+			return 'rune' in v;
 		case 'react':
 			return typeof v.line === 'string';
 		case 'cast':
