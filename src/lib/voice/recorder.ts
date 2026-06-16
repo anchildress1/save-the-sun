@@ -29,6 +29,9 @@ let buffers: Float32Array[] = [];
 let recording = false;
 // A denied/absent mic is terminal for the session (R1): never re-prompt once sealed.
 let sealed: RecorderFailure | null = null;
+// Bumped by closeRecorder so a setup still awaiting permission/worklet when teardown runs discards
+// the stream/context it finally gets instead of storing them onto a torn-down (unmounted) page.
+let setupGen = 0;
 
 function classify(err: unknown): RecorderFailure {
 	if (err instanceof DOMException) {
@@ -48,6 +51,10 @@ function classify(err: unknown): RecorderFailure {
 async function ensureMic(): Promise<RecorderResult> {
 	if (sealed) return { ok: false, reason: sealed };
 	if (node && context) return { ok: true };
+	// Snapshot the teardown generation: if closeRecorder runs while we're awaiting below, the late
+	// resources are released here instead of being stored onto an unmounted page.
+	const gen = setupGen;
+	const tornDown = () => gen !== setupGen;
 	let media: MediaStream;
 	try {
 		media = await navigator.mediaDevices.getUserMedia({
@@ -59,6 +66,10 @@ async function ensureMic(): Promise<RecorderResult> {
 		// device briefly busy) stays retryable so a blip doesn't seal the mic for the whole session.
 		if (reason === 'denied' || reason === 'no-device') sealed = reason;
 		return { ok: false, reason };
+	}
+	if (tornDown()) {
+		for (const track of media.getTracks()) track.stop();
+		return { ok: false, reason: 'audio' };
 	}
 	let createdCtx: AudioContext | null = null;
 	try {
@@ -79,6 +90,12 @@ async function ensureMic(): Promise<RecorderResult> {
 		source.connect(tap);
 		// An unconnected node is not guaranteed to be pulled by the graph; the worklet stays silent.
 		tap.connect(ctx.destination);
+		// Teardown may have won while the worklet module loaded — release everything, store nothing.
+		if (tornDown()) {
+			for (const track of media.getTracks()) track.stop();
+			void ctx.close();
+			return { ok: false, reason: 'audio' };
+		}
 		context = ctx;
 		stream = media;
 		node = tap;
@@ -173,6 +190,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 /** Release the mic entirely (page teardown). A later start re-opens it. */
 export function closeRecorder(): void {
+	setupGen++; // a setup mid-flight will see this and discard the resources it's about to acquire
 	recording = false;
 	buffers = [];
 	node?.disconnect();

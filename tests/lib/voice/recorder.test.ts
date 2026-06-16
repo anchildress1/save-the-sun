@@ -155,4 +155,22 @@ describe('recorder — teardown', () => {
 		expect(FakeAudioContext.instances[0].close).toHaveBeenCalledTimes(1);
 		expect(isRecording()).toBe(false);
 	});
+
+	it('discards a late mic setup when teardown wins the race — no orphaned stream', async () => {
+		let finishGum: (stream: { getTracks: () => unknown[] }) => void = () => {};
+		getUserMedia.mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					finishGum = resolve;
+				})
+		);
+		const pending = startRecording();
+		closeRecorder(); // teardown while getUserMedia is still pending
+		finishGum({ getTracks: () => [track] });
+
+		expect(await pending).toEqual({ ok: false, reason: 'audio' });
+		// The stream that arrived after teardown is stopped, not stored onto the unmounted page.
+		expect(track.stop).toHaveBeenCalledTimes(1);
+		expect(recorderSealed()).toBeNull(); // not a terminal failure
+	});
 });
