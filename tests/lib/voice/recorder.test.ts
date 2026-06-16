@@ -121,6 +121,30 @@ describe('recorder — permission/device failures seal the session (R1)', () => 
 		expect(await startRecording()).toEqual({ ok: false, reason });
 		expect(getUserMedia).toHaveBeenCalledTimes(1);
 	});
+
+	it('does NOT seal on a transient audio error — a later hold retries the mic', async () => {
+		getUserMedia.mockRejectedValueOnce(new DOMException('busy', 'AbortError'));
+		expect(await startRecording()).toEqual({ ok: false, reason: 'audio' });
+		expect(recorderSealed()).toBeNull();
+		// The next hold re-prompts and can succeed.
+		expect(await startRecording()).toEqual({ ok: true });
+		expect(getUserMedia).toHaveBeenCalledTimes(2);
+	});
+
+	it('closes the AudioContext (not just the track) when worklet setup fails — no leak', async () => {
+		class FailingCtx extends FakeAudioContext {
+			audioWorklet = {
+				addModule: vi.fn(async () => {
+					throw new Error('worklet blocked');
+				})
+			};
+		}
+		vi.stubGlobal('AudioContext', FailingCtx);
+		expect(await startRecording()).toEqual({ ok: false, reason: 'audio' });
+		expect(recorderSealed()).toBeNull(); // setup failure is retryable
+		expect(track.stop).toHaveBeenCalledTimes(1);
+		expect(FakeAudioContext.instances.at(-1)!.close).toHaveBeenCalledTimes(1);
+	});
 });
 
 describe('recorder — teardown', () => {

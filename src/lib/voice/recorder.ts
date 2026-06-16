@@ -55,11 +55,15 @@ async function ensureMic(): Promise<RecorderResult> {
 		});
 	} catch (err) {
 		const reason = classify(err);
-		sealed = reason; // permission/device failure is final for the session
+		// Only a denial or a missing device is terminal — a transient 'audio' error (AbortError,
+		// device briefly busy) stays retryable so a blip doesn't seal the mic for the whole session.
+		if (reason === 'denied' || reason === 'no-device') sealed = reason;
 		return { ok: false, reason };
 	}
+	let createdCtx: AudioContext | null = null;
 	try {
 		const ctx = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
+		createdCtx = ctx;
 		void ctx.resume();
 		const url = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'text/javascript' }));
 		try {
@@ -80,7 +84,10 @@ async function ensureMic(): Promise<RecorderResult> {
 		node = tap;
 		return { ok: true };
 	} catch (err) {
+		// Setup is retryable (not sealed), so release BOTH the tracks and the context — a leaked
+		// AudioContext per retry would eventually hit the browser's cap and break all audio.
 		for (const track of media.getTracks()) track.stop();
+		void createdCtx?.close();
 		return { ok: false, reason: classify(err) };
 	}
 }
