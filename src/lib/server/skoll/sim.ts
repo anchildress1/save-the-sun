@@ -14,6 +14,7 @@
 
 import { runes } from '$lib/board';
 import { GameEngine, selectSecret } from '$lib/server/engine/engine';
+import { liveCandidates } from './floor';
 import {
 	freshSkollState,
 	takeSkollTurn,
@@ -30,9 +31,12 @@ export interface SimResult {
 	/** Moves that fell back to the floor because the decider FAILED (threw / illegal / malformed). The
 	 *  floor-only sweep expects this to equal `turns`; a live run uses it to reject contaminated proof. */
 	floorMoves: number;
-	/** Moves where the ≤2 convergence guard forced the closing cast — Gemini's play cornered the
-	 *  board, so this is real live play, not a failure. Counted apart from `floorMoves`. */
+	/** Moves where the convergence guard forced the closing cast (one rune left) — real live play, not a
+	 *  failure. Counted apart from `floorMoves`. */
 	guardMoves: number;
+	/** One readable line per turn — his Ask/Cast, the answer, and how many runes still stand. For the
+	 *  `--trace` diagnostic; shows exactly how a game reached its length. */
+	trace: string[];
 }
 
 // A decider that always rejects, so planMove always drops to the deterministic floor. This is how the
@@ -84,6 +88,8 @@ export async function playFloorGame(
 	let turns = 0;
 	let floorMoves = 0;
 	let guardMoves = 0;
+	const trace: string[] = [];
+	const tag = (s: string) => (s === 'gemini' ? '' : ` [${s}]`);
 
 	for (let move = 0; move < MAX_MOVES; move++) {
 		// The human seat takes no action in self-play — hand the turn straight to Sköll.
@@ -98,19 +104,24 @@ export async function playFloorGame(
 			// An illegal cast (unknown rune, out of turn, round over) is a harness regression, not play.
 			if (!out.result.ok)
 				throw new Error(`harness: illegal cast (${out.result.reason}) on seed ${seed}`);
-			if (out.result.won)
-				return { seed, secret: secret.name, turns, won: true, floorMoves, guardMoves };
+			const won = out.result.won;
+			trace.push(`#${turns} cast ${out.runeName}${tag(out.source)} → ${won ? 'WIN' : 'wrong'}`);
+			if (won)
+				return { seed, secret: secret.name, turns, won: true, floorMoves, guardMoves, trace };
 			// A legal-but-wrong cast is real self-play slack; takeSkollTurn already ruled the rune out.
 			continue;
 		}
 
 		// Resolve his parked Ask as a Pass — the human reaction the app awaits — so the fact lands.
 		resolveSkollAsk(engine, state, { ok: true, choice: 'Pass' });
+		const answer = state.facts.at(-1)?.answer ? 'yes' : 'no';
+		const left = liveCandidates(state.facts).length;
+		trace.push(`#${turns} "${out.echo}"${tag(out.source)} → ${answer}  (${left} left)`);
 	}
 
 	// Unreachable from truthful play (a wrong cast can't recur, so the trait space bounds the loop);
 	// the cap only guards against a logic regression turning into a hang.
-	return { seed, secret: secret.name, turns, won: false, floorMoves, guardMoves };
+	return { seed, secret: secret.name, turns, won: false, floorMoves, guardMoves, trace };
 }
 
 /** Aggregate self-play metrics across a contiguous seed sweep `[startSeed, startSeed + games)`. */

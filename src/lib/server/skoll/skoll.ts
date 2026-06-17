@@ -92,6 +92,10 @@ export interface SkollPayload {
 	answers: { trait: string; holds: boolean }[];
 	// Rune ids he has crossed off his own sheet.
 	crossedOff: number[];
+	// The runes still consistent with every answer — his worksheet, computed so a weak model doesn't
+	// have to derive it (and re-cast already-dead runes). Deducible from board + answers, so it leaks
+	// nothing the secret doesn't already share with every other survivor; he names his cast from here.
+	standing: string[];
 	// His seeded opening hunch (a trait phrase) — used only when he has learned nothing yet.
 	hunch: string;
 }
@@ -137,6 +141,7 @@ export function buildPayload(state: SkollState): SkollPayload {
 		})),
 		answers: state.facts.map((f) => ({ trait: valuePhrase(f.query), holds: f.answer })),
 		crossedOff: [...state.crossed],
+		standing: liveCandidates(state.facts).map((r) => r.name),
 		hunch: state.hunch
 	};
 }
@@ -268,17 +273,17 @@ async function planMove(
 	rng: () => number
 ): Promise<{ move: SkollMove } & SkollDecision> {
 	const payload = buildPayload(state);
-	// Set when Gemini's play cornered the board to ≤2 and the guard forced the cast — distinct from a
-	// genuine failure floor, so the live corpus can count it as real play (see SkollSource).
+	// Set when only the lone survivor was left and the guard forced the cast — distinct from a genuine
+	// failure floor, so the live corpus can count it as real play (see SkollSource).
 	let guardForced = false;
 	try {
 		const raw = await decide(payload);
 		const move = validateMove(raw);
-		// Convergence guard (server-authoritative): once only one or two runes can still be the secret,
-		// he MUST cast. A model that keeps asking there is the non-convergence the floor never had —
-		// drop the ask and let the floor name one of the survivors (it casts at ≤2), so the round closes
-		// near the target window no matter how the model plays.
-		const corneredAsk = move?.kind === 'ask' && liveCandidates(state.facts).length <= 2;
+		// Convergence guard (server-authoritative): only when a SINGLE rune can still be the secret does
+		// he have to cast — asking the lone survivor is meaningless, so the guard names it. At two he keeps
+		// his agency: ask the question that tells the pair apart, or cast if he wants. (The DRY-asking
+		// prompt + MAX_MOVES cap keep him from dithering the pair.)
+		const corneredAsk = move?.kind === 'ask' && liveCandidates(state.facts).length <= 1;
 		if (move && !corneredAsk) {
 			for (const id of legalCrossOffs(raw.crossOff)) state.crossed.add(id);
 			if (dev && state.crossed.size)
@@ -292,7 +297,7 @@ async function planMove(
 		}
 		if (corneredAsk) {
 			guardForced = true;
-			console.warn('[skoll] ask refused at ≤2 live candidates — forcing the cast');
+			console.warn('[skoll] ask refused — one rune left, forcing the cast');
 		} else {
 			console.warn(`[skoll] illegal/malformed decision, floor fires: ${JSON.stringify(raw)}`);
 		}

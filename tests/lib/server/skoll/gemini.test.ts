@@ -32,14 +32,14 @@ function geminiJson(body: object) {
 }
 
 // A fresh-board payload (nothing learned yet) — carries the seeded opening hunch like buildPayload.
-const emptyMove = { board: [], answers: [], crossedOff: [], hunch: 'a gold rune' };
+const emptyMove = { board: [], answers: [], crossedOff: [], standing: [], hunch: 'a gold rune' };
 
 describe('Gemini Sköll adapter', () => {
 	beforeEach(() => {
 		sdk.generateContent.mockReset();
 	});
 
-	it('requests a Gemini 3.5 Flash move with structured JSON and minimal thinking', async () => {
+	it('requests a Gemini Flash-Lite move with structured JSON and low thinking', async () => {
 		geminiJson({ kind: 'ask', axis: 'fill', fillValue: 'Light', crossOff: [1] });
 
 		const result = await decideSkollMove(emptyMove);
@@ -51,17 +51,17 @@ describe('Gemini Sköll adapter', () => {
 		});
 		expect(sdk.generateContent).toHaveBeenCalledWith(
 			expect.objectContaining({
-				model: 'gemini-3.5-flash',
+				model: 'gemini-3.1-flash-lite',
 				config: expect.objectContaining({
 					responseMimeType: 'application/json',
-					thinkingConfig: { thinkingLevel: 'MINIMAL' },
+					thinkingConfig: { thinkingLevel: 'LOW' },
 					temperature: 0.7
 				})
 			})
 		);
 	});
 
-	it('requests Sköll reactions from the same Gemini 3.5 Flash model', async () => {
+	it('requests Sköll reactions from the same Gemini Flash-Lite model', async () => {
 		geminiJson({ reaction: 'Hex' });
 
 		const result = await decideSkollReaction({
@@ -75,7 +75,7 @@ describe('Gemini Sköll adapter', () => {
 		expect(result).toEqual({ reaction: 'Hex' });
 		expect(sdk.generateContent).toHaveBeenCalledWith(
 			expect.objectContaining({
-				model: 'gemini-3.5-flash',
+				model: 'gemini-3.1-flash-lite',
 				config: expect.objectContaining({
 					responseMimeType: 'application/json',
 					thinkingConfig: { thinkingLevel: 'MINIMAL' },

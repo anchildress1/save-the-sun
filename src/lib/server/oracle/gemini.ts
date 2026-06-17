@@ -1,5 +1,5 @@
 // Gemini adapter — the Oracle's LLM seam. Not coverage-gated: oracle.ts re-validates everything it
-// returns. gemini-3.5-flash, MINIMAL thinking, JSON out.
+// returns. gemini-3.1-flash-lite, MINIMAL thinking, JSON out — both game characters run the lite tier.
 
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
@@ -8,7 +8,7 @@ import { captureGemini } from '$lib/server/debug/log';
 import type { PowerOp, Query } from '$lib/server/engine/queries';
 import type { Interpretation, Interpret, RefusalClass } from './types';
 
-const MODEL = 'gemini-3.5-flash';
+const MODEL = 'gemini-3.1-flash-lite';
 
 const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
 const COLORS: string[] = [...new Set(runes.map((r) => r.color))];
