@@ -149,7 +149,7 @@ async function runLive(games) {
 	);
 	const runs = [];
 	// One clean row per game. Columns: turns-to-win, the Gemini decisions that drove the narrowing, the
-	// ≤2 guard casts that closed it, and any failure floors. Headers spaced to match the padded rows.
+	// lone-survivor guard casts that closed it, and any failure floors. Headers spaced to match the rows.
 	console.log('  seed   result   turns   gemini   guard   floor   secret');
 	console.log('  ────   ──────   ─────   ──────   ─────   ─────   ──────');
 	for (let seed = 1; seed <= games; seed++) {
