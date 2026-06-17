@@ -30,6 +30,10 @@ const drainWaiters = new Set<() => void>();
 // otherwise the bumped generation only takes effect on the next chunk, wedging the chain.
 const activeFetches = new Set<AbortController>();
 
+// A stream that stalls mid-flight (chunks stop without `done`) would wedge every later deliver().
+// Bound the gap BETWEEN chunks, not the total — long lines legitimately stream over time.
+const TTS_IDLE_TIMEOUT_MS = 10_000;
+
 function abortActiveFetches(): void {
 	for (const controller of activeFetches) controller.abort();
 	activeFetches.clear();
@@ -156,21 +160,31 @@ async function pumpAudio(
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
 	let buffer = '';
-	for (;;) {
-		if (isStale(active, gen)) return abort.abort();
-		const { done, value } = await reader.read();
-		if (done) return;
-		buffer += decoder.decode(value, { stream: true });
-		let nl: number;
-		while ((nl = buffer.indexOf('\n')) >= 0) {
-			const chunk = buffer.slice(0, nl);
-			buffer = buffer.slice(nl + 1);
+	let idle: ReturnType<typeof setTimeout> | undefined;
+	const armIdle = () => {
+		clearTimeout(idle);
+		idle = setTimeout(() => abort.abort(), TTS_IDLE_TIMEOUT_MS);
+	};
+	try {
+		for (;;) {
 			if (isStale(active, gen)) return abort.abort();
-			if (chunk) {
-				setSpeaking(voice);
-				active.enqueue(chunk);
+			armIdle();
+			const { done, value } = await reader.read();
+			if (done) return;
+			buffer += decoder.decode(value, { stream: true });
+			let nl: number;
+			while ((nl = buffer.indexOf('\n')) >= 0) {
+				const chunk = buffer.slice(0, nl);
+				buffer = buffer.slice(nl + 1);
+				if (isStale(active, gen)) return abort.abort();
+				if (chunk) {
+					setSpeaking(voice);
+					active.enqueue(chunk);
+				}
 			}
 		}
+	} finally {
+		clearTimeout(idle);
 	}
 }
 
