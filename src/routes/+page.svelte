@@ -160,7 +160,8 @@
 	let turns = $state<number>(untrack(() => data.state.turns));
 	let winner = $state<Player | null>(untrack(() => data.state.winner));
 	let roundOver = $derived(roundStatus === 'won');
-	// A human win adds a risen sun marker; a Sköll win leaves only the moonlit night and defeat line.
+	// A human win gilds the outcome line and finishes the dawn (nightT → 1); a Sköll win holds the
+	// moonlit night and the defeat tag.
 	let humanWon = $derived(roundOver && winner === 'Human');
 	let skollWon = $derived(roundOver && winner === 'Sköll');
 	let outcomeLine = $derived(humanWon ? RITE.sunCrests : RITE.skollTakes);
@@ -1225,31 +1226,6 @@
 			</div>
 		</div>
 
-		<div class="night-block">
-			{#if humanWon}
-				<svg class="sun-risen" viewBox="0 0 64 64" aria-hidden="true">
-					<defs>
-						<radialGradient id="sunFace" cx="50%" cy="45%" r="60%">
-							<stop offset="0%" stop-color="#fff3cf" />
-							<stop offset="60%" stop-color="#f3c45a" />
-							<stop offset="100%" stop-color="#d9a94a" />
-						</radialGradient>
-					</defs>
-					<g stroke="#f3c45a" stroke-width="2.2" stroke-linecap="round">
-						{#each Array.from({ length: 12 }, (_, i) => i) as i (i)}
-							<line
-								x1={32 + 16 * Math.cos((i * Math.PI) / 6)}
-								y1={32 + 16 * Math.sin((i * Math.PI) / 6)}
-								x2={32 + 22 * Math.cos((i * Math.PI) / 6)}
-								y2={32 + 22 * Math.sin((i * Math.PI) / 6)}
-							/>
-						{/each}
-					</g>
-					<circle cx="32" cy="32" r="14" fill="url(#sunFace)" />
-				</svg>
-			{/if}
-		</div>
-
 		{#if !showEndScreen}
 			<div class="header-controls">
 				<button
@@ -1566,7 +1542,7 @@
 	.rite-header {
 		position: relative;
 		display: grid;
-		grid-template-columns: 1fr auto 1fr;
+		grid-template-columns: 1fr auto;
 		align-items: center;
 		min-height: 7rem;
 		padding: 0.8rem 1rem;
@@ -1707,20 +1683,6 @@
 		color: var(--ink-muted);
 		font-style: italic;
 		font-size: 0.95rem;
-	}
-
-	.night-block {
-		justify-self: center;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-	}
-
-	/* The risen sun replaces the moon on a human win — the saved sun, warm and radiant. */
-	.sun-risen {
-		width: 58px;
-		height: 58px;
-		filter: drop-shadow(0 0 20px rgba(243, 196, 90, 0.6));
 	}
 
 	.night-progress {
@@ -2296,10 +2258,10 @@
 		}
 
 		.rite-header {
-			grid-template-columns: minmax(0, 1fr) auto;
+			grid-template-columns: minmax(0, 1fr);
 			grid-template-areas:
-				'title night'
-				'controls controls';
+				'title'
+				'controls';
 			gap: 0.65rem;
 			min-height: auto;
 			padding: 0.7rem;
@@ -2322,10 +2284,6 @@
 
 		.tagline {
 			font-size: 0.85rem;
-		}
-
-		.night-block {
-			grid-area: night;
 		}
 
 		.night-progress {

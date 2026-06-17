@@ -474,10 +474,9 @@ describe('Save the Sun page', () => {
 		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
 	});
 
-	it('raises the sun and voices the victory line in the header on a human win', async () => {
+	it('voices the victory line in the header on a human win', async () => {
 		const screen = render(Page, propsWith(HUMAN_WON));
 		expect(screen.container.querySelector('.header-background-image')).not.toBeNull();
-		expect(screen.container.querySelector('.sun-risen')).not.toBeNull();
 		await expect
 			.element(screen.getByTestId('outcome-line'))
 			.toHaveTextContent('Sól crests the rim of the world.');
@@ -485,10 +484,9 @@ describe('Save the Sun page', () => {
 
 	it('keeps the moon banner on a Sköll win — short tag in the header, no defeat copy in the panel', async () => {
 		const screen = render(Page, propsWith(SKOLL_WON));
-		// No sunrise for a loss — the moonlit background holds. The header carries only the short tag;
-		// the defeat sentence belongs to the end screen alone, never doubled into the Oracle panel.
+		// The moonlit background holds. The header carries only the short tag; the defeat sentence
+		// belongs to the end screen alone, never doubled into the Oracle panel.
 		expect(screen.container.querySelector('.header-background-image')).not.toBeNull();
-		expect(screen.container.querySelector('.sun-risen')).toBeNull();
 		// The loss freezes the night mid-sink — nightT snaps to 1 only when the dawn is won.
 		expect(
 			screen.container

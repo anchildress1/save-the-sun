@@ -462,7 +462,6 @@ test.describe('the night advances', () => {
 		await page.getByRole('button', { name: /select sowilo as cast target/i }).click();
 		await page.getByRole('button', { name: 'Name it' }).click();
 
-		await expect(page.locator('.sun-risen')).toBeVisible();
 		// nightT snaps to 1 on a human win: the sky finishes its full 44px descent.
 		await expect
 			.poll(() =>
