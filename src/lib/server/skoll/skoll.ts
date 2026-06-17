@@ -116,7 +116,7 @@ export type SkollDecide = (payload: SkollPayload) => Promise<RawSkollDecision>;
 
 export type SkollMove = { kind: 'ask'; query: Query } | { kind: 'cast'; runeName: string };
 // 'gemini' — his decision stood. 'floor' — Gemini failed (threw/illegal/malformed) and the
-// deterministic fallback played. 'guard' — Gemini's play legitimately cornered the board to ≤2 and
+// deterministic fallback played. 'guard' — Gemini's play cornered the board to a lone survivor and
 // the convergence guard forced the closing cast; NOT a failure, so the live corpus counts it as real
 // play (apart from a 'floor' fallback, which taints live evidence).
 export type SkollSource = 'gemini' | 'floor' | 'guard';
@@ -279,12 +279,16 @@ async function planMove(
 	try {
 		const raw = await decide(payload);
 		const move = validateMove(raw);
-		// Convergence guard (server-authoritative): only when a SINGLE rune can still be the secret does
-		// he have to cast — asking the lone survivor is meaningless, so the guard names it. At two he keeps
-		// his agency: ask the question that tells the pair apart, or cast if he wants. (The DRY-asking
-		// prompt + MAX_MOVES cap keep him from dithering the pair.)
-		const corneredAsk = move?.kind === 'ask' && liveCandidates(state.facts).length <= 1;
-		if (move && !corneredAsk) {
+		// Convergence guard (server-authoritative): once a SINGLE rune can still be the secret the answer
+		// is already decided, so anything but casting that rune wastes the turn — force the cast whether he
+		// asked the meaningless lone-survivor question OR cast some already-dead rune. At two he keeps his
+		// agency: ask the splitter, or guess and miss. (The DRY-asking prompt + MAX_MOVES cap stop dithering.)
+		const survivors = liveCandidates(state.facts);
+		const cornered =
+			move != null &&
+			survivors.length <= 1 &&
+			!(move.kind === 'cast' && move.runeName === survivors[0]?.name);
+		if (move && !cornered) {
 			for (const id of legalCrossOffs(raw.crossOff)) state.crossed.add(id);
 			if (dev && state.crossed.size)
 				console.debug(`[skoll] sheet: ${[...state.crossed].join(',')}`);
@@ -295,9 +299,9 @@ async function planMove(
 				reasoning: raw.reasoning?.trim() || summarizePayload(payload)
 			};
 		}
-		if (corneredAsk) {
+		if (cornered) {
 			guardForced = true;
-			console.warn('[skoll] ask refused — one rune left, forcing the cast');
+			console.warn('[skoll] move refused — one rune left, forcing the cast');
 		} else {
 			console.warn(`[skoll] illegal/malformed decision, floor fires: ${JSON.stringify(raw)}`);
 		}

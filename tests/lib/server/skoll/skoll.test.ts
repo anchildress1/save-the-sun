@@ -275,6 +275,31 @@ describe('takeSkollTurn — Gemini plays, engine referees', () => {
 		expect(engine.reactionWindow).toBeNull(); // a cast — no Ask window opened
 	});
 
+	it('forces the survivor when Gemini casts a dead rune with one left — a legal-but-wrong cast', async () => {
+		const engine = skollsTurn();
+		// One rune (Sowilo) can still be the secret, but Gemini casts a different, already-ruled-out rune.
+		// validateMove accepts any legal name, so without the guard the engine logs a wrong cast and the
+		// turn is wasted; the guard must redirect to the lone survivor instead.
+		const state: SkollState = {
+			...freshSkollState(SEED),
+			facts: [{ query: { axis: 'rune', value: 'Sowilo' }, answer: true }]
+		};
+		const out = await takeSkollTurn(engine, state, decideCast('Isa'), mulberry32(1));
+		expect(out.kind).toBe('cast');
+		expect(out.source).toBe('guard'); // redirected, not the dead-rune cast Gemini returned
+		if (out.kind === 'cast') expect(out.runeName).toBe('Sowilo');
+	});
+
+	it('lets his cast stand when it names the lone survivor — no needless guard override', async () => {
+		const engine = skollsTurn();
+		const state: SkollState = {
+			...freshSkollState(SEED),
+			facts: [{ query: { axis: 'rune', value: 'Sowilo' }, answer: true }]
+		};
+		const out = await takeSkollTurn(engine, state, decideCast('Sowilo'), mulberry32(1));
+		expect(out).toMatchObject({ kind: 'cast', source: 'gemini', runeName: 'Sowilo' });
+	});
+
 	it('leaves his ask alone with two candidates — he plays the final pair himself', async () => {
 		const engine = skollsTurn();
 		// Two Sun-Light runes survive (mirrors floor.test). The guard only fires at one left, so his
