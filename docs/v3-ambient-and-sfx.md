@@ -70,16 +70,18 @@ You are in **one lifecycle phase at a time**, so buckets are near-mutually-exclu
 | Bucket | Fires on | Signal (already in `+page.svelte`) |
 |---|---|---|
 | splash open | splash mount | component mount |
-| idle | input wait past N seconds | the existing idle timer |
+| idle | input wait past N seconds | **net-new** input-wait timer (none exists yet) |
 | hunt mood | `nightT` crosses a threshold (≈ 0.6) | `nightT` (line 192) — already an escalation curve off `turns` |
-| defeat exit | loss end-screen shows | `roundStatus` / outcome |
+| defeat exit | the **human win** (Sól wins) end-screen — ux-copy §2 "the witch wins" | `humanWon` |
 
-**`nightT` is the hunt-mood signal.** It is `Math.min(0.95, 1 - 0.85^turns)` — a 0→1 menace ramp already derived client-side. Hunt mood off the *player-visible* board (turns) is free. Hunt mood off **Sköll's own closing-in** (how narrowed his guess is) is thematically better but net-new — the engine does not surface his confidence today. Deferred as the P2 upgrade path.
+**`nightT` is the hunt-mood signal.** It is `Math.min(0.95, 1 - Math.pow(0.85, turns))` — a 0→1 menace ramp already derived client-side. Hunt mood off the *player-visible* board (turns) is free. Hunt mood off **Sköll's own closing-in** (how narrowed his guess is) is thematically better but net-new — the engine does not surface his confidence today. Deferred as the P2 upgrade path.
+
+> v1 nightT hunt mood is limited to the **generic far/closing** lines. The count-specific **near** lines (ux-copy §2 "Two left. I need one.") must NOT play off `nightT` — it can't know his actual candidate count, so they'd mislead. They wait for the real Sköll-confidence signal (P2). _(expand later: the far-vs-closing `nightT` thresholds.)_
 
 ### The only state stored
 
 1. **Which bucket** ← current lifecycle phase. Free.
-2. **Which clip** ← random pick, no-immediate-repeat. One integer per bucket. This is the entire "ledger."
+2. **Which clip** ← random pick from the bucket's **unused-this-round** set (ux-copy §2: "no line repeats within a night"), cleared on a new round. *(Not last-index-only — that allows A→B→A within one night.)*
 3. **May it play?** ← `Voice-not-busy && audio-on`. Both already wired.
 
 ### Drop-on-busy (the one real rule)
@@ -103,9 +105,9 @@ Short, non-vocal, latency-critical one-shots. **Not TTS** — a shipped sound-de
 | Event | Source | Already observable in `+page.svelte` |
 |---|---|---|
 | cast lands | `dispatch` cast result | cast handler |
-| rune crossed off | `crossings` change | `crossings` (line 259) |
+| rune crossed off | RuneGrid **user-change** event | not `crossings` directly — it also sets on restore/reset |
 | hex / scry | reaction dispatch | react handler |
-| medallion wake / sleep | medallion toggle | delivery enable/disable |
+| medallion wake / sleep | recorder hold | `startHold` / `endHold` — not delivery enable/disable (that's the speaker lifecycle) |
 | win / loss sting | outcome | `roundStatus` (line 159) |
 
 ### Rules
@@ -127,13 +129,13 @@ We will likely not implement V3. These are the seams v2 must **not** close off, 
 
 3. **`nightT` + `turns` are a trigger contract.** Keep `turns` in the server `state` and `nightT` derived in `+page.svelte`. Hunt mood depends on them. Don't drop or rename without noting it here.
 
-4. **The TTS synth stays importable outside the route.** `synthesizeStream(text, voice)` (`src/lib/server/voice/tts.ts`) is already a plain export — a build script can call it for clip generation. Keep synth callable **without** the `+server.ts` request context.
+4. **Build-time TTS needs a runnable synth path.** `synthesizeStream(text, voice)` (`src/lib/server/voice/tts.ts`) is exported, but the module imports SvelteKit aliases (`$env/dynamic/private`, `$lib/voice/config`) — a plain-Node import fails before it runs. The clip generator must either run **under Vite/SvelteKit** (e.g. a vite-node script) or the synth helper moves to an **alias-free module**. _(expand later: pick one before relying on this seam.)_
 
 5. **Reserve a per-session clip cache keyed by `roundId`.** Game-start dynamic lines need somewhere session-scoped to live (`src/lib/server/engine/session.ts` already holds `roundId`/`boardSeed`). Don't assume the session holds only board state — leave room for a per-round generated-clip manifest.
 
 6. **The speaking indicator = captioned lines only.** `subscribeDelivery` (`src/lib/voice/delivery.ts`) emits `speaking`/`idle` for the medallion. Keep this bound to game-move voice. Ambient/SFX must be addable **without** emitting these (mood is not "someone is answering you").
 
-7. **A "Voice busy?" signal is public.** Ambient drop-on-busy needs to read whether a game line is voicing. `subscribeDelivery` (speaking/idle) is the authority — keep it, or expose an equivalent predicate. Don't make busy-state private to the chain.
+7. **A queued-or-speaking predicate is public.** Ambient drop-on-busy needs to know a game line is voicing. `subscribeDelivery` (speaking/idle) is **not enough** — it emits only at the first chunk and never replays state to a new subscriber, so a line that's chain-waiting or mid-fetch reads as idle and ambience can overlap it. Expose a predicate true from **enqueue through drain** (chain-waiting + in-flight fetch + playing), not just the events.
 
 ---
 
