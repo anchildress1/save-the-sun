@@ -7,7 +7,7 @@ import {
 	type LineDescriptor
 } from '$lib/server/voice/lines';
 import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
-import { skollAskEcho } from '$lib/server/skoll/skoll';
+import { skollAskEcho, skollCastEcho } from '$lib/server/skoll/skoll';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { REACTION_LINES } from '$lib/voice/reactionLines';
 import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
@@ -97,6 +97,16 @@ describe('composeLine', () => {
 		expect(composeLine({ kind: 'skoll-ask', query: null })).toBeNull();
 	});
 
+	it('voices Sköll’s winning cast from the named rune (his own line)', () => {
+		expect(composeLine({ kind: 'skoll-cast', rune: 'Sowilo' })).toBe(skollCastEcho('Sowilo'));
+	});
+
+	it('refuses a Sköll cast that names no real board rune', () => {
+		expect(composeLine({ kind: 'skoll-cast', rune: 'Plastic' })).toBeNull();
+		expect(composeLine({ kind: 'skoll-cast', rune: '' })).toBeNull();
+		expect(composeLine({ kind: 'skoll-cast', rune: null })).toBeNull();
+	});
+
 	it('voices a framing-only reaction line verbatim', () => {
 		expect(composeLine({ kind: 'react', line: 'human-hex' })).toBe(REACTION_LINES['human-hex']);
 		expect(composeLine({ kind: 'react', line: 'human-pass' })).toBe(REACTION_LINES['human-pass']);
@@ -161,6 +171,7 @@ describe('composeLine', () => {
 describe('voiceForLine', () => {
 	it('routes Sköll’s Ask to his voice, everything else to the Oracle’s', () => {
 		expect(voiceForLine({ kind: 'skoll-ask', query: {} })).toBe(SKOLL_VOICE);
+		expect(voiceForLine({ kind: 'skoll-cast', rune: 'Sowilo' })).toBe(SKOLL_VOICE);
 		expect(voiceForLine({ kind: 'refusal', refusal: 'empty' })).toBe(ORACLE_VOICE);
 		expect(voiceForLine({ kind: 'answer', query: {}, affirmative: true })).toBe(ORACLE_VOICE);
 		expect(voiceForLine({ kind: 'react', line: 'human-hex' })).toBe(ORACLE_VOICE);
@@ -200,6 +211,7 @@ describe('isLineDescriptor', () => {
 		expect(isLineDescriptor({ kind: 'refusal', refusal: 'empty' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'answer', query: {}, affirmative: true })).toBe(true);
 		expect(isLineDescriptor({ kind: 'skoll-ask', query: {} })).toBe(true);
+		expect(isLineDescriptor({ kind: 'skoll-cast', rune: 'Sowilo' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'react', line: 'human-hex' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'cast', result: 'true' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'outcome', result: 'win' })).toBe(true);
@@ -213,6 +225,7 @@ describe('isLineDescriptor', () => {
 		expect(isLineDescriptor({ kind: 'refusal' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'answer', query: {} })).toBe(false);
 		expect(isLineDescriptor({ kind: 'skoll-ask' })).toBe(false);
+		expect(isLineDescriptor({ kind: 'skoll-cast' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'react' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'cast' })).toBe(false);
 	});

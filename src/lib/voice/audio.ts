@@ -16,6 +16,9 @@ export interface Speaker {
 	 *  drains on schedule, so `busy`, the drain callback, and caption turn-timing are unchanged —
 	 *  only the sound is gated. */
 	setMuted(muted: boolean): void;
+	/** Current output level as RMS in [0, 1] — the medallion pulse reads this each frame. Sampled
+	 *  pre-mute, so the visual still tracks the line's envelope when the sound is muted. */
+	level(): number;
 	close(): void;
 }
 
@@ -26,7 +29,14 @@ export function createSpeaker(muted = false): Speaker {
 	// is scheduled without dropping buffers, so unmuting mid-line resumes cleanly.
 	const master = context.createGain();
 	master.gain.value = muted ? 0 : 1;
+	// Sources → analyser → master(mute) → destination. The analyser sits PRE-mute so the medallion's
+	// pulse tracks the line's real envelope even while the sound is muted (R11: silence the voice,
+	// keep the visual + captions).
+	const analyser = context.createAnalyser();
+	analyser.fftSize = 256;
+	analyser.connect(master);
 	master.connect(context.destination);
+	const levelBuffer = new Uint8Array(analyser.fftSize);
 	const active = new Set<AudioBufferSourceNode>();
 	let cursor = 0;
 	let drained: (() => void) | null = null;
@@ -55,7 +65,7 @@ export function createSpeaker(muted = false): Speaker {
 			for (let i = 0; i < pcm.length; i++) channel[i] = pcm[i] / 0x8000;
 			const node = context.createBufferSource();
 			node.buffer = buffer;
-			node.connect(master);
+			node.connect(analyser);
 			node.onended = () => {
 				active.delete(node);
 				if (active.size === 0) drained?.();
@@ -74,6 +84,15 @@ export function createSpeaker(muted = false): Speaker {
 		},
 		setMuted(next) {
 			master.gain.value = next ? 0 : 1;
+		},
+		level() {
+			analyser.getByteTimeDomainData(levelBuffer);
+			let sumSquares = 0;
+			for (const byte of levelBuffer) {
+				const sample = (byte - 128) / 128; // byte domain (0–255, 128 = silence) → [-1, 1]
+				sumSquares += sample * sample;
+			}
+			return Math.sqrt(sumSquares / levelBuffer.length);
 		},
 		close() {
 			stop();

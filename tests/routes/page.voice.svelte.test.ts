@@ -15,6 +15,7 @@ const deliveryMock = vi.hoisted(() => {
 		stopDelivery: vi.fn(),
 		deliver: vi.fn<(descriptor: { kind: string }) => Promise<void>>(async () => {}),
 		whenDrained: vi.fn(async () => {}),
+		currentLevel: vi.fn(() => 0),
 		subscribeDelivery(listener: (event: unknown) => void) {
 			listeners.add(listener);
 			return () => listeners.delete(listener);
@@ -29,6 +30,7 @@ vi.mock('$lib/voice/delivery', () => deliveryMock);
 const recorderMock = vi.hoisted(() => ({
 	startRecording: vi.fn(async () => ({ ok: true }) as { ok: boolean; reason?: string }),
 	stopRecording: vi.fn(async () => ({ wavBase64: 'WAV' }) as { wavBase64: string } | null),
+	releaseRecorder: vi.fn(),
 	recorderSealed: vi.fn<() => string | null>(() => null),
 	closeRecorder: vi.fn()
 }));
@@ -516,6 +518,94 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 		await expect
 			.element(screen.getByTestId('skoll-echo'))
 			.toHaveTextContent('I scent a fire rune on her.');
+	});
+
+	it("voices Sköll's winning cast through the delivery seam when his Advance casts", async () => {
+		const ASK_QUERY = { axis: 'element', value: 'Fire' };
+		const ACTIVE_TURN: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		const WON_TURN: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 2 };
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (body.type === 'Advance') {
+				return new Response(
+					JSON.stringify({
+						type: 'Advance',
+						skoll: { casts: { echo: 'I name it. Sowilo.', rune: 'Sowilo' } },
+						state: WON_TURN
+					})
+				);
+			}
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						query: ASK_QUERY,
+						answer: ASK_ANSWER,
+						affirmative: false,
+						turnConsumed: true
+					},
+					skollVsYou: { reaction: 'Pass' },
+					state: ACTIVE_TURN
+				})
+			);
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('mute-toggle').click(); // audio on
+		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'skoll-cast', rune: 'Sowilo' })
+		);
+	});
+
+	it('holds the end-screen for a winning cast resumed before the speaker, then plays it on first gesture', async () => {
+		allowMotion(); // audio defaults on
+		const SKOLL_TURN: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		const WON_TURN: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 2 };
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (body.type === 'Advance') {
+				return new Response(
+					JSON.stringify({
+						type: 'Advance',
+						skoll: { casts: { echo: 'I name it. Sowilo.', rune: 'Sowilo' } },
+						state: WON_TURN
+					})
+				);
+			}
+			return new Response('{}');
+		});
+		// Resume on Sköll's turn: onMount drives his Advance, which returns the winning cast, before any
+		// gesture opens the speaker.
+		const screen = render(Page, { ...pageProps, data: { ...pageProps.data, state: SKOLL_TURN } });
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('I name it. Sowilo.');
+
+		// The cast is held (deliver is a no-op without a speaker), and the splash is withheld too — the
+		// queued line returns a real pending promise, so the end-screen hold can't fall through early.
+		expect(deliveryMock.deliver).not.toHaveBeenCalled();
+		expect(screen.container.querySelector('[data-testid="end-screen"]')).toBeNull();
+
+		window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'skoll-cast', rune: 'Sowilo' })
+		);
+		// His line played and drained — the held splash is released.
+		await vi.waitFor(() =>
+			expect(screen.container.querySelector('[data-testid="end-screen"]')).not.toBeNull()
+		);
 	});
 });
 

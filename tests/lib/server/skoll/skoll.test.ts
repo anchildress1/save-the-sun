@@ -43,9 +43,21 @@ describe('buildPayload — board + facts + sheet + seeded hunch, no secret', () 
 			crossed: new Set([3, 7])
 		};
 		const payload = buildPayload(state);
-		expect(Object.keys(payload).sort()).toEqual(['answers', 'board', 'crossedOff', 'hunch']);
+		expect(Object.keys(payload).sort()).toEqual([
+			'answers',
+			'board',
+			'crossedOff',
+			'hunch',
+			'standing'
+		]);
 		expect(payload.answers).toEqual([{ trait: 'a fire rune', holds: true }]);
 		expect(payload.crossedOff).toEqual([3, 7]);
+		// standing = the runes still consistent with his answers (here, the fire runes) — his worksheet.
+		expect(payload.standing.length).toBeGreaterThan(0);
+		expect(payload.standing.length).toBeLessThan(runes.length);
+		expect(payload.standing.every((n) => runes.find((r) => r.name === n)?.element === 'Fire')).toBe(
+			true
+		);
 		// Board carries public traits only — no `fill`-of-secret marker, no human crossings.
 		expect(Object.keys(payload.board[0]).sort()).toEqual([
 			'color',
@@ -155,7 +167,13 @@ describe('takeSkollTurn — Gemini plays, engine referees', () => {
 		const payload = (decide as ReturnType<typeof vi.fn>).mock.calls[0][0] as SkollPayload;
 		const seen = JSON.stringify(payload);
 		// The payload reveals no which-rune-is-secret signal: it is pure public board + his facts.
-		expect(Object.keys(payload).sort()).toEqual(['answers', 'board', 'crossedOff', 'hunch']);
+		expect(Object.keys(payload).sort()).toEqual([
+			'answers',
+			'board',
+			'crossedOff',
+			'hunch',
+			'standing'
+		]);
 		expect(seen).not.toContain('secret');
 	});
 
@@ -236,6 +254,71 @@ describe('takeSkollTurn — Gemini plays, engine referees', () => {
 		expect(out).toMatchObject({ kind: 'cast', result: { ok: true, won: true } });
 		expect(engine.status).toBe('won');
 		expect(engine.winner).toBe('Sköll');
+	});
+
+	it('forces the cast on the lone survivor, overriding an ask he can no longer learn from', async () => {
+		const engine = skollsTurn();
+		// One rune can still be the secret — asking it is meaningless, so the guard names it.
+		const state: SkollState = {
+			...freshSkollState(SEED),
+			facts: [{ query: { axis: 'rune', value: 'Sowilo' }, answer: true }]
+		};
+		const out = await takeSkollTurn(
+			engine,
+			state,
+			decideAsk({ axis: 'fill', value: 'Light' }),
+			mulberry32(1)
+		);
+		expect(out.kind).toBe('cast'); // not the ask Gemini returned
+		expect(out.source).toBe('guard'); // forced by the guard, distinct from a failure floor
+		if (out.kind === 'cast') expect(out.runeName).toBe('Sowilo');
+		expect(engine.reactionWindow).toBeNull(); // a cast — no Ask window opened
+	});
+
+	it('forces the survivor when Gemini casts a dead rune with one left — a legal-but-wrong cast', async () => {
+		const engine = skollsTurn();
+		// One rune (Sowilo) can still be the secret, but Gemini casts a different, already-ruled-out rune.
+		// validateMove accepts any legal name, so without the guard the engine logs a wrong cast and the
+		// turn is wasted; the guard must redirect to the lone survivor instead.
+		const state: SkollState = {
+			...freshSkollState(SEED),
+			facts: [{ query: { axis: 'rune', value: 'Sowilo' }, answer: true }]
+		};
+		const out = await takeSkollTurn(engine, state, decideCast('Isa'), mulberry32(1));
+		expect(out.kind).toBe('cast');
+		expect(out.source).toBe('guard'); // redirected, not the dead-rune cast Gemini returned
+		if (out.kind === 'cast') expect(out.runeName).toBe('Sowilo');
+	});
+
+	it('lets his cast stand when it names the lone survivor — no needless guard override', async () => {
+		const engine = skollsTurn();
+		const state: SkollState = {
+			...freshSkollState(SEED),
+			facts: [{ query: { axis: 'rune', value: 'Sowilo' }, answer: true }]
+		};
+		const out = await takeSkollTurn(engine, state, decideCast('Sowilo'), mulberry32(1));
+		expect(out).toMatchObject({ kind: 'cast', source: 'gemini', runeName: 'Sowilo' });
+	});
+
+	it('leaves his ask alone with two candidates — he plays the final pair himself', async () => {
+		const engine = skollsTurn();
+		// Two Sun-Light runes survive (mirrors floor.test). The guard only fires at one left, so his
+		// distinguishing question stands instead of a forced 50/50 cast.
+		const state: SkollState = {
+			...freshSkollState(SEED),
+			facts: [
+				{ query: { axis: 'element', value: 'Sun' }, answer: true },
+				{ query: { axis: 'fill', value: 'Light' }, answer: true }
+			]
+		};
+		const out = await takeSkollTurn(
+			engine,
+			state,
+			decideAsk({ axis: 'color', value: 'Gold' }),
+			mulberry32(1)
+		);
+		expect(out).toMatchObject({ kind: 'ask', source: 'gemini' });
+		expect(engine.reactionWindow).toBe('Sköll'); // his Ask opened, not overridden
 	});
 
 	it('falls to the floor on an illegal/malformed decision', async () => {

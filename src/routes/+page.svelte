@@ -14,11 +14,13 @@
 		deliver,
 		whenDrained,
 		subscribeDelivery,
+		currentLevel,
 		type DeliveryEvent
 	} from '$lib/voice/delivery';
 	import {
 		startRecording,
 		stopRecording,
+		releaseRecorder,
 		recorderSealed,
 		closeRecorder
 	} from '$lib/voice/recorder';
@@ -233,6 +235,11 @@
 		if (skoll.asks) {
 			skollEcho = skoll.asks.echo;
 			skollAsking = true;
+		} else if (skoll.casts) {
+			// His winning cast is a written game move (R10) — his box shows the line he speaks as the
+			// night closes; the end screen rises behind it once it's been heard.
+			skollEcho = skoll.casts.echo;
+			skollAsking = false;
 		} else {
 			skollEcho = '';
 			skollAsking = false;
@@ -278,18 +285,31 @@
 	// the end-screen hold awaits so the splash never preempts her final answer.
 	let answerAudio: Promise<void> | null = null;
 
-	// A Sköll Ask generated before the speaker is open (a reload that resumes on his turn re-drives his
-	// move in onMount, before the first gesture) is held here and voiced once audio is ready, so it
-	// isn't spent into a no-op deliver() and lost while audio is on.
+	// A Sköll line generated before the speaker is open (a reload that resumes on his turn re-drives his
+	// move in onMount, before the first gesture) is held here and voiced once audio is ready, so it isn't
+	// spent into a no-op deliver() and lost while audio is on. Covers both his Ask and a winning Cast —
+	// a resumed defeat must still replay "I name it…" once a gesture opens the speaker.
 	let pendingSkollVoice: LineDescriptor | null = null;
-	function voiceSkollAsk(descriptor: LineDescriptor) {
-		if (audioReady) void deliver(descriptor);
-		else if (audioOn) pendingSkollVoice = descriptor;
+	// Settles the promise voiceSkoll handed back for a queued line — resolved when flushPendingVoice
+	// finally plays it (or when the line is dropped). Keeps `answerAudio` honest: the end-screen hold
+	// waits for the real post-gesture playback, not a phantom resolve, so a resumed defeat plays his
+	// cast before the splash instead of late over it.
+	let pendingSkollResolve: (() => void) | null = null;
+	function voiceSkoll(descriptor: LineDescriptor): Promise<void> {
+		if (audioReady) return deliver(descriptor);
+		if (!audioOn) return Promise.resolve();
+		pendingSkollVoice = descriptor;
+		return new Promise<void>((resolve) => {
+			pendingSkollResolve = resolve;
+		});
 	}
 	function flushPendingVoice() {
 		if (pendingSkollVoice && audioReady) {
-			void deliver(pendingSkollVoice);
+			const done = deliver(pendingSkollVoice);
+			const settle = pendingSkollResolve;
 			pendingSkollVoice = null;
+			pendingSkollResolve = null;
+			if (settle) void done.finally(settle);
 		}
 	}
 
@@ -382,6 +402,8 @@
 			audioOn = false;
 			audioReady = false;
 			pendingSkollVoice = null; // muted: drop the held line rather than voice it on a later unmute
+			pendingSkollResolve?.(); // settle any end-screen waiter — the dropped line won't play now
+			pendingSkollResolve = null;
 			disableDelivery();
 		}
 		writeMuted(!audioOn);
@@ -444,6 +466,9 @@
 		medalState = 'thinking';
 		try {
 			const clip = await stopRecording();
+			// Drop the mic the instant the clip is assembled — before the transcribe round-trip — so
+			// Chrome's in-use indicator clears on release, not at the end of the turn.
+			releaseRecorder();
 			if (clip && reacting) {
 				const choice = await classifyReactionUtterance(clip.wavBase64);
 				if (fresh()) await respondReaction(choice);
@@ -586,10 +611,13 @@
 			// His Ask is a game move (R10) — written on his frame and voiced in his own voice through the
 			// same delivery seam as the Oracle (a no-op when audio is off). The medallion shows
 			// 'skoll-speaking' from the delivery event while it plays.
-			if (skoll?.asks) voiceSkollAsk(skollVoice(skoll.asks.query));
-			// A Sköll win deliberately leaves the Oracle's last voiced line in place (the answer, and
-			// his Scry note when he overheard it) — that line is the WHY of the loss, and the end
-			// screen already owns the "Sköll takes the sun" text. Never double it into the panel.
+			if (skoll?.asks) void voiceSkoll(skollVoice(skoll.asks.query));
+			// His winning cast is voiced in his own voice through the same seam (server recomposes from
+			// the rune). The handle holds the end-screen splash until his line is heard (whenDrained),
+			// then the outcome verse follows. A Sköll win still leaves the Oracle's last voiced answer in
+			// the panel (the WHY of the loss); his cast line shows in HIS box, never doubled into hers.
+			else if (skoll?.casts)
+				answerAudio = voiceSkoll({ kind: 'skoll-cast', rune: skoll.casts.rune });
 			skollStalled = false;
 		} catch (err) {
 			// A failed Advance leaves the turn with Sköll, so the controls stay locked. Surface an
@@ -1171,7 +1199,12 @@
 				<!-- The Oracle's two controls: the medallion (hold to speak — pointer, or hold Space) and
 				     the output-mute switch. Both are native buttons; Tab reaches each. -->
 				<div class="voice-controls" role="group" aria-label="Oracle voice controls">
-					<EclipseMedallion state={medalState} onHoldStart={startHold} onHoldEnd={endHold} />
+					<EclipseMedallion
+						state={medalState}
+						getLevel={currentLevel}
+						onHoldStart={startHold}
+						onHoldEnd={endHold}
+					/>
 					<button
 						class="voice-switch"
 						type="button"

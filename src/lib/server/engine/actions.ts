@@ -71,6 +71,10 @@ export interface SkollTurn {
 	// `query` rides along so the client can voice his Ask through the TTS route (the server recomposes
 	// his line from it — never arbitrary client text); `echo` is the same line as text (R10).
 	asks?: { echo: string; query: Query };
+	// A winning cast is a game move too (R10): `rune` rides along so the client voices his line through
+	// the TTS route (server recomposes), `echo` is the same line as text. Present only when his cast
+	// WON — a wrong cast just hands the turn back, with no line.
+	casts?: { echo: string; rune: string };
 }
 
 /** How Sköll's parked Ask resolved after the human reacted. A Hex kills it; a Scry shares it.

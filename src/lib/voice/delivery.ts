@@ -69,7 +69,7 @@ function goIdle(): void {
 // Mirrors the server's voiceForLine (lines.ts) — kept client-side so the indicator never pulls
 // server code into the bundle. Sköll's Ask and the loss outcome are his; everything else hers.
 function speakerFor(descriptor: LineDescriptor): DeliveryVoice {
-	if (descriptor.kind === 'skoll-ask') return 'skoll';
+	if (descriptor.kind === 'skoll-ask' || descriptor.kind === 'skoll-cast') return 'skoll';
 	if (descriptor.kind === 'outcome' && descriptor.result === 'lose') return 'skoll';
 	return 'oracle';
 }
@@ -99,6 +99,12 @@ export function enableDelivery(): void {
 /** Whether a gesture has opened the speaker — audio plays only once this is true. */
 export function deliveryReady(): boolean {
 	return speaker !== null;
+}
+
+/** Current output level (RMS, 0–1) of the open speaker, or 0 when none — the medallion polls this
+ *  each frame to pulse with the voice instead of a fixed CSS loop. */
+export function currentLevel(): number {
+	return speaker?.level() ?? 0;
 }
 
 /**

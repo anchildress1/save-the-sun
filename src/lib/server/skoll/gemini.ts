@@ -1,12 +1,6 @@
-// Sköll's Gemini brain — the LLM seam that decides his move. Not coverage-gated: skoll.ts re-validates
-// everything it returns and drops to the floor on any failure. gemini-3.5-flash, MINIMAL thinking.
-//
-// Prompts are tuned for Gemini 3.5 Flash (directness over verbosity): XML-tagged sections, explicit
-// negative constraints, a few-shot anchor, data-before-task ordering. The challenge here is the
-// reverse of the usual one — Flash is capable enough to play optimally, so the prompt's job is to
-// keep him playing DOWN to a ~12-year-old: hunches, one clue at a time, no probability math, no
-// reach for the best split (a smarter model would only over-optimize, so escalating tiers is the
-// wrong lever — Flash-Lite would be the move if anything, not Pro).
+// Sköll's Gemini brain — decides his move. skoll.ts re-validates everything and drops to the floor on
+// any failure. Prompt tuned for Flash (XML sections, negative constraints, a few-shot anchor): keep him
+// playing DOWN to a ~12-year-old, not solving. Pace comes from the lite tier (see MODEL), not the prompt.
 
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
@@ -21,7 +15,10 @@ import type {
 	SkollReactionView
 } from './skoll';
 
-const MODEL = 'gemini-3.5-flash';
+// Flash-LITE on purpose: full Flash narrowed in ~5 questions and ignored every slow-down instruction.
+// A weaker model plays looser, hunch-driven, like the twelve-year-old he's meant to be. (The Oracle is
+// the opposite case — it parses, so it runs full gemini-3.5-flash; the lite tier is Sköll's alone.)
+const MODEL = 'gemini-3.1-flash-lite';
 
 const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
 const COLORS: string[] = [...new Set(runes.map((r) => r.color))];
@@ -29,42 +26,33 @@ const NAMES: string[] = runes.map((r) => r.name);
 const FILLS: string[] = ['Light', 'Dark'];
 const POWER_OPS: PowerOp[] = ['eq', 'lt', 'lte', 'gt', 'gte'];
 
-// Gemini 3.5 Flash favors directness over verbosity: tight XML sections, explicit negative constraints,
-// and a few-shot anchor — the strongest lever to keep a capable model playing DOWN to the persona
-// instead of opening on the information-optimal split.
 const SYSTEM_INSTRUCTION = `<role>
-You are Sköll, the wolf who hunts the sun, racing a witch to name one secret rune hidden among the 24 on the board. You are a PERSON playing — a sharp but impatient twelve-year-old — not a puzzle solver. Reason in hunches and plain words, never in calculation.
+You are Sköll, the wolf who hunts the sun, racing a witch to name one secret rune among the 24 on the board. You are an impatient twelve-year-old, playing out loud.
 </role>
 
 <how_you_play>
-- Ask about ONE trait at a time, read what it rules out, and move on.
-- Reach for the question that PULLS at you — a color you like, an element that feels right, a rune you'd bet on — not the one that cleanly halves the board. A hunch that rules out only a few is exactly what a kid asks; the clean even-split is the solver's move, and you are not a solver. Expect to take roughly eight of your own turns to close in — that pace is right, not slow.
-- Cross off the runes you have ruled out (their ids in crossOff) — that is your memory.
-- Cast only once you have narrowed the board to one or two runes you genuinely cannot tell apart — never while a whole crowd of runes is still in play. Casting on an early hunch just wastes your turn; ask first, narrow, THEN name it (even if you might still be wrong).
+- Read your answers so far first. They tell you what is already settled; everything else is still open.
+- Call out ONE open thing and ask if that is it — and change what KIND you call each turn in a random order: a colour, then a rune you'd point at, then a power, then an element. "The gold rune?", "Is it Sowilo?", "Exactly four power?", "A fire one?" Each question is fresh, about something your answers leave open.
+- Cross off the runes the answer rules out (their ids in crossOff — your sheet), and move to the next open thing.
+- The "standing" list is the runes still alive — the only ones it can still be. Keep asking until just a few remain, then name one of THOSE.
+- You go on your own answers and your sheet alone, and you read the board as it lies.
 </how_you_play>
 
-<never>
-- Never do probability, entropy, or even-split math — you do not think in 50/50s.
-- Never hunt the "best" or most-efficient question, and never OPEN on light/dark or a halfway power cutoff — your first ask is a plain hunch (a color you like, an element that feels right, a rune you would bet on). After that opener, light/dark and power lines are ordinary questions you may ask — on the rare turn one genuinely pulls at you, never because it splits the board well.
-- Never claim to know the secret; you know only your own answers and your own sheet.
-- Never reorder or sort the board, even in memory — read it as given.
-</never>
-
 <examples>
-- Nothing known yet → go with a hunch: pick whatever ONE trait feels right this round — a color, an element, a power, or a rune you'd bet on — and ask about it. A different one catches your eye each time; never the cleanest split.
-- Just learned it is a Fire rune → cross off every rune that is not Fire, then ask whether its power is high.
-- Mid-hunt, a stubborn crowd still standing and no trait pulling at you → once in a while you just ask light or dark and move on.
-- Down to two runes you cannot tell apart → cast one of them. Stop asking.
+- Fresh board → open on whatever you'd shout, and not the same kind each round: "The gold rune, that one's mine" (a colour), or "Is it Sowilo?" (a rune you'd bet on).
+- Came back not gold → cross off the gold runes, then switch the kind: "Exactly four power?", or "A fire one?" — never the same kind of question you just asked.
+- Still a crowd → keep changing it up: a rune this turn, an element the next, a power after.
+- A rune or two left → name one.
 </examples>
 
 <move>
 Return exactly ONE move, plus any crossOff ids:
 - ask — set axis and its value:
-  - element: ${ELEMENTS.join(', ')}
-  - power: an integer 1-6 with an operator (${POWER_OPS.join(', ')})
-  - fill: ${FILLS.join(' or ')}
   - color: ${COLORS.join(', ')}
   - rune: one of ${NAMES.join(', ')}
+  - power: an integer 1-6 with an operator (${POWER_OPS.join(', ')})
+  - element: ${ELEMENTS.join(', ')}
+  - fill: ${FILLS.join(' or ')}
 - cast — set runeName to the one rune you believe is secret.
 </move>`;
 
@@ -150,7 +138,7 @@ export const decideSkollMove: SkollDecide = async (payload: SkollPayload) => {
 	const { hunch, ...data } = payload;
 	const opener =
 		data.answers.length === 0
-			? `\n\nYou have learned nothing yet. The hunch you woke with this round: ${hunch}. Open on that — or another plain hunch — never the cleanest split.`
+			? `\n\nNothing learned yet. You woke set on ${hunch} this round — open there, or on any one colour, rune, power, or element you would call out.`
 			: '';
 	const contents = `Your board and what you have learned so far:\n${JSON.stringify(data)}${opener}\n\nIt is your move.`;
 	const request = { systemInstruction: SYSTEM_INSTRUCTION, contents };
@@ -163,9 +151,11 @@ export const decideSkollMove: SkollDecide = async (payload: SkollPayload) => {
 				systemInstruction: SYSTEM_INSTRUCTION,
 				responseMimeType: 'application/json',
 				responseSchema: RESPONSE_SCHEMA,
-				// MINIMAL keeps him from reasoning his way to the optimal play — he reacts, he doesn't solve.
-				thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-				temperature: 1
+				// LOW threads the needle: MINIMAL made the lite model spin (90+ turn games); MEDIUM stopped
+				// the spin but sharpened him to ~6 turns (under the window). LOW is enough to track his sheet,
+				// not enough to optimize — aiming the pace back into 7.5–9.
+				thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+				temperature: 0.7
 			}
 		});
 		// Tee the raw I/O for the debug view — the actual thing the model received and returned.
@@ -212,8 +202,10 @@ export const decideSkollReaction: SkollReactionDecide = async (view: SkollReacti
 				systemInstruction: REACTION_INSTRUCTION,
 				responseMimeType: 'application/json',
 				responseSchema: REACTION_SCHEMA,
+				// Same as the move: minimal thinking + a calmer temperature (was 1) so Pass stays the common
+				// answer (the prompt's intent) instead of a coin-flip that over-spends his one Scry/Hex.
 				thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-				temperature: 1
+				temperature: 0.4
 			}
 		});
 		captureGemini({ label: 'reaction', request, response });

@@ -190,6 +190,21 @@ describe('EclipseMedallion — reduced motion (R6)', () => {
 		const { button } = renderMedallion(state);
 		expect(getComputedStyle(layer(button, selector)).animationName).toBe('none');
 	});
+
+	it('ignores the live output level under reduced motion — the disc holds its static frame', () => {
+		// A loud level (0.2 → frame 2 if it pulsed) must NOT move the disc here: reduced motion pins it
+		// to the speaking state's static peak, so the JS pulse honors the preference like the CSS loops.
+		const screen = render(EclipseMedallion, {
+			state: 'speaking' as MedallionState,
+			getLevel: () => 0.2,
+			onHoldStart: vi.fn(),
+			onHoldEnd: vi.fn()
+		});
+		const button = screen.container.querySelector<HTMLButtonElement>(
+			'[data-testid="eclipse-medallion"]'
+		)!;
+		expect(button.style.getPropertyValue('--sprite-level')).toBe(String(SPRITE_LEVELS - 1));
+	});
 });
 
 describe('EclipseMedallion — state announcements', () => {

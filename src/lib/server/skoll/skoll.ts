@@ -18,7 +18,7 @@ import {
 	type ReactionChoice,
 	type ReactionOutcome
 } from '$lib/server/engine/reactions';
-import { chooseFloorMove, type EarnedFact } from './floor';
+import { chooseFloorMove, liveCandidates, type EarnedFact } from './floor';
 
 /** Sköll's private, per-round memory. Holds no secret and no read of the human's crossings. */
 export interface SkollState {
@@ -92,6 +92,10 @@ export interface SkollPayload {
 	answers: { trait: string; holds: boolean }[];
 	// Rune ids he has crossed off his own sheet.
 	crossedOff: number[];
+	// The runes still consistent with every answer — his worksheet, computed so a weak model doesn't
+	// have to derive it (and re-cast already-dead runes). Deducible from board + answers, so it leaks
+	// nothing the secret doesn't already share with every other survivor; he names his cast from here.
+	standing: string[];
 	// His seeded opening hunch (a trait phrase) — used only when he has learned nothing yet.
 	hunch: string;
 }
@@ -111,7 +115,11 @@ export interface RawSkollDecision {
 export type SkollDecide = (payload: SkollPayload) => Promise<RawSkollDecision>;
 
 export type SkollMove = { kind: 'ask'; query: Query } | { kind: 'cast'; runeName: string };
-export type SkollSource = 'gemini' | 'floor';
+// 'gemini' — his decision stood. 'floor' — Gemini failed (threw/illegal/malformed) and the
+// deterministic fallback played. 'guard' — Gemini's play cornered the board to a lone survivor and
+// the convergence guard forced the closing cast; NOT a failure, so the live corpus counts it as real
+// play (apart from a 'floor' fallback, which taints live evidence).
+export type SkollSource = 'gemini' | 'floor' | 'guard';
 
 export type SkollOutcome =
 	| { kind: 'cast'; source: SkollSource; reasoning: string; runeName: string; result: CastResult }
@@ -133,6 +141,7 @@ export function buildPayload(state: SkollState): SkollPayload {
 		})),
 		answers: state.facts.map((f) => ({ trait: valuePhrase(f.query), holds: f.answer })),
 		crossedOff: [...state.crossed],
+		standing: liveCandidates(state.facts).map((r) => r.name),
 		hunch: state.hunch
 	};
 }
@@ -202,6 +211,13 @@ function skollPowerLine(op: PowerOp, n: number): string {
 	}
 }
 
+/** Sköll's winning cast in his own voice — he names the rune as the night closes (ux-copy.md §2,
+ *  the winning-cast bucket). A game move, voiced through the shared TTS route like his Ask; only his
+ *  *winning* cast carries a line (a wrong cast just hands the turn back). */
+export function skollCastEcho(runeName: string): string {
+	return `I name it. ${runeName}.`;
+}
+
 /** Sköll's Ask in his own voice — first-person, predatory, naming the sign the human judges for
  *  Scry/Hex (ux-copy.md §2). NOT the Oracle's third-person paraphrase. Exported so a page load can
  *  rehydrate the interrupt prompt when a round resumes on his parked Ask. */
@@ -257,10 +273,22 @@ async function planMove(
 	rng: () => number
 ): Promise<{ move: SkollMove } & SkollDecision> {
 	const payload = buildPayload(state);
+	// Set when only the lone survivor was left and the guard forced the cast — distinct from a genuine
+	// failure floor, so the live corpus can count it as real play (see SkollSource).
+	let guardForced = false;
 	try {
 		const raw = await decide(payload);
 		const move = validateMove(raw);
-		if (move) {
+		// Convergence guard (server-authoritative): once a SINGLE rune can still be the secret the answer
+		// is already decided, so anything but casting that rune wastes the turn — force the cast whether he
+		// asked the meaningless lone-survivor question OR cast some already-dead rune. At two he keeps his
+		// agency: ask the splitter, or guess and miss. (The DRY-asking prompt + MAX_MOVES cap stop dithering.)
+		const survivors = liveCandidates(state.facts);
+		const cornered =
+			move != null &&
+			survivors.length <= 1 &&
+			!(move.kind === 'cast' && move.runeName === survivors[0]?.name);
+		if (move && !cornered) {
 			for (const id of legalCrossOffs(raw.crossOff)) state.crossed.add(id);
 			if (dev && state.crossed.size)
 				console.debug(`[skoll] sheet: ${[...state.crossed].join(',')}`);
@@ -271,13 +299,22 @@ async function planMove(
 				reasoning: raw.reasoning?.trim() || summarizePayload(payload)
 			};
 		}
-		console.warn(`[skoll] illegal/malformed decision, floor fires: ${JSON.stringify(raw)}`);
+		if (cornered) {
+			guardForced = true;
+			console.warn('[skoll] move refused — one rune left, forcing the cast');
+		} else {
+			console.warn(`[skoll] illegal/malformed decision, floor fires: ${JSON.stringify(raw)}`);
+		}
 	} catch (err) {
 		console.error('[skoll] Gemini decision failed, floor fires:', err);
 	}
 	// The floor doesn't reason — the demo shows the earned-only state it played from instead.
 	const floor = chooseFloorMove(state.facts, asked(state), rng);
-	return { move: floor, source: 'floor', reasoning: summarizePayload(payload) };
+	return {
+		move: floor,
+		source: guardForced ? 'guard' : 'floor',
+		reasoning: summarizePayload(payload)
+	};
 }
 
 /** Already-asked queries — the answers he holds; the floor excludes them as redundant. */

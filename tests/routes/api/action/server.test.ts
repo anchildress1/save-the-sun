@@ -186,12 +186,13 @@ describe('POST /api/action', () => {
 		}
 	});
 
-	it('ends the round in defeat when Sköll casts true on Advance', async () => {
+	it('ends the round in defeat when Sköll casts true on Advance, carrying his cast to voice', async () => {
 		skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
 		await ask();
 		const data = await json(await advance());
-		// The defeat is engine truth in the turn state, not a Sköll flavor line.
-		expect(data.skoll).toEqual({});
+		// The defeat is engine truth in the turn state; his winning cast also rides the wire so the
+		// client can voice it (a game move, R10) — the rune for the server to recompose, the echo as text.
+		expect(data.skoll).toEqual({ casts: { echo: `I name it. ${SECRET}.`, rune: SECRET } });
 		expect(data.state).toMatchObject({ status: 'won', winner: 'Sköll' });
 	});
 
@@ -329,7 +330,7 @@ describe('POST /api/action', () => {
 			expect(secretEv.data).toMatchObject({ secret: SECRET, seed: SEED });
 		});
 
-		it('splits a human Ask into her input, the Oracle’s reading, and the engine’s verdict', async () => {
+		it('splits a human Ask into her input, the Oracle’s reading and answer, and the engine’s verdict', async () => {
 			await ask();
 			// Her raw free-text — hers (input), distinct from the Oracle's reading of it.
 			const human = byOwner('Human').at(-1)!;
@@ -337,10 +338,15 @@ describe('POST /api/action', () => {
 			expect(human.message).toContain('is it light?');
 			expect(human.data).toMatchObject({ question: 'is it light?' });
 			// The Oracle's LLM reading — its own event, not bolted onto the engine's verdict.
-			const reading = byOwner('Oracle').at(-1)!;
+			const reading = byOwner('Oracle').find((e) => e.part === 'Ask')!;
 			expect(reading).toMatchObject({ kind: 'llm', part: 'Ask' });
 			expect(reading.message).toContain('whether it is light'); // the Oracle's read, in the message
 			expect(reading.data).toMatchObject({ query: { axis: 'fill', value: 'Light' } });
+			// Her spoken answer — the Oracle's own event, separate from the engine's verdict below.
+			const answer = byOwner('Oracle').find((e) => e.part === 'Answer')!;
+			expect(answer).toMatchObject({ kind: 'deterministic', part: 'Answer' });
+			expect(answer.message).toMatch(/^answers: (Yes|No)\. Sól is/);
+			expect(answer.data).toHaveProperty('affirmative');
 			// The verdict is the engine fact — deterministic, no inference attached.
 			const v = lastVerdict();
 			expect(v).toMatchObject({ kind: 'deterministic', part: 'Ask' });

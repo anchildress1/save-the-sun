@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	startRecording,
 	stopRecording,
+	releaseRecorder,
 	isRecording,
 	recorderSealed,
 	closeRecorder,
@@ -80,12 +81,29 @@ describe('recorder — capture', () => {
 		expect(bytes.length).toBe(44 + 5000 * 2); // header + PCM16 samples
 	});
 
-	it('reuses the open mic on a second hold — no second prompt', async () => {
+	it('releases the mic stream on release so Chrome stops showing it in use', async () => {
 		await startRecording();
 		feed(5000);
 		await stopRecording();
+		releaseRecorder();
+		expect(track.stop).toHaveBeenCalledTimes(1); // tracks dropped, indicator clears
+		expect(isRecording()).toBe(false);
+	});
+
+	it('re-acquires the stream on the next hold but keeps the one context + worklet', async () => {
 		await startRecording();
-		expect(getUserMedia).toHaveBeenCalledTimes(1);
+		feed(5000);
+		await stopRecording();
+		releaseRecorder();
+
+		expect(await startRecording()).toEqual({ ok: true });
+		feed(5000);
+		expect(await stopRecording()).not.toBeNull();
+		// A fresh stream each hold (no re-prompt — the grant is remembered), but the context and its
+		// worklet are built once and reused, so a re-acquire never pays the worklet load.
+		expect(getUserMedia).toHaveBeenCalledTimes(2);
+		expect(FakeAudioContext.instances).toHaveLength(1);
+		expect(FakeAudioContext.instances[0].audioWorklet.addModule).toHaveBeenCalledTimes(1);
 	});
 
 	it('returns null for an utterance too short to be a real Ask', async () => {

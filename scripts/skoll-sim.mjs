@@ -1,14 +1,12 @@
-// Sköll self-play sim — drives a real GameEngine across a seed sweep, prints the pacing metrics, and
-// writes them to the committed corpus.
+// Sköll self-play measurement — drives a real GameEngine across a seed sweep and prints the stats.
 //
-//   node scripts/skoll-sim.mjs [games]          floor only (default 1000) — the CI-measurable proxy
-//   node scripts/skoll-sim.mjs --live [games]    ALSO run the live Gemini wolf (default 10), local only
+//   node scripts/skoll-sim.mjs [games]               floor only (default 1000), no key needed
+//   node scripts/skoll-sim.mjs --live [games] --trace  live Gemini wolf, needs a GEMINI_API_KEY
 //
-// The floor is the only part of Sköll that runs without a Gemini key, so it is the CI-measurable proxy
-// for his win pacing. `--live` additionally drives the REAL `decideSkollMove` brain (gemini-3.5-flash)
-// through the same loop, counting every API call and recording each run as proof — it needs a
-// GEMINI_API_KEY (read from .env) and the network, so it never runs in CI. A floor-only run preserves
-// the existing live section so re-running the floor never wipes the recorded live evidence.
+// A read-only tool: the write-up lives in the curated docs/skoll-metrics-corpus.md (the twelve-year-old
+// thesis + the trace evidence). This script just produces the numbers — run it to see/refresh them.
+// `--live` drives the REAL `decideSkollMove` brain through the same loop; `--trace` prints each game's
+// turn-by-turn log (the evidence the corpus quotes).
 //
 // The repo's TS modules use the SvelteKit `$lib` alias and a bare JSON import that only Vite resolves.
 // This script teaches plain Node both, via module resolve/load hooks, so the sim runs with no extra
@@ -16,7 +14,6 @@
 
 import { registerHooks } from 'node:module';
 import { existsSync, readFileSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -90,18 +87,13 @@ registerHooks({
 	}
 });
 
-const { simulateFloor, playFloorGame, median, skollSeedFor, BOARD_SIZE } = await import(
-	pathToFileURL(path.join(LIB, 'server', 'skoll', 'sim.ts')).href
-);
-
-const TARGET = { lo: 7.5, hi: 9 };
-const LIVE_MARKER_START = '<!-- LIVE:START -->';
-const LIVE_MARKER_END = '<!-- LIVE:END -->';
-const corpusPath = path.join(ROOT, 'docs', 'skoll-metrics-corpus.md');
+const { simulateFloor, playFloorGame, withQuietConsole, median, skollSeedFor, BOARD_SIZE } =
+	await import(pathToFileURL(path.join(LIB, 'server', 'skoll', 'sim.ts')).href);
 
 // --- arg parsing ---------------------------------------------------------------------------------
 const argv = process.argv.slice(2);
 const live = argv.includes('--live');
+const trace = argv.includes('--trace'); // print each live game's turn-by-turn log
 const gamesArg = argv.find((a) => !a.startsWith('--'));
 
 function parsePositive(arg, fallback) {
@@ -118,31 +110,26 @@ function parsePositive(arg, fallback) {
 // With --live the positional arg sizes the LIVE run, so the floor keeps its full default sweep.
 const floorGames = parsePositive(live ? undefined : gamesArg, 1000);
 const floor = await simulateFloor(floorGames);
-const floorInWindow = floor.meanTurns >= TARGET.lo && floor.meanTurns <= TARGET.hi;
 
 console.log(`Sköll floor self-play — ${floorGames} seeded games over a ${BOARD_SIZE}-rune board\n`);
 console.log(`  win rate     ${(floor.winRate * 100).toFixed(1)}%`);
-console.log(`  mean turns   ${floor.meanTurns.toFixed(2)}  (target ${TARGET.lo}–${TARGET.hi})`);
+console.log(`  mean turns   ${floor.meanTurns.toFixed(2)}`);
 console.log(`  median turns ${floor.medianTurns}`);
 console.log(`  range        ${floor.minTurns}–${floor.maxTurns}`);
-console.log(`  pacing       ${floorInWindow ? 'WITHIN target window' : 'OUT OF target window'}\n`);
+// A min-max solver cracks 24 runes in ~5; the floor's hunch-weighting runs slower on purpose.
+console.log(`  (a solver would average ~5 — slower is the point)\n`);
 
 // --- live sweep (opt-in, real Gemini, local only) ------------------------------------------------
-let liveSection;
 if (live) {
 	const liveGames = parsePositive(gamesArg, 10);
 	if (!process.env.GEMINI_API_KEY) {
 		console.error('--live needs GEMINI_API_KEY (set it in .env); refusing to fake the numbers');
 		process.exit(1);
 	}
-	liveSection = await runLive(liveGames);
-} else {
-	liveSection = preserveLiveSection();
+	await runLive(liveGames);
 }
 
-const corpus = renderCorpus(floor, floorGames, floorInWindow, liveSection);
-await writeFile(corpusPath, corpus, 'utf8');
-console.log(`corpus written → ${path.relative(ROOT, corpusPath)}`);
+console.log('Numbers only — the write-up is curated in docs/skoll-metrics-corpus.md.');
 
 // -------------------------------------------------------------------------------------------------
 
@@ -158,166 +145,73 @@ async function runLive(games) {
 	);
 
 	console.log(
-		`Live Gemini wolf — ${games} real games (seeds 1–${games}); every move is one Gemini decision\n`
+		`Live Gemini wolf — ${games} real games (seeds 1–${games}), real Gemini every move\n`
 	);
 	const runs = [];
-	let totalDecisions = 0;
-	let totalFloored = 0;
+	// One clean row per game. Columns: turns-to-win, the Gemini decisions that drove the narrowing, the
+	// lone-survivor guard casts that closed it, and any failure floors. Headers spaced to match the rows.
+	console.log('  seed   result   turns   gemini   guard   floor   secret');
+	console.log('  ────   ──────   ─────   ──────   ─────   ─────   ──────');
 	for (let seed = 1; seed <= games; seed++) {
-		// One decideSkollMove invocation per Sköll move (the SDK may retry a decision internally, so
-		// this is a decision count, not a raw network-call count). A decision that throws or returns an
-		// illegal move floors inside takeSkollTurn — r.floorMoves catches that so a degraded run can't
-		// masquerade as live evidence.
+		// One decideSkollMove invocation per Sköll move (the SDK may retry a decision internally, so this
+		// is a decision count, not a raw network-call count). A decision that throws or returns an illegal
+		// move floors inside takeSkollTurn — r.floorMoves catches that so a degraded run can't masquerade
+		// as live evidence. Each game is wrapped to silence the guard/failure console noise so the rows
+		// below read clean; the counts (guard/floor) carry that signal instead.
 		// Engine seed = `seed` (so the secret + per-run label stay reproducible); Sköll gets an
 		// independent decorrelated seed, mirroring production's two separate randomSeed() calls so the
 		// opening hunch handed to Gemini isn't coupled to selectSecret(seed).
-		const r = await playFloorGame(
-			seed,
-			new GameEngine(seed),
-			freshSkollState(skollSeedFor(seed)),
-			decideSkollMove
+		const r = await withQuietConsole(() =>
+			playFloorGame(
+				seed,
+				new GameEngine(seed),
+				freshSkollState(skollSeedFor(seed)),
+				decideSkollMove
+			)
 		);
-		const decisions = r.turns;
-		totalDecisions += decisions;
-		totalFloored += r.floorMoves;
+		// A guard-forced cast is the deterministic floor naming the lone survivor after Gemini's own play
+		// cornered the board — real live play, but not a Gemini *decision*, so it's excluded from the count.
+		const decisions = r.turns - r.guardMoves;
 		runs.push({ ...r, decisions });
+		const cell = (n, w) => String(n).padStart(w);
 		console.log(
-			`  seed ${String(seed).padStart(2)} → ${r.won ? 'win ' : 'LOSS'} in ${String(r.turns).padStart(2)} turns (${decisions} decisions${r.floorMoves ? `, ${r.floorMoves} floored` : ''})  [secret: ${r.secret}]`
+			`  ${cell(seed, 4)}   ${(r.won ? 'win' : 'LOSS').padEnd(6)}   ${cell(r.turns, 5)}   ${cell(decisions, 6)}   ${cell(r.guardMoves, 5)}   ${cell(r.floorMoves, 5)}   ${r.secret}`
 		);
+		if (trace) {
+			for (const line of r.trace) console.log(`           ${line}`);
+			console.log('');
+		}
 	}
 
-	// The live section's whole claim is "real Gemini, every move." A move that fell back to the floor
-	// (API down, quota, malformed/illegal output) breaks that claim, so refuse to record it as proof.
-	if (totalFloored > 0) {
+	// A game with a floored move (Gemini threw / returned an illegal move) is contaminated evidence, so
+	// it's EXCLUDED from the recorded stats — floor play never masquerades as Gemini. But one transient
+	// hiccup must not throw the whole run away: the clean games still count, and only an all-floored run
+	// (nothing clean to record) is a hard failure.
+	const clean = runs.filter((r) => r.floorMoves === 0);
+	const excluded = runs.filter((r) => r.floorMoves > 0);
+	if (clean.length === 0) {
 		console.error(
-			`\n--live floored ${totalFloored} move(s): Gemini failed or returned an illegal move. ` +
-				`Refusing to record floor play as live evidence — re-run when the API is healthy.`
+			'\n--live: every game floored — Gemini failed throughout. Nothing clean to record; re-run when the API is healthy.'
 		);
 		process.exit(1);
 	}
+	if (excluded.length > 0) {
+		console.log(
+			`\n  excluded ${excluded.length} contaminated game(s) — Gemini floored mid-game (seed ${excluded.map((r) => r.seed).join(', ')}); the ${clean.length} clean games below stand.`
+		);
+	}
 
-	const wins = runs.filter((r) => r.won);
+	const wins = clean.filter((r) => r.won);
 	const turns = wins.map((r) => r.turns).sort((a, b) => a - b);
 	const mean = turns.length ? turns.reduce((a, t) => a + t, 0) / turns.length : 0;
-	const inWindow = mean >= TARGET.lo && mean <= TARGET.hi;
+	const range = turns.length ? `${turns[0]}–${turns.at(-1)}` : '—';
+	const fast = turns.filter((t) => t <= 5).length; // the lucky early-read tail
+	const cleanDecisions = clean.reduce((a, r) => a + r.decisions, 0);
+	const cleanGuarded = clean.reduce((a, r) => a + r.guardMoves, 0);
 	console.log(
-		`\n  live: ${wins.length}/${games} wins, mean ${mean.toFixed(2)} turns, ${totalDecisions} Gemini decisions — ${inWindow ? 'WITHIN' : 'OUT OF'} window\n`
+		`\n  ${wins.length}/${clean.length} clean wins · mean ${mean.toFixed(2)} · median ${median(turns)} turns (range ${range})`
 	);
-
-	return renderLive({
-		runs,
-		games,
-		wins: wins.length,
-		mean,
-		median: median(turns),
-		totalDecisions,
-		inWindow
-	});
-}
-
-// Reuse the existing recorded live section on a floor-only run so re-running the floor never erases
-// the live evidence. Falls back to a placeholder if the corpus has none yet.
-function preserveLiveSection() {
-	if (existsSync(corpusPath)) {
-		const text = readFileSync(corpusPath, 'utf8');
-		const a = text.indexOf(LIVE_MARKER_START);
-		// Search the end marker AFTER the start so duplicated/misordered markers can't slice backwards.
-		const b = a === -1 ? -1 : text.indexOf(LIVE_MARKER_END, a + LIVE_MARKER_START.length);
-		if (a !== -1 && b > a) return text.slice(a + LIVE_MARKER_START.length, b).trim();
-	}
-	return '## Live wolf testing\n\n_No live run recorded yet. Run `node scripts/skoll-sim.mjs --live` locally (needs a key)._';
-}
-
-function renderLive({ runs, games, wins, mean, median, totalDecisions, inWindow }) {
-	const rows = runs
-		.map(
-			(r) =>
-				`| ${r.seed} | ${r.secret} | ${r.turns} | ${r.won ? 'win ✅' : 'loss ❌'} | ${r.decisions} |`
-		)
-		.join('\n');
-	const turnsList = runs.filter((r) => r.won).map((r) => r.turns);
-	const min = turnsList.length ? Math.min(...turnsList) : 0;
-	const max = turnsList.length ? Math.max(...turnsList) : 0;
-	return `## Live wolf testing (local, real Gemini)
-
-The deterministic floor above is the CI proxy. This section is the **real thing**: the live Gemini wolf
-(\`gemini-3.5-flash\`, the actual \`decideSkollMove\` brain) driven through the *same* engine loop as the
-floor, one Gemini decision per move. Run locally with a \`GEMINI_API_KEY\` — never in CI, which has no key.
-Regenerate with \`node scripts/skoll-sim.mjs --live [games]\`.
-
-**How it was tested.** For each seed 1–${games}: a fresh \`GameEngine\` and \`freshSkollState\` (production
-path), the human seat passes, and Sköll plays every move via \`decideSkollMove\` against the live API. The
-engine resolves each Ask/Cast truthfully and reports the win. **Every Sköll move is one Gemini decision**
-(the SDK may retry a decision internally, so this counts decisions, not raw network calls). A decision
-that throws or returns an illegal move would fall back to the floor — the run is **rejected** if any move
-floors, so every move recorded here is a real Gemini decision.
-
-**The bar.** A run is a *win* only when Sköll casts the true rune (the engine's verdict, never the
-model's claim). Pacing target: **mean turns-to-win in ${TARGET.lo}–${TARGET.hi}** — beatable by a
-competent human, still a real threat. Turns-to-win counts Sköll's own moves (Asks + the winning Cast).
-
-| metric | value |
-| --- | --- |
-| live games (seeds 1–${games}) | ${games} |
-| wins | ${wins}/${games} (${((wins / games) * 100).toFixed(1)}%) |
-| **total Gemini decisions** | **${totalDecisions}** |
-| mean decisions / game | ${(totalDecisions / games).toFixed(1)} |
-| mean turns-to-win | **${mean.toFixed(2)}** |
-| median turns-to-win | ${median} |
-| min / max turns | ${min} / ${max} |
-| within ${TARGET.lo}–${TARGET.hi} window | ${inWindow ? 'yes ✅' : 'no ❌'} |
-
-### Per-run results (proof)
-
-| seed | secret | turns-to-win | result | gemini decisions |
-| --- | --- | --- | --- | --- |
-${rows}`;
-}
-
-function renderCorpus(m, gameCount, inWindow, liveSection) {
-	const peak = Math.max(...m.distribution.map((d) => d.count), 1);
-	const rows = m.distribution
-		.map(({ turns, count }) => {
-			const pct = ((count / m.wins) * 100).toFixed(1);
-			const bar = '█'.repeat(Math.max(1, Math.round((count / peak) * 30)));
-			return `| ${turns} | ${count} | ${pct}% | ${bar} |`;
-		})
-		.join('\n');
-
-	return `# Sköll Metrics Corpus 🐺
-
-> Floor stats: \`node scripts/skoll-sim.mjs\`. Live stats: \`node scripts/skoll-sim.mjs --live\` (local,
-> needs a key). Do not hand-edit — re-run the script to refresh.
-
-Self-play of Sköll's **deterministic floor** (his seeded fallback move) driven move-by-move through a
-real \`GameEngine\` until he casts the secret. The floor is the only part of Sköll that runs without a
-Gemini key, so it is the measurable proxy for his win pacing. **Turns-to-win counts Sköll's own moves**
-(his Asks plus the winning Cast), not the engine's alternation flips.
-
-The pacing target: Sköll's own wins average **${TARGET.lo}–${TARGET.hi} turns** — slow enough that a
-competent human can beat him, fast enough that he's a real threat.
-
-## Aggregate (floor)
-
-| metric | value |
-| --- | --- |
-| games (seeds) | ${gameCount} |
-| board size | ${BOARD_SIZE} runes |
-| win rate | ${(m.winRate * 100).toFixed(1)}% |
-| mean turns-to-win | **${m.meanTurns.toFixed(2)}** |
-| median turns-to-win | ${m.medianTurns} |
-| min / max turns | ${m.minTurns} / ${m.maxTurns} |
-| target window | ${TARGET.lo}–${TARGET.hi} |
-| within window | ${inWindow ? 'yes ✅' : 'no ❌'} |
-
-## Turns-to-win distribution (floor)
-
-| turns | games | share | |
-| --- | --- | --- | --- |
-${rows}
-
-${LIVE_MARKER_START}
-${liveSection}
-${LIVE_MARKER_END}
-`;
+	console.log(
+		`  ${cleanDecisions} gemini decisions · ${cleanGuarded} guard casts · ${fast} lucky ≤5-turn reads\n`
+	);
 }

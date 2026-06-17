@@ -16,6 +16,7 @@ import {
 	takeSkollTurn,
 	resolveSkollAsk,
 	reactToHumanAsk,
+	skollCastEcho,
 	type SkollOutcome,
 	type SkollState
 } from '$lib/server/skoll/skoll';
@@ -109,10 +110,14 @@ function geminiEvents(sessionId: string, movePart: TurnPart): void {
 	}
 }
 
-// His templated Ask is surfaced for the human to react to; a Cast carries no flavor line. The query
-// rides along so the client can voice the Ask through the TTS route (server recomposes the line).
+// His templated Ask is surfaced for the human to react to; his WINNING cast rides along too so the
+// client can voice it (server recomposes from the rune). A wrong cast carries no line — it just hands
+// the turn back. Both lines are recomposed server-side, never replayed from client text.
 function describeTurn(out: SkollOutcome): SkollTurn {
-	return out.kind === 'ask' ? { asks: { echo: out.echo, query: out.query } } : {};
+	if (out.kind === 'ask') return { asks: { echo: out.echo, query: out.query } };
+	if (castWon(out.result))
+		return { casts: { echo: skollCastEcho(out.runeName), rune: out.runeName } };
+	return {};
 }
 
 // Validation is pure and runs before the lock; everything touching shared engine/Sköll memory runs
@@ -270,9 +275,20 @@ async function askWithSkollReaction(
 		engine.passTurn(); // her question dies; her turn is spent with no answer
 	} else {
 		oracle = answerAsk(engine, 'Human', prepared.query, prepared.paraphrase);
-		// A Scry lets Sköll overhear her answer — his earned fact.
-		if (vs.scried && oracle.ok)
-			skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
+		if (oracle.ok) {
+			// A Scry lets Sköll overhear her answer — his earned fact.
+			if (vs.scried) skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
+			// Her spoken reply, owned by the Oracle — distinct from the Engine's verdict of the same
+			// truth below, and absent when she's hexed silent (mirrors what the voice route delivers).
+			logEvent(sessionId, {
+				owner: 'Oracle',
+				kind: 'deterministic',
+				part: 'Answer',
+				level: 'info',
+				message: `answers: ${oracle.answer}`,
+				data: { affirmative: oracle.affirmative }
+			});
+		}
 	}
 
 	let truth: string;
@@ -306,11 +322,13 @@ async function playSkollIfActive(
 	geminiEvents(sessionId, part);
 	const crossedThisMove = [...skoll.crossed].filter((id) => !before.has(id));
 
-	// llm when Gemini decided, deterministic + warn when the floor did (so a fallback stands out).
+	// llm when Gemini decided; deterministic when the floor did (a failure fallback OR the guard's
+	// forced cast). A genuine fallback warns so it stands out; the guard cast is normal play (info).
 	const floored = out.source === 'floor';
+	const deterministic = floored || out.source === 'guard';
 	logEvent(sessionId, {
 		owner: 'Sköll',
-		kind: floored ? 'deterministic' : 'llm',
+		kind: deterministic ? 'deterministic' : 'llm',
 		part,
 		level: floored ? 'warn' : 'info',
 		message: out.kind === 'cast' ? `casts ${out.runeName}` : out.echo,

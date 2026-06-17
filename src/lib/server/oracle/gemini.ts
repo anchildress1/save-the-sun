@@ -1,5 +1,7 @@
 // Gemini adapter — the Oracle's LLM seam. Not coverage-gated: oracle.ts re-validates everything it
-// returns. gemini-3.5-flash, MINIMAL thinking, JSON out.
+// returns. gemini-3.5-flash, MINIMAL thinking, JSON out. Full Flash on purpose: the Oracle's job is
+// to read the witch's free text correctly, not to play down — that's Sköll's lite-tier thesis, not
+// hers. A weaker parser just misreads the gnarly cases (white-pips fill vs Black hue, bare symbols).
 
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';

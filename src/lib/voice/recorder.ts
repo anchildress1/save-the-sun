@@ -1,6 +1,8 @@
 // Push-to-talk capture. Hold to record, release to get a WAV (PCM16 mono @ 16kHz) the transcribe
-// route accepts. The mic is opened once (one permission prompt) and reused; a denial is remembered
-// so the rite never re-prompts. WAV is used over MediaRecorder because Gemini reliably accepts it.
+// route accepts. The mic stream is acquired per hold and released on let-go (so Chrome's in-use
+// indicator clears between holds); the AudioContext + worklet are built once and kept alive so a
+// re-acquire pays only getUserMedia, never the worklet load. A denial is remembered so the rite
+// never re-prompts. WAV is used over MediaRecorder because Gemini reliably accepts it.
 
 import { MIC_SAMPLE_RATE } from './config';
 
@@ -24,6 +26,7 @@ registerProcessor('pcm-tap', PcmTapProcessor);
 
 let context: AudioContext | null = null;
 let stream: MediaStream | null = null;
+let source: MediaStreamAudioSourceNode | null = null;
 let node: AudioWorkletNode | null = null;
 let buffers: Float32Array[] = [];
 let recording = false;
@@ -44,66 +47,101 @@ function classify(err: unknown): RecorderFailure {
 	return 'audio';
 }
 
-// Opens the mic + worklet once, lazily inside the hold gesture (browsers need one for audio).
-async function ensureMic(): Promise<RecorderResult> {
-	if (sealed) return { ok: false, reason: sealed };
-	if (node && context) return { ok: true };
-	// Snapshot the teardown generation: if closeRecorder runs while we're awaiting below, the late
-	// resources are released here instead of being stored onto an unmounted page.
-	const gen = setupGen;
-	const tornDown = () => gen !== setupGen;
-	let media: MediaStream;
+function stopTracks(media: MediaStream): void {
+	for (const track of media.getTracks()) track.stop();
+}
+
+// Acquire the mic stream inside the hold gesture. Only a denial or missing device is terminal — a
+// transient 'audio' error (AbortError, device briefly busy) stays retryable so a blip doesn't seal
+// the mic for the whole session.
+async function acquireMedia(): Promise<
+	{ ok: true; media: MediaStream } | { ok: false; reason: RecorderFailure }
+> {
 	try {
-		media = await navigator.mediaDevices.getUserMedia({
+		const media = await navigator.mediaDevices.getUserMedia({
 			audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }
 		});
+		return { ok: true, media };
 	} catch (err) {
 		const reason = classify(err);
-		// Only a denial or a missing device is terminal — a transient 'audio' error (AbortError,
-		// device briefly busy) stays retryable so a blip doesn't seal the mic for the whole session.
 		if (reason === 'denied' || reason === 'no-device') sealed = reason;
 		return { ok: false, reason };
 	}
-	if (tornDown()) {
-		for (const track of media.getTracks()) track.stop();
-		return { ok: false, reason: 'audio' };
+}
+
+// The context + worklet are built once and survive a release; only a fresh context loads the module
+// (re-adding 'pcm-tap' to a live context throws). `created` is the fresh build (null on reuse) so a
+// teardown that wins the race closes only what this call opened.
+async function ensureContext(): Promise<{ ctx: AudioContext; created: AudioContext | null }> {
+	const existing = context;
+	if (existing) return { ctx: existing, created: null };
+	const ctx = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
+	void ctx.resume();
+	const url = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'text/javascript' }));
+	try {
+		await ctx.audioWorklet.addModule(url);
+	} catch (err) {
+		void ctx.close(); // this call built the context — don't leak it when the module load fails
+		throw err;
+	} finally {
+		URL.revokeObjectURL(url);
 	}
+	return { ctx, created: ctx };
+}
+
+// Lazily inside the hold gesture (browsers need one for audio): acquire the mic stream, then build
+// the tap onto the kept-alive AudioContext. closeRecorder bumps setupGen; a setup still awaiting
+// permission/worklet when that happens releases the late resources here instead of storing them.
+async function ensureMic(): Promise<RecorderResult> {
+	if (sealed) return { ok: false, reason: sealed };
+	if (stream && node && context) return { ok: true };
+	const gen = setupGen;
+	const tornDown = () => gen !== setupGen;
+
+	const acquired = await acquireMedia();
+	if (!acquired.ok) return acquired;
+	const media = acquired.media;
+	if (tornDown()) return abandon(media);
+
 	let createdCtx: AudioContext | null = null;
 	try {
-		const ctx = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
-		createdCtx = ctx;
-		void ctx.resume();
-		const url = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'text/javascript' }));
-		try {
-			await ctx.audioWorklet.addModule(url);
-		} finally {
-			URL.revokeObjectURL(url);
-		}
-		const source = ctx.createMediaStreamSource(media);
+		const built = await ensureContext();
+		createdCtx = built.created;
+		const ctx = built.ctx;
+		if (tornDown()) return abandon(media, createdCtx);
+
+		const src = ctx.createMediaStreamSource(media);
 		const tap = new AudioWorkletNode(ctx, 'pcm-tap');
 		tap.port.onmessage = (event: MessageEvent<Float32Array>) => {
 			if (recording) buffers.push(event.data);
 		};
-		source.connect(tap);
+		src.connect(tap);
 		// An unconnected node is not guaranteed to be pulled by the graph; the worklet stays silent.
 		tap.connect(ctx.destination);
-		// Teardown may have won while the worklet module loaded — release everything, store nothing.
 		if (tornDown()) {
-			for (const track of media.getTracks()) track.stop();
-			void ctx.close();
-			return { ok: false, reason: 'audio' };
+			src.disconnect();
+			tap.disconnect();
+			return abandon(media, createdCtx);
 		}
 		context = ctx;
 		stream = media;
+		source = src;
 		node = tap;
 		return { ok: true };
 	} catch (err) {
-		// Setup is retryable (not sealed), so release BOTH the tracks and the context — a leaked
-		// AudioContext per retry would eventually hit the browser's cap and break all audio.
-		for (const track of media.getTracks()) track.stop();
+		// Setup is retryable (not sealed), so release the tracks and any context THIS call created — a
+		// leaked AudioContext per retry would eventually hit the browser's cap and break all audio.
+		stopTracks(media);
 		void createdCtx?.close();
 		return { ok: false, reason: classify(err) };
 	}
+}
+
+// A teardown won the setup race — release what we hold and report the retryable failure.
+function abandon(media: MediaStream, ctx?: AudioContext | null): RecorderResult {
+	stopTracks(media);
+	if (ctx) void ctx.close();
+	return { ok: false, reason: 'audio' };
 }
 
 /** Whether the mic has been sealed shut (denied / no device) for this session. */
@@ -185,15 +223,24 @@ function bytesToBase64(bytes: Uint8Array): string {
 	return btoa(binary);
 }
 
-/** Release the mic entirely (page teardown). A later start re-opens it. */
-export function closeRecorder(): void {
-	setupGen++; // a setup mid-flight will see this and discard the resources it's about to acquire
+/** Release the mic stream on hold release, stopping its tracks so Chrome's in-use indicator clears.
+ *  The AudioContext + worklet stay alive, so the next hold re-acquires with only a getUserMedia. */
+export function releaseRecorder(): void {
 	recording = false;
 	buffers = [];
 	node?.disconnect();
 	node = null;
+	source?.disconnect();
+	source = null;
 	for (const track of stream?.getTracks() ?? []) track.stop();
 	stream = null;
+}
+
+/** Release the mic entirely (page teardown), including the kept-alive context. A later start
+ *  rebuilds everything. */
+export function closeRecorder(): void {
+	setupGen++; // a setup mid-flight will see this and discard the resources it's about to acquire
+	releaseRecorder();
 	void context?.close();
 	context = null;
 }

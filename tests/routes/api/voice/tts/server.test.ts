@@ -14,7 +14,7 @@ vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
 import { POST } from '$routes/api/voice/tts/+server';
 import { resetTtsWindows, TTS_SESSION_LIMIT } from '$lib/server/voice/rateLimit';
 import { refusalLine } from '$lib/server/oracle/oracle';
-import { skollAskEcho } from '$lib/server/skoll/skoll';
+import { skollAskEcho, skollCastEcho } from '$lib/server/skoll/skoll';
 import { synthPrompt } from '$lib/server/voice/lines';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 
@@ -73,6 +73,23 @@ describe('POST /api/voice/tts', () => {
 		expect(prompt).not.toBe(line);
 		expect(prompt).toContain(`"${line}"`);
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE);
+	});
+
+	it('voices Sköll’s winning cast in his voice, naming the board rune', async () => {
+		tts.synthesizeStream.mockReturnValueOnce(streamOf('grr'));
+		const line = skollCastEcho('Sowilo');
+
+		const response = await call('wolf-cast', { kind: 'skoll-cast', rune: 'Sowilo' });
+
+		expect(response.status).toBe(200);
+		const prompt = synthPrompt({ kind: 'skoll-cast', rune: 'Sowilo' }, line);
+		expect(prompt).toContain(`"${line}"`);
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE);
+	});
+
+	it('rejects a Sköll cast that names no board rune with 400', async () => {
+		const response = await call('wolf-cast-bad', { kind: 'skoll-cast', rune: 'Plastic' });
+		expect(response.status).toBe(400);
 	});
 
 	it('rejects a malformed JSON body with 400 before charging the budget', async () => {
