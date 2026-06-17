@@ -847,7 +847,7 @@ describe('Save the Sun page — first-run onboarding (S7)', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByTestId('show-instructions').click();
 		// Straight into the tour (no title screen) on the first concept.
-		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 5');
+		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 6');
 		expect(screen.container.querySelector('[data-testid="onboarding"]')).not.toBeNull();
 	});
 });

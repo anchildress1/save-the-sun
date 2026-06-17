@@ -295,11 +295,14 @@ Sól speaks only at victory—the goddess's rarity is the power.
 - **Secondary:** **"How the rite works"** (opens onboarding)
 
 ### First-run onboarding (one concept per step, dismissable, board visible behind)
-- **Step 1—the stakes:** "Tonight the coven makes one offering to Sól. Name her true rune before Sköll does, and the longest day breaks. Fail, and the wolf swallows the dawn."
-- **Step 2—Ask:** "Ask the Oracle yes/no questions about the runes — their element, power, light, hue, or one rune by name. She answers the sign she reads. One question a turn."
-- **Step 3—read & cross:** "Twenty-four runes stand in the open. Cross off what each answer rules out. The crossing is yours — the board never does it for you. That reading is the whole game."
-- **Step 4—Cast:** "When you're sure, cast a rune. Cast true and dawn is yours. Cast wrong and the turn is gone. Sköll is racing you for the same rune."
-- **Step 5—Scry & Hex:** "Sköll asks the Oracle too. When he does, you may answer back once — Scry to overhear her reply, or Hex to silence her and kill his question. One Scry and one Hex a night; a Cast is sacred, never interrupted."
+Plain, clear, mechanic-first — flavor stays light so the rules read at a glance. Cast comes last (it's the endgame action).
+
+- **Step 1—the goal:** "One of the 24 runes is Sól's true rune. Find it and name it before Sköll does. Beat him to it and you win; if he names it first, you lose."
+- **Step 2—Ask:** "Ask the Oracle a yes/no question about the runes — by element, power, light, hue, or one rune by name. She answers truthfully. One question per turn."
+- **Step 3—Speak:** "Rather speak than type? Hold the medallion (or the Space bar), say your question, and release to send. It works just like the text box — and you can answer Sköll by voice too."
+- **Step 4—read & cross:** "Each answer rules some runes out. Cross those off yourself — the board never does it for you. Narrowing the 24 down is how you find the rune."
+- **Step 5—Scry & Hex:** "Sköll questions the Oracle too. Each time he does, you may respond once: Scry to hear her answer, or Hex to block his question. One Scry and one Hex per game."
+- **Step 6—Cast:** "When you're sure, cast your rune. Cast right and you win the day; cast wrong and you lose the turn. Save it for when you have the answer."
 - **Final button:** **"Take up the runes."**
 
 ## 6. Chrome & States

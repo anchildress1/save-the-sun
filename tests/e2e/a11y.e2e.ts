@@ -60,7 +60,7 @@ test.describe('a11y — axe has no violations on any surface', () => {
 			.getByTestId('onboarding')
 			.getByRole('button', { name: 'How the rite works' })
 			.click();
-		await expect(page.getByTestId('step-count')).toHaveText('1 / 5');
+		await expect(page.getByTestId('step-count')).toHaveText('1 / 6');
 		const results = await sweep(page);
 		expect(results.violations).toEqual([]);
 	});

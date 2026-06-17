@@ -1265,7 +1265,12 @@
 			<div class="voice-stack">
 				<!-- The Oracle's two controls: the medallion (hold to speak — pointer, or hold Space) and
 				     the output-mute switch. Both are native buttons; Tab reaches each. -->
-				<div class="voice-controls" role="group" aria-label="Oracle voice controls">
+				<div
+					class="voice-controls"
+					role="group"
+					aria-label="Oracle voice controls"
+					data-coach="voice"
+				>
 					<EclipseMedallion
 						state={medalState}
 						getLevel={currentLevel}
