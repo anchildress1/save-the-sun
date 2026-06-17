@@ -1,5 +1,7 @@
 // Gemini adapter — the Oracle's LLM seam. Not coverage-gated: oracle.ts re-validates everything it
-// returns. gemini-3.1-flash-lite, MINIMAL thinking, JSON out — both game characters run the lite tier.
+// returns. gemini-3.5-flash, MINIMAL thinking, JSON out. Full Flash on purpose: the Oracle's job is
+// to read the witch's free text correctly, not to play down — that's Sköll's lite-tier thesis, not
+// hers. A weaker parser just misreads the gnarly cases (white-pips fill vs Black hue, bare symbols).
 
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
@@ -8,7 +10,7 @@ import { captureGemini } from '$lib/server/debug/log';
 import type { PowerOp, Query } from '$lib/server/engine/queries';
 import type { Interpretation, Interpret, RefusalClass } from './types';
 
-const MODEL = 'gemini-3.1-flash-lite';
+const MODEL = 'gemini-3.5-flash';
 
 const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
 const COLORS: string[] = [...new Set(runes.map((r) => r.color))];

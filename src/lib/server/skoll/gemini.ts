@@ -16,8 +16,8 @@ import type {
 } from './skoll';
 
 // Flash-LITE on purpose: full Flash narrowed in ~5 questions and ignored every slow-down instruction.
-// A weaker model plays looser, hunch-driven, like the twelve-year-old he's meant to be (the Oracle runs
-// the same lite tier — both game characters do).
+// A weaker model plays looser, hunch-driven, like the twelve-year-old he's meant to be. (The Oracle is
+// the opposite case — it parses, so it runs full gemini-3.5-flash; the lite tier is Sköll's alone.)
 const MODEL = 'gemini-3.1-flash-lite';
 
 const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
