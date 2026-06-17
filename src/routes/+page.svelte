@@ -290,15 +290,26 @@
 	// spent into a no-op deliver() and lost while audio is on. Covers both his Ask and a winning Cast —
 	// a resumed defeat must still replay "I name it…" once a gesture opens the speaker.
 	let pendingSkollVoice: LineDescriptor | null = null;
+	// Settles the promise voiceSkoll handed back for a queued line — resolved when flushPendingVoice
+	// finally plays it (or when the line is dropped). Keeps `answerAudio` honest: the end-screen hold
+	// waits for the real post-gesture playback, not a phantom resolve, so a resumed defeat plays his
+	// cast before the splash instead of late over it.
+	let pendingSkollResolve: (() => void) | null = null;
 	function voiceSkoll(descriptor: LineDescriptor): Promise<void> {
 		if (audioReady) return deliver(descriptor);
-		if (audioOn) pendingSkollVoice = descriptor;
-		return Promise.resolve();
+		if (!audioOn) return Promise.resolve();
+		pendingSkollVoice = descriptor;
+		return new Promise<void>((resolve) => {
+			pendingSkollResolve = resolve;
+		});
 	}
 	function flushPendingVoice() {
 		if (pendingSkollVoice && audioReady) {
-			void deliver(pendingSkollVoice);
+			const done = deliver(pendingSkollVoice);
+			const settle = pendingSkollResolve;
 			pendingSkollVoice = null;
+			pendingSkollResolve = null;
+			if (settle) void done.finally(settle);
 		}
 	}
 
@@ -391,6 +402,8 @@
 			audioOn = false;
 			audioReady = false;
 			pendingSkollVoice = null; // muted: drop the held line rather than voice it on a later unmute
+			pendingSkollResolve?.(); // settle any end-screen waiter — the dropped line won't play now
+			pendingSkollResolve = null;
 			disableDelivery();
 		}
 		writeMuted(!audioOn);

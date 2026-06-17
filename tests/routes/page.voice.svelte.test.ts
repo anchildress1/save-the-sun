@@ -564,6 +564,49 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'skoll-cast', rune: 'Sowilo' })
 		);
 	});
+
+	it('holds the end-screen for a winning cast resumed before the speaker, then plays it on first gesture', async () => {
+		allowMotion(); // audio defaults on
+		const SKOLL_TURN: GameState = {
+			activePlayer: 'Sköll',
+			status: 'active',
+			winner: null,
+			turns: 1
+		};
+		const WON_TURN: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 2 };
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (body.type === 'Advance') {
+				return new Response(
+					JSON.stringify({
+						type: 'Advance',
+						skoll: { casts: { echo: 'I name it. Sowilo.', rune: 'Sowilo' } },
+						state: WON_TURN
+					})
+				);
+			}
+			return new Response('{}');
+		});
+		// Resume on Sköll's turn: onMount drives his Advance, which returns the winning cast, before any
+		// gesture opens the speaker.
+		const screen = render(Page, { ...pageProps, data: { ...pageProps.data, state: SKOLL_TURN } });
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('I name it. Sowilo.');
+
+		// The cast is held (deliver is a no-op without a speaker), and the splash is withheld too — the
+		// queued line returns a real pending promise, so the end-screen hold can't fall through early.
+		expect(deliveryMock.deliver).not.toHaveBeenCalled();
+		expect(screen.container.querySelector('[data-testid="end-screen"]')).toBeNull();
+
+		window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+		await vi.waitFor(() =>
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'skoll-cast', rune: 'Sowilo' })
+		);
+		// His line played and drained — the held splash is released.
+		await vi.waitFor(() =>
+			expect(screen.container.querySelector('[data-testid="end-screen"]')).not.toBeNull()
+		);
+	});
 });
 
 describe('Save the Sun page — spoken reaction to Sköll', () => {
