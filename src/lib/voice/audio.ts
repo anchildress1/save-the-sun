@@ -88,8 +88,8 @@ export function createSpeaker(muted = false): Speaker {
 		level() {
 			analyser.getByteTimeDomainData(levelBuffer);
 			let sumSquares = 0;
-			for (let i = 0; i < levelBuffer.length; i++) {
-				const sample = (levelBuffer[i] - 128) / 128; // byte domain (0–255, 128 = silence) → [-1, 1]
+			for (const byte of levelBuffer) {
+				const sample = (byte - 128) / 128; // byte domain (0–255, 128 = silence) → [-1, 1]
 				sumSquares += sample * sample;
 			}
 			return Math.sqrt(sumSquares / levelBuffer.length);
