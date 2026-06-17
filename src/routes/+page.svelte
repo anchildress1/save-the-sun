@@ -575,18 +575,30 @@
 		return { kind: 'skoll-ask', query };
 	}
 
+	// Action/new-game hit Gemini (Ask interpret + Sköll move), so a hung request would strand `pending`
+	// and lock the controls — each fetch is bounded, and on timeout the AbortController trips and the
+	// call degrades through the existing catch paths. Generous because the model round-trip is the cost.
+	const ACTION_TIMEOUT_MS = 30_000;
+
 	// Return type is derived from the action's `type`, so a caller can't request a
 	// mismatched result shape.
 	async function dispatch<T extends GameAction['type']>(
 		action: Extract<GameAction, { type: T }>
 	): Promise<ActionResponse<T>> {
-		const res = await fetch('/api/action', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(action)
-		});
-		if (!res.ok) throw new Error(`Action rejected (${res.status})`);
-		return res.json() as Promise<ActionResponse<T>>;
+		const abort = new AbortController();
+		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
+		try {
+			const res = await fetch('/api/action', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(action),
+				signal: abort.signal
+			});
+			if (!res.ok) throw new Error(`Action rejected (${res.status})`);
+			return (await res.json()) as ActionResponse<T>;
+		} finally {
+			clearTimeout(timer);
+		}
 	}
 
 	// Sköll's move is its own request, fired after any action that hands him the turn — so the
@@ -598,11 +610,14 @@
 		// reaction — advancing then is a server no-op, and the prompt is already up.
 		if (roundStatus !== 'active' || activePlayer !== 'Sköll' || skollAsking) return;
 		await tick();
+		const abort = new AbortController();
+		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
 		try {
 			const res = await fetch('/api/action', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ type: 'Advance' })
+				body: JSON.stringify({ type: 'Advance' }),
+				signal: abort.signal
 			});
 			if (!res.ok) throw new Error(`Advance rejected (${res.status})`);
 			const { skoll, state } = (await res.json()) as AdvanceResponse;
@@ -625,6 +640,8 @@
 			console.error('[ui] Sköll advance failed:', err);
 			answer = RITE.wolfStalled;
 			skollStalled = true;
+		} finally {
+			clearTimeout(timer);
 		}
 	}
 
@@ -981,8 +998,10 @@
 	async function newGame(): Promise<boolean> {
 		pending = true;
 		let res: Response | undefined;
+		const abort = new AbortController();
+		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
 		try {
-			res = await fetch('/api/new-game', { method: 'POST' });
+			res = await fetch('/api/new-game', { method: 'POST', signal: abort.signal });
 			if (!res.ok) throw new Error(`New game rejected (${res.status})`);
 			const {
 				boardSeed: seed,
@@ -1023,6 +1042,7 @@
 			answer = RITE.oracleSilent;
 			return false;
 		} finally {
+			clearTimeout(timer);
 			pending = false;
 		}
 	}
