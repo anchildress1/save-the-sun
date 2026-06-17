@@ -84,44 +84,61 @@ export async function playFloorGame(
 	state: SkollState = freshSkollState(skollSeedFor(seed)),
 	decide: SkollDecide = FLOOR_ONLY
 ): Promise<SimResult> {
-	const secret = selectSecret(seed);
-	let turns = 0;
-	let floorMoves = 0;
-	let guardMoves = 0;
-	const trace: string[] = [];
-	const tag = (s: string) => (s === 'gemini' ? '' : ` [${s}]`);
+	const secret = selectSecret(seed).name;
+	const tally: Tally = { turns: 0, floorMoves: 0, guardMoves: 0, trace: [] };
+	const result = (won: boolean): SimResult => ({ seed, secret, won, ...tally });
 
 	for (let move = 0; move < MAX_MOVES; move++) {
-		// The human seat takes no action in self-play — hand the turn straight to Sköll.
-		if (engine.activePlayer === 'Human') engine.passTurn();
-
-		const out = await takeSkollTurn(engine, state, decide, state.rng);
-		turns += 1;
-		if (out.source === 'floor') floorMoves += 1;
-		else if (out.source === 'guard') guardMoves += 1;
-
-		if (out.kind === 'cast') {
-			// An illegal cast (unknown rune, out of turn, round over) is a harness regression, not play.
-			if (!out.result.ok)
-				throw new Error(`harness: illegal cast (${out.result.reason}) on seed ${seed}`);
-			const won = out.result.won;
-			trace.push(`#${turns} cast ${out.runeName}${tag(out.source)} → ${won ? 'WIN' : 'wrong'}`);
-			if (won)
-				return { seed, secret: secret.name, turns, won: true, floorMoves, guardMoves, trace };
-			// A legal-but-wrong cast is real self-play slack; takeSkollTurn already ruled the rune out.
-			continue;
-		}
-
-		// Resolve his parked Ask as a Pass — the human reaction the app awaits — so the fact lands.
-		resolveSkollAsk(engine, state, { ok: true, choice: 'Pass' });
-		const answer = state.facts.at(-1)?.answer ? 'yes' : 'no';
-		const left = liveCandidates(state.facts).length;
-		trace.push(`#${turns} "${out.echo}"${tag(out.source)} → ${answer}  (${left} left)`);
+		// A winning cast ends the round; a wrong cast or an Ask is self-play slack and keeps going.
+		if (await playSkollMove(engine, state, decide, tally, seed)) return result(true);
 	}
-
 	// Unreachable from truthful play (a wrong cast can't recur, so the trait space bounds the loop);
 	// the cap only guards against a logic regression turning into a hang.
-	return { seed, secret: secret.name, turns, won: false, floorMoves, guardMoves, trace };
+	return result(false);
+}
+
+/** Mutable per-game accumulators threaded through {@link playSkollMove}. */
+interface Tally {
+	turns: number;
+	floorMoves: number;
+	guardMoves: number;
+	trace: string[];
+}
+
+/** Play one Sköll move through the real engine, updating the tally + trace. Returns true iff his cast
+ *  won (the round is over). Throws on an illegal cast — a harness regression, never live slack. */
+async function playSkollMove(
+	engine: GameEngine,
+	state: SkollState,
+	decide: SkollDecide,
+	tally: Tally,
+	seed: number
+): Promise<boolean> {
+	// The human seat takes no action in self-play — hand the turn straight to Sköll.
+	if (engine.activePlayer === 'Human') engine.passTurn();
+
+	const out = await takeSkollTurn(engine, state, decide, state.rng);
+	tally.turns += 1;
+	if (out.source === 'floor') tally.floorMoves += 1;
+	else if (out.source === 'guard') tally.guardMoves += 1;
+	const tag = out.source === 'gemini' ? '' : ` [${out.source}]`;
+
+	if (out.kind === 'cast') {
+		// An illegal cast (unknown rune, out of turn, round over) is a harness regression, not play.
+		if (!out.result.ok)
+			throw new Error(`harness: illegal cast (${out.result.reason}) on seed ${seed}`);
+		tally.trace.push(
+			`#${tally.turns} cast ${out.runeName}${tag} → ${out.result.won ? 'WIN' : 'wrong'}`
+		);
+		return out.result.won;
+	}
+
+	// Resolve his parked Ask as a Pass — the human reaction the app awaits — so the fact lands.
+	resolveSkollAsk(engine, state, { ok: true, choice: 'Pass' });
+	const answer = state.facts.at(-1)?.answer ? 'yes' : 'no';
+	const left = liveCandidates(state.facts).length;
+	tally.trace.push(`#${tally.turns} "${out.echo}"${tag} → ${answer}  (${left} left)`);
+	return false;
 }
 
 /** Aggregate self-play metrics across a contiguous seed sweep `[startSeed, startSeed + games)`. */
