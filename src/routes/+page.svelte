@@ -580,6 +580,60 @@
 	// call degrades through the existing catch paths. Generous because the model round-trip is the cost.
 	const ACTION_TIMEOUT_MS = 30_000;
 
+	// Mirrors the load/`/api/state` snapshot — the authoritative round the client resyncs to.
+	type StateSnapshot = {
+		boardSeed: number;
+		roundId: string;
+		state: GameState;
+		pendingReaction: { echo: string; held: { Scry: boolean; Hex: boolean } } | null;
+	};
+
+	// Resync to authoritative server state after a dropped action response. A timed-out or failed POST
+	// aborts the browser fetch, but the server completed the move under `withSessionLock`, so the
+	// engine has moved on — without this the UI strands on a stale turn/board (or a retry that no-ops)
+	// until a reload. Fetches the same snapshot the page load builds and re-applies it. Returns whether
+	// the resync landed.
+	async function reconcile(): Promise<boolean> {
+		const prevRoundId = roundId;
+		const abort = new AbortController();
+		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
+		let snap: StateSnapshot;
+		try {
+			const res = await fetch('/api/state', { signal: abort.signal });
+			if (!res.ok) throw new Error(`State reconcile rejected (${res.status})`);
+			snap = (await res.json()) as StateSnapshot;
+			// A malformed snapshot (no turn state) can't be trusted to re-key the view — fail the resync
+			// rather than apply a partial that would crash applyState or mis-key persistence.
+			if (!snap?.state || !snap.roundId)
+				throw new Error('State reconcile returned no usable snapshot');
+		} catch (err) {
+			console.error('[ui] reconcile failed:', err);
+			return false;
+		} finally {
+			clearTimeout(timer);
+		}
+		// A dropped new-game still reset the round server-side — drop the per-round view so crossings,
+		// the voiced line, and the outcome can't resume against a new secret.
+		if (snap.roundId !== prevRoundId) {
+			restoreCrossed = [];
+			crossings = [];
+			answer = '';
+			askValue = '';
+			outcomeVoiced = false;
+			stopDelivery();
+		}
+		seedOverride = snap.boardSeed;
+		roundIdOverride = snap.roundId;
+		applyState(snap.state);
+		skollEcho = snap.pendingReaction?.echo ?? '';
+		skollAsking = snap.pendingReaction != null;
+		heldScry = snap.pendingReaction?.held.Scry ?? true;
+		heldHex = snap.pendingReaction?.held.Hex ?? true;
+		skollStalled = false;
+		cancelCast();
+		return true;
+	}
+
 	// Return type is derived from the action's `type`, so a caller can't request a
 	// mismatched result shape.
 	async function dispatch<T extends GameAction['type']>(
@@ -635,11 +689,15 @@
 				answerAudio = voiceSkoll({ kind: 'skoll-cast', rune: skoll.casts.rune });
 			skollStalled = false;
 		} catch (err) {
-			// A failed Advance leaves the turn with Sköll, so the controls stay locked. Surface an
-			// in-world line AND a retry, or the human is soft-locked with only a console trace.
 			console.error('[ui] Sköll advance failed:', err);
-			answer = RITE.wolfStalled;
-			skollStalled = true;
+			// His move may have landed server-side before the response dropped — resync, so a parked Ask
+			// surfaces its reaction prompt (or a won round its end screen) instead of a retry that no-ops
+			// against the already-advanced turn. Only a turn still genuinely stuck on Sköll keeps the rouse.
+			await reconcile();
+			if (!skollAsking && activePlayer === 'Sköll' && roundStatus === 'active') {
+				answer = RITE.wolfStalled;
+				skollStalled = true;
+			}
 		} finally {
 			clearTimeout(timer);
 		}
@@ -885,6 +943,9 @@
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
 			console.error('[ui] Ask dispatch failed:', err);
+			// The Ask may have landed and handed the turn to Sköll — resync so the controls reflect whose
+			// turn it really is (runAsk then drives his move) rather than re-enabling Human against it.
+			await reconcile();
 			answer = RITE.oracleSilent;
 			return { line: RITE.oracleSilent, consumed: false, voice: null };
 		}
@@ -958,6 +1019,9 @@
 			return line;
 		} catch (err) {
 			console.error('[ui] React dispatch failed:', err);
+			// The reaction may have resolved server-side (charge spent, turn advanced) — resync so the
+			// held charges and turn match engine truth instead of stranding the prompt.
+			await reconcile();
 			answer = RITE.oracleSilent;
 			return RITE.oracleSilent;
 		}
@@ -1039,8 +1103,12 @@
 			return true;
 		} catch (err) {
 			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
-			answer = RITE.oracleSilent;
-			return false;
+			// resetEngine() may have minted the fresh round before the response dropped — resync so the
+			// board matches the new secret. A resync that lands on a fresh live round means the reset
+			// effectively took; one still showing the finished round (or a failed resync) means it didn't.
+			const synced = await reconcile();
+			if (!synced) answer = RITE.oracleSilent;
+			return synced && !roundOver;
 		} finally {
 			clearTimeout(timer);
 			pending = false;
@@ -1075,6 +1143,9 @@
 			return line;
 		} catch (err) {
 			console.error('[ui] Cast dispatch failed:', err);
+			// The cast may have committed server-side (it's irreversible) — resync so a win's end screen
+			// and the advanced turn show instead of the controls re-enabling against a decided round.
+			await reconcile();
 			answer = RITE.castFalters;
 			return RITE.castFalters;
 		} finally {

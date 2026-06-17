@@ -1104,6 +1104,85 @@ describe('Save the Sun page — Sköll turn reload reconcile', () => {
 	});
 });
 
+// A dropped action RESPONSE (the 30s abort trips, or the network drops) differs from a reload: the
+// server completed the move under withSessionLock, so the engine moved on while the browser gave up.
+// The catch must resync to /api/state or the UI strands on a stale turn/board. These prove it does.
+describe('Save the Sun page — dropped action response reconcile', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+		localStorage.clear();
+	});
+
+	it('surfaces Sköll’s parked Ask when his Advance response drops mid-flight', async () => {
+		const error = expectConsole('error');
+		// The Ask hands the turn to Sköll; his Advance then drops — but the server DID park his Ask, so
+		// /api/state carries the interrupt. The catch must show the reaction prompt, not a rouse retry.
+		stubFetch(async (url: string, init?: { body?: string }) => {
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 0,
+						roundId: 'test-round',
+						state: SKOLL_TURN,
+						pendingReaction: { echo: 'A gold rune. Mine.', held: { Scry: true, Hex: true } }
+					})
+				);
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (body.type === 'Advance') return new Response('nope', { status: 500 });
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'No. Sól is not reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: SKOLL_TURN
+				})
+			);
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		// Resynced to the parked Ask — the interrupt is up, and the dead-end rouse retry is NOT.
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('A gold rune. Mine.');
+		expect(screen.container.querySelector('[data-testid="rouse-wolf"]')).toBeNull();
+		expect(error).toHaveBeenCalled();
+	});
+
+	it('re-keys the board to the new round when a new-game response drops but the server reset', async () => {
+		const error = expectConsole('error');
+		localStorage.setItem(
+			VIEW_STATE_KEY,
+			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: 'old' })
+		);
+		// The POST drops (500), but resetEngine already minted 'next-round' — /api/state proves it, so
+		// the catch resyncs the board to the new secret instead of stranding on the old one.
+		stubFetch(async (url: string) => {
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 99,
+						roundId: 'next-round',
+						state: HUMAN_TURN,
+						pendingReaction: null
+					})
+				);
+			if (url.includes('/api/new-game')) return new Response('nope', { status: 500 });
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Begin another night' }).click();
+		await vi.waitFor(() => {
+			const saved = JSON.parse(localStorage.getItem(VIEW_STATE_KEY) ?? '{}');
+			expect(saved.roundId).toBe('next-round');
+			expect(saved.crossings).toEqual([]);
+		});
+		expect(error).toHaveBeenCalled();
+	});
+});
+
 // S9: the end-screen rite takes over when the round resolves — the victory/defeat sequence and the
 // replay/leave CTAs. These prove it shows on the right outcome, owns the single replay surface, and
 // drives newGame / back-to-title.
