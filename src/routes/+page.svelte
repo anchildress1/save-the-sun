@@ -285,13 +285,15 @@
 	// the end-screen hold awaits so the splash never preempts her final answer.
 	let answerAudio: Promise<void> | null = null;
 
-	// A Sköll Ask generated before the speaker is open (a reload that resumes on his turn re-drives his
-	// move in onMount, before the first gesture) is held here and voiced once audio is ready, so it
-	// isn't spent into a no-op deliver() and lost while audio is on.
+	// A Sköll line generated before the speaker is open (a reload that resumes on his turn re-drives his
+	// move in onMount, before the first gesture) is held here and voiced once audio is ready, so it isn't
+	// spent into a no-op deliver() and lost while audio is on. Covers both his Ask and a winning Cast —
+	// a resumed defeat must still replay "I name it…" once a gesture opens the speaker.
 	let pendingSkollVoice: LineDescriptor | null = null;
-	function voiceSkollAsk(descriptor: LineDescriptor) {
-		if (audioReady) void deliver(descriptor);
-		else if (audioOn) pendingSkollVoice = descriptor;
+	function voiceSkoll(descriptor: LineDescriptor): Promise<void> {
+		if (audioReady) return deliver(descriptor);
+		if (audioOn) pendingSkollVoice = descriptor;
+		return Promise.resolve();
 	}
 	function flushPendingVoice() {
 		if (pendingSkollVoice && audioReady) {
@@ -596,12 +598,13 @@
 			// His Ask is a game move (R10) — written on his frame and voiced in his own voice through the
 			// same delivery seam as the Oracle (a no-op when audio is off). The medallion shows
 			// 'skoll-speaking' from the delivery event while it plays.
-			if (skoll?.asks) voiceSkollAsk(skollVoice(skoll.asks.query));
+			if (skoll?.asks) void voiceSkoll(skollVoice(skoll.asks.query));
 			// His winning cast is voiced in his own voice through the same seam (server recomposes from
 			// the rune). The handle holds the end-screen splash until his line is heard (whenDrained),
 			// then the outcome verse follows. A Sköll win still leaves the Oracle's last voiced answer in
 			// the panel (the WHY of the loss); his cast line shows in HIS box, never doubled into hers.
-			else if (skoll?.casts) answerAudio = deliver({ kind: 'skoll-cast', rune: skoll.casts.rune });
+			else if (skoll?.casts)
+				answerAudio = voiceSkoll({ kind: 'skoll-cast', rune: skoll.casts.rune });
 			skollStalled = false;
 		} catch (err) {
 			// A failed Advance leaves the turn with Sköll, so the controls stay locked. Surface an
