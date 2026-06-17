@@ -297,12 +297,12 @@ Sól speaks only at victory—the goddess's rarity is the power.
 ### First-run onboarding (one concept per step, dismissable, board visible behind)
 Plain, clear, mechanic-first — flavor stays light so the rules read at a glance. Cast comes last (it's the endgame action).
 
-- **Step 1—the goal:** "One of the 24 runes is Sól's true rune. Find it and name it before Sköll does. Beat him to it and you win; if he names it first, you lose."
-- **Step 2—Ask:** "Ask the Oracle a yes/no question about the runes — by element, power, light, hue, or one rune by name. She answers truthfully. One question per turn."
+- **Step 1—The Goal:** "Your goal is to name Sól's true rune before Sköll does. One of the 24 runes is hers — find it first and you win the day; if he names it first, you lose."
+- **Step 2—Ask:** "On your turn, ask the Oracle one yes/no question about the runes — by element, power, light, hue, or a rune by name. She always answers truthfully."
 - **Step 3—Speak:** "Rather speak than type? Hold the medallion (or the Space bar), say your question, and release to send. It works just like the text box — and you can answer Sköll by voice too."
-- **Step 4—read & cross:** "Each answer rules some runes out. Cross those off yourself — the board never does it for you. Narrowing the 24 down is how you find the rune."
-- **Step 5—Scry & Hex:** "Sköll questions the Oracle too. Each time he does, you may respond once: Scry to hear her answer, or Hex to block his question. One Scry and one Hex per game."
-- **Step 6—Cast:** "When you're sure, cast your rune. Cast right and you win the day; cast wrong and you lose the turn. Save it for when you have the answer."
+- **Step 4—Read & Cross:** "After each answer, cross off the runes it rules out — tap a rune to mark it. The board never does this for you."
+- **Step 5—Scry & Hex:** "When Sköll questions the Oracle, answer back once — Scry to hear her reply, or Hex to block his question. You get one Scry and one Hex per game."
+- **Step 6—Cast:** "When you're sure, cast your rune to name it. Get it right and you win the day; get it wrong and you lose the turn — so cast only when you're certain."
 - **Final button:** **"Take up the runes."**
 
 ## 6. Chrome & States

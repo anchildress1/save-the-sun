@@ -27,13 +27,15 @@ describe('Onboarding — title screen + first-run tour (S7)', () => {
 		await screen.getByRole('button', { name: 'How the rite works' }).click();
 
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 6');
-		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('before Sköll does');
+		await expect
+			.element(screen.getByTestId('step-body'))
+			.toHaveTextContent('Your goal is to name Sól’s true rune before Sköll does');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('2 / 6');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('Ask the Oracle a yes/no question');
+			.toHaveTextContent('ask the Oracle one yes/no question');
 
 		// Voice input — the new push-to-talk step.
 		await screen.getByRole('button', { name: 'Next' }).click();
@@ -44,20 +46,20 @@ describe('Onboarding — title screen + first-run tour (S7)', () => {
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('4 / 6');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('Each answer rules some runes out');
+			.toHaveTextContent('cross off the runes it rules out');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('5 / 6');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('Scry to hear her answer, or Hex to block his question');
+			.toHaveTextContent('Hex to block his question');
 
 		// Cast comes last now (ux-copy.md §5 order).
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('6 / 6');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('Cast right and you win the day');
+			.toHaveTextContent('cast only when you’re certain');
 	});
 
 	it('finishes the tour with "Take up the runes."', async () => {
