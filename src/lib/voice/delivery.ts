@@ -227,6 +227,10 @@ async function streamLine(
 	if (isStale(active, gen)) return;
 	const abort = new AbortController();
 	activeFetches.add(abort);
+	// pumpAudio's idle timer only covers gaps once headers arrive — bound the connect/first-byte wait
+	// too, or a fetch that stalls before responding leaves this line awaiting forever and wedges every
+	// later deliver() behind it on the chain. Cleared the moment the response resolves.
+	const connect = setTimeout(() => abort.abort(), TTS_IDLE_TIMEOUT_MS);
 	try {
 		const res = await fetch('/api/voice/tts', {
 			method: 'POST',
@@ -234,10 +238,12 @@ async function streamLine(
 			body: JSON.stringify(descriptor),
 			signal: abort.signal
 		});
+		clearTimeout(connect);
 		if (res.ok && res.body) await pumpAudio(res.body, active, gen, voice, abort);
 	} catch {
 		/* network failure or abort — the panel already carries the line; stay silent */
 	} finally {
+		clearTimeout(connect);
 		activeFetches.delete(abort);
 	}
 }
