@@ -170,6 +170,7 @@ async function pumpAudio(
 			if (isStale(active, gen)) return abort.abort();
 			armIdle();
 			const { done, value } = await reader.read();
+			clearTimeout(idle); // the chunk landed — the timer measures only the wait BETWEEN chunks, never decode/enqueue
 			if (done) return;
 			buffer += decoder.decode(value, { stream: true });
 			let nl: number;
