@@ -235,6 +235,14 @@ function skollMoveVoice(out: SkollOutcome): LineDescriptor | null {
 // deterministic line is restyled by Gemini and stashed server-side, so the route voices only her own
 // words by id — never arbitrary text. A failed/slow author leaves `voiced` unset; the client then
 // voices the deterministic `answer`. The engine verdict + the answer log stay the canonical truth.
+// The deterministic answer always opens "Yes."/"No."; a faithful restyle must open the same way. If
+// the flair's first word isn't that verdict, Gemini changed the meaning (a flip, or a reworded verdict)
+// — discard it and let the client voice the deterministic line. The Oracle never lies, even in flair.
+function flairKeepsVerdict(flair: string, affirmative: boolean): boolean {
+	const firstWord = (/[A-Za-z]+/.exec(flair)?.[0] ?? '').toLowerCase();
+	return firstWord === (affirmative ? 'yes' : 'no');
+}
+
 async function authorAnswerFlair(
 	sessionId: string,
 	oracle: Extract<OracleResult, { ok: true }>
@@ -242,6 +250,10 @@ async function authorAnswerFlair(
 	const flair = await composeOracleFlair(oracle.answer);
 	geminiEvents(sessionId, 'Ask'); // drain the flair call's raw I/O onto this turn's Ask beat
 	if (!flair) return;
+	if (!flairKeepsVerdict(flair, oracle.affirmative)) {
+		console.warn(`[oracle] flair dropped — verdict not preserved: ${JSON.stringify(flair)}`);
+		return;
+	}
 	const id = storeVoiceLine(sessionId, flair, ORACLE_VOICE);
 	oracle.voiced = { kind: 'authored', id, voice: ORACLE_VOICE, text: flair };
 }

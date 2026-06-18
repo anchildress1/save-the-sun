@@ -40,7 +40,7 @@ flowchart TB
         Log["debug/log.ts<br/>per-session event stream"]
     end
 
-    Gemini["Gemini API<br/>transcribe + TTS — gemini-3.x-flash<br/>oracle + Sköll — gemini-3.5-flash"]
+    Gemini["Gemini API<br/>Oracle — gemini-3.5-flash · Sköll — gemini-3.1-flash-lite<br/>transcribe — gemini-3.5-flash · TTS — gemini-3.1-flash-tts-preview"]
 
     Page --> Action
     Page --> NewGame
@@ -143,10 +143,11 @@ sequenceDiagram
     Del-->>Panel: plays alongside the written line
 ```
 
-- **Server-owned, allow-listed.** The route voices only known line IDs (engine outcomes, the pre-engine refusals and guards), never arbitrary client text, so it can't be spammed for free TTS. The finite templated lines are cached.
-- **Both voices, one route.** The Oracle's answers, refusals, reaction resolutions, and cast outcomes are hers; **Sköll's Ask and the loss outcome are his**. A win speaks in the Oracle's voice (the victory coda), a loss in Sköll's (the night-everlasting verse), so the player hears who took the day.
-- **Mic-independent.** Output rides this seam regardless of the mic; the output-mute control (below) silences it without touching the captions.
-- **Deferred** (`ttd.md`): Sköll's winning cast voiced (the dynamic `{Rune}`, once it rides the `Advance` wire) and the audio-only ambience taunt layer (`ux-copy.md` section 2).
+- **Server-owned, two paths, no client text.** The route voices either a known line ID recomposed from the engine's truth (`lines.ts` allow-list — engine outcomes, refusals, guards; cached), **or** a Gemini-authored line stashed server-side and fetched by an opaque per-session id (`storeVoiceLine`/`getVoiceLine`). Either way the words come from the server, never the wire, so it can't be spammed for free TTS.
+- **Live authoring, guarded.** The Oracle's clean answer is dramatized by Gemini per Ask (`composeOracleFlair`), and the end screen speaks a fresh in-character line — the Oracle's blessing on a win, Sköll's gloat on a loss (`composeEndingFlair`). Authoring is bounded + timed-out with a deterministic fallback, and an answer flair that doesn't open with the engine's own Yes/No is discarded — the Oracle never lies, even in flair.
+- **Both voices, one route.** The Oracle's answers, refusals, reaction resolutions, cast outcomes, and the win blessing are hers; **Sköll's Ask, his winning cast, and the loss gloat are his** — so the player hears who took the day.
+- **Mic-independent + recoverable.** Output rides this seam regardless of the mic; the output-mute control (below) silences it without touching the captions. The last voiced line is recorded per session, so a dropped action's response can recover and re-voice the real result instead of a false silent line.
+- **Deferred** (`ttd.md`): the audio-only ambience taunt layer (`ux-copy.md` section 2).
 
 ### Input — push-to-talk (optional)
 

@@ -22,61 +22,55 @@ describe('Onboarding — title screen + first-run tour (S7)', () => {
 		expect(onDone).toHaveBeenCalledOnce();
 	});
 
-	it('walks the six concepts in order through the tour — Cast last', async () => {
+	it('walks the six concepts in order through the tour — board second, voice last', async () => {
 		const screen = render(Onboarding, { onDone: vi.fn() });
 		await screen.getByRole('button', { name: 'How the rite works' }).click();
 
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 6');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('Your goal is to cast Sól’s true rune before Sköll does');
+			.toHaveTextContent('Cast it before Sköll does');
 
+		// The board overview — 24 unique runes by trait, before any action (no question reference).
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('2 / 6');
-		await expect
-			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('ask the Oracle one yes/no question');
+		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('no two alike');
 
-		// Voice input — the new push-to-talk step.
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('3 / 6');
-		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('Hold the medallion');
+		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('one yes/no question');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('4 / 6');
-		await expect
-			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('cross off the runes it rules out');
+		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('one Scry and one Hex');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('5 / 6');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('Hex to block his question');
+			.toHaveTextContent('be certain before you name it');
 
-		// Cast comes last now (ux-copy.md §5 order).
+		// Voice comes last — it drives everything the buttons already covered.
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('6 / 6');
-		await expect
-			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('cast only when you’re certain');
+		await expect.element(screen.getByTestId('step-body')).toHaveTextContent('Hold the medallion');
 	});
 
-	it('finishes the tour with "Take up the runes."', async () => {
+	it('finishes the tour with "Find her rune."', async () => {
 		const onDone = vi.fn();
 		const screen = render(Onboarding, { onDone });
 		await screen.getByRole('button', { name: 'How the rite works' }).click();
 		for (let i = 0; i < 5; i++) await screen.getByRole('button', { name: 'Next' }).click();
-		await screen.getByRole('button', { name: 'Take up the runes.' }).click();
+		await screen.getByRole('button', { name: 'Find her rune.' }).click();
 		expect(onDone).toHaveBeenCalledOnce();
 	});
 
-	it('drops Skip on the last step — only "Take up the runes."', async () => {
+	it('drops Skip on the last step — only "Find her rune."', async () => {
 		const screen = render(Onboarding, { onDone: vi.fn() });
 		await screen.getByRole('button', { name: 'How the rite works' }).click();
 		for (let i = 0; i < 5; i++) await screen.getByRole('button', { name: 'Next' }).click();
 		await expect
-			.element(screen.getByRole('button', { name: 'Take up the runes.' }))
+			.element(screen.getByRole('button', { name: 'Find her rune.' }))
 			.toBeInTheDocument();
 		expect(screen.container.querySelector('button')?.textContent).not.toContain('Skip');
 		expect(

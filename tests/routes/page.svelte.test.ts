@@ -1399,6 +1399,49 @@ describe('Save the Sun page — dropped action response reconcile', () => {
 		expect(screen.container.querySelector('[data-testid="rouse-wolf"]')).toBeNull();
 		expect(error).toHaveBeenCalled();
 	});
+
+	it('spends the Scry charge when a committed React response drops (P2-c)', async () => {
+		const error = expectConsole('error');
+		stubFetch(async (url: string, init?: { body?: string }) => {
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 0,
+						roundId: 'test-round',
+						state: HUMAN_TURN, // the React resolved server-side: parked Ask cleared, turn back to her
+						pendingReaction: null,
+						lastLine: {
+							text: 'You scry his sign. Yes. Sól is reaching for a gold rune.',
+							voice: {
+								kind: 'react',
+								line: 'human-scry',
+								query: { axis: 'color', value: 'Gold' },
+								affirmative: true
+							}
+						}
+					})
+				);
+			if (body.type === 'Advance') return new Response(JSON.stringify(advanceAsk()));
+			if (body.type === 'React') return new Response('drop', { status: 500 }); // committed, response lost
+			return new Response(JSON.stringify(defaultAsk()));
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen); // → his parked Ask
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
+
+		await screen.getByRole('button', { name: 'Scry' }).click(); // React drops → reconcile recovers it
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('gold rune');
+
+		// The Scry charge was spent server-side; the next Sköll Ask must show it spent, not re-offered.
+		await humanAsks(screen);
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
+		const scry = screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement;
+		const hex = screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement;
+		expect(scry.disabled).toBe(true); // spent
+		expect(hex.disabled).toBe(false); // untouched
+		expect(error).toHaveBeenCalled();
+	});
 });
 
 // S9: the end-screen rite takes over when the round resolves — the victory/defeat sequence and the

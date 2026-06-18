@@ -7,10 +7,16 @@ export default defineConfig({
 	// Keep the dev server from reloading the live app when a test run or build rewrites
 	// generated artifacts — a coverage run was flooding `make dev` with page reloads.
 	server: {
-		watch: { ignored: ['**/coverage/**', '**/test-results/**', '**/build/**'] }
+		watch: {
+			ignored: ['**/coverage/**', '**/test-results/**', '**/build/**', '**/test-report.junit.xml']
+		}
 	},
 	test: {
 		expect: { requireAssertions: true },
+		// JUnit alongside the console reporter so a run prints normally AND writes the report Codecov's
+		// test-results upload consumes. `outputFile` keys the path per reporter.
+		reporters: ['default', 'junit'],
+		outputFile: { junit: 'test-report.junit.xml' },
 		coverage: {
 			provider: 'v8',
 			reporter: ['text-summary', 'lcov'],

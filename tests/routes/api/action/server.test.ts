@@ -81,23 +81,45 @@ describe('POST /api/action', () => {
 
 	it('voices a Gemini-authored line, stored by id, on a clean answer (ttd:17)', async () => {
 		const { composeOracleFlair } = await import('$lib/server/oracle/gemini');
+		// The verdict for this query/seed is "No"; a faithful flair opens with that same word.
 		(composeOracleFlair as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-			'Yes — the white sign holds; she reaches into light.'
+			'No — the white sign stays cold; Sól does not reach into light.'
 		);
 
 		const data = await json(await ask());
 
 		expect(data.oracle.voiced).toMatchObject({
 			kind: 'authored',
-			text: 'Yes — the white sign holds; she reaches into light.',
+			text: 'No — the white sign stays cold; Sól does not reach into light.',
 			voice: ORACLE_VOICE
 		});
 		// The words live in the session store, keyed by the id on the wire — the route voices them by
 		// lookup, never from the wire. The stored line matches the display text.
 		expect(getVoiceLine(SID, data.oracle.voiced.id)).toEqual({
-			text: 'Yes — the white sign holds; she reaches into light.',
+			text: 'No — the white sign stays cold; Sól does not reach into light.',
 			voice: ORACLE_VOICE
 		});
+	});
+
+	it('drops a flair that flips the verdict — falls back to the deterministic answer (P1)', async () => {
+		// restore in finally so the silenced console.warn can't leak into later tests in this file
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		try {
+			const { composeOracleFlair } = await import('$lib/server/oracle/gemini');
+			// The real verdict here is "No"; a flair that opens "Yes" changed the meaning, so it's discarded
+			// and the client voices the deterministic answer instead — the Oracle never lies, even in flair.
+			(composeOracleFlair as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+				'Yes — she reaches into light.'
+			);
+
+			const data = await json(await ask());
+
+			expect(data.oracle.ok).toBe(true);
+			expect(data.oracle.voiced).toBeUndefined();
+			expect(warn).toHaveBeenCalled();
+		} finally {
+			warn.mockRestore();
+		}
 	});
 
 	it('omits the authored line when flair fails — the deterministic answer stands (ttd:17)', async () => {

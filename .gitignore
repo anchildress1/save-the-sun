@@ -24,6 +24,9 @@ vite.config.ts.timestamp-*
 # Playwright
 test-results
 
+# Codecov test-results (JUnit) report
+test-report.junit.xml
+
 # Vitest browser run artifacts (failure screenshots + attachments)
 **/__screenshots__/
 .vitest-attachments

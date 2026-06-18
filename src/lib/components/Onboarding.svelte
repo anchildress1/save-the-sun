@@ -12,35 +12,35 @@
 	const STEPS = [
 		{
 			// Scene-setting, not a pointer — no anchor, so it opens as a centered intro and the board
-			// stays unhighlighted until "Read & Cross."
+			// stays unhighlighted until "The Board."
 			label: 'The Goal',
 			target: null,
-			body: 'Your goal is to cast Sól’s true rune before Sköll does. One of the 24 runes is hers — find it first and you win the day; if Sköll finds it first, you lose.'
+			body: 'One rune on the board is Sól’s — her true rune. Cast it before Sköll does: name it first and the sun is saved; if he names it first, the night is his.'
+		},
+		{
+			label: 'The Board',
+			target: '[data-coach="board"]',
+			body: 'Twenty-four runes, no two alike — each with its own element, color, and a power from 1 to 6. Watch the power’s pips, too; they carry a tell of their own.'
 		},
 		{
 			label: 'Ask',
 			target: '[data-coach="ask"]',
-			body: 'On your turn, ask the Oracle one yes/no question about the runes — by element, power, light, color, or a rune by name. She always answers truthfully.'
-		},
-		{
-			label: 'Speak',
-			target: '[data-coach="voice"]',
-			body: 'Rather speak than type? Hold the medallion (or the backtick key) and say your question, then release to send. It works just like the text box — and you can answer Sköll by voice too.'
-		},
-		{
-			label: 'Read & Cross',
-			target: '[data-coach="board"]',
-			body: 'After each answer, cross off the runes it rules out — tap a rune to mark it. The board never does this for you.'
+			body: 'Ask the Oracle one yes/no question about a trait — an element, a power, a color, or a rune by name. Her answer is always true. Cross off whatever it rules out; the board leaves that to you.'
 		},
 		{
 			label: 'Scry & Hex',
 			target: '[data-coach="reactions"]',
-			body: 'When Sköll questions the Oracle, answer back once — Scry to hear her reply, or Hex to block his question. You get one Scry and one Hex per game.'
+			body: 'Sköll hunts the same rune, and he questions the Oracle too. You hold one Scry and one Hex for the whole game — Scry to overhear her reply to him, or Hex to cut his question short.'
 		},
 		{
 			label: 'Cast',
 			target: '[data-coach="cast"]',
-			body: 'When you’re sure, cast your rune — say “cast” and its name, or choose Cast and tap it. Get it right and you win the day; get it wrong and you lose the turn — so cast only when you’re certain.'
+			body: 'When the board’s down to one, cast it — tap Cast, then the rune. Get it right and the day is yours; get it wrong and your turn’s gone, so be certain before you name it.'
+		},
+		{
+			label: 'Speak',
+			target: '[data-coach="voice"]',
+			body: 'Rather not type? Hold the medallion (or press the backtick key), speak, then let go. Your voice does all of it — ask, Scry, Hex, and cast.'
 		}
 	];
 
@@ -240,7 +240,7 @@
 				<button class="btn btn--secondary" type="button" onclick={() => onDone()}> Skip </button>
 			{/if}
 			<button class="btn btn--primary" type="button" onclick={next}>
-				{isLast ? 'Take up the runes.' : 'Next'}
+				{isLast ? 'Find her rune.' : 'Next'}
 			</button>
 		</div>
 		<p class="step-count" data-testid="step-count">{step + 1} / {STEPS.length}</p>
