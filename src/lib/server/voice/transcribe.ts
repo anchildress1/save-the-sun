@@ -122,9 +122,10 @@ export async function interpretAsk(
 	const raw = (
 		await runAudioPrompt(wavBase64, ASK_OR_CAST_INSTRUCTION.replace('{NAMES}', names.join(', ')))
 	).trim();
-	const cast = /^cast:\s*(.+)$/i.exec(raw);
-	if (!cast) return { text: raw };
-	const said = cast[1].trim().toLowerCase();
+	// Plain prefix check, not a regex — the "CAST:" sentinel is the model's, and a `\s*(.+)` pattern
+	// is a needless ReDoS surface. Anything without the prefix is a question, verbatim.
+	if (!raw.toLowerCase().startsWith('cast:')) return { text: raw };
+	const said = raw.slice('cast:'.length).trim().toLowerCase();
 	return { cast: names.find((name) => name.toLowerCase() === said) ?? '' };
 }
 
