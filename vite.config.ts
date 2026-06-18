@@ -1,17 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { playwright } from '@vitest/browser-playwright';
-import { codecovVitePlugin } from '@codecov/vite-plugin';
 
 export default defineConfig({
-	plugins: [
-		codecovVitePlugin({
-			enableBundleAnalysis: process.env.CODECOV_TOKEN !== undefined,
-			bundleName: 'save-the-sun',
-			uploadToken: process.env.CODECOV_TOKEN
-		}),
-		sveltekit()
-	],
+	plugins: [sveltekit()],
 	// Keep the dev server from reloading the live app when a test run or build rewrites
 	// generated artifacts — a coverage run was flooding `make dev` with page reloads.
 	server: {
