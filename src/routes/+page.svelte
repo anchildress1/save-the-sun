@@ -691,6 +691,10 @@
 		if (d && (d.kind === 'skoll-ask' || d.kind === 'skoll-cast')) {
 			skollEcho = line.text;
 			skollAsking = d.kind === 'skoll-ask';
+			if (d.kind === 'skoll-cast' && roundOver) {
+				endHeld = true;
+				skollCastPending = true;
+			}
 		} else {
 			answer = line.text;
 		}

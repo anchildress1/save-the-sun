@@ -1388,8 +1388,14 @@ describe('Save the Sun page — dropped action response reconcile', () => {
 		});
 		const screen = render(Page, pageProps);
 		await humanAsks(screen);
-		// His cast line lands in HIS frame, the loss screen rises behind it — never a silent stall.
+		// His cast line lands in HIS frame, then the loss screen rises behind it — never an instant
+		// silent splash and never a stalled retry.
 		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('I name it. Sowilo.');
+		expect(screen.container.querySelector('[data-testid="end-screen"]')).toBeNull();
+		await vi.waitFor(
+			() => expect(screen.container.querySelector('[data-testid="end-screen"]')).not.toBeNull(),
+			{ timeout: 3000 }
+		);
 		expect(screen.container.querySelector('[data-testid="rouse-wolf"]')).toBeNull();
 		expect(error).toHaveBeenCalled();
 	});
