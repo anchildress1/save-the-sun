@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { claimTtsSlot } from '$lib/server/voice/rateLimit';
 import { composeLine, isLineDescriptor, voiceForLine, synthPrompt } from '$lib/server/voice/lines';
+import { getVoiceLine } from '$lib/server/engine/session';
 import { synthesizeStream, isCached } from '$lib/server/voice/tts';
 import type { RequestHandler } from './$types';
 
@@ -21,15 +22,24 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	if (!isLineDescriptor(body)) return badLine();
 
-	const line = composeLine(body);
-	// A well-shaped descriptor whose values don't compose to an allow-listed line is refused, not
-	// synthesized — the gate is the line, not the request shape. Validated BEFORE any quota spend so a
-	// flood of malformed/unknown payloads can't exhaust the synth budget.
-	if (line === null) return badLine();
-	// The descriptor's kind picks the voice (Sköll's lines in his voice, the Oracle's in hers); the
-	// synthesis prompt wraps the line in that speaker's director's-notes (both voices, never bare).
-	const voice = voiceForLine(body);
-	const prompt = synthPrompt(body, line);
+	// Two resolution paths, ONE invariant — the client never supplies the words. An `authored` line
+	// (Gemini-written, dynamic) is looked up by id from this session's store; everything else recomposes
+	// from the descriptor. A well-shaped descriptor that resolves to nothing (unknown id, or values that
+	// don't compose to an allow-listed line) is refused BEFORE any quota spend.
+	let line: string | null;
+	let voice: string;
+	if (body.kind === 'authored') {
+		const stored = getVoiceLine(locals.sessionId, body.id);
+		if (stored === null) return badLine();
+		line = stored.text;
+		voice = stored.voice;
+	} else {
+		line = composeLine(body);
+		if (line === null) return badLine();
+		voice = voiceForLine(body);
+	}
+	// The synthesis prompt wraps the line in its speaker's director's-notes (both voices, never bare).
+	const prompt = synthPrompt(voice, line);
 
 	// A cached line replays from memory — no Gemini call — so it skips both the synth budget and the
 	// key requirement. Only an uncached line costs a synth: gate it, and fail loudly (503, not a silent

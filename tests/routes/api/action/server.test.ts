@@ -24,10 +24,9 @@ vi.mock('$lib/server/skoll/gemini', () => ({
 
 import { POST } from '$routes/api/action/+server';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
-import { resetEngine, getEngine, getSkoll } from '$lib/server/engine/session';
+import { resetEngine, getEngine, getSkoll, getVoiceLine } from '$lib/server/engine/session';
 import { getEvents, captureGemini, runWithSession } from '$lib/server/debug/log';
 import { selectSecret } from '$lib/server/engine/engine';
-import { verifyLine } from '$lib/server/voice/sign';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { runes } from '$lib/board';
 
@@ -79,7 +78,7 @@ describe('POST /api/action', () => {
 		expect(data.state).toMatchObject({ activePlayer: 'Sköll', status: 'active' });
 	});
 
-	it('voices a Gemini-authored, server-signed line on a clean answer (ttd:17)', async () => {
+	it('voices a Gemini-authored line, stored by id, on a clean answer (ttd:17)', async () => {
 		const { composeOracleFlair } = await import('$lib/server/oracle/gemini');
 		(composeOracleFlair as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
 			'Yes — the white sign holds; she reaches into light.'
@@ -92,8 +91,12 @@ describe('POST /api/action', () => {
 			text: 'Yes — the white sign holds; she reaches into light.',
 			voice: ORACLE_VOICE
 		});
-		// The signature is the gate: it verifies for this exact (voice, text) the server authored.
-		expect(verifyLine(ORACLE_VOICE, data.oracle.voiced.text, data.oracle.voiced.sig)).toBe(true);
+		// The words live in the session store, keyed by the id on the wire — the route voices them by
+		// lookup, never from the wire. The stored line matches the display text.
+		expect(getVoiceLine(SID, data.oracle.voiced.id)).toEqual({
+			text: 'Yes — the white sign holds; she reaches into light.',
+			voice: ORACLE_VOICE
+		});
 	});
 
 	it('omits the authored line when flair fails — the deterministic answer stands (ttd:17)', async () => {
@@ -275,7 +278,7 @@ describe('POST /api/action', () => {
 		expect(data.skoll).toBeUndefined();
 	});
 
-	it('carries the Oracle blessing (signed, her voice) when the human cast wins (ttd:22)', async () => {
+	it('carries the Oracle blessing (her voice, stored by id) when the human cast wins (ttd:22)', async () => {
 		const { composeEndingFlair } = await import('$lib/server/oracle/gemini');
 		(composeEndingFlair as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
 			'The dawn is kept; Sól climbs free.'
@@ -288,10 +291,13 @@ describe('POST /api/action', () => {
 			text: 'The dawn is kept; Sól climbs free.',
 			voice: ORACLE_VOICE
 		});
-		expect(verifyLine(ORACLE_VOICE, data.outcomeFlair.text, data.outcomeFlair.sig)).toBe(true);
+		expect(getVoiceLine(SID, data.outcomeFlair.id)).toEqual({
+			text: 'The dawn is kept; Sól climbs free.',
+			voice: ORACLE_VOICE
+		});
 	});
 
-	it('carries Sköll’s gloat (signed, his voice) when his Advance cast wins (ttd:22)', async () => {
+	it('carries Sköll’s gloat (his voice, stored by id) when his Advance cast wins (ttd:22)', async () => {
 		const { composeEndingFlair } = await import('$lib/server/oracle/gemini');
 		(composeEndingFlair as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
 			'The sun is mine. Your night has no morning.'
@@ -307,7 +313,10 @@ describe('POST /api/action', () => {
 			text: 'The sun is mine. Your night has no morning.',
 			voice: SKOLL_VOICE
 		});
-		expect(verifyLine(SKOLL_VOICE, data.outcomeFlair.text, data.outcomeFlair.sig)).toBe(true);
+		expect(getVoiceLine(SID, data.outcomeFlair.id)).toEqual({
+			text: 'The sun is mine. Your night has no morning.',
+			voice: SKOLL_VOICE
+		});
 	});
 
 	it('does not mint fresh ending flair for no-op actions after the round is already won', async () => {

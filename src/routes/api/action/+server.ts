@@ -9,12 +9,17 @@ import {
 	type AuthoredLine,
 	type Player
 } from '$lib/server/engine/actions';
-import { getEngine, getSkoll, withSessionLock, recordLine } from '$lib/server/engine/session';
+import {
+	getEngine,
+	getSkoll,
+	withSessionLock,
+	recordLine,
+	storeVoiceLine
+} from '$lib/server/engine/session';
 import { composeLine, type LineDescriptor } from '$lib/server/voice/lines';
 import { interpret, composeOracleFlair, composeEndingFlair } from '$lib/server/oracle/gemini';
 import { voiceAnswer, prepareAsk, answerAsk } from '$lib/server/oracle/oracle';
 import type { OracleResult } from '$lib/server/oracle/types';
-import { signLine } from '$lib/server/voice/sign';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { resolveReaction } from '$lib/server/engine/reactions';
 import {
@@ -135,7 +140,9 @@ function geminiEvents(sessionId: string, movePart: TurnPart): void {
 // a descriptor that doesn't compose stores nothing, so a non-voiced move never clobbers the prior line.
 function rememberLine(sessionId: string, voice: LineDescriptor | null): void {
 	if (!voice) return;
-	const text = composeLine(voice);
+	// An authored line isn't recomposable (its words live in the store, by id) — its display text rides
+	// the descriptor, so recover from there; everything else recomposes from the allow-list.
+	const text = voice.kind === 'authored' ? voice.text : composeLine(voice);
 	recordLine(sessionId, text === null ? null : { text, voice });
 }
 
@@ -168,8 +175,10 @@ async function authorEnding(
 	geminiEvents(sessionId, 'Cast'); // a Gemini call happened — tee its raw I/O to the debug log
 	if (text === null) return undefined;
 	const voice = outcome === 'win' ? ORACLE_VOICE : SKOLL_VOICE;
-	const sig = signLine(voice, text);
-	return sig === null ? undefined : { kind: 'authored', text, voice, sig };
+	// Stash the words server-side; the wire carries only the id (+ voice/text for the client), and the
+	// TTS route voices it by id lookup — never from the wire.
+	const id = storeVoiceLine(sessionId, text, voice);
+	return { kind: 'authored', id, voice, text };
 }
 
 // His templated Ask is surfaced for the human to react to; his WINNING cast rides along too so the
@@ -382,14 +391,18 @@ async function askWithSkollReaction(
 	}
 
 	// She authors her verdict aloud on a clean answer (ttd:17): when Sköll neither hexed nor scried, the
-	// deterministic line is restyled by Gemini and server-signed, so the route still voices only her own
-	// words — never arbitrary text. A failed/slow author leaves `voiced` unset; the client then voices
-	// the deterministic `answer`. The engine verdict + the log above stay the canonical deterministic truth.
+	// deterministic line is restyled by Gemini and stashed server-side, so the route voices only her own
+	// words by id — never arbitrary text. A failed/slow author leaves `voiced` unset; the client then
+	// voices the deterministic `answer`. The engine verdict + the log above stay the canonical truth.
 	if (oracle?.ok && vs.choice === 'Pass') {
 		const flair = await composeOracleFlair(oracle.answer);
 		geminiEvents(sessionId, 'Ask'); // drain the flair call's raw I/O onto this turn's Ask beat
-		const sig = flair ? signLine(ORACLE_VOICE, flair) : null;
-		if (flair && sig) oracle.voiced = { kind: 'authored', text: flair, voice: ORACLE_VOICE, sig };
+		if (flair) {
+			// Stash the words server-side; the wire carries the id (+ voice/text for the client). The TTS
+			// route voices it by id lookup, so it never voices client-supplied words.
+			const id = storeVoiceLine(sessionId, flair, ORACLE_VOICE);
+			oracle.voiced = { kind: 'authored', id, voice: ORACLE_VOICE, text: flair };
+		}
 	}
 
 	let truth: string;

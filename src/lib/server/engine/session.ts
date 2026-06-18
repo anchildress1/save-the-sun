@@ -31,6 +31,16 @@ export interface RecoverableLine {
 	voice: LineDescriptor | null;
 }
 const lastLines = new Map<string, RecoverableLine>();
+// Authored (Gemini-written) voice lines awaiting TTS, keyed by an opaque id. The TTS route voices one
+// ONLY by id lookup — the client never supplies the spoken words, the same invariant as every other
+// descriptor (so the route can't be abused for arbitrary text without any signing). Round-scoped: a
+// round authors a handful; the per-session map is bounded and cleared with the round.
+export interface AuthoredVoiceLine {
+	text: string;
+	voice: string;
+}
+const MAX_VOICE_LINES = 32;
+const voiceLines = new Map<string, Map<string, AuthoredVoiceLine>>();
 
 function randomSeed(): number {
 	return crypto.getRandomValues(new Uint32Array(1))[0];
@@ -70,6 +80,7 @@ function remember(sessionId: string, engine: GameEngine): GameEngine {
 		roundIds.delete(lru); // and the view-state token keyed to that round
 		boardSeeds.delete(lru); // and the round's board order
 		lastLines.delete(lru); // and the recoverable line, scoped to the same round
+		voiceLines.delete(lru); // and any authored lines awaiting TTS for that round
 		resetLog(lru); // and the demo log, lifecycle-linked to the same round
 		// Rare, but the resulting fresh-secret-on-next-access desync is otherwise invisible.
 		console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
@@ -91,6 +102,7 @@ export function resetEngine(sessionId: string, seed?: number): GameEngine {
 	roundIds.delete(sessionId); // and the view-state token — the next read mints a fresh round id
 	boardSeeds.delete(sessionId); // and the board order — a fresh round deals a fresh layout
 	lastLines.delete(sessionId); // and the recoverable line — a fresh round has spoken nothing yet
+	voiceLines.delete(sessionId); // and any authored lines — a fresh round authors its own
 	resetLog(sessionId); // and the demo log — a fresh round starts the on-stage record over
 	return remember(sessionId, create(sessionId, seed ?? randomSeed()));
 }
@@ -158,6 +170,27 @@ export function recordLine(sessionId: string, line: RecoverableLine | null): voi
 export function getLastLine(sessionId: string): RecoverableLine | null {
 	requireId(sessionId);
 	return lastLines.get(sessionId) ?? null;
+}
+
+/**
+ * Stash an authored line for the TTS route to voice by id (ttd:17/ttd:22). Returns the opaque id the
+ * client echoes back — the words live only here, never on the wire the route trusts. Bounded per round.
+ */
+export function storeVoiceLine(sessionId: string, text: string, voice: string): string {
+	requireId(sessionId);
+	const id = crypto.randomUUID();
+	const lines = voiceLines.get(sessionId) ?? new Map<string, AuthoredVoiceLine>();
+	lines.set(id, { text, voice });
+	// Insertion-ordered: drop the oldest once over the cap so a marathon round can't grow unbounded.
+	if (lines.size > MAX_VOICE_LINES) lines.delete(lines.keys().next().value as string);
+	voiceLines.set(sessionId, lines);
+	return id;
+}
+
+/** The authored line for an id, or null if unknown/evicted — the route refuses to voice an unknown id. */
+export function getVoiceLine(sessionId: string, id: string): AuthoredVoiceLine | null {
+	requireId(sessionId);
+	return voiceLines.get(sessionId)?.get(id) ?? null;
 }
 
 // Per-session single-flight: an action yields mid-flight (takeSkollTurn awaits Gemini) on shared

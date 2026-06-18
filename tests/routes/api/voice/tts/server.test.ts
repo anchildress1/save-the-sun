@@ -16,7 +16,7 @@ import { resetTtsWindows, TTS_SESSION_LIMIT } from '$lib/server/voice/rateLimit'
 import { refusalLine } from '$lib/server/oracle/oracle';
 import { skollAskEcho, skollCastEcho } from '$lib/server/skoll/skoll';
 import { synthPrompt } from '$lib/server/voice/lines';
-import { signLine } from '$lib/server/voice/sign';
+import { storeVoiceLine } from '$lib/server/engine/session';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 
 function streamOf(...chunks: string[]) {
@@ -56,7 +56,7 @@ describe('POST /api/voice/tts', () => {
 		expect(await response.text()).toBe('pcm-a\npcm-b\n');
 		// Her line is synthesized wrapped in the Oracle's director's-notes, in her voice.
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
-			synthPrompt({ kind: 'refusal', refusal: 'empty' }, refusalLine('empty')),
+			synthPrompt(ORACLE_VOICE, refusalLine('empty')),
 			ORACLE_VOICE
 		);
 	});
@@ -70,7 +70,7 @@ describe('POST /api/voice/tts', () => {
 
 		expect(response.status).toBe(200);
 		// The synthesized text is the directed prompt (not the bare line) — that's what makes him growl.
-		const prompt = synthPrompt({ kind: 'skoll-ask', query }, line);
+		const prompt = synthPrompt(SKOLL_VOICE, line);
 		expect(prompt).not.toBe(line);
 		expect(prompt).toContain(`"${line}"`);
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE);
@@ -83,7 +83,7 @@ describe('POST /api/voice/tts', () => {
 		const response = await call('wolf-cast', { kind: 'skoll-cast', rune: 'Sowilo' });
 
 		expect(response.status).toBe(200);
-		const prompt = synthPrompt({ kind: 'skoll-cast', rune: 'Sowilo' }, line);
+		const prompt = synthPrompt(SKOLL_VOICE, line);
 		expect(prompt).toContain(`"${line}"`);
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE);
 	});
@@ -105,44 +105,63 @@ describe('POST /api/voice/tts', () => {
 		expect(tts.synthesizeStream).not.toHaveBeenCalled();
 	});
 
-	it('voices an authored Oracle line carrying a valid signature (ttd:17)', async () => {
+	it('voices an authored line by id lookup from the session store (ttd:17)', async () => {
 		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm'));
 		const text = 'Yes — the flame-sign burns; Sól reaches for fire.';
-		const body = {
-			kind: 'authored' as const,
-			text,
-			voice: ORACLE_VOICE,
-			sig: signLine(ORACLE_VOICE, text) as string
-		};
+		const id = storeVoiceLine('authored-sess', text, ORACLE_VOICE);
 
-		const response = await call('authored', body);
+		const response = await call('authored-sess', {
+			kind: 'authored',
+			id,
+			voice: ORACLE_VOICE,
+			text
+		});
 
 		expect(response.status).toBe(200);
-		// Voiced in her director's-notes, in her voice — the gate admitted it because the sig matched.
+		// Voiced in her director's-notes, in her voice — the route resolved the words from the store by id.
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
-			synthPrompt(body, text),
+			synthPrompt(ORACLE_VOICE, text),
 			ORACLE_VOICE
 		);
 	});
 
-	it('refuses an authored line with a forged signature — the gate admits no arbitrary text', async () => {
-		const response = await call('forged', {
+	it('voices the STORED words, never the wire text — the route admits no arbitrary text', async () => {
+		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm'));
+		const stored = 'No. She does not reach into fire.';
+		const id = storeVoiceLine('authored-sess2', stored, ORACLE_VOICE);
+
+		// A caller tampers the wire text, keeping a real id — the route must voice the STORED line.
+		await call('authored-sess2', {
 			kind: 'authored',
-			text: 'Whatever a caller wants spoken for free.',
+			id,
 			voice: ORACLE_VOICE,
-			sig: 'not-a-real-signature'
+			text: 'Whatever a caller wants spoken for free.'
+		});
+
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
+			synthPrompt(ORACLE_VOICE, stored),
+			ORACLE_VOICE
+		);
+	});
+
+	it('refuses an authored line whose id is unknown to the session (no store entry)', async () => {
+		const response = await call('authored-sess3', {
+			kind: 'authored',
+			id: 'no-such-id',
+			voice: ORACLE_VOICE,
+			text: 'arbitrary'
 		});
 		expect(response.status).toBe(400);
 		expect(tts.synthesizeStream).not.toHaveBeenCalled();
 	});
 
-	it('refuses an authored line whose text was tampered after signing', async () => {
-		const sig = signLine(ORACLE_VOICE, 'the line the server signed');
-		const response = await call('tampered', {
+	it('does not cross sessions — an id stored for one session is unknown to another', async () => {
+		const id = storeVoiceLine('owner-sess', 'her line', ORACLE_VOICE);
+		const response = await call('other-sess', {
 			kind: 'authored',
-			text: 'a different line entirely',
+			id,
 			voice: ORACLE_VOICE,
-			sig
+			text: 'x'
 		});
 		expect(response.status).toBe(400);
 		expect(tts.synthesizeStream).not.toHaveBeenCalled();

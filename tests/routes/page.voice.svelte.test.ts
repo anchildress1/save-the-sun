@@ -666,9 +666,9 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 		);
 	});
 
-	it('voices her dramatized, server-signed line when the server authored one (ttd:17)', async () => {
+	it('voices her dramatized, store-backed line when the server authored one (ttd:17)', async () => {
 		const FLAIR = 'Yes — the flame-sign burns; she reaches for fire.';
-		const voiced = { kind: 'authored', text: FLAIR, voice: 'Gacrux', sig: 'server-signed' };
+		const voiced = { kind: 'authored', id: 'vl-answer-1', voice: 'Gacrux', text: FLAIR };
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
 			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
@@ -703,9 +703,9 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 	it('voices the authored ending blessing on a win, not a fixed splash beat (ttd:22)', async () => {
 		const ENDING = {
 			kind: 'authored',
-			text: 'The dawn is kept; Sól climbs free.',
+			id: 'vl-ending-1',
 			voice: 'Gacrux',
-			sig: 'server-signed'
+			text: 'The dawn is kept; Sól climbs free.'
 		};
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');

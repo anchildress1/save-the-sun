@@ -107,9 +107,11 @@ export interface PendingReaction {
  */
 export interface AuthoredLine {
 	kind: 'authored';
-	text: string;
+	// Opaque id into the session's voice-line store — the TTS route voices the words by lookup, never
+	// from the wire. `voice` drives the medallion; `text` is the display copy.
+	id: string;
 	voice: string;
-	sig: string;
+	text: string;
 }
 
 /**

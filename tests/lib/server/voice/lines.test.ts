@@ -210,12 +210,9 @@ describe('voiceForLine', () => {
 });
 
 describe('synthPrompt', () => {
-	it('wraps each line in its speaker’s director’s-notes, quoting the line', () => {
-		const skoll = synthPrompt({ kind: 'skoll-ask', query: {} }, 'I scent a fire rune on her.');
-		const oracle = synthPrompt(
-			{ kind: 'refusal', refusal: 'empty' },
-			'Speak your question, witch.'
-		);
+	it('wraps each line in its voice’s director’s-notes, quoting the line', () => {
+		const skoll = synthPrompt(SKOLL_VOICE, 'I scent a fire rune on her.');
+		const oracle = synthPrompt(ORACLE_VOICE, 'Speak your question, witch.');
 		// Each carries its own direction (distinct) and ends on the quoted line, not the bare line.
 		expect(skoll).toContain('"I scent a fire rune on her."');
 		expect(skoll).not.toBe('I scent a fire rune on her.');
@@ -223,19 +220,17 @@ describe('synthPrompt', () => {
 		expect(skoll.slice(0, 40)).not.toBe(oracle.slice(0, 40)); // different speaker notes
 	});
 
-	it('gives the loss outcome Sköll’s growl, the win the Oracle’s notes', () => {
-		const lose = synthPrompt(
-			{ kind: 'outcome', result: 'lose', beat: 'verse' },
-			'The night is everlasting.'
+	it('keys the director’s-notes on the voice — Sköll’s growl vs the Oracle’s notes', () => {
+		// Same voice → same direction, whatever the line (an authored line and a composed one match).
+		expect(synthPrompt(SKOLL_VOICE, 'The night is everlasting.').slice(0, 40)).toBe(
+			synthPrompt(SKOLL_VOICE, 'x').slice(0, 40)
 		);
-		const win = synthPrompt(
-			{ kind: 'outcome', result: 'win', beat: 'coda' },
-			'The light is yours to keep.'
+		expect(synthPrompt(ORACLE_VOICE, 'The light is yours to keep.').slice(0, 40)).toBe(
+			synthPrompt(ORACLE_VOICE, 'x').slice(0, 40)
 		);
-		const skollAsk = synthPrompt({ kind: 'skoll-ask', query: {} }, 'x');
-		const oracleAns = synthPrompt({ kind: 'refusal', refusal: 'empty' }, 'x');
-		expect(lose.slice(0, 40)).toBe(skollAsk.slice(0, 40)); // same Sköll direction
-		expect(win.slice(0, 40)).toBe(oracleAns.slice(0, 40)); // same Oracle direction
+		expect(synthPrompt(SKOLL_VOICE, 'x').slice(0, 40)).not.toBe(
+			synthPrompt(ORACLE_VOICE, 'x').slice(0, 40)
+		);
 	});
 });
 

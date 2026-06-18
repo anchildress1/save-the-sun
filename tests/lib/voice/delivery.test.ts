@@ -374,7 +374,7 @@ describe('delivery speaking events', () => {
 		]);
 	});
 
-	it("emits Sköll's voice for signed authored Sköll lines", async () => {
+	it("emits Sköll's voice for authored Sköll lines", async () => {
 		vi.mocked(fetch).mockImplementation(async () => ndjsonResponse('pcm-a'));
 		enableDelivery();
 		const events = collect();
@@ -382,9 +382,9 @@ describe('delivery speaking events', () => {
 		await deliver({ kind: 'outcome', result: 'win', beat: 'coda' });
 		await deliver({
 			kind: 'authored',
-			text: 'The sun is mine. Your night has no morning.',
+			id: 'vl-skoll-1',
 			voice: SKOLL_VOICE,
-			sig: 'server-signed'
+			text: 'The sun is mine. Your night has no morning.'
 		});
 
 		expect(speaking(events)).toEqual([
