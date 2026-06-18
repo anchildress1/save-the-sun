@@ -27,6 +27,7 @@
 	import type { LineDescriptor } from '$lib/server/voice/lines';
 	import { REACTION_LINES } from '$lib/voice/reactionLines';
 	import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
+	import { VOICED_SEQUENCE } from '$lib/voice/outcomeLines';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
@@ -180,17 +181,19 @@
 	let showEndScreen = $derived(roundOver && !endHeld);
 	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
 
-	// Voice the outcome once the splash is up (ux-copy §4): a win in the Oracle's voice, a loss in
-	// Sköll's — so the player hears who took the day. The line is one beat of the splash copy (R10),
-	// queued behind any cast line on the shared speaker. Once per round; reset by a new game.
+	// Voice the full closing rite once the splash is up (ux-copy §4): the staged beats spoken in
+	// sequence — a win in the Oracle's voice, a loss in Sköll's — so the player hears the whole verse,
+	// not a lone beat. The lines queue in order on the shared speaker (the win skips its lead, already
+	// voiced as the cast landed). Each beat is written (R10). Once per round; reset by a new game.
 	let outcomeVoiced = false;
 	$effect(() => {
 		// Flip the once-guard only when the speaker is open — so a resumed/won round cannot spend
-		// its outcome voice before the browser gesture unlocks audio. The loss verse is voiced in
-		// Sköll's voice, the win coda in the Oracle's; the medallion follows from the delivery event.
+		// its outcome voice before the browser gesture unlocks audio. The medallion follows the
+		// delivery events (ember for Sköll's loss, gold for the Oracle's win).
 		if (showEndScreen && !outcomeVoiced && audioOn && audioReady) {
 			outcomeVoiced = true;
-			void deliver({ kind: 'outcome', result: endOutcome });
+			for (const beat of VOICED_SEQUENCE[endOutcome])
+				void deliver({ kind: 'outcome', result: endOutcome, beat });
 		}
 	});
 	let nightProgress = $derived(

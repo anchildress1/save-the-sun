@@ -16,7 +16,13 @@ export const OUTCOME_LINES = {
 } as const;
 
 export type Outcome = keyof typeof OUTCOME_LINES;
+export type OutcomeBeat = keyof (typeof OUTCOME_LINES)['win']; // 'lead' | 'verse' | 'coda'
 
-// The beat each outcome voices: the win's triumphant coda (the lead "The rune is true." is already
-// voiced as the cast lands), the loss's verse — a pronouncement that growls without naming himself.
-export const VOICED_BEAT = { win: 'coda', lose: 'verse' } as const;
+// The beats each outcome voices, in order — the full closing rite, not a single beat. The win skips
+// its lead ("The rune is true.") because the winning cast already voiced that exact line a beat earlier;
+// re-voicing it would double. The loss voices all three: his cast names the rune ("I name it. {Rune}."),
+// a different line from the loss lead. Win in the Oracle's voice, loss in Sköll's (Sól rides the Oracle).
+export const VOICED_SEQUENCE = {
+	win: ['verse', 'coda'],
+	lose: ['lead', 'verse', 'coda']
+} as const satisfies Record<Outcome, readonly OutcomeBeat[]>;

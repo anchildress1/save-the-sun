@@ -598,9 +598,20 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 		expect(deliveryMock.deliver).not.toHaveBeenCalled();
 
 		window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+		// The full staged sequence voices in order — the win skips its lead (heard at cast), then verse,
+		// then the triumphant coda.
 		await vi.waitFor(() =>
-			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'outcome', result: 'win' })
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({
+				kind: 'outcome',
+				result: 'win',
+				beat: 'coda'
+			})
 		);
+		expect(deliveryMock.deliver).toHaveBeenCalledWith({
+			kind: 'outcome',
+			result: 'win',
+			beat: 'verse'
+		});
 	});
 
 	it('queues a Sköll Ask resumed before the speaker opens, voicing it on the first gesture', async () => {

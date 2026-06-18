@@ -10,7 +10,7 @@ import type { RefusalClass } from '$lib/server/oracle/types';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { REACTION_LINES, carriesAnswer, type ReactionLineId } from '$lib/voice/reactionLines';
 import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
-import { OUTCOME_LINES, VOICED_BEAT, type Outcome } from '$lib/voice/outcomeLines';
+import { OUTCOME_LINES, type Outcome, type OutcomeBeat } from '$lib/voice/outcomeLines';
 import { runes } from '$lib/board';
 
 const REFUSAL_CLASSES: ReadonlySet<RefusalClass> = new Set([
@@ -44,9 +44,9 @@ export type LineDescriptor =
 	// A cast resolution (ux-copy §4): the true/falters lines are fixed; the wrong line names the rune,
 	// validated against the board so the route still voices only a server-owned line.
 	| { kind: 'cast'; result: 'true' | 'wrong' | 'falters'; rune?: string }
-	// The end-screen outcome (ux-copy §4): one beat of the splash copy — the win's coda in the Oracle's
-	// voice, the loss's verse in Sköll's, so the player hears who took the day.
-	| { kind: 'outcome'; result: Outcome };
+	// The end-screen outcome (ux-copy §4): one beat of the staged splash copy, voiced in sequence — the
+	// win in the Oracle's voice, the loss in Sköll's, so the player hears who took the day.
+	| { kind: 'outcome'; result: Outcome; beat: OutcomeBeat };
 
 // Parse a query and bound it to the real board (runes are 1-6); null on anything malformed or
 // out-of-range. Shared by the answer, Sköll-ask, and scry composers.
@@ -84,10 +84,11 @@ function composeCast(result: 'true' | 'wrong' | 'falters', rune: unknown): strin
 	return match ? wrongCastLine(match.name) : null;
 }
 
-function composeOutcome(result: Outcome): string | null {
-	// own-property only: an inherited key must not resolve to a prototype method.
+function composeOutcome(result: Outcome, beat: OutcomeBeat): string | null {
+	// own-property only on both keys: an inherited key must not resolve to a prototype method.
 	if (!Object.hasOwn(OUTCOME_LINES, result)) return null;
-	return OUTCOME_LINES[result][VOICED_BEAT[result]];
+	const beats = OUTCOME_LINES[result];
+	return Object.hasOwn(beats, beat) ? beats[beat] : null;
 }
 
 /** Compose the exact server-owned line for a descriptor, or null when it is not allow-listed. */
@@ -113,7 +114,7 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 		case 'cast':
 			return composeCast(descriptor.result, descriptor.rune);
 		case 'outcome':
-			return composeOutcome(descriptor.result);
+			return composeOutcome(descriptor.result, descriptor.beat);
 	}
 }
 
@@ -168,8 +169,9 @@ export function isLineDescriptor(value: unknown): value is LineDescriptor {
 		case 'react':
 			return typeof v.line === 'string';
 		case 'cast':
-		case 'outcome':
 			return typeof v.result === 'string';
+		case 'outcome':
+			return typeof v.result === 'string' && typeof v.beat === 'string';
 		default:
 			return false;
 	}

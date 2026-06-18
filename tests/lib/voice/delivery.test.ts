@@ -364,8 +364,8 @@ describe('delivery speaking events', () => {
 		const events = collect();
 
 		await deliver({ kind: 'skoll-ask', query: { axis: 'power', value: 3 } });
-		await deliver({ kind: 'outcome', result: 'win' });
-		await deliver({ kind: 'outcome', result: 'lose' });
+		await deliver({ kind: 'outcome', result: 'win', beat: 'coda' });
+		await deliver({ kind: 'outcome', result: 'lose', beat: 'verse' });
 		expect(speaking(events)).toEqual([
 			{ type: 'speaking', voice: 'skoll' },
 			{ type: 'speaking', voice: 'oracle' },
