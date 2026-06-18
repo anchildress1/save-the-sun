@@ -9,7 +9,7 @@ overrides:
   tmp: ^0.2.6
   uuid: ^11.1.1
   protobufjs@<=7.6.2: '>=7.6.3 <8'
-  js-yaml@<=4.1.1: '>=4.2.0'
+  js-yaml@<=4.1.1: '>=4.2.0 <5'
 
 importers:
 
