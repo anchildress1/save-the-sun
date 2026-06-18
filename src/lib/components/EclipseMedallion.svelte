@@ -6,6 +6,7 @@
 		RING_RUNES,
 		SPRITE_LEVELS,
 		spriteLevel,
+		voiceEnvelope,
 		type MedallionState
 	} from './medallionState';
 	import { RUNE_SYMBOL_ASSET } from './runeVisuals';
@@ -37,12 +38,11 @@
 	let reducedMotion = $state(false);
 	let pulsing = $derived(isSpeaking(current) && !reducedMotion && getLevel !== undefined);
 
-	// Disc frame: the live envelope mapped onto the 0–11 strip while pulsing; the state's fixed frame
-	// otherwise. Corona level (0–1) drives the speaking-state glow's opacity/scale from the same source.
-	let level = $derived(
-		pulsing ? Math.round(liveLevel * (SPRITE_LEVELS - 1)) : spriteLevel(current)
-	);
-	let coronaLevel = $derived(pulsing ? liveLevel : 0);
+	// Disc frame: the live envelope (RMS lifted across the strip) mapped onto 0–11 while pulsing; the
+	// state's fixed frame otherwise. The same envelope drives the corona glow's opacity/scale.
+	let envelope = $derived(pulsing ? voiceEnvelope(liveLevel) : 0);
+	let level = $derived(pulsing ? Math.round(envelope * (SPRITE_LEVELS - 1)) : spriteLevel(current));
+	let coronaLevel = $derived(envelope);
 
 	// Poll the speaker's level each animation frame while a voice plays — the disc/corona then pulse
 	// to the real envelope. Stops the moment the state leaves speaking (or motion is reduced).

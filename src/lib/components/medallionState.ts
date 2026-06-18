@@ -70,3 +70,15 @@ export function spriteLevel(state: MedallionState): number {
 			return SPRITE_PEAK_LEVEL;
 	}
 }
+
+// Voiced speech RMS sits low — a normal beat peaks around 0.2, not 1.0 — so the raw envelope only
+// ever lit the bottom few frames of the 0–11 strip (dimmer than idle's frame 4), reading as a dead
+// disc. Lift it with a gain and hold a floor: a quiet beat still reads as speaking (disc ≥ idle),
+// a loud one drives toward peak.
+export const VOICE_GAIN = 4;
+export const SPEAK_FLOOR = 0.4;
+
+/** Map a raw output RMS (0–1) to the medallion's speaking envelope, clamped to [SPEAK_FLOOR, 1]. */
+export function voiceEnvelope(rms: number): number {
+	return Math.min(1, Math.max(SPEAK_FLOOR, rms * VOICE_GAIN));
+}
