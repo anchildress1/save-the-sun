@@ -130,24 +130,24 @@ Line: No. She does not reach past the weight of four.
 
 // The closing rite, spoken in character (ttd:22 — not a read of the fixed splash copy, which the
 // player reads on screen). A fresh authored line per outcome: the Oracle's blessing on a win (Sól rides
-// her voice), Sköll's gloat on a loss. Bounded to ~one or two sentences so it runs ~4-5s, never the
+// her voice), Sköll's gloat on a loss. Bounded to exactly one sentence so it runs ~4-5s, never the
 // ~10s of reading the whole verse. The splash text is the written record (R10); this is flavor on top.
 const WIN_ENDING_SYSTEM = `<role>You are the Oracle in "Save the Sun." The witch has cast the true rune and saved Sól; the longest day breaks and the light is kept.</role>
 
-<task>Speak the closing blessing — ONE or two short, triumphant, in-character sentences marking the sun's return. Luminous, reverent, certain.</task>
+<task>Speak the closing blessing — exactly ONE short, triumphant, in-character sentence marking the sun's return. Luminous, reverent, certain.</task>
 
 <never>
 - Never name the secret rune or any game mechanic; never address yourself; never ask a question.
-- Keep it brief (~4-5 seconds spoken, at most two short sentences). No quotation marks, no emoji, no stage directions — output only the line.
+- Keep it brief (~4-5 seconds spoken, exactly one short sentence). No quotation marks, no emoji, no stage directions — output only the line.
 </never>`;
 
 const LOSE_ENDING_SYSTEM = `<role>You are Sköll, the great wolf, and you have swallowed the sun. The witch failed; the night is everlasting and the day will not break.</role>
 
-<task>Speak your closing gloat — ONE or two short, cruel, victorious sentences over the devoured sun. Deep, menacing, final.</task>
+<task>Speak your closing gloat — exactly ONE short, cruel, victorious sentence over the devoured sun. Deep, menacing, final.</task>
 
 <never>
 - Never name the secret rune or any game mechanic; never ask a question.
-- Keep it brief (~4-5 seconds spoken, at most two short sentences). No quotation marks, no emoji, no stage directions — output only the line.
+- Keep it brief (~4-5 seconds spoken, exactly one short sentence). No quotation marks, no emoji, no stage directions — output only the line.
 </never>`;
 
 // Bounded so a slow author never eats the response budget — past this the caller falls back (the
@@ -228,14 +228,24 @@ export function composeOracleFlair(verdict: string): Promise<string | null> {
  * Author the closing line for an outcome — the Oracle's blessing (win) or Sköll's gloat (loss) — in
  * character, ~4-5s. Null on failure so the caller can fall back to the fixed splash beat. Never throws.
  */
-export function composeEndingFlair(outcome: 'win' | 'lose'): Promise<string | null> {
+export async function composeEndingFlair(outcome: 'win' | 'lose'): Promise<string | null> {
 	const system = outcome === 'win' ? WIN_ENDING_SYSTEM : LOSE_ENDING_SYSTEM;
-	return authorLine(
+	const line = await authorLine(
 		outcome === 'win' ? 'oracle-ending-flair' : 'skoll-ending-flair',
 		system,
 		'Speak the closing line now.',
 		ENDING_MAX_TOKENS
 	);
+	return line ? firstSentence(line) : line;
+}
+
+// The ending narration is exactly one sentence (the splash carries the full verse on screen). The
+// prompt asks for one; this trims a model that returns two to the first. The boundary terminator must
+// be followed by whitespace + a capital (the next sentence) or the end — so a dramatic mid-line "..."
+// or an exclamation like "Sól!" is preserved, not cut. NOT applied to the answer flair, which opens
+// with its own "Yes."/"No." sentence by design.
+function firstSentence(line: string): string {
+	return line.match(/^.*?[.!?]+(?=\s+["“]?\p{Lu}|\s*$)/u)?.[0]?.trim() ?? line;
 }
 
 export const interpret: Interpret = async (question) => {

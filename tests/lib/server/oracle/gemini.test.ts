@@ -170,10 +170,8 @@ describe('composeEndingFlair (ttd:22)', () => {
 		sdk.generateContent.mockResolvedValueOnce({ text: 'The dawn is kept; Sól climbs free.' });
 		expect(await composeEndingFlair('win')).toBe('The dawn is kept; Sól climbs free.');
 
-		sdk.generateContent.mockResolvedValueOnce({
-			text: 'The sun is mine. Your night has no morning.'
-		});
-		expect(await composeEndingFlair('lose')).toBe('The sun is mine. Your night has no morning.');
+		sdk.generateContent.mockResolvedValueOnce({ text: 'The night is everlasting.' });
+		expect(await composeEndingFlair('lose')).toBe('The night is everlasting.');
 
 		expect(sdk.generateContent).toHaveBeenLastCalledWith(
 			expect.objectContaining({
@@ -189,9 +187,21 @@ describe('composeEndingFlair (ttd:22)', () => {
 
 	it('strips wrapping quotes and drops a stray stage-note line', async () => {
 		sdk.generateContent.mockResolvedValueOnce({
-			text: '"The dawn is kept. Sól climbs free."\n(she raises her arms)'
+			text: '"The dawn is kept and Sól climbs free."\n(she raises her arms)'
 		});
-		expect(await composeEndingFlair('win')).toBe('The dawn is kept. Sól climbs free.');
+		expect(await composeEndingFlair('win')).toBe('The dawn is kept and Sól climbs free.');
+	});
+
+	it('trims a two-sentence ending to exactly the first sentence', async () => {
+		sdk.generateContent.mockResolvedValueOnce({
+			text: 'The sun is mine. Your night has no morning.'
+		});
+		expect(await composeEndingFlair('lose')).toBe('The sun is mine.');
+	});
+
+	it('keeps one dramatic sentence whole — a mid-line ellipsis is not a sentence boundary', async () => {
+		sdk.generateContent.mockResolvedValueOnce({ text: 'Rise, Sól... the long day is yours!' });
+		expect(await composeEndingFlair('win')).toBe('Rise, Sól... the long day is yours!');
 	});
 
 	it('falls back to null on a model error — never throws into the resolving path', async () => {
