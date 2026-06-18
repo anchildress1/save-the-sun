@@ -6,15 +6,16 @@ import {
 	type SkollTurn,
 	type SkollReaction,
 	type AdvanceResponse,
+	type AuthoredLine,
 	type Player
 } from '$lib/server/engine/actions';
 import { getEngine, getSkoll, withSessionLock, recordLine } from '$lib/server/engine/session';
 import { composeLine, type LineDescriptor } from '$lib/server/voice/lines';
-import { interpret, composeOracleFlair } from '$lib/server/oracle/gemini';
+import { interpret, composeOracleFlair, composeEndingFlair } from '$lib/server/oracle/gemini';
 import { voiceAnswer, prepareAsk, answerAsk } from '$lib/server/oracle/oracle';
 import type { OracleResult } from '$lib/server/oracle/types';
 import { signLine } from '$lib/server/voice/sign';
-import { ORACLE_VOICE } from '$lib/voice/config';
+import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { resolveReaction } from '$lib/server/engine/reactions';
 import {
 	takeSkollTurn,
@@ -142,6 +143,24 @@ function castVoiceLine(cast: CastResult, runeName: string): LineDescriptor | nul
 		: { kind: 'cast', result: 'wrong', rune: runeName };
 }
 
+// Author + sign the end-screen closing line when this action resolved the round (ttd:22): the Oracle's
+// blessing on a win (Sól rides her voice), Sköll's gloat on a loss — a character line, NOT a read of the
+// fixed splash copy the player reads on screen. Undefined when the round isn't decided or authoring
+// failed/has no key — the client then falls back to the fixed splash beat.
+async function authorEnding(
+	sessionId: string,
+	engine: GameEngine
+): Promise<AuthoredLine | undefined> {
+	if (engine.status !== 'won' || engine.winner === null) return undefined;
+	const outcome = engine.winner === 'Human' ? 'win' : 'lose';
+	const text = await composeEndingFlair(outcome);
+	geminiEvents(sessionId, 'Cast'); // a Gemini call happened — tee its raw I/O to the debug log
+	if (text === null) return undefined;
+	const voice = outcome === 'win' ? ORACLE_VOICE : SKOLL_VOICE;
+	const sig = signLine(voice, text);
+	return sig === null ? undefined : { kind: 'authored', text, voice, sig };
+}
+
 // His templated Ask is surfaced for the human to react to; his WINNING cast rides along too so the
 // client can voice it (server recomposes from the rune). A wrong cast carries no line — it just hands
 // the turn back. Both lines are recomposed server-side, never replayed from client text.
@@ -185,9 +204,11 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 	// (or his Ask is already parked), so a stray Advance is harmless.
 	if ((body.type as string) === 'Advance') {
 		const skollTurn = await playSkollIfActive(sessionId, engine, skoll);
+		const outcomeFlair = await authorEnding(sessionId, engine);
 		const response: AdvanceResponse = {
 			type: 'Advance',
 			...(skollTurn && { skoll: skollTurn }),
+			...(outcomeFlair && { outcomeFlair }),
 			state: gameState(engine)
 		};
 		return json(response);
@@ -277,7 +298,9 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 		}
 		rememberLine(sessionId, castVoiceLine(result.cast, (action as { runeName: string }).runeName));
 	}
-	return json({ ...result, state: gameState(engine) });
+	// A winning human cast ends the round in victory — author her blessing for the end screen.
+	const outcomeFlair = result.type === 'Cast' ? await authorEnding(sessionId, engine) : undefined;
+	return json({ ...result, state: gameState(engine), ...(outcomeFlair && { outcomeFlair }) });
 }
 
 async function askWithSkollReaction(

@@ -149,33 +149,58 @@ Verdict: No. Sól is not reaching for a rune of more than 4 power.
 Line: No. She does not reach past the weight of four.
 </examples>`;
 
-// Bounded so a slow author never eats the Oracle's response budget — past this the caller voices the
-// deterministic line instead. Short, since one sentence is all she speaks.
-const FLAIR_TIMEOUT_MS = 2500;
-const FLAIR_MAX_TOKENS = 64;
+// The closing rite, spoken in character (ttd:22 — not a read of the fixed splash copy, which the
+// player reads on screen). A fresh authored line per outcome: the Oracle's blessing on a win (Sól rides
+// her voice), Sköll's gloat on a loss. Bounded to ~one or two sentences so it runs ~4-5s, never the
+// ~10s of reading the whole verse. The splash text is the written record (R10); this is flavor on top.
+const WIN_ENDING_SYSTEM = `<role>You are the Oracle in "Save the Sun." The witch has cast the true rune and saved Sól; the longest day breaks and the light is kept.</role>
 
-/**
- * Dramatize a deterministic verdict line into one in-character Oracle sentence, or null on any failure
- * /timeout/empty so the caller can fall back to the deterministic line. Never throws.
- */
-export async function composeOracleFlair(verdict: string): Promise<string | null> {
-	const contents = `Verdict: ${verdict}\nLine:`;
-	const request = { systemInstruction: FLAIR_SYSTEM, contents };
+<task>Speak the closing blessing — ONE or two short, triumphant, in-character sentences marking the sun's return. Luminous, reverent, certain.</task>
+
+<never>
+- Never name the secret rune or any game mechanic; never address yourself; never ask a question.
+- Keep it brief (~4-5 seconds spoken, at most two short sentences). No quotation marks, no emoji, no stage directions — output only the line.
+</never>`;
+
+const LOSE_ENDING_SYSTEM = `<role>You are Sköll, the great wolf, and you have swallowed the sun. The witch failed; the night is everlasting and the day will not break.</role>
+
+<task>Speak your closing gloat — ONE or two short, cruel, victorious sentences over the devoured sun. Deep, menacing, final.</task>
+
+<never>
+- Never name the secret rune or any game mechanic; never ask a question.
+- Keep it brief (~4-5 seconds spoken, at most two short sentences). No quotation marks, no emoji, no stage directions — output only the line.
+</never>`;
+
+// Bounded so a slow author never eats the response budget — past this the caller falls back (the
+// deterministic line for an answer, the fixed splash beat for an ending). Short by design.
+const FLAIR_TIMEOUT_MS = 2500;
+const ANSWER_MAX_TOKENS = 64;
+const ENDING_MAX_TOKENS = 72;
+
+// Shared authoring: a temp-1 MINIMAL-thinking call wrapped in a timeout, teed to the debug log, with
+// quotes/whitespace stripped. Returns null on any failure/timeout/empty so the caller can fall back.
+// Never throws.
+async function authorLine(
+	system: string,
+	contents: string,
+	maxOutputTokens: number
+): Promise<string | null> {
+	const request = { systemInstruction: system, contents };
 	try {
-		const flair = await Promise.race([
+		const result = await Promise.race([
 			ai().models.generateContent({
 				model: MODEL,
 				contents,
 				config: {
-					systemInstruction: FLAIR_SYSTEM,
+					systemInstruction: system,
 					thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
 					temperature: 1,
-					maxOutputTokens: FLAIR_MAX_TOKENS
+					maxOutputTokens
 				}
 			}),
 			new Promise<null>((resolve) => setTimeout(() => resolve(null), FLAIR_TIMEOUT_MS))
 		]);
-		if (flair === null) {
+		if (result === null) {
 			captureGemini({
 				label: 'oracle-flair',
 				request,
@@ -183,9 +208,10 @@ export async function composeOracleFlair(verdict: string): Promise<string | null
 			});
 			return null;
 		}
-		captureGemini({ label: 'oracle-flair', request, response: flair });
-		// One line only; strip wrapping quotes/whitespace the model may add. Empty → fall back.
-		const line = (flair.text ?? '')
+		captureGemini({ label: 'oracle-flair', request, response: result });
+		// First line only (drops any stray stage-note/preamble the model adds on a new line), with
+		// wrapping quotes stripped. One or two short sentences live on one line. Empty → fall back.
+		const line = (result.text ?? '')
 			.trim()
 			.split('\n')[0]
 			.replace(/^["“]|["”]$/g, '')
@@ -196,6 +222,23 @@ export async function composeOracleFlair(verdict: string): Promise<string | null
 		console.error('[oracle] Gemini flair failed:', { model: MODEL, error: err });
 		return null;
 	}
+}
+
+/**
+ * Dramatize a deterministic verdict line into one in-character Oracle sentence, or null on any failure
+ * /timeout/empty so the caller can fall back to the deterministic line. Never throws.
+ */
+export function composeOracleFlair(verdict: string): Promise<string | null> {
+	return authorLine(FLAIR_SYSTEM, `Verdict: ${verdict}\nLine:`, ANSWER_MAX_TOKENS);
+}
+
+/**
+ * Author the closing line for an outcome — the Oracle's blessing (win) or Sköll's gloat (loss) — in
+ * character, ~4-5s. Null on failure so the caller can fall back to the fixed splash beat. Never throws.
+ */
+export function composeEndingFlair(outcome: 'win' | 'lose'): Promise<string | null> {
+	const system = outcome === 'win' ? WIN_ENDING_SYSTEM : LOSE_ENDING_SYSTEM;
+	return authorLine(system, 'Speak the closing line now.', ENDING_MAX_TOKENS);
 }
 
 export const interpret: Interpret = async (question) => {

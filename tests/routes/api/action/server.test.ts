@@ -8,8 +8,10 @@ vi.mock('$lib/server/oracle/gemini', () => ({
 		query: { axis: 'fill', value: 'Light' },
 		paraphrase: 'whether it is light'
 	})),
-	// Default: no flair (the deterministic line stands). A test overrides this to prove the authored path.
-	composeOracleFlair: vi.fn(async () => null)
+	// Default: no flair (the deterministic line / fixed beat stands). Tests override to prove the
+	// authored paths.
+	composeOracleFlair: vi.fn(async () => null),
+	composeEndingFlair: vi.fn(async () => null)
 }));
 
 // The sign gate (sign.ts) reuses this as its HMAC key — set it so an authored line can be signed.
@@ -26,7 +28,7 @@ import { resetEngine, getEngine, getSkoll } from '$lib/server/engine/session';
 import { getEvents, captureGemini, runWithSession } from '$lib/server/debug/log';
 import { selectSecret } from '$lib/server/engine/engine';
 import { verifyLine } from '$lib/server/voice/sign';
-import { ORACLE_VOICE } from '$lib/voice/config';
+import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { runes } from '$lib/board';
 
 const SEED = 1;
@@ -271,6 +273,48 @@ describe('POST /api/action', () => {
 		expect(data).toMatchObject({ type: 'Cast', cast: { won: true } });
 		expect(data.state).toEqual({ activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 });
 		expect(data.skoll).toBeUndefined();
+	});
+
+	it('carries the Oracle blessing (signed, her voice) when the human cast wins (ttd:22)', async () => {
+		const { composeEndingFlair } = await import('$lib/server/oracle/gemini');
+		(composeEndingFlair as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+			'The dawn is kept; Sól climbs free.'
+		);
+
+		const data = await json(await call({ type: 'Cast', player: 'Human', runeName: SECRET }));
+
+		expect(data.outcomeFlair).toMatchObject({
+			kind: 'authored',
+			text: 'The dawn is kept; Sól climbs free.',
+			voice: ORACLE_VOICE
+		});
+		expect(verifyLine(ORACLE_VOICE, data.outcomeFlair.text, data.outcomeFlair.sig)).toBe(true);
+	});
+
+	it('carries Sköll’s gloat (signed, his voice) when his Advance cast wins (ttd:22)', async () => {
+		const { composeEndingFlair } = await import('$lib/server/oracle/gemini');
+		(composeEndingFlair as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+			'The sun is mine. Your night has no morning.'
+		);
+		skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
+
+		await ask();
+		const data = await json(await advance());
+
+		expect(data.state).toMatchObject({ status: 'won', winner: 'Sköll' });
+		expect(data.outcomeFlair).toMatchObject({
+			kind: 'authored',
+			text: 'The sun is mine. Your night has no morning.',
+			voice: SKOLL_VOICE
+		});
+		expect(verifyLine(SKOLL_VOICE, data.outcomeFlair.text, data.outcomeFlair.sig)).toBe(true);
+	});
+
+	it('omits outcomeFlair when ending authoring fails — client falls back to the fixed beat (ttd:22)', async () => {
+		// composeEndingFlair defaults to null; a winning cast carries no authored line.
+		const data = await json(await call({ type: 'Cast', player: 'Human', runeName: SECRET }));
+		expect(data.cast.won).toBe(true);
+		expect(data.outcomeFlair).toBeUndefined();
 	});
 
 	it('hands the wolf his turn after a wrong human cast (taken on Advance)', async () => {

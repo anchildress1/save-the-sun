@@ -100,6 +100,19 @@ export interface PendingReaction {
 }
 
 /**
+ * A Gemini-authored, server-signed closing line voiced on the end screen (ttd:22) — the Oracle's
+ * blessing on a win, Sköll's gloat on a loss. Structurally an `authored` LineDescriptor; the client
+ * delivers it through the same gated TTS route. Absent when authoring failed (client falls back to the
+ * fixed splash beat).
+ */
+export interface AuthoredLine {
+	kind: 'authored';
+	text: string;
+	voice: string;
+	sig: string;
+}
+
+/**
  * The `Advance` wire response — Sköll's own turn, run as its own request (not a player ActionResult,
  * so it's modeled separately). `skoll` is absent when it wasn't his turn to take.
  */
@@ -107,6 +120,8 @@ export interface AdvanceResponse {
 	type: 'Advance';
 	skoll?: SkollTurn;
 	state: GameState;
+	// His gloat when this Advance was his winning cast (the round ends in defeat).
+	outcomeFlair?: AuthoredLine;
 }
 
 /** Read the engine's public turn state into a wire DTO. */
@@ -128,7 +143,14 @@ export function gameState(engine: GameEngine): GameState {
 export type ActionResponse<T extends ActionResult['type'] = ActionResult['type']> = Extract<
 	ActionResult,
 	{ type: T }
-> & { state: GameState; skoll?: SkollTurn; skollReaction?: SkollReaction; skollVsYou?: SkollVsYou };
+> & {
+	state: GameState;
+	skoll?: SkollTurn;
+	skollReaction?: SkollReaction;
+	skollVsYou?: SkollVsYou;
+	// Her blessing when this action was the winning cast (the round ends in victory).
+	outcomeFlair?: AuthoredLine;
+};
 
 /** Route one action to the engine/Oracle. */
 export async function handleAction(action: GameAction, deps: ActionDeps): Promise<ActionResult> {

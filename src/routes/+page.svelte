@@ -181,19 +181,23 @@
 	let showEndScreen = $derived(roundOver && !endHeld);
 	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
 
-	// Voice the full closing rite once the splash is up (ux-copy §4): the staged beats spoken in
-	// sequence — a win in the Oracle's voice, a loss in Sköll's — so the player hears the whole verse,
-	// not a lone beat. The lines queue in order on the shared speaker (the win skips its lead, already
-	// voiced as the cast landed). Each beat is written (R10). Once per round; reset by a new game.
+	// Voice the closing rite once the splash is up (ux-copy §4, ttd:22): the winner speaks ONE authored
+	// in-character line — the Oracle's blessing on a win, Sköll's gloat on a loss — carried (signed) on
+	// the resolving response. NOT a read of the fixed splash copy (the player reads that on screen). When
+	// no authored line rode the response (authoring failed, or a resumed round), fall back to the fixed
+	// punch beat. Once per round; reset by a new game.
 	let outcomeVoiced = false;
+	let endFlair = $state<LineDescriptor | null>(null);
 	$effect(() => {
 		// Flip the once-guard only when the speaker is open — so a resumed/won round cannot spend
 		// its outcome voice before the browser gesture unlocks audio. The medallion follows the
 		// delivery events (ember for Sköll's loss, gold for the Oracle's win).
 		if (showEndScreen && !outcomeVoiced && audioOn && audioReady) {
 			outcomeVoiced = true;
-			for (const beat of VOICED_SEQUENCE[endOutcome])
-				void deliver({ kind: 'outcome', result: endOutcome, beat });
+			if (endFlair) void deliver(endFlair);
+			else
+				for (const beat of VOICED_SEQUENCE[endOutcome])
+					void deliver({ kind: 'outcome', result: endOutcome, beat });
 		}
 	});
 	let nightProgress = $derived(
@@ -726,6 +730,7 @@
 			answer = '';
 			askValue = '';
 			outcomeVoiced = false;
+			endFlair = null;
 			heldScry = true;
 			heldHex = true;
 			stopDelivery();
@@ -789,7 +794,9 @@
 				signal: abort.signal
 			});
 			if (!res.ok) throw new Error(`Advance rejected (${res.status})`);
-			const { skoll, state } = (await res.json()) as AdvanceResponse;
+			const { skoll, state, outcomeFlair } = (await res.json()) as AdvanceResponse;
+			// His gloat for the end screen when this Advance was his winning cast (ttd:22).
+			if (outcomeFlair) endFlair = outcomeFlair;
 			// His winning cast is a turn that must play. Hold the splash synchronously — BEFORE applyState
 			// flips roundOver — so his cast frame shows first, even with audio off (which would otherwise
 			// reveal the end screen at once). skollCastPending tells the hold effect to pace the beat.
@@ -1236,6 +1243,7 @@
 			heldScry = true;
 			heldHex = true;
 			outcomeVoiced = false; // the fresh round re-arms the end-screen outcome voice
+			endFlair = null;
 			// Drop any still-playing/queued Oracle line from the round just ended — TTS delivery is
 			// fire-and-forget, so without this a prior answer could bleed over the fresh blank round.
 			stopDelivery();
@@ -1262,12 +1270,14 @@
 	// Never throws — see performAsk.
 	async function performCast(runeName: string): Promise<string> {
 		try {
-			const { cast, state } = await dispatch({
+			const { cast, state, outcomeFlair } = await dispatch({
 				type: 'Cast',
 				player: 'Human',
 				runeName
 			});
 			applyState(state);
+			// Her blessing for the end screen when this cast won (ttd:22); the effect voices it on the splash.
+			if (outcomeFlair) endFlair = outcomeFlair;
 			let line: string;
 			let voice: LineDescriptor;
 			if (cast.ok) {

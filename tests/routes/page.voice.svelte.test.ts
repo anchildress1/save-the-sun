@@ -700,6 +700,39 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 		await vi.waitFor(() => expect(deliveryMock.deliver).toHaveBeenCalledWith(voiced));
 	});
 
+	it('voices the authored ending blessing on a win, not a fixed splash beat (ttd:22)', async () => {
+		const ENDING = {
+			kind: 'authored',
+			text: 'The dawn is kept; Sól climbs free.',
+			voice: 'Gacrux',
+			sig: 'server-signed'
+		};
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (body.type === 'Cast')
+				return new Response(
+					JSON.stringify({
+						type: 'Cast',
+						cast: { ok: true, won: true },
+						state: HUMAN_WON,
+						outcomeFlair: ENDING
+					})
+				);
+			return new Response(JSON.stringify({ type: 'Advance', state: HUMAN_WON }));
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('mute-toggle').click(); // audio on + speaker open
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // arm
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await screen.getByRole('button', { name: 'Name it' }).click();
+		// Her authored blessing voices on the end screen — the fixed `outcome` beat does not.
+		await vi.waitFor(() => expect(deliveryMock.deliver).toHaveBeenCalledWith(ENDING));
+		expect(deliveryMock.deliver).not.toHaveBeenCalledWith(
+			expect.objectContaining({ kind: 'outcome' })
+		);
+	});
+
 	it("voices Sköll's Ask through the delivery seam when his Advance asks", async () => {
 		const ASK_QUERY = { axis: 'element', value: 'Fire' };
 		const SKOLL_TURN: GameState = {

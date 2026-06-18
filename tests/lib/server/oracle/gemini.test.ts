@@ -24,7 +24,7 @@ vi.mock('$env/dynamic/private', () => ({
 	env: { GEMINI_API_KEY: 'test-gemini-key' }
 }));
 
-import { interpret, composeOracleFlair } from '$lib/server/oracle/gemini';
+import { interpret, composeOracleFlair, composeEndingFlair } from '$lib/server/oracle/gemini';
 
 function geminiJson(body: object) {
 	sdk.generateContent.mockResolvedValueOnce({ text: JSON.stringify(body) });
@@ -156,6 +156,48 @@ describe('composeOracleFlair (ttd:17)', () => {
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 		sdk.generateContent.mockRejectedValueOnce(new Error('429'));
 		expect(await composeOracleFlair('Yes. Sól is reaching for fire.')).toBeNull();
+		expect(consoleError).toHaveBeenCalledOnce();
+		consoleError.mockRestore();
+	});
+});
+
+describe('composeEndingFlair (ttd:22)', () => {
+	beforeEach(() => {
+		sdk.generateContent.mockReset();
+	});
+
+	it('authors a closing line, bounded — temp 1, MINIMAL thinking, ~72 tokens', async () => {
+		sdk.generateContent.mockResolvedValueOnce({ text: 'The dawn is kept; Sól climbs free.' });
+		expect(await composeEndingFlair('win')).toBe('The dawn is kept; Sól climbs free.');
+
+		sdk.generateContent.mockResolvedValueOnce({
+			text: 'The sun is mine. Your night has no morning.'
+		});
+		expect(await composeEndingFlair('lose')).toBe('The sun is mine. Your night has no morning.');
+
+		expect(sdk.generateContent).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				model: 'gemini-3.5-flash',
+				config: expect.objectContaining({
+					thinkingConfig: { thinkingLevel: 'MINIMAL' },
+					temperature: 1,
+					maxOutputTokens: 72
+				})
+			})
+		);
+	});
+
+	it('strips wrapping quotes and drops a stray stage-note line', async () => {
+		sdk.generateContent.mockResolvedValueOnce({
+			text: '"The dawn is kept. Sól climbs free."\n(she raises her arms)'
+		});
+		expect(await composeEndingFlair('win')).toBe('The dawn is kept. Sól climbs free.');
+	});
+
+	it('falls back to null on a model error — never throws into the resolving path', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		sdk.generateContent.mockRejectedValueOnce(new Error('boom'));
+		expect(await composeEndingFlair('lose')).toBeNull();
 		expect(consoleError).toHaveBeenCalledOnce();
 		consoleError.mockRestore();
 	});
