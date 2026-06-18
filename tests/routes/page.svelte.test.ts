@@ -283,6 +283,37 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('Sowilo is not the one. The night holds.');
 	});
 
+	it('plays Sköll’s winning cast before the defeat splash, even with audio off', async () => {
+		// Human's wrong cast hands the turn to Sköll; his Advance is a winning cast that ends the round.
+		stubFetch(async (_url: string, init?: { body?: string }) => {
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (body.type === 'Advance')
+				return new Response(
+					JSON.stringify({
+						type: 'Advance',
+						skoll: { casts: { rune: 'Sowilo', echo: 'I name it. Sowilo.' } },
+						state: SKOLL_WON
+					})
+				);
+			return new Response(
+				JSON.stringify({ type: 'Cast', cast: { ok: true, won: false }, state: SKOLL_TURN })
+			);
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await screen.getByRole('button', { name: 'Name it' }).click();
+
+		// His cast frame plays first — the end screen is held during the beat, not slammed up instantly.
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('I name it');
+		expect(screen.container.querySelector('[data-testid="end-screen"]')).toBeNull();
+		// Then the defeat splash takes over once the beat ends.
+		await vi.waitFor(
+			() => expect(screen.container.querySelector('[data-testid="end-screen"]')).not.toBeNull(),
+			{ timeout: 3000 }
+		);
+	});
+
 	it('cancels a cast with no turn spent', async () => {
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Cast the rune' }).click();

@@ -171,6 +171,12 @@
 	// Held back (`endHeld`) until the Oracle's last spoken line has drained, so the splash never stomps
 	// her answer mid-sentence when Sköll's winning cast lands right behind it.
 	let endHeld = $state(false);
+	// A live Sköll cast must play like any other turn — his cast frame shows before the defeat splash.
+	// With audio on, the spoken line paces that beat; with audio off there's nothing to wait on, so the
+	// hold runs a fixed beat instead of revealing the splash at once. Set the round his cast lands,
+	// cleared when the beat ends or the round leaves the won state.
+	const SKOLL_CAST_BEAT_MS = 1800;
+	let skollCastPending = $state(false);
 	let showEndScreen = $derived(roundOver && !endHeld);
 	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
 
@@ -315,21 +321,42 @@
 		}
 	}
 
-	// Hold the end-screen splash until her last line has been heard. Only when audio is on — silent
-	// play resolves instantly. Capped (8s) so a stuck synth can never strand the round on the board.
+	// Hold the end-screen splash so the resolving turn plays before it. Two ways to pace the hold:
+	// audio drain (a voiced line is in flight) or a fixed beat (a live Sköll cast with audio off, which
+	// has nothing to wait on but must still show his cast frame). A resumed or text-only win with no
+	// line in flight shows the splash at once. Capped so a stuck synth can never strand it off-screen.
 	$effect(() => {
-		// Only hold when a line is actually in flight (answerAudio set this session) — a resumed or
-		// text-only win has nothing to wait for, so the splash shows at once. (answerAudio is a plain
-		// handle, not reactive; the effect re-runs on roundOver/audioOn, by when it's set.)
-		if (!roundOver || !audioOn || answerAudio === null) {
+		if (!roundOver) {
+			endHeld = false;
+			skollCastPending = false;
+			return;
+		}
+		// answerAudio is a plain handle, not reactive; the effect re-runs on roundOver/audioOn/cast, by
+		// when it's set.
+		const holdForAudio = audioOn && answerAudio !== null;
+		const holdForBeat = !audioOn && skollCastPending;
+		if (!holdForAudio && !holdForBeat) {
 			endHeld = false;
 			return;
 		}
 		endHeld = true;
 		let cancelled = false;
 		const HOLD_CAP_MS = 8000;
-		// Wait for her line to finish streaming in, then drain — but race the whole wait against a hard
-		// cap so a hung fetch/stream (answerAudio never settling) can never strand the splash off-screen.
+		const release = () => {
+			if (cancelled) return;
+			endHeld = false;
+			skollCastPending = false;
+		};
+		if (holdForBeat) {
+			// Silent cast: a fixed beat to read his cast frame, then the splash.
+			const timer = setTimeout(release, SKOLL_CAST_BEAT_MS);
+			return () => {
+				cancelled = true;
+				clearTimeout(timer);
+			};
+		}
+		// Voiced: wait for the line to stream in and drain, raced against a hard cap so a hung stream
+		// can never strand the splash off-screen.
 		Promise.race([
 			(async () => {
 				try {
@@ -340,9 +367,7 @@
 				await whenDrained(HOLD_CAP_MS);
 			})(),
 			new Promise((resolve) => setTimeout(resolve, HOLD_CAP_MS))
-		]).finally(() => {
-			if (!cancelled) endHeld = false;
-		});
+		]).finally(release);
 		return () => {
 			cancelled = true;
 		};
@@ -736,6 +761,13 @@
 			});
 			if (!res.ok) throw new Error(`Advance rejected (${res.status})`);
 			const { skoll, state } = (await res.json()) as AdvanceResponse;
+			// His winning cast is a turn that must play. Hold the splash synchronously — BEFORE applyState
+			// flips roundOver — so his cast frame shows first, even with audio off (which would otherwise
+			// reveal the end screen at once). skollCastPending tells the hold effect to pace the beat.
+			if (skoll?.casts) {
+				endHeld = true;
+				skollCastPending = true;
+			}
 			applyState(state);
 			applySkoll(skoll);
 			// His Ask is a game move (R10) — written on his frame and voiced in his own voice through the
