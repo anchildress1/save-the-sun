@@ -401,7 +401,10 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
-		expect(error).toHaveBeenCalledWith('[ui] New game failed (status 500):', expect.any(Error));
+		expect(error).toHaveBeenCalledWith(
+			'[ui] New game failed:',
+			expect.objectContaining({ message: expect.stringContaining('500') })
+		);
 	});
 
 	it('treats a 200 with no board seed as a failure, not a silent no-op', async () => {
@@ -410,7 +413,10 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
-		expect(error).toHaveBeenCalledWith('[ui] New game failed (status 200):', expect.any(Error));
+		expect(error).toHaveBeenCalledWith(
+			'[ui] New game failed:',
+			expect.objectContaining({ message: expect.stringContaining('boardSeed') })
+		);
 	});
 
 	it('opens on the early-night progress line before any turn is spent', async () => {
@@ -1097,7 +1103,10 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
-		expect(error).toHaveBeenCalledWith('[ui] New game failed (status 200):', expect.any(Error));
+		expect(error).toHaveBeenCalledWith(
+			'[ui] New game failed:',
+			expect.objectContaining({ message: expect.stringContaining('roundId') })
+		);
 	});
 
 	it('degrades to no restore when reading storage throws (private mode) — never breaks play', async () => {

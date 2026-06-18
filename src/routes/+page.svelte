@@ -673,6 +673,20 @@
 	// call degrades through the existing catch paths. Generous because the model round-trip is the cost.
 	const ACTION_TIMEOUT_MS = 30_000;
 
+	// One bounded POST/GET: aborts after ACTION_TIMEOUT_MS so a hung request can't strand `pending`,
+	// then degrades through the caller's catch. Throws on a non-ok status (the message carries it).
+	async function boundedAction<T>(url: string, init?: RequestInit): Promise<T> {
+		const abort = new AbortController();
+		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
+		try {
+			const res = await fetch(url, { ...init, signal: abort.signal });
+			if (!res.ok) throw new Error(`${init?.method ?? 'GET'} ${url} rejected (${res.status})`);
+			return (await res.json()) as T;
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+
 	// Mirrors the load/`/api/state` snapshot — the authoritative round the client resyncs to.
 	type RecoveredLine = { text: string; voice: LineDescriptor | null };
 	type StateSnapshot = {
@@ -728,13 +742,9 @@
 	// the resync landed.
 	async function reconcile(): Promise<{ landed: boolean; lastLine: RecoveredLine | null }> {
 		const prevRoundId = roundId;
-		const abort = new AbortController();
-		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
 		let snap: StateSnapshot;
 		try {
-			const res = await fetch('/api/state', { signal: abort.signal });
-			if (!res.ok) throw new Error(`State reconcile rejected (${res.status})`);
-			snap = (await res.json()) as StateSnapshot;
+			snap = await boundedAction<StateSnapshot>('/api/state');
 			// A malformed snapshot (no turn state) can't be trusted to re-key the view — fail the resync
 			// rather than apply a partial that would crash applyState or mis-key persistence.
 			if (!snap?.state || !snap.roundId)
@@ -742,8 +752,6 @@
 		} catch (err) {
 			console.error('[ui] reconcile failed:', err);
 			return { landed: false, lastLine: null };
-		} finally {
-			clearTimeout(timer);
 		}
 		// A dropped new-game still reset the round server-side — drop the per-round view so crossings,
 		// the voiced line, and the outcome can't resume against a new secret. A fresh round also restores
@@ -783,20 +791,11 @@
 	async function dispatch<T extends GameAction['type']>(
 		action: Extract<GameAction, { type: T }>
 	): Promise<ActionResponse<T>> {
-		const abort = new AbortController();
-		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
-		try {
-			const res = await fetch('/api/action', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(action),
-				signal: abort.signal
-			});
-			if (!res.ok) throw new Error(`Action rejected (${res.status})`);
-			return (await res.json()) as ActionResponse<T>;
-		} finally {
-			clearTimeout(timer);
-		}
+		return boundedAction<ActionResponse<T>>('/api/action', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(action)
+		});
 	}
 
 	// Sköll's move is its own request, fired after any action that hands him the turn — so the
@@ -808,17 +807,12 @@
 		// reaction — advancing then is a server no-op, and the prompt is already up.
 		if (roundStatus !== 'active' || activePlayer !== 'Sköll' || skollAsking) return;
 		await tick();
-		const abort = new AbortController();
-		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
 		try {
-			const res = await fetch('/api/action', {
+			const { skoll, state, outcomeFlair } = await boundedAction<AdvanceResponse>('/api/action', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ type: 'Advance' }),
-				signal: abort.signal
+				body: JSON.stringify({ type: 'Advance' })
 			});
-			if (!res.ok) throw new Error(`Advance rejected (${res.status})`);
-			const { skoll, state, outcomeFlair } = (await res.json()) as AdvanceResponse;
 			// His gloat for the end screen when this Advance was his winning cast (ttd:22).
 			if (outcomeFlair) endFlair = outcomeFlair;
 			// His winning cast is a turn that must play. Hold the splash synchronously — BEFORE applyState
@@ -856,8 +850,6 @@
 				answer = RITE.wolfStalled;
 				skollStalled = true;
 			}
-		} finally {
-			clearTimeout(timer);
 		}
 	}
 
@@ -1225,21 +1217,16 @@
 	// Returns whether the reset landed, so a caller can avoid advancing the view on a failed reset.
 	async function newGame(): Promise<boolean> {
 		pending = true;
-		let res: Response | undefined;
-		const abort = new AbortController();
-		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
 		try {
-			res = await fetch('/api/new-game', { method: 'POST', signal: abort.signal });
-			if (!res.ok) throw new Error(`New game rejected (${res.status})`);
 			const {
 				boardSeed: seed,
 				roundId: nextRoundId,
 				state
-			} = (await res.json()) as {
+			} = await boundedAction<{
 				boardSeed: number;
 				roundId: string;
 				state: GameState;
-			};
+			}>('/api/new-game', { method: 'POST' });
 			// A 200 with no usable seed/token would leave the view keyed to the OLD round while the
 			// server reset — treat it as a hard failure, not a silent no-op that mis-keys persistence.
 			if (!Number.isFinite(seed)) throw new Error('New game response missing boardSeed');
@@ -1267,7 +1254,7 @@
 			cancelCast();
 			return true;
 		} catch (err) {
-			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
+			console.error('[ui] New game failed:', err);
 			// resetEngine() may have minted the fresh round before the response dropped — resync so the
 			// board matches the new secret. The reset took ONLY if the resync lands on a NEW round: a
 			// same-round resync (the POST failed before resetting) left the board/secret unchanged, so
@@ -1278,7 +1265,6 @@
 			if (!reset) answer = RITE.oracleSilent;
 			return reset;
 		} finally {
-			clearTimeout(timer);
 			pending = false;
 		}
 	}
