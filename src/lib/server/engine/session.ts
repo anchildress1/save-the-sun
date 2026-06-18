@@ -69,6 +69,18 @@ function requireId(sessionId: string): void {
 	if (!sessionId) throw new Error('session registry called without a sessionId');
 }
 
+// Drop everything scoped to a round for one session — his memory, the view-state token, the board
+// order, the recoverable + authored lines, and the demo log. Shared by LRU eviction and a fresh round
+// so the parallel maps can never drift out of sync (add a new round-scoped map here, once).
+function evictRoundState(sessionId: string): void {
+	skolls.delete(sessionId);
+	roundIds.delete(sessionId);
+	boardSeeds.delete(sessionId);
+	lastLines.delete(sessionId);
+	voiceLines.delete(sessionId);
+	resetLog(sessionId);
+}
+
 function remember(sessionId: string, engine: GameEngine): GameEngine {
 	engines.delete(sessionId);
 	engines.set(sessionId, engine);
@@ -76,12 +88,7 @@ function remember(sessionId: string, engine: GameEngine): GameEngine {
 		// size > cap ⇒ the registry is non-empty, so the first key always exists.
 		const [lru] = engines.keys();
 		engines.delete(lru);
-		skolls.delete(lru); // his memory dies with the round it belonged to
-		roundIds.delete(lru); // and the view-state token keyed to that round
-		boardSeeds.delete(lru); // and the round's board order
-		lastLines.delete(lru); // and the recoverable line, scoped to the same round
-		voiceLines.delete(lru); // and any authored lines awaiting TTS for that round
-		resetLog(lru); // and the demo log, lifecycle-linked to the same round
+		evictRoundState(lru);
 		// Rare, but the resulting fresh-secret-on-next-access desync is otherwise invisible.
 		console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
 	}
@@ -98,12 +105,7 @@ export function getEngine(sessionId: string): GameEngine {
 /** Start a fresh round for one session; pass a seed for a deterministic secret. */
 export function resetEngine(sessionId: string, seed?: number): GameEngine {
 	requireId(sessionId);
-	skolls.delete(sessionId); // a new round wipes the wolf's memory; recreated lazily on his turn
-	roundIds.delete(sessionId); // and the view-state token — the next read mints a fresh round id
-	boardSeeds.delete(sessionId); // and the board order — a fresh round deals a fresh layout
-	lastLines.delete(sessionId); // and the recoverable line — a fresh round has spoken nothing yet
-	voiceLines.delete(sessionId); // and any authored lines — a fresh round authors its own
-	resetLog(sessionId); // and the demo log — a fresh round starts the on-stage record over
+	evictRoundState(sessionId); // a new round wipes his memory, the view token, the board, lines, the log
 	return remember(sessionId, create(sessionId, seed ?? randomSeed()));
 }
 
