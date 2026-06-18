@@ -166,6 +166,9 @@ async function authorLine(
 	maxOutputTokens: number
 ): Promise<string | null> {
 	const request = { systemInstruction: system, contents };
+	// Hold the timeout id so the race's loser is cleared in `finally` — when the API call wins, the
+	// timer (and its closure) would otherwise linger until it fires for nothing.
+	let timeout: ReturnType<typeof setTimeout> | undefined;
 	try {
 		const result = await Promise.race([
 			ai().models.generateContent({
@@ -178,7 +181,9 @@ async function authorLine(
 					maxOutputTokens
 				}
 			}),
-			new Promise<null>((resolve) => setTimeout(() => resolve(null), FLAIR_TIMEOUT_MS))
+			new Promise<null>((resolve) => {
+				timeout = setTimeout(() => resolve(null), FLAIR_TIMEOUT_MS);
+			})
 		]);
 		if (result === null) {
 			captureGemini({
@@ -201,6 +206,8 @@ async function authorLine(
 		captureGemini({ label, request, error: String(err) });
 		console.error('[oracle] Gemini flair failed:', { model: MODEL, error: err });
 		return null;
+	} finally {
+		clearTimeout(timeout);
 	}
 }
 
