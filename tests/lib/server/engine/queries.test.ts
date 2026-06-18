@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { runes } from '$lib/board';
-import { parseQuery, resolveQuery, type PowerOp } from '$lib/server/engine/queries';
+import {
+	parseQuery,
+	queryFromFields,
+	resolveQuery,
+	type PowerOp
+} from '$lib/server/engine/queries';
 
 const ELEMENTS = [...new Set(runes.map((r) => r.element))];
 const COLORS = [...new Set(runes.map((r) => r.color))];
@@ -157,5 +162,44 @@ describe('parseQuery — validation (the referee leash)', () => {
 			value: 7
 		});
 		expect(runes.some((r) => resolveQuery(r, { axis: 'power', op: 'eq', value: 7 }))).toBe(false);
+	});
+});
+
+// The flat LLM-tool-call shape both adapters (Oracle + Sköll) return, mapped to one Query by axis.
+// Shape only — values aren't validated here (parseQuery re-checks), so any string passes through.
+describe('queryFromFields — flat adapter fields → one Query by axis', () => {
+	it('maps each axis from its own value field', () => {
+		expect(queryFromFields({ axis: 'element', elementValue: 'Fire' })).toEqual({
+			axis: 'element',
+			value: 'Fire'
+		});
+		expect(queryFromFields({ axis: 'color', colorValue: 'Gold' })).toEqual({
+			axis: 'color',
+			value: 'Gold'
+		});
+		expect(queryFromFields({ axis: 'fill', fillValue: 'Light' })).toEqual({
+			axis: 'fill',
+			value: 'Light'
+		});
+		expect(queryFromFields({ axis: 'rune', runeName: 'Sowilo' })).toEqual({
+			axis: 'rune',
+			value: 'Sowilo'
+		});
+		expect(queryFromFields({ axis: 'power', powerOp: 'gte', powerValue: 4 })).toEqual({
+			axis: 'power',
+			op: 'gte',
+			value: 4
+		});
+	});
+
+	it('returns null when the axis is missing its value, unknown, or absent', () => {
+		expect(queryFromFields({ axis: 'element' })).toBeNull();
+		expect(queryFromFields({ axis: 'color' })).toBeNull();
+		expect(queryFromFields({ axis: 'fill' })).toBeNull();
+		expect(queryFromFields({ axis: 'rune' })).toBeNull();
+		expect(queryFromFields({ axis: 'power', powerOp: 'gte' })).toBeNull(); // no powerValue
+		expect(queryFromFields({ axis: 'power', powerValue: 4 })).toBeNull(); // no powerOp
+		expect(queryFromFields({ axis: 'mixed' })).toBeNull();
+		expect(queryFromFields({})).toBeNull();
 	});
 });

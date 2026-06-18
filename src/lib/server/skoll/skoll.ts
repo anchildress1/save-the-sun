@@ -8,7 +8,7 @@
 // builder takes his state, not the engine, so the secret is structurally unreachable.
 
 import { dev } from '$app/environment';
-import { runes } from '$lib/board';
+import { runes, ELEMENTS, COLORS, RUNE_NAMES as RUNE_NAME_LIST } from '$lib/board';
 import { mulberry32 } from '$lib/prng';
 import { parseQuery, type PowerOp, type Query } from '$lib/server/engine/queries';
 import { valuePhrase } from '$lib/server/oracle/oracle';
@@ -52,11 +52,9 @@ export interface SkollDecision {
  * the clean 50/50 split — exactly the optimal play this nudge exists to steer him away from).
  */
 function pickHunch(rng: () => number): string {
-	const elements = [...new Set(runes.map((r) => r.element))];
-	const colors = [...new Set(runes.map((r) => r.color))];
 	const candidates: Query[] = [
-		...elements.map((value): Query => ({ axis: 'element', value })),
-		...colors.map((value): Query => ({ axis: 'color', value }))
+		...ELEMENTS.map((value): Query => ({ axis: 'element', value })),
+		...COLORS.map((value): Query => ({ axis: 'color', value }))
 	];
 	return valuePhrase(candidates[Math.floor(rng() * candidates.length)]);
 }
@@ -159,7 +157,7 @@ export function summarizePayload(payload: SkollPayload): string {
 }
 
 const RUNE_IDS = new Set(runes.map((r) => r.id));
-const RUNE_NAMES = new Set(runes.map((r) => r.name));
+const RUNE_NAMES = new Set(RUNE_NAME_LIST);
 
 /** Keep only legal rune ids from an untrusted cross-off list; malformed ids are dropped (logged). */
 function legalCrossOffs(ids: unknown): number[] {

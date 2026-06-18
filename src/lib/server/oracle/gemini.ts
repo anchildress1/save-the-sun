@@ -5,17 +5,14 @@
 
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
-import { runes } from '$lib/board';
+import { ELEMENTS, COLORS, RUNE_NAMES as NAMES } from '$lib/board';
 import { captureGemini } from '$lib/server/debug/log';
 import type { GeminiCall } from '$lib/server/debug/log';
-import type { PowerOp, Query } from '$lib/server/engine/queries';
+import { queryFromFields, type PowerOp } from '$lib/server/engine/queries';
 import type { Interpretation, Interpret, RefusalClass } from './types';
 
 const MODEL = 'gemini-3.5-flash';
 
-const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
-const COLORS: string[] = [...new Set(runes.map((r) => r.color))];
-const NAMES: string[] = runes.map((r) => r.name);
 const FILLS: string[] = ['Light', 'Dark'];
 const POWER_OPS: PowerOp[] = ['eq', 'lt', 'lte', 'gt', 'gte'];
 
@@ -83,31 +80,12 @@ interface RawResponse {
 	powerValue?: number;
 }
 
-function toQuery(raw: RawResponse): Query | null {
-	switch (raw.axis) {
-		case 'element':
-			return raw.elementValue ? { axis: 'element', value: raw.elementValue } : null;
-		case 'color':
-			return raw.colorValue ? { axis: 'color', value: raw.colorValue } : null;
-		case 'fill':
-			return raw.fillValue ? { axis: 'fill', value: raw.fillValue } : null;
-		case 'rune':
-			return raw.runeName ? { axis: 'rune', value: raw.runeName } : null;
-		case 'power':
-			return raw.powerOp && typeof raw.powerValue === 'number'
-				? { axis: 'power', op: raw.powerOp, value: raw.powerValue }
-				: null;
-		default:
-			return null;
-	}
-}
-
 const REFUSALS = new Set(['mixed-type', 'secret-seeking', 'prompt-injection', 'negation']);
 
 // Map the flat schema response into an Interpretation, defaulting to a refusal.
 function normalize(raw: RawResponse): Interpretation {
 	if (raw.kind === 'query') {
-		const query = toQuery(raw);
+		const query = queryFromFields(raw);
 		if (query) return { kind: 'query', query, paraphrase: raw.paraphrase ?? '' };
 	}
 	if (raw.refusalClass && REFUSALS.has(raw.refusalClass)) {
