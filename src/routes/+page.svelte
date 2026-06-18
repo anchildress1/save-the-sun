@@ -14,7 +14,6 @@
 		deliver,
 		whenDrained,
 		subscribeDelivery,
-		currentLevel,
 		type DeliveryEvent
 	} from '$lib/voice/delivery';
 	import {
@@ -1432,12 +1431,7 @@
 					aria-label="Oracle voice controls"
 					data-coach="voice"
 				>
-					<EclipseMedallion
-						state={medalState}
-						getLevel={currentLevel}
-						onHoldStart={startHold}
-						onHoldEnd={endHold}
-					/>
+					<EclipseMedallion state={medalState} onHoldStart={startHold} onHoldEnd={endHold} />
 					<button
 						class="voice-switch"
 						type="button"

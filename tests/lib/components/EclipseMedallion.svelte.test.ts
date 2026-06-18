@@ -190,27 +190,18 @@ describe('EclipseMedallion — reduced motion (R6)', () => {
 	it.each([
 		{ state: 'idle' as const, selector: '.corona', why: 'breathing pulse' },
 		{ state: 'recording' as const, selector: '.corona', why: 'recording pulse' },
-		{ state: 'speaking' as const, selector: '.corona', why: 'voice pulse' },
-		{ state: 'skoll-speaking' as const, selector: '.corona', why: 'ember pulse' },
-		{ state: 'speaking' as const, selector: '.disc', why: 'playback loop' }
+		{ state: 'recording' as const, selector: '.disc', why: 'sprite loop' }
 	])('replaces the $why with a static glow in the $state state', ({ state, selector }) => {
 		const { button } = renderMedallion(state);
 		expect(getComputedStyle(layer(button, selector)).animationName).toBe('none');
 	});
 
-	it('ignores the live output level under reduced motion — the disc holds its static frame', () => {
-		// A loud level (0.2 → frame 2 if it pulsed) must NOT move the disc here: reduced motion pins it
-		// to the speaking state's static peak, so the JS pulse honors the preference like the CSS loops.
-		const screen = render(EclipseMedallion, {
-			state: 'speaking' as MedallionState,
-			getLevel: () => 0.2,
-			onHoldStart: vi.fn(),
-			onHoldEnd: vi.fn()
-		});
-		const button = screen.container.querySelector<HTMLButtonElement>(
-			'[data-testid="eclipse-medallion"]'
-		)!;
+	it('holds the speaking disc at its static peak — no audio-driven pulse to honor or ignore', () => {
+		// The live-level pulse was stripped: speaking is a steady lit disc, so the frame is the state's
+		// fixed peak regardless of any playback, with no animation to disable under reduced motion.
+		const { button } = renderMedallion('speaking');
 		expect(button.style.getPropertyValue('--sprite-level')).toBe(String(SPRITE_LEVELS - 1));
+		expect(getComputedStyle(layer(button, '.disc')).animationName).toBe('none');
 	});
 });
 

@@ -4,10 +4,7 @@ import {
 	MEDALLION_LABEL,
 	RING_RUNES,
 	SPRITE_LEVELS,
-	SPEAK_FLOOR,
-	VOICE_GAIN,
 	spriteLevel,
-	voiceEnvelope,
 	type MedallionState
 } from '$lib/components/medallionState';
 import { RUNE_SYMBOL_ASSET } from '$lib/components/runeVisuals';
@@ -83,39 +80,5 @@ describe('spriteLevel', () => {
 		{ state: 'skoll-speaking' as const, level: 11 }
 	])('rests $state on level $level', ({ state, level }) => {
 		expect(spriteLevel(state)).toBe(level);
-	});
-});
-
-describe('voiceEnvelope', () => {
-	it('floors silence at SPEAK_FLOOR so a quiet beat still reads as speaking, never below idle', () => {
-		expect(voiceEnvelope(0)).toBe(SPEAK_FLOOR);
-		// Idle rests at frame 4; the speaking floor must map at or above it, never dimmer than idle.
-		expect(Math.round(voiceEnvelope(0) * (SPRITE_LEVELS - 1))).toBeGreaterThanOrEqual(
-			spriteLevel('idle')
-		);
-	});
-
-	it('clamps a loud beat to 1 — the strip never overshoots its peak', () => {
-		expect(voiceEnvelope(0.5)).toBe(1);
-		expect(voiceEnvelope(1)).toBe(1);
-	});
-
-	it('lifts a realistic speech RMS near peak — the regression that left the disc dead', () => {
-		// Measured live: voiced TTS RMS peaks ~0.2–0.25. The raw value alone lit only frame ~2 (dimmer
-		// than idle); gained, it must drive the disc near peak so the pulse is actually visible.
-		expect(Math.round(voiceEnvelope(0.23) * (SPRITE_LEVELS - 1))).toBeGreaterThanOrEqual(9);
-	});
-
-	it('rises with the input between floor and clamp', () => {
-		expect(voiceEnvelope(0.12)).toBeLessThan(voiceEnvelope(0.2));
-		expect(voiceEnvelope(0.15)).toBeCloseTo(0.15 * VOICE_GAIN, 5);
-	});
-
-	it('stays within [SPEAK_FLOOR, 1] for any input, including out-of-range', () => {
-		for (const rms of [-0.1, 0, 0.05, 0.3, 0.9, 2]) {
-			const v = voiceEnvelope(rms);
-			expect(v).toBeGreaterThanOrEqual(SPEAK_FLOOR);
-			expect(v).toBeLessThanOrEqual(1);
-		}
 	});
 });

@@ -7,6 +7,7 @@ const audio = vi.hoisted(() => {
 		setMuted: vi.fn(),
 		close: vi.fn(),
 		onDrained: vi.fn(),
+		onSpeaking: vi.fn(),
 		busy: false
 	};
 	const createSpeaker = vi.fn(() => speaker);
@@ -36,6 +37,15 @@ const fireDrain = () => {
 	const handler = audio.speaker.onDrained.mock.calls.at(-1)?.[0];
 	if (!handler) throw new Error('delivery never registered an onDrained handler');
 	handler();
+};
+
+// The speaking handler delivery registers at enable() — calling it simulates the speaker reaching
+// a clip of `voice` in the queue. Playback timing (which voice, when) is the speaker's job, proven
+// in audio.test.ts; here we drive it directly to prove delivery forwards it to subscribers.
+const fireSpeaking = (voice: 'oracle' | 'skoll') => {
+	const handler = audio.speaker.onSpeaking.mock.calls.at(-1)?.[0];
+	if (!handler) throw new Error('delivery never registered an onSpeaking handler');
+	handler(voice);
 };
 
 // A streaming TTS response: NDJSON, one base64 chunk per line.
@@ -81,7 +91,7 @@ describe('delivery seam', () => {
 			body: JSON.stringify(LINE),
 			signal: expect.any(AbortSignal)
 		});
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['pcm-a', 'pcm-b', 'pcm-c']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['pcm-a', 'pcm-b', 'pcm-c']);
 	});
 
 	it('stays silent when the route refuses the line', async () => {
@@ -121,12 +131,12 @@ describe('delivery seam', () => {
 
 		const inflight = deliver(LINE);
 		// Let the first chunk be read, then close the speaker before releasing the second.
-		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first'));
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first', 'oracle'));
 		disableDelivery();
 		releaseSecond();
 		await inflight;
 
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['first']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['first']);
 		expect(audio.speaker.close).toHaveBeenCalledTimes(1);
 	});
 
@@ -151,7 +161,7 @@ describe('delivery seam', () => {
 		enableDelivery();
 
 		const inflight = deliver(LINE);
-		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first'));
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first', 'oracle'));
 		expect(capturedSignal?.aborted).toBe(false);
 
 		// In real fetch this aborts the body stream and unblocks the pending read; here we assert the
@@ -161,7 +171,7 @@ describe('delivery seam', () => {
 
 		releaseSecond();
 		await inflight;
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['first']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['first']);
 	});
 
 	it('serializes back-to-back deliveries so two lines never interleave their chunks', async () => {
@@ -188,16 +198,21 @@ describe('delivery seam', () => {
 		const first = deliver(LINE);
 		const second = deliver(LINE);
 
-		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('her-1'));
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('her-1', 'oracle'));
 		// The second line has NOT begun — it is queued behind the first, so only one fetch so far.
 		expect(fetch).toHaveBeenCalledTimes(1);
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['her-1']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['her-1']);
 
 		releaseFirst();
 		await Promise.all([first, second]);
 
 		// Her whole line enqueued before his — no interleaving.
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['her-1', 'her-2', 'his-1', 'his-2']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual([
+			'her-1',
+			'her-2',
+			'his-1',
+			'his-2'
+		]);
 	});
 
 	it('drops a line queued behind an in-flight one when a stop lands before its turn', async () => {
@@ -223,7 +238,7 @@ describe('delivery seam', () => {
 
 		const first = deliver(LINE);
 		const second = deliver(LINE);
-		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('her-1'));
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('her-1', 'oracle'));
 
 		stopDelivery(); // a new round bumps generation while the second line is still queued
 		releaseFirst();
@@ -231,7 +246,7 @@ describe('delivery seam', () => {
 
 		// The first's remaining chunk and the entire second line are dropped — only the pre-stop chunk
 		// played, and the queued line never fetched.
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['her-1']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['her-1']);
 		expect(fetch).toHaveBeenCalledTimes(1);
 	});
 
@@ -252,14 +267,14 @@ describe('delivery seam', () => {
 		enableDelivery();
 
 		const inflight = deliver(LINE);
-		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first'));
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first', 'oracle'));
 		// A new round stops delivery while this fetch is still streaming.
 		stopDelivery();
 		releaseSecond();
 		await inflight;
 
 		// The stale chunk is dropped, but the speaker stays open (stop, not close).
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['first']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['first']);
 		expect(audio.speaker.stop).toHaveBeenCalled();
 		expect(audio.speaker.close).not.toHaveBeenCalled();
 		expect(deliveryReady()).toBe(true);
@@ -345,39 +360,37 @@ describe('delivery speaking events', () => {
 		return events;
 	}
 
-	const speaking = (events: DeliveryEvent[]) => events.filter((e) => e.type === 'speaking');
-
-	it("emits the Oracle's voice when her line begins, idle when it drains", async () => {
+	it('forwards the voice the speaker is sounding to subscribers, idle when it drains', async () => {
 		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm-a'));
 		enableDelivery();
 		const events = collect();
 
-		await deliver(LINE); // refusal → her voice
+		await deliver(LINE); // refusal → her voice, tagged on enqueue
+		// Enqueue alone is silent: nothing is "spoken" until the speaker actually reaches the clip.
+		expect(events).toEqual([]);
+
+		fireSpeaking('oracle');
 		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }]);
 
 		fireDrain();
 		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }, { type: 'idle' }]);
 	});
 
-	it("emits Sköll's voice for his Ask and the loss outcome", async () => {
+	it('tags each chunk with the voice its descriptor maps to (his Ask and the loss are Sköll)', async () => {
 		vi.mocked(fetch).mockImplementation(async () => ndjsonResponse('pcm-a'));
 		enableDelivery();
-		const events = collect();
 
 		await deliver({ kind: 'skoll-ask', query: { axis: 'power', value: 3 } });
 		await deliver({ kind: 'outcome', result: 'win', beat: 'coda' });
 		await deliver({ kind: 'outcome', result: 'lose', beat: 'verse' });
-		expect(speaking(events)).toEqual([
-			{ type: 'speaking', voice: 'skoll' },
-			{ type: 'speaking', voice: 'oracle' },
-			{ type: 'speaking', voice: 'skoll' }
-		]);
+
+		// The voice tag is what the speaker later announces — Ask + loss are his, the win is hers.
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[1])).toEqual(['skoll', 'oracle', 'skoll']);
 	});
 
-	it("emits Sköll's voice for authored Sköll lines", async () => {
+	it('tags authored Sköll lines as his', async () => {
 		vi.mocked(fetch).mockImplementation(async () => ndjsonResponse('pcm-a'));
 		enableDelivery();
-		const events = collect();
 
 		await deliver({ kind: 'outcome', result: 'win', beat: 'coda' });
 		await deliver({
@@ -387,10 +400,7 @@ describe('delivery speaking events', () => {
 			text: 'The sun is mine. Your night has no morning.'
 		});
 
-		expect(speaking(events)).toEqual([
-			{ type: 'speaking', voice: 'oracle' },
-			{ type: 'speaking', voice: 'skoll' }
-		]);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[1])).toEqual(['oracle', 'skoll']);
 	});
 
 	it('stays idle when a line produces no audio', async () => {
@@ -408,6 +418,7 @@ describe('delivery speaking events', () => {
 		const events = collect();
 
 		await deliver(LINE);
+		fireSpeaking('oracle');
 		stopDelivery();
 		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }, { type: 'idle' }]);
 	});
@@ -419,6 +430,7 @@ describe('delivery speaking events', () => {
 		const off = subscribeDelivery((e) => events.push(e));
 
 		await deliver(LINE);
+		fireSpeaking('oracle');
 		off();
 		fireDrain();
 		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }]);

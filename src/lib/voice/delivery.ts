@@ -100,17 +100,14 @@ export function enableDelivery(): void {
 	if (speaker) return;
 	speaker = createSpeaker(muted);
 	speaker.onDrained(handleDrained);
+	// The speaker reports the voice actually sounding (playback-driven), so the indicator flips to
+	// Sköll only once his clip starts — not when his chunks were queued behind her still-playing line.
+	speaker.onSpeaking((voice) => setSpeaking(voice as DeliveryVoice));
 }
 
 /** Whether a gesture has opened the speaker — audio plays only once this is true. */
 export function deliveryReady(): boolean {
 	return speaker !== null;
-}
-
-/** Current output level (RMS, 0–1) of the open speaker, or 0 when none — the medallion polls this
- *  each frame to pulse with the voice instead of a fixed CSS loop. */
-export function currentLevel(): number {
-	return speaker?.level() ?? 0;
 }
 
 /**
@@ -150,8 +147,8 @@ function isStale(active: Speaker, gen: number): boolean {
 }
 
 // Read the NDJSON stream and enqueue each base64 chunk as it arrives, so playback starts at the
-// first chunk. Bails (and aborts the fetch) the moment the delivery goes stale. The first chunk
-// that actually reaches the speaker flips the speaking indicator to this line's voice.
+// first chunk. Bails (and aborts the fetch) the moment the delivery goes stale. Each chunk is tagged
+// with this line's voice; the speaker flips the indicator when that voice actually starts playing.
 async function pumpAudio(
 	body: ReadableStream<Uint8Array>,
 	active: Speaker,
@@ -180,10 +177,7 @@ async function pumpAudio(
 				const chunk = buffer.slice(0, nl);
 				buffer = buffer.slice(nl + 1);
 				if (isStale(active, gen)) return abort.abort();
-				if (chunk) {
-					setSpeaking(voice);
-					active.enqueue(chunk);
-				}
+				if (chunk) active.enqueue(chunk, voice);
 			}
 		}
 	} finally {
