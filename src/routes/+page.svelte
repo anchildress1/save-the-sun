@@ -182,10 +182,10 @@
 	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
 
 	// Voice the closing rite once the splash is up (ux-copy §4, ttd:22): the winner speaks ONE authored
-	// in-character line — the Oracle's blessing on a win, Sköll's gloat on a loss — carried (signed) on
-	// the resolving response. NOT a read of the fixed splash copy (the player reads that on screen). When
-	// no authored line rode the response (authoring failed, or a resumed round), fall back to the fixed
-	// punch beat. Once per round; reset by a new game.
+	// in-character line — the Oracle's blessing on a win, Sköll's gloat on a loss — carried (as an
+	// `authored` id) on the resolving response. NOT a read of the fixed splash copy (the player reads
+	// that on screen). When no authored line rode the response (authoring failed, or a resumed round),
+	// fall back to the fixed punch beat. Once per round; reset by a new game.
 	let outcomeVoiced = false;
 	let endFlair = $state<LineDescriptor | null>(null);
 	$effect(() => {
@@ -1069,8 +1069,8 @@
 				// Refusal wins before the answer branch: a refused sign is never voiced as a verdict.
 				outcome = { line: oracle.line, consumed: false, voice: oracleVoice(oracle) };
 			} else if (oracle?.ok) {
-				// Her dramatized, server-signed line when the server authored one (ttd:17); else the
-				// deterministic answer. The panel shows exactly what she voices (R10).
+				// Her dramatized line when the server authored one this turn (ttd:17, voiced by id lookup);
+				// else the deterministic answer. The panel shows exactly what she voices (R10).
 				outcome = oracle.voiced
 					? { line: oracle.voiced.text, consumed: true, voice: oracle.voiced }
 					: { line: oracle.answer, consumed: true, voice: oracleVoice(oracle) };
@@ -1110,8 +1110,9 @@
 			if (fromTyped && outcome.consumed) askValue = '';
 			// Voice her own line through the delivery seam (server TTS); a no-op when audio is off (no
 			// speaker). The handle lets a round that ends on Sköll's next move hold the splash until
-			// she's heard.
-			answerAudio = outcome.voice ? deliver(outcome.voice) : null;
+			// she's heard. Guard, not assign: a dropped-then-recovered Ask already set `answerAudio` to the
+			// re-voiced line inside performAsk (voice === null), so don't clobber that handle with null.
+			if (outcome.voice) answerAudio = deliver(outcome.voice);
 			await advanceSkoll();
 		} finally {
 			pending = false;
