@@ -204,6 +204,12 @@
 		--corona-rgb: 200, 71, 63;
 	}
 
+	/* The player's own voice (input) reads moonlight silver-blue — distinct from the Oracle's gold and
+	   the wolf's ember, so recording is never mistaken for a spoken reply. Paired with the flare below. */
+	.medallion[data-voice-state='recording'] {
+		--corona-rgb: 150, 185, 225;
+	}
+
 	.medallion:focus-visible {
 		outline: 2px solid var(--gold-bright);
 		outline-offset: 4px;
@@ -263,6 +269,12 @@
 	/* Ember shift for the wolf — paired with the deepening eclipse below, never the only signal. */
 	.medallion[data-voice-state='skoll-speaking'] .disc {
 		filter: hue-rotate(-40deg) saturate(1.25);
+	}
+
+	/* Recording shifts the gold disc toward the same moonlight silver-blue as its corona, so the
+	   player's voice reads cohesively cool — distinct from gold/ember. The flare animation rides on top. */
+	.medallion[data-voice-state='recording'] .disc {
+		filter: hue-rotate(170deg) saturate(0.9);
 	}
 
 	/* Sköll speaking: a dark overlay swallows the disc center (the sun devoured) while an inset
@@ -369,7 +381,7 @@
 
 	.medallion[data-voice-state='recording'] .ring-rune {
 		opacity: 0.7;
-		filter: var(--rune-tint) drop-shadow(0 0 4px rgba(217, 169, 74, 0.8));
+		filter: var(--rune-tint) drop-shadow(0 0 4px rgba(150, 185, 225, 0.8));
 	}
 
 	/* Thinking: the rune ring orbits slowly while the words are read. */

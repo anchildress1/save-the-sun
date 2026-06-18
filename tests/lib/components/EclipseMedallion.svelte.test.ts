@@ -140,8 +140,15 @@ describe('EclipseMedallion — state visuals', () => {
 		expect(getComputedStyle(button).getPropertyValue('--corona-rgb').trim()).toBe('200, 71, 63');
 	});
 
-	it('keeps the gold palette and hides the eclipse for every Oracle-side state', () => {
-		for (const state of ALL_STATES.filter((s) => s !== 'skoll-speaking')) {
+	it('paints the player input silver-blue while recording — its own voice, not the Oracle gold', () => {
+		const { button } = renderMedallion('recording');
+		expect(getComputedStyle(button).getPropertyValue('--corona-rgb').trim()).toBe('150, 185, 225');
+		expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('0');
+	});
+
+	it('keeps the gold palette and hides the eclipse for the Oracle-side states', () => {
+		// Recording (input, silver-blue) and Sköll (ember) carry their own hues — the rest stay gold.
+		for (const state of ALL_STATES.filter((s) => s !== 'skoll-speaking' && s !== 'recording')) {
 			const { button } = renderMedallion(state);
 			expect(getComputedStyle(button).getPropertyValue('--corona-rgb').trim()).toBe('217, 169, 74');
 			expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('0');
