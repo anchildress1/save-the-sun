@@ -840,21 +840,15 @@
 		// Page-wide push-to-talk: hold the backtick (`) to record, release to ask. Backtick — NOT Space —
 		// because Space is the activation key for whatever control has focus (a11y); a global Space hold
 		// would have to yield to any focused button, so it silently stopped working after a click.
-		// Backtick activates nothing, so it works regardless of focus — it only has to stand down inside
-		// a text field, where it types. (Tab to the medallion and its own Space/Enter hold still works.)
-		function typingTarget(el: EventTarget | null): boolean {
-			const node = el as HTMLElement | null;
-			if (!node) return false;
-			return node.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(node.tagName);
-		}
+		// Backtick activates nothing and is never wanted inside a rune question, so it holds the mic
+		// regardless of focus — including the Ask field (preventDefault keeps the ` from typing). (Tab to
+		// the medallion and its own Space/Enter hold still works.)
 		// Once a page-level press starts a hold it OWNS that hold until keyup — even if focus moves to a
 		// field or button mid-hold. Keying the keyup off live focus would skip endHold and strand the
 		// recorder in 'recording'. Key-repeat must not re-fire the hold.
 		let pttHeld = false;
 		function onKeyDown(e: KeyboardEvent) {
 			if (e.code !== 'Backquote') return;
-			// In a text field the backtick must type — only repurpose it over the page chrome.
-			if (!pttHeld && typingTarget(document.activeElement)) return;
 			e.preventDefault();
 			if (e.repeat || pttHeld) return;
 			pttHeld = true;
@@ -1194,11 +1188,14 @@
 		} catch (err) {
 			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
 			// resetEngine() may have minted the fresh round before the response dropped — resync so the
-			// board matches the new secret. A resync that lands on a fresh live round means the reset
-			// effectively took; one still showing the finished round (or a failed resync) means it didn't.
+			// board matches the new secret. The reset took ONLY if the resync lands on a NEW round: a
+			// same-round resync (the POST failed before resetting) left the board/secret unchanged, so
+			// report the failure rather than suppressing it behind a still-active round.
+			const prevRoundId = roundId;
 			const synced = await reconcile();
-			if (!synced) answer = RITE.oracleSilent;
-			return synced && !roundOver;
+			const reset = synced && roundId !== prevRoundId;
+			if (!reset) answer = RITE.oracleSilent;
+			return reset;
 		} finally {
 			clearTimeout(timer);
 			pending = false;

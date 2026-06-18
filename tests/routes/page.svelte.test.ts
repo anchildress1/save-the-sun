@@ -1273,6 +1273,37 @@ describe('Save the Sun page — dropped action response reconcile', () => {
 		});
 		expect(error).toHaveBeenCalled();
 	});
+
+	it('reports a failed reset when new-game drops and the resync lands on the same round', async () => {
+		const error = expectConsole('error');
+		localStorage.setItem(
+			VIEW_STATE_KEY,
+			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: 'old' })
+		);
+		// The POST drops before resetEngine ran, so /api/state still reports the SAME live round —
+		// nothing reset. The catch must surface the failure, not report success behind a still-active round.
+		stubFetch(async (url: string) => {
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 0,
+						roundId: 'test-round',
+						state: HUMAN_TURN,
+						pendingReaction: null
+					})
+				);
+			if (url.includes('/api/new-game')) return new Response('nope', { status: 500 });
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Begin another night' }).click();
+
+		// The in-world failure shows, and the view stays keyed to the unchanged round (no false reset).
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+		const saved = JSON.parse(localStorage.getItem(VIEW_STATE_KEY) ?? '{}');
+		expect(saved.roundId).toBe('test-round');
+		expect(error).toHaveBeenCalled();
+	});
 });
 
 // S9: the end-screen rite takes over when the round resolves — the victory/defeat sequence and the

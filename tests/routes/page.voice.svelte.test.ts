@@ -203,12 +203,13 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
 	});
 
-	it('backtick inside the Ask field types normally — it does not record', () => {
+	it('backtick records even from inside the Ask field — push-to-talk works while typing', async () => {
 		const screen = render(Page, pageProps);
-		const input = screen.container.querySelector<HTMLInputElement>('#oracle-ask')!;
-		input.focus();
-		window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backquote', bubbles: true }));
-		expect(recorderMock.startRecording).not.toHaveBeenCalled();
+		screen.container.querySelector<HTMLInputElement>('#oracle-ask')!.focus();
+		holdPtt();
+		expect(recorderMock.startRecording).toHaveBeenCalledOnce();
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		releasePtt();
 	});
 
 	it('the backtick records even when a button has focus — Space could not (it activates the button)', async () => {
