@@ -71,7 +71,7 @@ You are in **one lifecycle phase at a time**, so buckets are near-mutually-exclu
 |---|---|---|
 | splash open | splash mount | component mount |
 | idle | input wait past N seconds | **net-new** input-wait timer (none exists yet) |
-| hunt mood | `nightT` crosses a threshold (≈ 0.6) | `nightT` (line 192) — already an escalation curve off `turns` |
+| hunt mood | `nightT` crosses a threshold (≈ 0.6) | `nightT` — already an escalation curve off `turns` |
 | defeat exit | the **human win** (Sól wins) end-screen — ux-copy §2 "the witch wins" | `humanWon` |
 
 **`nightT` is the hunt-mood signal.** It is `Math.min(0.95, 1 - Math.pow(0.85, turns))` — a 0→1 menace ramp already derived client-side. Hunt mood off the *player-visible* board (turns) is free. Hunt mood off **Sköll's own closing-in** (how narrowed his guess is) is thematically better but net-new — the engine does not surface his confidence today. Deferred as the P2 upgrade path.
@@ -108,7 +108,7 @@ Short, non-vocal, latency-critical one-shots. **Not TTS** — a shipped sound-de
 | rune crossed off | RuneGrid **user-change** event | not `crossings` directly — it also sets on restore/reset |
 | hex / scry | reaction dispatch | react handler |
 | medallion wake / sleep | recorder hold | `startHold` / `endHold` — not delivery enable/disable (that's the speaker lifecycle) |
-| win / loss sting | outcome | `roundStatus` (line 159) |
+| win / loss sting | outcome | `roundStatus` |
 
 ### Rules
 
