@@ -347,6 +347,40 @@ describe('Save the Sun page — cast by voice', () => {
 		});
 	}
 
+	it('casts hands-free when the rune is named without arming', async () => {
+		// A normal hold (no Cast button first): the server resolves an explicit spoken cast to a board
+		// rune and the page commits it.
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const url = String(input);
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (url === '/api/voice/transcribe') {
+				return new Response(
+					JSON.stringify(body.runes && !body.mode ? { rune: 'Sowilo' } : { text: '' })
+				);
+			}
+			if (url === '/api/action') {
+				if (body.type === 'Advance')
+					return new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN }));
+				if (body.type === 'Cast')
+					return new Response(
+						JSON.stringify({ type: 'Cast', cast: { ok: true, won: true }, state: HUMAN_WON })
+					);
+			}
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+
+		press(screen); // no arming — just hold and name the rune
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		release(screen);
+
+		await vi.waitFor(() => {
+			const casts = actionBodies().filter((b) => b.type === 'Cast');
+			expect(casts).toHaveLength(1);
+			expect(casts[0].runeName).toBe('Sowilo');
+		});
+	});
+
 	it('casts the named rune when a cast is armed and the rune is spoken', async () => {
 		mockCastFetch('Sowilo');
 		const screen = render(Page, pageProps);

@@ -481,16 +481,24 @@
 				const choice = await classifyReactionUtterance(clip.wavBase64);
 				if (fresh()) await respondReaction(choice);
 			} else if (clip && casting) {
+				// Armed by hand: the rune name alone casts (the arm already declared intent).
 				const name = await classifyCastUtterance(clip.wavBase64);
 				if (fresh()) await respondCast(name);
 			} else if (clip) {
-				// Dispatch straight to the engine — the spoken words never fill the typing box (the
-				// transcribe route tees what was heard to /debug for mishear diagnosis). Mirror the typed
-				// box's gate (canAct/pending/castMode), re-checked after the async read: a hold that began
-				// during Sköll's turn must not land an Ask once the lock frees and steal the next turn.
-				const question = (await transcribeUtterance(clip.wavBase64)).trim();
-				if (question !== '' && fresh() && canAct && !pending && !castMode) {
-					await runAsk(question, false);
+				// A normal hold is a question — or a hands-free cast when the player explicitly names a
+				// rune. The spoken words never fill the typing box (the route tees what was heard to
+				// /debug). Re-check the gate after the async read: a hold begun during Sköll's turn must
+				// not land once the lock frees and steal the next turn.
+				const heard = await interpretUtterance(clip.wavBase64);
+				if (fresh()) {
+					if ('cast' in heard) {
+						await respondCast(heard.cast);
+					} else {
+						const question = heard.text.trim();
+						if (question !== '' && canAct && !pending && !castMode) {
+							await runAsk(question, false);
+						}
+					}
 				}
 			}
 		} catch (err) {
@@ -522,14 +530,19 @@
 		}
 	}
 
-	// POST the held WAV to the transcribe route; empty string on any failure (degrade, never throw).
-	async function transcribeUtterance(wavBase64: string): Promise<string> {
-		const res = await postUtterance({ wavBase64 });
-		if (!res?.ok) return '';
+	// Read a normal hold: a question, or a hands-free cast when the player names a board rune. Sends the
+	// board names so the server can match a spoken cast; a `cast` result (even '') means cast intent,
+	// so it routes to respondCast rather than being re-read as a question. Degrades to an empty Ask.
+	async function interpretUtterance(
+		wavBase64: string
+	): Promise<{ cast: string } | { text: string }> {
+		const res = await postUtterance({ wavBase64, runes: runes.map((r) => r.name) });
+		if (!res?.ok) return { text: '' };
 		try {
-			return ((await res.json()) as { text?: string }).text ?? '';
+			const data = (await res.json()) as { rune?: string; text?: string };
+			return typeof data.rune === 'string' ? { cast: data.rune } : { text: data.text ?? '' };
 		} catch {
-			return '';
+			return { text: '' };
 		}
 	}
 
@@ -583,11 +596,12 @@
 		}
 	}
 
-	// Commit a spoken cast through the same path the board's "Name it" uses. Guards mirror that button:
-	// the cast must still be armed and the turn live; a name that didn't resolve to a board rune asks
-	// again rather than guessing, so the irreversible cast is never staked on a mishear.
+	// Commit a spoken cast through the same path the board's "Name it" uses — whether armed by hand
+	// first or named hands-free (the server only resolves a name on an explicit cast + exact board
+	// match). Guards mirror the button: the turn must be live; a name that didn't resolve to a board
+	// rune asks again rather than guessing, so the irreversible cast is never staked on a mishear.
 	async function respondCast(name: string) {
-		if (!castMode || pending || !canAct) return;
+		if (pending || !canAct) return;
 		const rune = name ? runes.find((r) => r.name === name) : undefined;
 		if (!rune) {
 			answer = RITE.castUnclear;

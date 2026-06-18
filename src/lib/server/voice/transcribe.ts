@@ -97,6 +97,37 @@ export async function classifyCast(wavBase64: string, runes: string[]): Promise<
 	return names.find((name) => name.toLowerCase() === said) ?? '';
 }
 
+// The normal hold is usually a question, but the player may declare a cast hands-free. One call
+// decides: an EXPLICIT cast ("cast Sowilo", "I name Sowilo") matched to a board rune, else the
+// question transcribed verbatim. A rune merely mentioned in a question ("is it Sowilo?") is not a cast.
+const ASK_OR_CAST_INSTRUCTION =
+	'Listen to the player. If they EXPLICITLY declare casting or naming one rune as their final ' +
+	'answer — phrasings like "cast Sowilo", "I cast Sowilo", "I name Sowilo", "my answer is Sowilo" — ' +
+	'output exactly "CAST: <name>", copying <name> verbatim from this board list: {NAMES}. Otherwise ' +
+	'transcribe their words verbatim as plain text with no prefix (a question that merely mentions a ' +
+	'rune, like "is it Sowilo?", is NOT a cast). If there is no intelligible speech, output nothing.';
+
+/**
+ * Read a normal hold as a question (verbatim text) or a hands-free cast (an explicit cast of a board
+ * rune). A `cast` result carries the matched board name, or '' when the player tried to cast a rune
+ * that isn't on the board — so the irreversible cast never fires on a mishear, and an off-board cast
+ * is refused rather than re-read as a question. Falls back to plain transcription with no board list.
+ */
+export async function interpretAsk(
+	wavBase64: string,
+	runes: string[]
+): Promise<{ cast: string } | { text: string }> {
+	const names = runes.filter((name) => typeof name === 'string' && name.trim() !== '');
+	if (names.length === 0) return { text: await transcribe(wavBase64) };
+	const raw = (
+		await runAudioPrompt(wavBase64, ASK_OR_CAST_INSTRUCTION.replace('{NAMES}', names.join(', ')))
+	).trim();
+	const cast = /^cast:\s*(.+)$/i.exec(raw);
+	if (!cast) return { text: raw };
+	const said = cast[1].trim().toLowerCase();
+	return { cast: names.find((name) => name.toLowerCase() === said) ?? '' };
+}
+
 /** Test isolation only — the client is module state shared across a test file. */
 export function resetTranscribeClient(): void {
 	client = null;

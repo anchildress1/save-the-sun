@@ -1,7 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { claimTranscribeSlot } from '$lib/server/voice/rateLimit';
-import { transcribe, classifyReaction, classifyCast } from '$lib/server/voice/transcribe';
+import {
+	transcribe,
+	classifyReaction,
+	classifyCast,
+	interpretAsk
+} from '$lib/server/voice/transcribe';
 import { logEvent } from '$lib/server/debug/log';
 import type { RequestHandler } from './$types';
 
@@ -79,6 +84,30 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			message: `heard cast: ${rune || '(unclear)'}`
 		});
 		return json({ rune });
+	}
+
+	// Default (ask): a question, or a hands-free cast when the player names a board rune. Combined only
+	// when the client sends the board runes to match against; without them it's a plain transcribe.
+	if (Array.isArray(runes)) {
+		const result = await interpretAsk(wavBase64, runes as string[]);
+		if ('cast' in result) {
+			logEvent(locals.sessionId, {
+				owner: 'Human',
+				kind: 'input',
+				part: 'Voice',
+				level: 'info',
+				message: `heard cast: ${result.cast || '(unclear)'}`
+			});
+			return json({ rune: result.cast });
+		}
+		logEvent(locals.sessionId, {
+			owner: 'Human',
+			kind: 'input',
+			part: 'Voice',
+			level: 'info',
+			message: `heard: ${result.text || '(nothing)'}`
+		});
+		return json({ text: result.text });
 	}
 
 	const text = await transcribe(wavBase64);

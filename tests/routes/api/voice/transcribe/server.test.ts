@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const stt = vi.hoisted(() => ({
 	transcribe: vi.fn(),
 	classifyReaction: vi.fn(),
-	classifyCast: vi.fn()
+	classifyCast: vi.fn(),
+	interpretAsk: vi.fn()
 }));
 vi.mock('$lib/server/voice/transcribe', () => ({
 	transcribe: stt.transcribe,
 	classifyReaction: stt.classifyReaction,
-	classifyCast: stt.classifyCast
+	classifyCast: stt.classifyCast,
+	interpretAsk: stt.interpretAsk
 }));
 
 const mock = vi.hoisted(() => ({
@@ -78,6 +80,30 @@ describe('POST /api/voice/transcribe', () => {
 		const response = await call('cast-no-runes', { wavBase64: 'UklGRg==', mode: 'cast' });
 		expect(response.status).toBe(400);
 		expect(stt.classifyCast).not.toHaveBeenCalled();
+	});
+
+	it('detects a hands-free cast in ask mode when the board runes are sent', async () => {
+		stt.interpretAsk.mockResolvedValueOnce({ cast: 'Sowilo' });
+
+		const response = await call('hands-free', {
+			wavBase64: 'UklGRg==',
+			runes: ['Sowilo', 'Fehu']
+		});
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ rune: 'Sowilo' });
+		expect(stt.interpretAsk).toHaveBeenCalledExactlyOnceWith('UklGRg==', ['Sowilo', 'Fehu']);
+		expect(stt.transcribe).not.toHaveBeenCalled();
+	});
+
+	it('returns transcribed text in ask mode when interpretAsk reads a question', async () => {
+		stt.interpretAsk.mockResolvedValueOnce({ text: 'is it a fire rune' });
+
+		const response = await call('ask-runes', { wavBase64: 'UklGRg==', runes: ['Sowilo'] });
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ text: 'is it a fire rune' });
+		expect(stt.transcribe).not.toHaveBeenCalled();
 	});
 
 	it('rejects an unknown mode with 400', async () => {
