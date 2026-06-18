@@ -42,7 +42,13 @@ const emitDelivery = (event: DeliveryEvent) => deliveryMock.emit(event);
 const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
 const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 4 };
 const pageProps = {
-	data: { boardSeed: 0, roundId: 'test-round', state: HUMAN_TURN, pendingReaction: null },
+	data: {
+		boardSeed: 0,
+		roundId: 'test-round',
+		state: HUMAN_TURN,
+		pendingReaction: null,
+		lastLine: null
+	},
 	params: {},
 	form: null
 };

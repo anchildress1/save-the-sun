@@ -41,7 +41,7 @@ const props = (
 	pendingReaction: PendingReaction = null,
 	roundId = 'test-round'
 ) => ({
-	data: { boardSeed: 0, roundId, state, pendingReaction },
+	data: { boardSeed: 0, roundId, state, pendingReaction, lastLine: null },
 	params: {},
 	form: null
 });
@@ -1302,6 +1302,95 @@ describe('Save the Sun page — dropped action response reconcile', () => {
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
 		const saved = JSON.parse(localStorage.getItem(VIEW_STATE_KEY) ?? '{}');
 		expect(saved.roundId).toBe('test-round');
+		expect(error).toHaveBeenCalled();
+	});
+
+	// ttd:29: a >30s-but-successful action drops its response while the server committed under the lock.
+	// reconcile must recover the REAL result the snapshot carries (lastLine), not the false silent /
+	// falters / silent-loss line — proven for an Ask, a winning cast, and Sköll's winning cast.
+	it('recovers the real Oracle answer when an Ask response drops but the move committed', async () => {
+		const error = expectConsole('error');
+		stubFetch(async (url: string, init?: { body?: string }) => {
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 0,
+						roundId: 'test-round',
+						state: SKOLL_TURN, // the Ask handed the turn to Sköll — proof it committed
+						pendingReaction: null,
+						lastLine: {
+							text: 'Yes. Sól is reaching for a fire rune.',
+							voice: {
+								kind: 'answer',
+								query: { axis: 'element', value: 'Fire' },
+								affirmative: true
+							}
+						}
+					})
+				);
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (body.type === 'Ask') return new Response('nope', { status: 500 });
+			return new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN }));
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Yes. Sól is reaching for a fire rune.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain(
+			'The Oracle falls silent'
+		);
+		expect(error).toHaveBeenCalled();
+	});
+
+	it('recovers a winning cast outcome when the Cast response drops but the cast committed', async () => {
+		const error = expectConsole('error');
+		stubFetch(async (url: string, init?: { body?: string }) => {
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 0,
+						roundId: 'test-round',
+						state: HUMAN_WON, // the round resolved — the cast committed despite the dropped response
+						pendingReaction: null,
+						lastLine: { text: 'The rune is true.', voice: { kind: 'cast', result: 'true' } }
+					})
+				);
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (body.type === 'Cast') return new Response('nope', { status: 500 });
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await screen.getByRole('button', { name: 'Name it' }).click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The rune is true.');
+		expect(screen.getByTestId('answer').element().textContent).not.toContain('The rite falters');
+		expect(error).toHaveBeenCalled();
+	});
+
+	it('recovers Sköll’s winning cast line when his Advance drops — no silent loss screen', async () => {
+		const error = expectConsole('error');
+		stubFetch(async (url: string, init?: { body?: string }) => {
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 0,
+						roundId: 'test-round',
+						state: SKOLL_WON, // he took the day — his cast committed before the response dropped
+						pendingReaction: null,
+						lastLine: { text: 'I name it. Sowilo.', voice: { kind: 'skoll-cast', rune: 'Sowilo' } }
+					})
+				);
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (body.type === 'Advance') return new Response('nope', { status: 500 });
+			return new Response(JSON.stringify(defaultAsk())); // the Ask hands the turn to Sköll
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		// His cast line lands in HIS frame, the loss screen rises behind it — never a silent stall.
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('I name it. Sowilo.');
+		expect(screen.container.querySelector('[data-testid="rouse-wolf"]')).toBeNull();
 		expect(error).toHaveBeenCalled();
 	});
 });

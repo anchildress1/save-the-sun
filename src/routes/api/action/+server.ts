@@ -8,9 +8,11 @@ import {
 	type AdvanceResponse,
 	type Player
 } from '$lib/server/engine/actions';
-import { getEngine, getSkoll, withSessionLock } from '$lib/server/engine/session';
+import { getEngine, getSkoll, withSessionLock, recordLine } from '$lib/server/engine/session';
+import { composeLine, type LineDescriptor } from '$lib/server/voice/lines';
 import { interpret } from '$lib/server/oracle/gemini';
 import { voiceAnswer, prepareAsk, answerAsk } from '$lib/server/oracle/oracle';
+import type { OracleResult } from '$lib/server/oracle/types';
 import { resolveReaction } from '$lib/server/engine/reactions';
 import {
 	takeSkollTurn,
@@ -110,6 +112,33 @@ function geminiEvents(sessionId: string, movePart: TurnPart): void {
 	}
 }
 
+// Remember the words a committed move voiced (and the descriptor that voices them) so a dropped
+// response can recover the real result. Composes through the same allow-list the voice route uses —
+// a descriptor that doesn't compose stores nothing, so a non-voiced move never clobbers the prior line.
+function rememberLine(sessionId: string, voice: LineDescriptor | null): void {
+	if (!voice) return;
+	const text = composeLine(voice);
+	recordLine(sessionId, text === null ? null : { text, voice });
+}
+
+// The Oracle's own line for an Ask result (her answer or refusal); system lines aren't voiced.
+// Refusal wins first: a result carrying a refusal must never voice an answer, even if it also reads
+// ok — a malformed both-state refuses rather than speaking a verdict it shouldn't.
+function oracleVoiceLine(oracle: OracleResult | undefined): LineDescriptor | null {
+	if (!oracle) return null;
+	if ('refusal' in oracle) return { kind: 'refusal', refusal: oracle.refusal };
+	if (oracle.ok) return { kind: 'answer', query: oracle.query, affirmative: oracle.affirmative };
+	return null;
+}
+
+// The cast outcome's voiced line; only a resolved cast voices (a rejected one never committed).
+function castVoiceLine(cast: CastResult, runeName: string): LineDescriptor | null {
+	if (!cast.ok) return null;
+	return cast.won
+		? { kind: 'cast', result: 'true' }
+		: { kind: 'cast', result: 'wrong', rune: runeName };
+}
+
 // His templated Ask is surfaced for the human to react to; his WINNING cast rides along too so the
 // client can voice it (server recomposes from the rune). A wrong cast carries no line — it just hands
 // the turn back. Both lines are recomposed server-side, never replayed from client text.
@@ -197,6 +226,20 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 						}
 					})
 				};
+		// Mirror the line the client voices for each resolution, so a dropped React response recovers it.
+		rememberLine(
+			sessionId,
+			answer.hexed
+				? { kind: 'react', line: 'human-hex' }
+				: answer.shared
+					? {
+							kind: 'react',
+							line: 'human-scry',
+							query: askedQuery,
+							affirmative: answer.affirmative
+						}
+					: { kind: 'react', line: 'human-pass' }
+		);
 		return json({ type: 'React', outcome: reaction, skollReaction, state: gameState(engine) });
 	}
 
@@ -213,17 +256,23 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 
 	const result = await handleAction(action, { engine, interpret });
 	// The fallback Ask path (stale turn, resolved round) still ran interpret — drain its raw I/O.
-	if (result.type === 'Ask') geminiEvents(sessionId, 'Ask');
-	if (result.type === 'Cast' && result.cast.ok) {
-		const runeName = (action as { runeName: string }).runeName;
-		logEvent(sessionId, {
-			owner: action.player,
-			kind: 'input',
-			part: 'Cast',
-			level: 'info',
-			message: `casts ${runeName}`
-		});
-		engineVerdict(sessionId, 'Cast', castTruth(action.player, runeName, result.cast.won));
+	if (result.type === 'Ask') {
+		geminiEvents(sessionId, 'Ask');
+		rememberLine(sessionId, oracleVoiceLine(result.oracle));
+	}
+	if (result.type === 'Cast') {
+		if (result.cast.ok) {
+			const runeName = (action as { runeName: string }).runeName;
+			logEvent(sessionId, {
+				owner: action.player,
+				kind: 'input',
+				part: 'Cast',
+				level: 'info',
+				message: `casts ${runeName}`
+			});
+			engineVerdict(sessionId, 'Cast', castTruth(action.player, runeName, result.cast.won));
+		}
+		rememberLine(sessionId, castVoiceLine(result.cast, (action as { runeName: string }).runeName));
 	}
 	return json({ ...result, state: gameState(engine) });
 }
@@ -248,6 +297,7 @@ async function askWithSkollReaction(
 			message: `Oracle refuses the sign`,
 			data: { result: prepared.result }
 		});
+		rememberLine(sessionId, oracleVoiceLine(prepared.result));
 		return json({ type: 'Ask', oracle: prepared.result, state: gameState(engine) });
 	}
 	logEvent(sessionId, {
@@ -297,6 +347,23 @@ async function askWithSkollReaction(
 	else truth = 'engine declined the Ask';
 	engineVerdict(sessionId, 'Ask', truth);
 
+	// Mirror the line the client voices for this outcome (his Hex/Scry framing, or her answer on a
+	// Pass), so a dropped Ask response recovers it instead of the false silent line.
+	const voice: LineDescriptor | null =
+		vs.choice === 'Hex'
+			? { kind: 'react', line: 'skoll-hex' }
+			: vs.choice === 'Scry' && oracle?.ok
+				? {
+						kind: 'react',
+						line: 'skoll-scry',
+						query: prepared.query,
+						affirmative: oracle.affirmative
+					}
+				: oracle?.ok
+					? { kind: 'answer', query: prepared.query, affirmative: oracle.affirmative }
+					: null;
+	rememberLine(sessionId, voice);
+
 	// The turn now sits with Sköll; the client advances him in a follow-up request.
 	return json({
 		type: 'Ask',
@@ -342,5 +409,15 @@ async function playSkollIfActive(
 	// His Cast resolves now; his Ask's verdict waits for the human's reaction.
 	if (out.kind === 'cast')
 		engineVerdict(sessionId, 'Cast', castTruth('Sköll', out.runeName, castWon(out.result)));
+	// Mirror his voiced line (his Ask, or his WINNING cast) so a dropped Advance recovers it — a loss
+	// screen never rises without his cast line, and a parked Ask keeps its prompt.
+	rememberLine(
+		sessionId,
+		out.kind === 'ask'
+			? { kind: 'skoll-ask', query: out.query }
+			: castWon(out.result)
+				? { kind: 'skoll-cast', rune: out.runeName }
+				: null
+	);
 	return describeTurn(out);
 }

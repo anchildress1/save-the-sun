@@ -1,4 +1,5 @@
-import { getEngine, getSkoll, getRoundId, getBoardSeed } from './session';
+import { getEngine, getSkoll, getRoundId, getBoardSeed, getLastLine } from './session';
+import type { RecoverableLine } from './session';
 import { gameState, type PendingReaction } from './actions';
 import { skollAskEcho } from '$lib/server/skoll/skoll';
 
@@ -7,6 +8,9 @@ export interface GameSnapshot {
 	roundId: string;
 	state: ReturnType<typeof gameState>;
 	pendingReaction: PendingReaction | null;
+	// The last committed voiced line, so a post-timeout resync can restore the real result a dropped
+	// response lost — instead of the client's false silent/falters line.
+	lastLine: RecoverableLine | null;
 }
 
 // The authoritative client view of a session's current round — shared by the page load and the
@@ -41,6 +45,7 @@ export function gameSnapshot(sessionId: string): GameSnapshot {
 		roundId: getRoundId(sessionId),
 		// The real turn/round state so a resumed round (incl. one already won) renders truthfully.
 		state: gameState(engine),
-		pendingReaction
+		pendingReaction,
+		lastLine: getLastLine(sessionId)
 	};
 }
