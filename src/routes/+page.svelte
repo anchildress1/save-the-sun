@@ -795,41 +795,38 @@
 		// promise a hold the recorder will refuse.
 		if (recorderSealed()) medalState = 'denied';
 
-		// Push-to-talk on the keyboard: hold Space over the page chrome to record, release to ask. When
-		// focus is on a control that uses Space itself — a button, link, the Ask field, the focused
-		// medallion (which runs its own hold) — Space must reach it, so we stand down and let the
-		// native activation through. Key-repeat must not re-fire the hold.
-		function ownsSpace(el: EventTarget | null): boolean {
+		// Page-wide push-to-talk: hold the backtick (`) to record, release to ask. Backtick — NOT Space —
+		// because Space is the activation key for whatever control has focus (a11y); a global Space hold
+		// would have to yield to any focused button, so it silently stopped working after a click.
+		// Backtick activates nothing, so it works regardless of focus — it only has to stand down inside
+		// a text field, where it types. (Tab to the medallion and its own Space/Enter hold still works.)
+		function typingTarget(el: EventTarget | null): boolean {
 			const node = el as HTMLElement | null;
 			if (!node) return false;
-			if (node.isContentEditable) return true;
-			if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(node.tagName)) return true;
-			return node.getAttribute('role') === 'button';
+			return node.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(node.tagName);
 		}
-		// Once a page-level Space press starts a hold it OWNS that hold until keyup — even if focus moves
-		// to the Ask field or a button mid-hold. Keying the keyup off live focus would skip endHold and
-		// strand the recorder in 'recording'.
-		let spaceHeldByPage = false;
+		// Once a page-level press starts a hold it OWNS that hold until keyup — even if focus moves to a
+		// field or button mid-hold. Keying the keyup off live focus would skip endHold and strand the
+		// recorder in 'recording'. Key-repeat must not re-fire the hold.
+		let pttHeld = false;
 		function onKeyDown(e: KeyboardEvent) {
-			if (e.code !== 'Space') return;
-			// A focused control that uses Space owns it — unless we already started a page-level hold.
-			if (!spaceHeldByPage && ownsSpace(document.activeElement)) return;
-			// preventDefault on EVERY Space keydown, including auto-repeats while held — otherwise the
-			// repeat events scroll the page. Only the first (non-repeat) press starts the hold.
+			if (e.code !== 'Backquote') return;
+			// In a text field the backtick must type — only repurpose it over the page chrome.
+			if (!pttHeld && typingTarget(document.activeElement)) return;
 			e.preventDefault();
-			if (e.repeat || spaceHeldByPage) return;
-			spaceHeldByPage = true;
+			if (e.repeat || pttHeld) return;
+			pttHeld = true;
 			void startHold();
 		}
 		function onKeyUp(e: KeyboardEvent) {
-			if (e.code !== 'Space' || !spaceHeldByPage) return;
+			if (e.code !== 'Backquote' || !pttHeld) return;
 			e.preventDefault();
-			spaceHeldByPage = false;
+			pttHeld = false;
 			void endHold();
 		}
 		// Tabbing/clicking away mid-hold must end the recording, or it would hang in 'recording'.
 		function onBlur() {
-			spaceHeldByPage = false;
+			pttHeld = false;
 			void endHold();
 		}
 		window.addEventListener('keydown', onKeyDown);
@@ -1313,8 +1310,9 @@
 
 		<aside class="oracle-panel">
 			<div class="voice-stack">
-				<!-- The Oracle's two controls: the medallion (hold to speak — pointer, or hold Space) and
-				     the output-mute switch. Both are native buttons; Tab reaches each. -->
+				<!-- The Oracle's two controls: the medallion (hold to speak — pointer, Space/Enter when
+				     focused, or the ` key from anywhere) and the output-mute switch. Both are native
+				     buttons; Tab reaches each. -->
 				<div
 					class="voice-controls"
 					role="group"

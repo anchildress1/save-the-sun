@@ -299,7 +299,7 @@ Plain, clear, mechanic-first — flavor stays light so the rules read at a glanc
 
 - **Step 1—The Goal:** "Your goal is to name Sól's true rune before Sköll does. One of the 24 runes is hers — find it first and you win the day; if he names it first, you lose."
 - **Step 2—Ask:** "On your turn, ask the Oracle one yes/no question about the runes — by element, power, light, hue, or a rune by name. She always answers truthfully."
-- **Step 3—Speak:** "Rather speak than type? Hold the medallion (or the Space bar), say your question, and release to send. It works just like the text box — and you can answer Sköll by voice too."
+- **Step 3—Speak:** "Rather speak than type? Hold the medallion (or the backtick key) and say your question, then release to send. It works just like the text box — and you can answer Sköll by voice too."
 - **Step 4—Read & Cross:** "After each answer, cross off the runes it rules out — tap a rune to mark it. The board never does this for you."
 - **Step 5—Scry & Hex:** "When Sköll questions the Oracle, answer back once — Scry to hear her reply, or Hex to block his question. You get one Scry and one Hex per game."
 - **Step 6—Cast:** "When you're sure, cast your rune — say “cast” and its name, or choose Cast and tap it. Get it right and you win the day; get it wrong and you lose the turn — so cast only when you're certain."
@@ -332,7 +332,7 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 
 ### Eclipse medallion (push-to-talk control)
 
-The medallion is the push-to-talk control: **hold** it (or hold `Space`) to record an Ask, release to send. Its accessible name carries the state plus the hold affordance; the announcement column is the polite live-region line for each transition. Visual states live in `v2-voice-requirements.md` R6.
+The medallion is the push-to-talk control: **hold** it (Space or Enter when it's focused, or the `` ` `` key from anywhere — never page-wide Space, which activates whatever control has focus) to record an Ask, release to send. Its accessible name carries the state plus the hold affordance; the announcement column is the polite live-region line for each transition. Visual states live in `v2-voice-requirements.md` R6.
 
 | State | Button label | Announced |
 |---|---|---|

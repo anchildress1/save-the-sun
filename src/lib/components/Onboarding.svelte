@@ -25,7 +25,7 @@
 		{
 			label: 'Speak',
 			target: '[data-coach="voice"]',
-			body: 'Rather speak than type? Hold the medallion (or the Space bar), say your question, and release to send. It works just like the text box — and you can answer Sköll by voice too.'
+			body: 'Rather speak than type? Hold the medallion (or the backtick key) and say your question, then release to send. It works just like the text box — and you can answer Sköll by voice too.'
 		},
 		{
 			label: 'Read & Cross',

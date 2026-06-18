@@ -87,10 +87,11 @@ const release = (screen: ReturnType<typeof render>) =>
 	medallion(screen)
 		.element()
 		.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
-const holdSpace = () =>
-	window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
-const releaseSpace = () =>
-	window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Space', bubbles: true }));
+// Page-wide push-to-talk is the backtick (`) — Space is reserved for activating the focused control.
+const holdPtt = () =>
+	window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backquote', bubbles: true }));
+const releasePtt = () =>
+	window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Backquote', bubbles: true }));
 
 // The browser context runs reducedMotion:'reduce' (vite.config.ts), so by default audio is muted
 // (PRD R9). The auto-prime-on-first-gesture path is a non-reduced-motion behavior, so the tests that
@@ -193,21 +194,33 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
 	});
 
-	it('hold Space anywhere records; release asks — the same path as a tap', async () => {
+	it('hold the backtick anywhere records; release asks — the same path as a tap', async () => {
 		const screen = render(Page, pageProps);
-		holdSpace();
+		holdPtt();
 		expect(recorderMock.startRecording).toHaveBeenCalledOnce();
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
-		releaseSpace();
+		releasePtt();
 		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
 	});
 
-	it('Space inside the Ask field types normally — it does not record', () => {
+	it('backtick inside the Ask field types normally — it does not record', () => {
 		const screen = render(Page, pageProps);
 		const input = screen.container.querySelector<HTMLInputElement>('#oracle-ask')!;
 		input.focus();
-		window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
+		window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backquote', bubbles: true }));
 		expect(recorderMock.startRecording).not.toHaveBeenCalled();
+	});
+
+	it('the backtick records even when a button has focus — Space could not (it activates the button)', async () => {
+		mockFetch(''); // empty transcript keeps this about the key, not a dispatched Ask
+		const screen = render(Page, pageProps);
+		// A focused control would swallow Space; the page-wide backtick must still start a hold.
+		screen.getByRole('button', { name: 'Cast the rune' }).element().focus();
+		holdPtt();
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		releasePtt();
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+		expect(recorderMock.startRecording).toHaveBeenCalled();
 	});
 
 	it('an empty transcript spends no turn and settles back to idle', async () => {
@@ -246,14 +259,14 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 			.toHaveTextContent('The fire flickered. Hold again to speak.');
 	});
 
-	it('ends a page-level Space hold on keyup even after focus moves to a control', async () => {
+	it('ends a page-level backtick hold on keyup even after focus moves to a control', async () => {
 		const screen = render(Page, pageProps);
 		(document.activeElement as HTMLElement | null)?.blur();
-		holdSpace(); // started from page chrome
+		holdPtt(); // started from page chrome
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
 		// Focus moves into the Ask field mid-hold; the release must still end the recording.
 		screen.container.querySelector<HTMLInputElement>('#oracle-ask')!.focus();
-		releaseSpace();
+		releasePtt();
 		await vi.waitFor(() => expect(recorderMock.stopRecording).toHaveBeenCalled());
 	});
 
