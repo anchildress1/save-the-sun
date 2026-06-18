@@ -396,6 +396,11 @@
 	// A hold begun with a cast armed names the rune to commit (the deliberate arm is the safety step,
 	// so a misheard question can never cast). Fixed at press like holdReacting.
 	let holdCasting = false;
+	// Bumped on every arm AND cancel, captured at the press: a transcription that resolves after the
+	// player canceled (or canceled-then-re-armed) sees a changed generation and drops — a stale boolean
+	// `castMode` would be true again after a re-arm and wrongly commit the abandoned utterance.
+	let castArm = 0;
+	let holdCastArm = 0;
 	let holdToken = '';
 
 	// Drive the medallion's voice from delivery playback: a line begins → its speaker; the queue
@@ -454,6 +459,7 @@
 		// question is only open on his turn; cast is armed only on hers, so they never truly overlap).
 		holdReacting = skollAsking;
 		holdCasting = !skollAsking && castMode;
+		holdCastArm = castArm;
 		holdToken = `${roundId}:${turns}`;
 		holdWanted = true;
 		holdSetupPending = true;
@@ -506,11 +512,11 @@
 				const choice = await classifyReactionUtterance(clip.wavBase64);
 				if (fresh()) await respondReaction(choice);
 			} else if (clip && casting) {
-				// Armed by hand: the rune name alone casts (the arm already declared intent). Re-check
-				// castMode AFTER the transcribe — "Not yet" clicked mid-flight cancels the arm, and an
-				// irreversible cast must not land after the player backed out.
+				// Armed by hand: the rune name alone casts (the arm already declared intent). Re-check the
+				// arm generation AFTER the transcribe — "Not yet" (or a cancel-then-re-arm) bumps it, so an
+				// irreversible cast can't land against an arm the player abandoned.
 				const name = await classifyCastUtterance(clip.wavBase64);
-				if (fresh() && castMode) await respondCast(name);
+				if (fresh() && castArm === holdCastArm) await respondCast(name);
 			} else if (clip) {
 				// A normal hold is a question — or a hands-free cast when the player explicitly names a
 				// rune. The spoken words never fill the typing box (the route tees what was heard to
@@ -849,6 +855,10 @@
 		let pttHeld = false;
 		function onKeyDown(e: KeyboardEvent) {
 			if (e.code !== 'Backquote') return;
+			// A full-screen modal (onboarding/title or the end screen) makes the board inert — the
+			// backtick must not start a hold behind it and dispatch against the live round. An in-flight
+			// hold keeps owning itself (pttHeld) so its keyup still ends cleanly.
+			if (!pttHeld && (showOnboarding || showEndScreen)) return;
 			e.preventDefault();
 			if (e.repeat || pttHeld) return;
 			pttHeld = true;
@@ -1126,11 +1136,13 @@
 	function armCast() {
 		castMode = true;
 		selectedTargetId = null;
+		castArm++; // a new arm invalidates any in-flight spoken cast from a prior arm
 	}
 
 	function cancelCast() {
 		castMode = false;
 		selectedTargetId = null;
+		castArm++; // canceling invalidates an in-flight spoken cast so it can't land after the backout
 	}
 
 	function handleTargetSelect(id: number) {

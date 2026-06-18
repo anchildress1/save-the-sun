@@ -203,6 +203,14 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
 	});
 
+	it('ignores the backtick while the onboarding modal is open', async () => {
+		localStorage.removeItem('save-the-sun:onboarded'); // first run → the title/tour modal shows
+		const screen = render(Page, pageProps);
+		await expect.element(screen.getByTestId('onboarding')).toBeInTheDocument();
+		holdPtt();
+		expect(recorderMock.startRecording).not.toHaveBeenCalled();
+	});
+
 	it('backtick records even from inside the Ask field — push-to-talk works while typing', async () => {
 		const screen = render(Page, pageProps);
 		screen.container.querySelector<HTMLInputElement>('#oracle-ask')!.focus();
@@ -441,6 +449,35 @@ describe('Save the Sun page — cast by voice', () => {
 
 		// The player backs out before the transcription returns — the irreversible cast must not land.
 		await screen.getByRole('button', { name: 'Not yet' }).click();
+		resolveCast(new Response(JSON.stringify({ rune: 'Sowilo' })));
+
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+		expect(actionBodies().some((b) => b.type === 'Cast')).toBe(false);
+	});
+
+	it('drops an armed spoken cast after a cancel-then-re-arm before it resolves', async () => {
+		// The boolean castMode is true again after a re-arm — only the arm generation tells the stale
+		// utterance apart, so it must not commit the cast the player abandoned.
+		let resolveCast: (r: Response) => void = () => {};
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const url = String(input);
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (url === '/api/voice/transcribe' && body.mode === 'cast') {
+				return new Promise<Response>((resolve) => {
+					resolveCast = resolve;
+				});
+			}
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // arm
+
+		press(screen);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		release(screen); // transcribe in flight
+
+		await screen.getByRole('button', { name: 'Not yet' }).click(); // cancel
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // re-arm: castMode true again
 		resolveCast(new Response(JSON.stringify({ rune: 'Sowilo' })));
 
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
