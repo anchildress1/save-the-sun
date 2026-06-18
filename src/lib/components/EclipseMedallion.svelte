@@ -360,11 +360,12 @@
 		opacity: 0.55;
 	}
 
-	/* Speaking: a steady lit corona — gold for the Oracle, ember for the wolf. No pulse; the
-	   indicator's only motion is the switch between voices as the delivery queue plays. */
+	/* Speaking: a slow, smooth corona breath — gold for the Oracle, ember for the wolf. A steady
+	   in-character glow, decoupled from the audio (no level sampling). Which voice still switches with
+	   the delivery queue; this keeps the active voice visibly alive without the old per-frame jitter. */
 	.medallion[data-voice-state='speaking'] .corona,
 	.medallion[data-voice-state='skoll-speaking'] .corona {
-		opacity: 0.7;
+		animation: speaking-glow 2.4s ease-in-out infinite;
 	}
 
 	.medallion[data-voice-state='speaking'] .ring-rune,
@@ -400,6 +401,18 @@
 		}
 	}
 
+	@keyframes speaking-glow {
+		0%,
+		100% {
+			opacity: 0.42;
+			transform: scale(1);
+		}
+		50% {
+			opacity: 0.85;
+			transform: scale(1.05);
+		}
+	}
+
 	/* Static glow intensities replace the pulses and orbit (R6). The theme's global near-zero
 	   durations aren't enough here: a frozen keyframe could park at its dimmest frame, so the
 	   animations are removed and each state gets a fixed intensity. The disc freezes on its inline
@@ -421,6 +434,11 @@
 
 		.medallion[data-voice-state='recording'] .ring-rune {
 			opacity: 0.85;
+		}
+
+		.medallion[data-voice-state='speaking'] .corona,
+		.medallion[data-voice-state='skoll-speaking'] .corona {
+			opacity: 0.7;
 		}
 	}
 
