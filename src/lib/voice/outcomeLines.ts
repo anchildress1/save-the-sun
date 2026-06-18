@@ -18,11 +18,12 @@ export const OUTCOME_LINES = {
 export type Outcome = keyof typeof OUTCOME_LINES;
 export type OutcomeBeat = keyof (typeof OUTCOME_LINES)['win']; // 'lead' | 'verse' | 'coda'
 
-// The beats each outcome voices, in order — the full closing rite, not a single beat. The win skips
-// its lead ("The rune is true.") because the winning cast already voiced that exact line a beat earlier;
-// re-voicing it would double. The loss voices all three: his cast names the rune ("I name it. {Rune}."),
-// a different line from the loss lead. Win in the Oracle's voice, loss in Sköll's (Sól rides the Oracle).
+// The beat each outcome voices — ONE, not the whole verse. The end-screen copy is fixed and already
+// printed on the splash, so voicing all of it is just a long read of static text (~10s in his growl).
+// Voice only the punch: the loss's lead ("Sköll takes the sun.") in Sköll's voice — the headline, not
+// otherwise spoken; the win's coda in the Oracle's (its lead "The rune is true." is already voiced as
+// the cast lands). The other beats stay on-screen text (still written, R10).
 export const VOICED_SEQUENCE = {
-	win: ['verse', 'coda'],
-	lose: ['lead', 'verse', 'coda']
+	win: ['coda'],
+	lose: ['lead']
 } as const satisfies Record<Outcome, readonly OutcomeBeat[]>;

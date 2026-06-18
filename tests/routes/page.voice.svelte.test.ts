@@ -598,8 +598,8 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 		expect(deliveryMock.deliver).not.toHaveBeenCalled();
 
 		window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
-		// The full staged sequence voices in order — the win skips its lead (heard at cast), then verse,
-		// then the triumphant coda.
+		// One punch beat — the win's triumphant coda (its lead is heard at the cast). The fixed verse
+		// stays on-screen text, not a long read.
 		await vi.waitFor(() =>
 			expect(deliveryMock.deliver).toHaveBeenCalledWith({
 				kind: 'outcome',
@@ -607,7 +607,8 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 				beat: 'coda'
 			})
 		);
-		expect(deliveryMock.deliver).toHaveBeenCalledWith({
+		// The verse is NOT voiced — it's already printed on the splash.
+		expect(deliveryMock.deliver).not.toHaveBeenCalledWith({
 			kind: 'outcome',
 			result: 'win',
 			beat: 'verse'
