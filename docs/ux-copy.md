@@ -300,8 +300,8 @@ Plain, clear, mechanic-first — flavor stays light so the rules read at a glanc
 Read in order: each card builds on the last, so none repeats the count or the win/lose stakes, and none scolds.
 
 - **Step 1—The Goal:** "One rune on the board is Sól's — her true rune. Cast it before Sköll does: name it first and the sun is saved; if he names it first, the night is his."
-- **Step 2—The Board:** "Twenty-four runes, no two alike. Each has an element, a power from 1 to 6, a color, and a light or dark cast — those traits are how you'll tell Sól's from the rest."
-- **Step 3—Ask:** "Ask the Oracle one yes/no question about a trait — an element, a power, a color, light or dark, or a rune by name. Her answer is always true. Cross off whatever it rules out; the board leaves that to you."
+- **Step 2—The Board:** "Twenty-four runes, no two alike — each with its own element, color, and a power from 1 to 6. Watch the power's pips, too; they carry a tell of their own." *(Light/dark — the clean 50/50 split — is deliberately NOT named here; the pip shade is the player's to discover, so onboarding never hands over the strongest question.)*
+- **Step 3—Ask:** "Ask the Oracle one yes/no question about a trait — an element, a power, a color, or a rune by name. Her answer is always true. Cross off whatever it rules out; the board leaves that to you." *(Light/dark omitted from the list for the same reason — askable, but discovered.)*
 - **Step 4—Scry & Hex:** "Sköll hunts the same rune, and he questions the Oracle too. You hold one Scry and one Hex for the whole game — Scry to overhear her reply to him, or Hex to cut his question short."
 - **Step 5—Cast:** "When the board's down to one, cast it — tap Cast, then the rune. Get it right and the day is yours; get it wrong and your turn's gone, so be certain before you name it."
 - **Step 6—Speak:** "Rather not type? Hold the medallion (or press the backtick key), speak, then let go. Your voice does all of it — ask, Scry, Hex, and cast."

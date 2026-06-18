@@ -20,12 +20,12 @@
 		{
 			label: 'The Board',
 			target: '[data-coach="board"]',
-			body: 'Twenty-four runes, no two alike. Each has an element, a power from 1 to 6, a color, and a light or dark cast — those traits are how you’ll tell Sól’s from the rest.'
+			body: 'Twenty-four runes, no two alike — each with its own element, color, and a power from 1 to 6. Watch the power’s pips, too; they carry a tell of their own.'
 		},
 		{
 			label: 'Ask',
 			target: '[data-coach="ask"]',
-			body: 'Ask the Oracle one yes/no question about a trait — an element, a power, a color, light or dark, or a rune by name. Her answer is always true. Cross off whatever it rules out; the board leaves that to you.'
+			body: 'Ask the Oracle one yes/no question about a trait — an element, a power, a color, or a rune by name. Her answer is always true. Cross off whatever it rules out; the board leaves that to you.'
 		},
 		{
 			label: 'Scry & Hex',
