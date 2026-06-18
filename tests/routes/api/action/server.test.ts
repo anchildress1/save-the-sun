@@ -102,19 +102,24 @@ describe('POST /api/action', () => {
 	});
 
 	it('drops a flair that flips the verdict — falls back to the deterministic answer (P1)', async () => {
+		// restore in finally so the silenced console.warn can't leak into later tests in this file
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		const { composeOracleFlair } = await import('$lib/server/oracle/gemini');
-		// The real verdict here is "No"; a flair that opens "Yes" changed the meaning, so it's discarded
-		// and the client voices the deterministic answer instead — the Oracle never lies, even in flair.
-		(composeOracleFlair as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-			'Yes — she reaches into light.'
-		);
+		try {
+			const { composeOracleFlair } = await import('$lib/server/oracle/gemini');
+			// The real verdict here is "No"; a flair that opens "Yes" changed the meaning, so it's discarded
+			// and the client voices the deterministic answer instead — the Oracle never lies, even in flair.
+			(composeOracleFlair as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+				'Yes — she reaches into light.'
+			);
 
-		const data = await json(await ask());
+			const data = await json(await ask());
 
-		expect(data.oracle.ok).toBe(true);
-		expect(data.oracle.voiced).toBeUndefined();
-		expect(warn).toHaveBeenCalled();
+			expect(data.oracle.ok).toBe(true);
+			expect(data.oracle.voiced).toBeUndefined();
+			expect(warn).toHaveBeenCalled();
+		} finally {
+			warn.mockRestore();
+		}
 	});
 
 	it('omits the authored line when flair fails — the deterministic answer stands (ttd:17)', async () => {

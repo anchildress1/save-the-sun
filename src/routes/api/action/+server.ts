@@ -239,7 +239,7 @@ function skollMoveVoice(out: SkollOutcome): LineDescriptor | null {
 // the flair's first word isn't that verdict, Gemini changed the meaning (a flip, or a reworded verdict)
 // — discard it and let the client voice the deterministic line. The Oracle never lies, even in flair.
 function flairKeepsVerdict(flair: string, affirmative: boolean): boolean {
-	const firstWord = (flair.match(/[A-Za-z]+/)?.[0] ?? '').toLowerCase();
+	const firstWord = (/[A-Za-z]+/.exec(flair)?.[0] ?? '').toLowerCase();
 	return firstWord === (affirmative ? 'yes' : 'no');
 }
 
