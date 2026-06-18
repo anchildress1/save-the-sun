@@ -27,6 +27,7 @@
 	import type { LineDescriptor } from '$lib/server/voice/lines';
 	import { REACTION_LINES } from '$lib/voice/reactionLines';
 	import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
+	import { VOICED_SEQUENCE } from '$lib/voice/outcomeLines';
 	import { runes } from '$lib/board';
 	import { readViewState, writeViewState } from '$lib/viewState';
 	import appIcon from '$lib/assets-webp/ui/app-icon.webp?url&no-inline';
@@ -180,17 +181,23 @@
 	let showEndScreen = $derived(roundOver && !endHeld);
 	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
 
-	// Voice the outcome once the splash is up (ux-copy §4): a win in the Oracle's voice, a loss in
-	// Sköll's — so the player hears who took the day. The line is one beat of the splash copy (R10),
-	// queued behind any cast line on the shared speaker. Once per round; reset by a new game.
+	// Voice the closing rite once the splash is up (ux-copy §4, ttd:22): the winner speaks ONE authored
+	// in-character line — the Oracle's blessing on a win, Sköll's gloat on a loss — carried (as an
+	// `authored` id) on the resolving response. NOT a read of the fixed splash copy (the player reads
+	// that on screen). When no authored line rode the response (authoring failed, or a resumed round),
+	// fall back to the fixed punch beat. Once per round; reset by a new game.
 	let outcomeVoiced = false;
+	let endFlair = $state<LineDescriptor | null>(null);
 	$effect(() => {
 		// Flip the once-guard only when the speaker is open — so a resumed/won round cannot spend
-		// its outcome voice before the browser gesture unlocks audio. The loss verse is voiced in
-		// Sköll's voice, the win coda in the Oracle's; the medallion follows from the delivery event.
+		// its outcome voice before the browser gesture unlocks audio. The medallion follows the
+		// delivery events (ember for Sköll's loss, gold for the Oracle's win).
 		if (showEndScreen && !outcomeVoiced && audioOn && audioReady) {
 			outcomeVoiced = true;
-			void deliver({ kind: 'outcome', result: endOutcome });
+			if (endFlair) void deliver(endFlair);
+			else
+				for (const beat of VOICED_SEQUENCE[endOutcome])
+					void deliver({ kind: 'outcome', result: endOutcome, beat });
 		}
 	});
 	let nightProgress = $derived(
@@ -648,8 +655,10 @@
 	// layer can voice it via the server TTS route. System lines (Sköll's, the engine's) aren't hers.
 	function oracleVoice(oracle: ActionResponse<'Ask'>['oracle']): LineDescriptor | null {
 		if (!oracle) return null;
+		// Refusal wins first: a result carrying a refusal must never voice an answer, even if it also
+		// reads ok — a malformed both-state refuses rather than speaking a verdict it shouldn't.
+		if ('refusal' in oracle) return { kind: 'refusal', refusal: oracle.refusal };
 		if (oracle.ok) return { kind: 'answer', query: oracle.query, affirmative: oracle.affirmative };
-		if (oracle.reason === 'refusal') return { kind: 'refusal', refusal: oracle.refusal };
 		return null;
 	}
 
@@ -665,19 +674,51 @@
 	const ACTION_TIMEOUT_MS = 30_000;
 
 	// Mirrors the load/`/api/state` snapshot — the authoritative round the client resyncs to.
+	type RecoveredLine = { text: string; voice: LineDescriptor | null };
 	type StateSnapshot = {
 		boardSeed: number;
 		roundId: string;
 		state: GameState;
 		pendingReaction: { echo: string; held: { Scry: boolean; Hex: boolean } } | null;
+		// The last committed voiced line — the real result a dropped response lost (ttd:29).
+		lastLine: RecoveredLine | null;
 	};
+
+	// Restore the result a dropped-but-committed action lost: show its words and re-voice it (a no-op
+	// when audio is off). Sköll's lines belong in his frame; everything else is the Oracle's panel.
+	function applyRecoveredLine(line: RecoveredLine) {
+		const d = line.voice;
+		if (d && (d.kind === 'skoll-ask' || d.kind === 'skoll-cast')) {
+			skollEcho = line.text;
+			skollAsking = d.kind === 'skoll-ask';
+			if (d.kind === 'skoll-cast' && roundOver) {
+				endHeld = true;
+				skollCastPending = true;
+			}
+		} else {
+			answer = line.text;
+		}
+		answerAudio = d ? deliver(d) : null;
+	}
+
+	// One recovery path for a dropped-but-committed action: resync, and if the reconciled state proves
+	// the move landed (`committed()`), restore its real voiced result. Returns whether it recovered, so
+	// each caller shows its failure line only when it did not.
+	async function recoverFromDrop(committed: () => boolean): Promise<boolean> {
+		const { landed, lastLine } = await reconcile();
+		if (landed && lastLine && committed()) {
+			applyRecoveredLine(lastLine);
+			return true;
+		}
+		return false;
+	}
 
 	// Resync to authoritative server state after a dropped action response. A timed-out or failed POST
 	// aborts the browser fetch, but the server completed the move under `withSessionLock`, so the
 	// engine has moved on — without this the UI strands on a stale turn/board (or a retry that no-ops)
 	// until a reload. Fetches the same snapshot the page load builds and re-applies it. Returns whether
 	// the resync landed.
-	async function reconcile(): Promise<boolean> {
+	async function reconcile(): Promise<{ landed: boolean; lastLine: RecoveredLine | null }> {
 		const prevRoundId = roundId;
 		const abort = new AbortController();
 		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
@@ -692,7 +733,7 @@
 				throw new Error('State reconcile returned no usable snapshot');
 		} catch (err) {
 			console.error('[ui] reconcile failed:', err);
-			return false;
+			return { landed: false, lastLine: null };
 		} finally {
 			clearTimeout(timer);
 		}
@@ -705,6 +746,7 @@
 			answer = '';
 			askValue = '';
 			outcomeVoiced = false;
+			endFlair = null;
 			heldScry = true;
 			heldHex = true;
 			stopDelivery();
@@ -723,7 +765,9 @@
 		}
 		skollStalled = false;
 		cancelCast();
-		return true;
+		// A new round (dropped new-game) has voiced nothing — the server returns no line, so callers
+		// can't mis-recover a stale result onto a fresh secret.
+		return { landed: true, lastLine: snap.roundId === prevRoundId ? snap.lastLine : null };
 	}
 
 	// Return type is derived from the action's `type`, so a caller can't request a
@@ -766,7 +810,9 @@
 				signal: abort.signal
 			});
 			if (!res.ok) throw new Error(`Advance rejected (${res.status})`);
-			const { skoll, state } = (await res.json()) as AdvanceResponse;
+			const { skoll, state, outcomeFlair } = (await res.json()) as AdvanceResponse;
+			// His gloat for the end screen when this Advance was his winning cast (ttd:22).
+			if (outcomeFlair) endFlair = outcomeFlair;
 			// His winning cast is a turn that must play. Hold the splash synchronously — BEFORE applyState
 			// flips roundOver — so his cast frame shows first, even with audio off (which would otherwise
 			// reveal the end screen at once). skollCastPending tells the hold effect to pace the beat.
@@ -792,8 +838,11 @@
 			// His move may have landed server-side before the response dropped — resync, so a parked Ask
 			// surfaces its reaction prompt (or a won round its end screen) instead of a retry that no-ops
 			// against the already-advanced turn. Only a turn still genuinely stuck on Sköll keeps the rouse.
-			await reconcile();
-			if (!skollAsking && activePlayer === 'Sköll' && roundStatus === 'active') {
+			// His winning cast is the one Advance result that voices — recover his cast line so a loss
+			// screen never rises silent. (A parked Ask already restores its prompt via reconcile; a wrong
+			// cast voices nothing, so it falls through to the stall check.)
+			const recovered = await recoverFromDrop(() => roundOver && winner === 'Sköll');
+			if (!recovered && !skollAsking && activePlayer === 'Sköll' && roundStatus === 'active') {
 				answer = RITE.wolfStalled;
 				skollStalled = true;
 			}
@@ -1016,10 +1065,15 @@
 						affirmative: oracle.affirmative
 					}
 				};
-			} else if (oracle?.ok) {
-				outcome = { line: oracle.answer, consumed: true, voice: oracleVoice(oracle) };
-			} else if (oracle?.reason === 'refusal') {
+			} else if (oracle && 'refusal' in oracle) {
+				// Refusal wins before the answer branch: a refused sign is never voiced as a verdict.
 				outcome = { line: oracle.line, consumed: false, voice: oracleVoice(oracle) };
+			} else if (oracle?.ok) {
+				// Her dramatized line when the server authored one this turn (ttd:17, voiced by id lookup);
+				// else the deterministic answer. The panel shows exactly what she voices (R10).
+				outcome = oracle.voiced
+					? { line: oracle.voiced.text, consumed: true, voice: oracle.voiced }
+					: { line: oracle.answer, consumed: true, voice: oracleVoice(oracle) };
 			} else if (oracle) {
 				// not-your-turn means the engine has handed the turn to Sköll. System line — not voiced.
 				outcome = {
@@ -1037,9 +1091,10 @@
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
 			console.error('[ui] Ask dispatch failed:', err);
-			// The Ask may have landed and handed the turn to Sköll — resync so the controls reflect whose
-			// turn it really is (runAsk then drives his move) rather than re-enabling Human against it.
-			await reconcile();
+			// The Ask may have landed and handed the turn to Sköll (or resolved the round) — resync and, if
+			// it committed, restore her real answer instead of the false silent line.
+			if (await recoverFromDrop(() => activePlayer === 'Sköll' || roundOver))
+				return { line: answer, consumed: true, voice: null };
 			answer = RITE.oracleSilent;
 			return { line: RITE.oracleSilent, consumed: false, voice: null };
 		}
@@ -1055,8 +1110,9 @@
 			if (fromTyped && outcome.consumed) askValue = '';
 			// Voice her own line through the delivery seam (server TTS); a no-op when audio is off (no
 			// speaker). The handle lets a round that ends on Sköll's next move hold the splash until
-			// she's heard.
-			answerAudio = outcome.voice ? deliver(outcome.voice) : null;
+			// she's heard. Guard, not assign: a dropped-then-recovered Ask already set `answerAudio` to the
+			// re-voiced line inside performAsk (voice === null), so don't clobber that handle with null.
+			if (outcome.voice) answerAudio = deliver(outcome.voice);
 			await advanceSkoll();
 		} finally {
 			pending = false;
@@ -1115,7 +1171,9 @@
 			console.error('[ui] React dispatch failed:', err);
 			// The reaction may have resolved server-side (charge spent, turn advanced) — resync so the
 			// held charges and turn match engine truth instead of stranding the prompt.
-			await reconcile();
+			// A committed React closes Sköll's parked Ask (skollAsking clears) — recover its real
+			// resolution line instead of the false silent line.
+			if (await recoverFromDrop(() => !skollAsking)) return answer;
 			answer = RITE.oracleSilent;
 			return RITE.oracleSilent;
 		}
@@ -1191,6 +1249,7 @@
 			heldScry = true;
 			heldHex = true;
 			outcomeVoiced = false; // the fresh round re-arms the end-screen outcome voice
+			endFlair = null;
 			// Drop any still-playing/queued Oracle line from the round just ended — TTS delivery is
 			// fire-and-forget, so without this a prior answer could bleed over the fresh blank round.
 			stopDelivery();
@@ -1204,7 +1263,7 @@
 			// same-round resync (the POST failed before resetting) left the board/secret unchanged, so
 			// report the failure rather than suppressing it behind a still-active round.
 			const prevRoundId = roundId;
-			const synced = await reconcile();
+			const { landed: synced } = await reconcile();
 			const reset = synced && roundId !== prevRoundId;
 			if (!reset) answer = RITE.oracleSilent;
 			return reset;
@@ -1217,12 +1276,14 @@
 	// Never throws — see performAsk.
 	async function performCast(runeName: string): Promise<string> {
 		try {
-			const { cast, state } = await dispatch({
+			const { cast, state, outcomeFlair } = await dispatch({
 				type: 'Cast',
 				player: 'Human',
 				runeName
 			});
 			applyState(state);
+			// Her blessing for the end screen when this cast won (ttd:22); the effect voices it on the splash.
+			if (outcomeFlair) endFlair = outcomeFlair;
 			let line: string;
 			let voice: LineDescriptor;
 			if (cast.ok) {
@@ -1244,7 +1305,9 @@
 			console.error('[ui] Cast dispatch failed:', err);
 			// The cast may have committed server-side (it's irreversible) — resync so a win's end screen
 			// and the advanced turn show instead of the controls re-enabling against a decided round.
-			await reconcile();
+			// A committed cast resolved the round (win) or handed the turn to Sköll (wrong) — recover its
+			// real outcome instead of the false falters line.
+			if (await recoverFromDrop(() => roundOver || activePlayer === 'Sköll')) return answer;
 			answer = RITE.castFalters;
 			return RITE.castFalters;
 		} finally {

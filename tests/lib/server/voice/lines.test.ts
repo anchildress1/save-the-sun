@@ -145,9 +145,28 @@ describe('composeLine', () => {
 		expect(composeLine({ kind: 'cast', result: 'wrong' })).toBeNull();
 	});
 
-	it('voices the outcome beat — the win coda, the loss verse', () => {
-		expect(composeLine({ kind: 'outcome', result: 'win' })).toBe(OUTCOME_LINES.win.coda);
-		expect(composeLine({ kind: 'outcome', result: 'lose' })).toBe(OUTCOME_LINES.lose.verse);
+	it('voices each staged outcome beat (the win lead is spoken at cast, not here)', () => {
+		expect(composeLine({ kind: 'outcome', result: 'win', beat: 'verse' })).toBe(
+			OUTCOME_LINES.win.verse
+		);
+		expect(composeLine({ kind: 'outcome', result: 'win', beat: 'coda' })).toBe(
+			OUTCOME_LINES.win.coda
+		);
+		expect(composeLine({ kind: 'outcome', result: 'lose', beat: 'lead' })).toBe(
+			OUTCOME_LINES.lose.lead
+		);
+		expect(composeLine({ kind: 'outcome', result: 'lose', beat: 'verse' })).toBe(
+			OUTCOME_LINES.lose.verse
+		);
+		expect(composeLine({ kind: 'outcome', result: 'lose', beat: 'coda' })).toBe(
+			OUTCOME_LINES.lose.coda
+		);
+	});
+
+	it('rejects an inherited-property beat — only lead/verse/coda compose', () => {
+		expect(
+			composeLine({ kind: 'outcome', result: 'win', beat: 'toString' } as unknown as LineDescriptor)
+		).toBeNull();
 	});
 
 	// Allow-list IDs are matched by own-property only — an inherited key (e.g. a prototype method
@@ -160,10 +179,18 @@ describe('composeLine', () => {
 			composeLine({ kind: 'react', line: 'hasOwnProperty' } as unknown as LineDescriptor)
 		).toBeNull();
 		expect(
-			composeLine({ kind: 'outcome', result: 'toString' } as unknown as LineDescriptor)
+			composeLine({
+				kind: 'outcome',
+				result: 'toString',
+				beat: 'coda'
+			} as unknown as LineDescriptor)
 		).toBeNull();
 		expect(
-			composeLine({ kind: 'outcome', result: 'constructor' } as unknown as LineDescriptor)
+			composeLine({
+				kind: 'outcome',
+				result: 'constructor',
+				beat: 'coda'
+			} as unknown as LineDescriptor)
 		).toBeNull();
 	});
 });
@@ -177,18 +204,15 @@ describe('voiceForLine', () => {
 		expect(voiceForLine({ kind: 'react', line: 'human-hex' })).toBe(ORACLE_VOICE);
 		expect(voiceForLine({ kind: 'cast', result: 'true' })).toBe(ORACLE_VOICE);
 		// The outcome splits by who took the day: a win is hers, a loss is his.
-		expect(voiceForLine({ kind: 'outcome', result: 'win' })).toBe(ORACLE_VOICE);
-		expect(voiceForLine({ kind: 'outcome', result: 'lose' })).toBe(SKOLL_VOICE);
+		expect(voiceForLine({ kind: 'outcome', result: 'win', beat: 'coda' })).toBe(ORACLE_VOICE);
+		expect(voiceForLine({ kind: 'outcome', result: 'lose', beat: 'verse' })).toBe(SKOLL_VOICE);
 	});
 });
 
 describe('synthPrompt', () => {
-	it('wraps each line in its speaker’s director’s-notes, quoting the line', () => {
-		const skoll = synthPrompt({ kind: 'skoll-ask', query: {} }, 'I scent a fire rune on her.');
-		const oracle = synthPrompt(
-			{ kind: 'refusal', refusal: 'empty' },
-			'Speak your question, witch.'
-		);
+	it('wraps each line in its voice’s director’s-notes, quoting the line', () => {
+		const skoll = synthPrompt(SKOLL_VOICE, 'I scent a fire rune on her.');
+		const oracle = synthPrompt(ORACLE_VOICE, 'Speak your question, witch.');
 		// Each carries its own direction (distinct) and ends on the quoted line, not the bare line.
 		expect(skoll).toContain('"I scent a fire rune on her."');
 		expect(skoll).not.toBe('I scent a fire rune on her.');
@@ -196,13 +220,17 @@ describe('synthPrompt', () => {
 		expect(skoll.slice(0, 40)).not.toBe(oracle.slice(0, 40)); // different speaker notes
 	});
 
-	it('gives the loss outcome Sköll’s growl, the win the Oracle’s notes', () => {
-		const lose = synthPrompt({ kind: 'outcome', result: 'lose' }, 'The night is everlasting.');
-		const win = synthPrompt({ kind: 'outcome', result: 'win' }, 'The light is yours to keep.');
-		const skollAsk = synthPrompt({ kind: 'skoll-ask', query: {} }, 'x');
-		const oracleAns = synthPrompt({ kind: 'refusal', refusal: 'empty' }, 'x');
-		expect(lose.slice(0, 40)).toBe(skollAsk.slice(0, 40)); // same Sköll direction
-		expect(win.slice(0, 40)).toBe(oracleAns.slice(0, 40)); // same Oracle direction
+	it('keys the director’s-notes on the voice — Sköll’s growl vs the Oracle’s notes', () => {
+		// Same voice → same direction, whatever the line (an authored line and a composed one match).
+		expect(synthPrompt(SKOLL_VOICE, 'The night is everlasting.').slice(0, 40)).toBe(
+			synthPrompt(SKOLL_VOICE, 'x').slice(0, 40)
+		);
+		expect(synthPrompt(ORACLE_VOICE, 'The light is yours to keep.').slice(0, 40)).toBe(
+			synthPrompt(ORACLE_VOICE, 'x').slice(0, 40)
+		);
+		expect(synthPrompt(SKOLL_VOICE, 'x').slice(0, 40)).not.toBe(
+			synthPrompt(ORACLE_VOICE, 'x').slice(0, 40)
+		);
 	});
 });
 
@@ -214,7 +242,7 @@ describe('isLineDescriptor', () => {
 		expect(isLineDescriptor({ kind: 'skoll-cast', rune: 'Sowilo' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'react', line: 'human-hex' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'cast', result: 'true' })).toBe(true);
-		expect(isLineDescriptor({ kind: 'outcome', result: 'win' })).toBe(true);
+		expect(isLineDescriptor({ kind: 'outcome', result: 'win', beat: 'coda' })).toBe(true);
 	});
 
 	it('rejects malformed shapes', () => {
@@ -228,5 +256,6 @@ describe('isLineDescriptor', () => {
 		expect(isLineDescriptor({ kind: 'skoll-cast' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'react' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'cast' })).toBe(false);
+		expect(isLineDescriptor({ kind: 'outcome', result: 'win' })).toBe(false); // beat required
 	});
 });

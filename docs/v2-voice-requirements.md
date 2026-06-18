@@ -157,6 +157,16 @@ Voice never solely carries game information. Every **game move** — an Ask and 
 - **Oracle response latency**: end of player speech to start of Oracle audio under ~1.5 s typical.
 - **Fallback integrity**: with voice fully disabled or failed, the game is 100% playable by buttons.
 
+### Measured — local dev, real Gemini (2026-06-18) 📏
+
+Numbers from `vite dev` against the live Gemini API on a local network — **not** the deployed Cloud Run (which adds region + cold-start latency). Live-deploy numbers still need the deployed URL.
+
+- **TTS audio-start** (first PCM chunk = start of audio): **~0.65 s uncached, ~3 ms cached.** Oracle target (1.5 s) met; Sköll's 500 ms is just missed on a cold synth, met on a cache hit. *(Sköll's <500 ms was specced for prebuilt taunt clips — the deferred ambience layer — not the shared TTS route.)*
+- **Full Ask compute** (`/api/action`: interpret → Sköll reaction → Oracle flair, three serial Gemini calls): **~2.0–3.0 s.** Over the ~1.5 s "Oracle response" target — but that target was specced for the **retired Live API**; push-to-talk is turn-based, so it's a soft bar. The flair call (ttd:17) adds ~0.6–0.9 s; it times out to the deterministic template, so it never stalls.
+- **interpret-only** (a refused Ask, one Gemini call): **~0.9–1.2 s.**
+- **Fallback integrity**: ✅ proven by the suite — the board renders and plays its moves with audio off/failed (delivery is a no-op without a speaker).
+- **Intent accuracy / hands-free completion**: covered by the spoken-path suites (transcribe → classify → dispatch); the destructive-confirm gate (S8) holds the zero-unconfirmed-misfire bar.
+
 ## Open Questions ❓
 
 - ~~**Gacrux on Live** (engineering)~~ **Resolved 2026-06-11 (S2):** Gacrux verified working on `gemini-3.1-flash-live-preview` against the real API (audio + transcripts returned). No Kore fallback needed; the voice is the single `ORACLE_VOICE` constant in `src/lib/voice/config.ts`.

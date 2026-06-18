@@ -42,7 +42,13 @@ const emitDelivery = (event: DeliveryEvent) => deliveryMock.emit(event);
 const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
 const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 4 };
 const pageProps = {
-	data: { boardSeed: 0, roundId: 'test-round', state: HUMAN_TURN, pendingReaction: null },
+	data: {
+		boardSeed: 0,
+		roundId: 'test-round',
+		state: HUMAN_TURN,
+		pendingReaction: null,
+		lastLine: null
+	},
 	params: {},
 	form: null
 };
@@ -592,9 +598,21 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 		expect(deliveryMock.deliver).not.toHaveBeenCalled();
 
 		window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+		// One punch beat — the win's triumphant coda (its lead is heard at the cast). The fixed verse
+		// stays on-screen text, not a long read.
 		await vi.waitFor(() =>
-			expect(deliveryMock.deliver).toHaveBeenCalledWith({ kind: 'outcome', result: 'win' })
+			expect(deliveryMock.deliver).toHaveBeenCalledWith({
+				kind: 'outcome',
+				result: 'win',
+				beat: 'coda'
+			})
 		);
+		// The verse is NOT voiced — it's already printed on the splash.
+		expect(deliveryMock.deliver).not.toHaveBeenCalledWith({
+			kind: 'outcome',
+			result: 'win',
+			beat: 'verse'
+		});
 	});
 
 	it('queues a Sköll Ask resumed before the speaker opens, voicing it on the first gesture', async () => {
@@ -645,6 +663,73 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 				query: { axis: 'element', value: 'Fire' },
 				affirmative: false
 			})
+		);
+	});
+
+	it('voices her dramatized, store-backed line when the server authored one (ttd:17)', async () => {
+		const FLAIR = 'Yes — the flame-sign burns; she reaches for fire.';
+		const voiced = { kind: 'authored', id: 'vl-answer-1', voice: 'Gacrux', text: FLAIR };
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (body.type === 'Advance')
+				return new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN }));
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						query: { axis: 'element', value: 'Fire' },
+						answer: ASK_ANSWER,
+						affirmative: false,
+						turnConsumed: true,
+						voiced
+					},
+					skollVsYou: { reaction: 'Pass' },
+					state: HUMAN_TURN
+				})
+			);
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('mute-toggle').click(); // audio on
+		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		// The panel shows exactly what she voices (R10) — the dramatized line, not the template.
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent(FLAIR);
+		// And the authored descriptor (id-backed) is what rides the delivery seam to the TTS route.
+		await vi.waitFor(() => expect(deliveryMock.deliver).toHaveBeenCalledWith(voiced));
+	});
+
+	it('voices the authored ending blessing on a win, not a fixed splash beat (ttd:22)', async () => {
+		const ENDING = {
+			kind: 'authored',
+			id: 'vl-ending-1',
+			voice: 'Gacrux',
+			text: 'The dawn is kept; Sól climbs free.'
+		};
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (body.type === 'Cast')
+				return new Response(
+					JSON.stringify({
+						type: 'Cast',
+						cast: { ok: true, won: true },
+						state: HUMAN_WON,
+						outcomeFlair: ENDING
+					})
+				);
+			return new Response(JSON.stringify({ type: 'Advance', state: HUMAN_WON }));
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('mute-toggle').click(); // audio on + speaker open
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // arm
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await screen.getByRole('button', { name: 'Name it' }).click();
+		// Her authored blessing voices on the end screen — the fixed `outcome` beat does not.
+		await vi.waitFor(() => expect(deliveryMock.deliver).toHaveBeenCalledWith(ENDING));
+		expect(deliveryMock.deliver).not.toHaveBeenCalledWith(
+			expect.objectContaining({ kind: 'outcome' })
 		);
 	});
 

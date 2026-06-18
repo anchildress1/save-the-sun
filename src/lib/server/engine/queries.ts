@@ -47,6 +47,40 @@ const VALUE_AXES: Record<string, ReadonlySet<unknown>> = {
 	rune: NAMES
 };
 
+/** The flat field shape both LLM adapters (Oracle + Sköll) return — one Query spread across columns. */
+export interface QueryFields {
+	axis?: string;
+	elementValue?: string;
+	colorValue?: string;
+	fillValue?: 'Light' | 'Dark';
+	runeName?: string;
+	powerOp?: PowerOp;
+	powerValue?: number;
+}
+
+/**
+ * Map an LLM adapter's flat tool-call fields into one Query by its axis, or null if the axis's value
+ * is absent. Shape only — the caller still re-validates with {@link parseQuery} (LLM output is untrusted).
+ */
+export function queryFromFields(raw: QueryFields): Query | null {
+	switch (raw.axis) {
+		case 'element':
+			return raw.elementValue ? { axis: 'element', value: raw.elementValue } : null;
+		case 'color':
+			return raw.colorValue ? { axis: 'color', value: raw.colorValue } : null;
+		case 'fill':
+			return raw.fillValue ? { axis: 'fill', value: raw.fillValue } : null;
+		case 'rune':
+			return raw.runeName ? { axis: 'rune', value: raw.runeName } : null;
+		case 'power':
+			return raw.powerOp && typeof raw.powerValue === 'number'
+				? { axis: 'power', op: raw.powerOp, value: raw.powerValue }
+				: null;
+		default:
+			return null;
+	}
+}
+
 /**
  * Validate an untrusted query payload into a canonical Query.
  * @param input loosely-typed payload from a UI or LLM tool call

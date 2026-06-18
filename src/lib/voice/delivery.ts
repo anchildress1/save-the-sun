@@ -8,6 +8,7 @@
 
 import { createSpeaker, type Speaker } from './audio';
 import type { LineDescriptor } from '$lib/server/voice/lines';
+import { SKOLL_VOICE } from '$lib/voice/config';
 
 /** Which prebuilt voice a delivered line carries — the medallion shows the speaker. */
 export type DeliveryVoice = 'oracle' | 'skoll';
@@ -75,6 +76,7 @@ function goIdle(): void {
 function speakerFor(descriptor: LineDescriptor): DeliveryVoice {
 	if (descriptor.kind === 'skoll-ask' || descriptor.kind === 'skoll-cast') return 'skoll';
 	if (descriptor.kind === 'outcome' && descriptor.result === 'lose') return 'skoll';
+	if (descriptor.kind === 'authored' && descriptor.voice === SKOLL_VOICE) return 'skoll';
 	return 'oracle';
 }
 

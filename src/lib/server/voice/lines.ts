@@ -10,7 +10,7 @@ import type { RefusalClass } from '$lib/server/oracle/types';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { REACTION_LINES, carriesAnswer, type ReactionLineId } from '$lib/voice/reactionLines';
 import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
-import { OUTCOME_LINES, VOICED_BEAT, type Outcome } from '$lib/voice/outcomeLines';
+import { OUTCOME_LINES, type Outcome, type OutcomeBeat } from '$lib/voice/outcomeLines';
 import { runes } from '$lib/board';
 
 const REFUSAL_CLASSES: ReadonlySet<RefusalClass> = new Set([
@@ -44,9 +44,15 @@ export type LineDescriptor =
 	// A cast resolution (ux-copy §4): the true/falters lines are fixed; the wrong line names the rune,
 	// validated against the board so the route still voices only a server-owned line.
 	| { kind: 'cast'; result: 'true' | 'wrong' | 'falters'; rune?: string }
-	// The end-screen outcome (ux-copy §4): one beat of the splash copy — the win's coda in the Oracle's
-	// voice, the loss's verse in Sköll's, so the player hears who took the day.
-	| { kind: 'outcome'; result: Outcome };
+	// The end-screen outcome (ux-copy §4): one beat of the staged splash copy, voiced in sequence — the
+	// win in the Oracle's voice, the loss in Sköll's, so the player hears who took the day.
+	| { kind: 'outcome'; result: Outcome; beat: OutcomeBeat }
+	// A Gemini-authored line (ttd:17/ttd:22): dynamic, so it can't be recomposed from a descriptor like
+	// the others. The words live server-side, keyed by `id`; the route voices them by id lookup, never
+	// from the wire — same "client never supplies the words" invariant as every other descriptor. `voice`
+	// drives the medallion client-side; `text` is the display copy (the route ignores it, voicing the
+	// stored line instead).
+	| { kind: 'authored'; id: string; voice: string; text: string };
 
 // Parse a query and bound it to the real board (runes are 1-6); null on anything malformed or
 // out-of-range. Shared by the answer, Sköll-ask, and scry composers.
@@ -84,10 +90,11 @@ function composeCast(result: 'true' | 'wrong' | 'falters', rune: unknown): strin
 	return match ? wrongCastLine(match.name) : null;
 }
 
-function composeOutcome(result: Outcome): string | null {
-	// own-property only: an inherited key must not resolve to a prototype method.
+function composeOutcome(result: Outcome, beat: OutcomeBeat): string | null {
+	// own-property only on both keys: an inherited key must not resolve to a prototype method.
 	if (!Object.hasOwn(OUTCOME_LINES, result)) return null;
-	return OUTCOME_LINES[result][VOICED_BEAT[result]];
+	const beats = OUTCOME_LINES[result];
+	return Object.hasOwn(beats, beat) ? beats[beat] : null;
 }
 
 /** Compose the exact server-owned line for a descriptor, or null when it is not allow-listed. */
@@ -113,13 +120,21 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 		case 'cast':
 			return composeCast(descriptor.result, descriptor.rune);
 		case 'outcome':
-			return composeOutcome(descriptor.result);
+			return composeOutcome(descriptor.result, descriptor.beat);
+		case 'authored':
+			// Resolved by the TTS route via the per-session store (the words aren't on the wire); never
+			// composed from the descriptor here, so it can't voice client-supplied text.
+			return null;
 	}
 }
 
 /** Which prebuilt voice speaks a descriptor — Sköll's lines (his Ask, the loss) in his voice,
  *  everything else the Oracle's. */
 export function voiceForLine(descriptor: LineDescriptor): string {
+	// An authored line carries its own voice. (Not a security check: the TTS route resolves authored
+	// lines by id from the session store and uses the STORED voice — this is just the correct answer
+	// if voiceForLine is ever called on one.)
+	if (descriptor.kind === 'authored') return descriptor.voice;
 	const skoll =
 		descriptor.kind === 'skoll-ask' ||
 		descriptor.kind === 'skoll-cast' ||
@@ -142,13 +157,12 @@ const ORACLE_TTS_DIRECTION =
 	'the line, no narration:';
 
 /**
- * The exact text handed to the TTS model for a composed line: each line wrapped in its speaker's
- * director's-notes so the model voices it in character (Sköll's growl, the Oracle's ceremony).
- * Deterministic, so the route can cache by it.
+ * The exact text handed to the TTS model for a line: wrapped in its speaker's director's-notes so the
+ * model voices it in character (Sköll's growl, the Oracle's ceremony). Keyed on the voice, so it works
+ * for both a composed descriptor and a stored authored line. Deterministic, so the route can cache by it.
  */
-export function synthPrompt(descriptor: LineDescriptor, line: string): string {
-	const direction =
-		voiceForLine(descriptor) === SKOLL_VOICE ? SKOLL_TTS_DIRECTION : ORACLE_TTS_DIRECTION;
+export function synthPrompt(voice: string, line: string): string {
+	const direction = voice === SKOLL_VOICE ? SKOLL_TTS_DIRECTION : ORACLE_TTS_DIRECTION;
 	return `${direction}\n\n"${line}"`;
 }
 
@@ -168,8 +182,11 @@ export function isLineDescriptor(value: unknown): value is LineDescriptor {
 		case 'react':
 			return typeof v.line === 'string';
 		case 'cast':
-		case 'outcome':
 			return typeof v.result === 'string';
+		case 'outcome':
+			return typeof v.result === 'string' && typeof v.beat === 'string';
+		case 'authored':
+			return typeof v.id === 'string' && typeof v.voice === 'string' && typeof v.text === 'string';
 		default:
 			return false;
 	}

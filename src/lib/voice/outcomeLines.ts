@@ -16,7 +16,14 @@ export const OUTCOME_LINES = {
 } as const;
 
 export type Outcome = keyof typeof OUTCOME_LINES;
+export type OutcomeBeat = keyof (typeof OUTCOME_LINES)['win']; // 'lead' | 'verse' | 'coda'
 
-// The beat each outcome voices: the win's triumphant coda (the lead "The rune is true." is already
-// voiced as the cast lands), the loss's verse — a pronouncement that growls without naming himself.
-export const VOICED_BEAT = { win: 'coda', lose: 'verse' } as const;
+// The beat each outcome voices — ONE, not the whole verse. The end-screen copy is fixed and already
+// printed on the splash, so voicing all of it is just a long read of static text (~10s in his growl).
+// Voice only the punch: the loss's lead ("Sköll takes the sun.") in Sköll's voice — the headline, not
+// otherwise spoken; the win's coda in the Oracle's (its lead "The rune is true." is already voiced as
+// the cast lands). The other beats stay on-screen text (still written, R10).
+export const VOICED_SEQUENCE = {
+	win: ['coda'],
+	lose: ['lead']
+} as const satisfies Record<Outcome, readonly OutcomeBeat[]>;

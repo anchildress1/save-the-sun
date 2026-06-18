@@ -24,7 +24,7 @@ vi.mock('$env/dynamic/private', () => ({
 	env: { GEMINI_API_KEY: 'test-gemini-key' }
 }));
 
-import { interpret } from '$lib/server/oracle/gemini';
+import { interpret, composeOracleFlair, composeEndingFlair } from '$lib/server/oracle/gemini';
 
 function geminiJson(body: object) {
 	sdk.generateContent.mockResolvedValueOnce({ text: JSON.stringify(body) });
@@ -113,6 +113,92 @@ describe('Gemini Oracle adapter', () => {
 		expect(consoleError).toHaveBeenCalledOnce();
 		expect(sdk.generateContent).toHaveBeenCalledOnce();
 
+		consoleError.mockRestore();
+	});
+});
+
+describe('composeOracleFlair (ttd:17)', () => {
+	beforeEach(() => {
+		sdk.generateContent.mockReset();
+	});
+
+	it('dramatizes a verdict — full Flash, MINIMAL thinking, temp 1, bounded output', async () => {
+		sdk.generateContent.mockResolvedValueOnce({ text: 'Yes — the flame-sign burns; she reaches.' });
+
+		const line = await composeOracleFlair('Yes. Sól is reaching for a fire rune.');
+
+		expect(line).toBe('Yes — the flame-sign burns; she reaches.');
+		expect(sdk.generateContent).toHaveBeenCalledWith(
+			expect.objectContaining({
+				model: 'gemini-3.5-flash',
+				config: expect.objectContaining({
+					thinkingConfig: { thinkingLevel: 'MINIMAL' },
+					temperature: 1,
+					maxOutputTokens: 64
+				})
+			})
+		);
+	});
+
+	it('takes the first line and strips wrapping quotes the model may add', async () => {
+		sdk.generateContent.mockResolvedValueOnce({ text: '"No. She does not reach."\n(stage note)' });
+		expect(await composeOracleFlair('No. Sól is not reaching for fire.')).toBe(
+			'No. She does not reach.'
+		);
+	});
+
+	it('falls back to null on an empty response (caller voices the deterministic line)', async () => {
+		sdk.generateContent.mockResolvedValueOnce({ text: '   ' });
+		expect(await composeOracleFlair('Yes. Sól is reaching for fire.')).toBeNull();
+	});
+
+	it('falls back to null on a model error — never throws into the Ask path', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		sdk.generateContent.mockRejectedValueOnce(new Error('429'));
+		expect(await composeOracleFlair('Yes. Sól is reaching for fire.')).toBeNull();
+		expect(consoleError).toHaveBeenCalledOnce();
+		consoleError.mockRestore();
+	});
+});
+
+describe('composeEndingFlair (ttd:22)', () => {
+	beforeEach(() => {
+		sdk.generateContent.mockReset();
+	});
+
+	it('authors a closing line, bounded — temp 1, MINIMAL thinking, ~72 tokens', async () => {
+		sdk.generateContent.mockResolvedValueOnce({ text: 'The dawn is kept; Sól climbs free.' });
+		expect(await composeEndingFlair('win')).toBe('The dawn is kept; Sól climbs free.');
+
+		sdk.generateContent.mockResolvedValueOnce({
+			text: 'The sun is mine. Your night has no morning.'
+		});
+		expect(await composeEndingFlair('lose')).toBe('The sun is mine. Your night has no morning.');
+
+		expect(sdk.generateContent).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				model: 'gemini-3.5-flash',
+				config: expect.objectContaining({
+					thinkingConfig: { thinkingLevel: 'MINIMAL' },
+					temperature: 1,
+					maxOutputTokens: 72
+				})
+			})
+		);
+	});
+
+	it('strips wrapping quotes and drops a stray stage-note line', async () => {
+		sdk.generateContent.mockResolvedValueOnce({
+			text: '"The dawn is kept. Sól climbs free."\n(she raises her arms)'
+		});
+		expect(await composeEndingFlair('win')).toBe('The dawn is kept. Sól climbs free.');
+	});
+
+	it('falls back to null on a model error — never throws into the resolving path', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		sdk.generateContent.mockRejectedValueOnce(new Error('boom'));
+		expect(await composeEndingFlair('lose')).toBeNull();
+		expect(consoleError).toHaveBeenCalledOnce();
 		consoleError.mockRestore();
 	});
 });

@@ -4,9 +4,9 @@
 
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
-import { runes } from '$lib/board';
+import { ELEMENTS, COLORS, RUNE_NAMES as NAMES } from '$lib/board';
 import { captureGemini } from '$lib/server/debug/log';
-import type { PowerOp, Query } from '$lib/server/engine/queries';
+import { queryFromFields, type PowerOp } from '$lib/server/engine/queries';
 import type {
 	RawSkollDecision,
 	SkollDecide,
@@ -20,9 +20,6 @@ import type {
 // the opposite case — it parses, so it runs full gemini-3.5-flash; the lite tier is Sköll's alone.)
 const MODEL = 'gemini-3.1-flash-lite';
 
-const ELEMENTS: string[] = [...new Set(runes.map((r) => r.element))];
-const COLORS: string[] = [...new Set(runes.map((r) => r.color))];
-const NAMES: string[] = runes.map((r) => r.name);
 const FILLS: string[] = ['Light', 'Dark'];
 const POWER_OPS: PowerOp[] = ['eq', 'lt', 'lte', 'gt', 'gte'];
 
@@ -95,29 +92,10 @@ interface RawResponse {
 	crossOff?: number[];
 }
 
-function toQuery(raw: RawResponse): Query | undefined {
-	switch (raw.axis) {
-		case 'element':
-			return raw.elementValue ? { axis: 'element', value: raw.elementValue } : undefined;
-		case 'color':
-			return raw.colorValue ? { axis: 'color', value: raw.colorValue } : undefined;
-		case 'fill':
-			return raw.fillValue ? { axis: 'fill', value: raw.fillValue } : undefined;
-		case 'rune':
-			return raw.runeName ? { axis: 'rune', value: raw.runeName } : undefined;
-		case 'power':
-			return raw.powerOp && typeof raw.powerValue === 'number'
-				? { axis: 'power', op: raw.powerOp, value: raw.powerValue }
-				: undefined;
-		default:
-			return undefined;
-	}
-}
-
 // Map the flat schema response into a (still untrusted) decision. skoll.ts validates the rest.
 function normalize(raw: RawResponse): RawSkollDecision {
 	if (raw.kind === 'cast') return { kind: 'cast', runeName: raw.runeName, crossOff: raw.crossOff };
-	return { kind: 'ask', query: toQuery(raw), crossOff: raw.crossOff };
+	return { kind: 'ask', query: queryFromFields(raw) ?? undefined, crossOff: raw.crossOff };
 }
 
 let client: GoogleGenAI | null = null;

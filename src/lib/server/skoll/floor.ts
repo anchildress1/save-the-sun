@@ -9,7 +9,7 @@
 // scripts/skoll-sim.mjs, slow enough that a competent human can beat him. He reasons from earned facts
 // only, never the secret.
 
-import { runes, type Rune } from '$lib/board';
+import { runes, ELEMENTS, COLORS, type Rune } from '$lib/board';
 import { resolveQuery, type PowerOp, type Query } from '$lib/server/engine/queries';
 
 /** One truthful answer Sköll has earned — his own resolved Ask, or anything he Scried. */
@@ -28,11 +28,9 @@ const POWER_OPS: PowerOp[] = ['eq', 'lt', 'lte', 'gt', 'gte'];
 const ALL_QUERIES: Query[] = buildAllQueries();
 
 function buildAllQueries(): Query[] {
-	const elements = [...new Set(runes.map((r) => r.element))];
-	const colors = [...new Set(runes.map((r) => r.color))];
 	const qs: Query[] = [
-		...elements.map((value): Query => ({ axis: 'element', value })),
-		...colors.map((value): Query => ({ axis: 'color', value })),
+		...ELEMENTS.map((value): Query => ({ axis: 'element', value })),
+		...COLORS.map((value): Query => ({ axis: 'color', value })),
 		{ axis: 'fill', value: 'Light' },
 		{ axis: 'fill', value: 'Dark' },
 		...runes.map((r): Query => ({ axis: 'rune', value: r.name }))

@@ -27,6 +27,7 @@ import {
 	resetDelivery,
 	type DeliveryEvent
 } from '$lib/voice/delivery';
+import { SKOLL_VOICE } from '$lib/voice/config';
 
 const LINE = { kind: 'refusal', refusal: 'empty' } as const;
 
@@ -364,10 +365,29 @@ describe('delivery speaking events', () => {
 		const events = collect();
 
 		await deliver({ kind: 'skoll-ask', query: { axis: 'power', value: 3 } });
-		await deliver({ kind: 'outcome', result: 'win' });
-		await deliver({ kind: 'outcome', result: 'lose' });
+		await deliver({ kind: 'outcome', result: 'win', beat: 'coda' });
+		await deliver({ kind: 'outcome', result: 'lose', beat: 'verse' });
 		expect(speaking(events)).toEqual([
 			{ type: 'speaking', voice: 'skoll' },
+			{ type: 'speaking', voice: 'oracle' },
+			{ type: 'speaking', voice: 'skoll' }
+		]);
+	});
+
+	it("emits Sköll's voice for authored Sköll lines", async () => {
+		vi.mocked(fetch).mockImplementation(async () => ndjsonResponse('pcm-a'));
+		enableDelivery();
+		const events = collect();
+
+		await deliver({ kind: 'outcome', result: 'win', beat: 'coda' });
+		await deliver({
+			kind: 'authored',
+			id: 'vl-skoll-1',
+			voice: SKOLL_VOICE,
+			text: 'The sun is mine. Your night has no morning.'
+		});
+
+		expect(speaking(events)).toEqual([
 			{ type: 'speaking', voice: 'oracle' },
 			{ type: 'speaking', voice: 'skoll' }
 		]);
