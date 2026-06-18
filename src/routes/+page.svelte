@@ -698,7 +698,15 @@
 		} else {
 			answer = line.text;
 		}
-		answerAudio = d ? deliver(d) : null;
+		// A recovered reaction spent its charge server-side — mark it spent so the client never re-offers a
+		// Scry/Hex the engine no longer allows (the snapshot only carries charge state while an Ask is parked).
+		if (d?.kind === 'react') {
+			if (d.line === 'human-scry') heldScry = false;
+			else if (d.line === 'human-hex') heldHex = false;
+		}
+		// Through voiceSkoll, not raw deliver: a recovery before the first gesture (a dropped onMount
+		// Advance) would no-op and lose the line — voiceSkoll holds it until audio is ready, then plays it.
+		answerAudio = d ? voiceSkoll(d) : null;
 	}
 
 	// One recovery path for a dropped-but-committed action: resync, and if the reconciled state proves
@@ -838,10 +846,12 @@
 			// His move may have landed server-side before the response dropped — resync, so a parked Ask
 			// surfaces its reaction prompt (or a won round its end screen) instead of a retry that no-ops
 			// against the already-advanced turn. Only a turn still genuinely stuck on Sköll keeps the rouse.
-			// His winning cast is the one Advance result that voices — recover his cast line so a loss
-			// screen never rises silent. (A parked Ask already restores its prompt via reconcile; a wrong
-			// cast voices nothing, so it falls through to the stall check.)
-			const recovered = await recoverFromDrop(() => roundOver && winner === 'Sköll');
+			// His Advance committed if it parked an Ask (skollAsking) or won the round with a cast — recover
+			// the line so his Ask is voiced, not just shown, and a loss screen never rises silent. (A wrong
+			// cast voices nothing and leaves the turn his, so it falls through to the stall check.)
+			const recovered = await recoverFromDrop(
+				() => skollAsking || (roundOver && winner === 'Sköll')
+			);
 			if (!recovered && !skollAsking && activePlayer === 'Sköll' && roundStatus === 'active') {
 				answer = RITE.wolfStalled;
 				skollStalled = true;
