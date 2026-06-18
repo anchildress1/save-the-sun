@@ -98,13 +98,27 @@ function humanAsks(sessionId: string, question: string): void {
 // reaction calls are Sköll's own.
 function geminiEvents(sessionId: string, movePart: TurnPart): void {
 	for (const call of drainGemini(sessionId)) {
-		// Her interpret and her flair are both the Oracle's, on the Ask beat; the move/reaction are his.
-		const oracle = call.label.startsWith('oracle');
+		let owner: 'Oracle' | 'Sköll' = 'Sköll';
 		let part: TurnPart = movePart;
-		if (oracle) part = 'Ask';
-		else if (call.label === 'reaction') part = 'React';
+		switch (call.label) {
+			case 'oracle':
+			case 'oracle-answer-flair':
+				owner = 'Oracle';
+				part = 'Ask';
+				break;
+			case 'oracle-ending-flair':
+				owner = 'Oracle';
+				part = 'Cast';
+				break;
+			case 'skoll-ending-flair':
+				part = 'Cast';
+				break;
+			case 'reaction':
+				part = 'React';
+				break;
+		}
 		logEvent(sessionId, {
-			owner: oracle ? 'Oracle' : 'Sköll',
+			owner,
 			kind: 'llm',
 			part,
 			level: call.error ? 'error' : 'info',
@@ -143,16 +157,13 @@ function castVoiceLine(cast: CastResult, runeName: string): LineDescriptor | nul
 		: { kind: 'cast', result: 'wrong', rune: runeName };
 }
 
-// Author + sign the end-screen closing line when this action resolved the round (ttd:22): the Oracle's
-// blessing on a win (Sól rides her voice), Sköll's gloat on a loss — a character line, NOT a read of the
-// fixed splash copy the player reads on screen. Undefined when the round isn't decided or authoring
-// failed/has no key — the client then falls back to the fixed splash beat.
+// Author + sign the end-screen closing line for the action that just resolved the round (ttd:22): the
+// Oracle's blessing on a win, Sköll's gloat on a loss. No-op requests after a won round do not get to
+// mint fresh Gemini copy.
 async function authorEnding(
 	sessionId: string,
-	engine: GameEngine
+	outcome: 'win' | 'lose'
 ): Promise<AuthoredLine | undefined> {
-	if (engine.status !== 'won' || engine.winner === null) return undefined;
-	const outcome = engine.winner === 'Human' ? 'win' : 'lose';
 	const text = await composeEndingFlair(outcome);
 	geminiEvents(sessionId, 'Cast'); // a Gemini call happened — tee its raw I/O to the debug log
 	if (text === null) return undefined;
@@ -204,7 +215,7 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 	// (or his Ask is already parked), so a stray Advance is harmless.
 	if ((body.type as string) === 'Advance') {
 		const skollTurn = await playSkollIfActive(sessionId, engine, skoll);
-		const outcomeFlair = await authorEnding(sessionId, engine);
+		const outcomeFlair = skollTurn?.casts ? await authorEnding(sessionId, 'lose') : undefined;
 		const response: AdvanceResponse = {
 			type: 'Advance',
 			...(skollTurn && { skoll: skollTurn }),
@@ -298,8 +309,11 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 		}
 		rememberLine(sessionId, castVoiceLine(result.cast, (action as { runeName: string }).runeName));
 	}
-	// A winning human cast ends the round in victory — author her blessing for the end screen.
-	const outcomeFlair = result.type === 'Cast' ? await authorEnding(sessionId, engine) : undefined;
+	// A winning cast ends the round — author the winner's closing line exactly once, on that move.
+	const outcomeFlair =
+		result.type === 'Cast' && result.cast.ok && result.cast.won && engine.winner !== null
+			? await authorEnding(sessionId, engine.winner === 'Human' ? 'win' : 'lose')
+			: undefined;
 	return json({ ...result, state: gameState(engine), ...(outcomeFlair && { outcomeFlair }) });
 }
 

@@ -7,6 +7,7 @@ import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
 import { runes } from '$lib/board';
 import { captureGemini } from '$lib/server/debug/log';
+import type { GeminiCall } from '$lib/server/debug/log';
 import type { PowerOp, Query } from '$lib/server/engine/queries';
 import type { Interpretation, Interpret, RefusalClass } from './types';
 
@@ -181,6 +182,7 @@ const ENDING_MAX_TOKENS = 72;
 // quotes/whitespace stripped. Returns null on any failure/timeout/empty so the caller can fall back.
 // Never throws.
 async function authorLine(
+	label: GeminiCall['label'],
 	system: string,
 	contents: string,
 	maxOutputTokens: number
@@ -202,13 +204,13 @@ async function authorLine(
 		]);
 		if (result === null) {
 			captureGemini({
-				label: 'oracle-flair',
+				label,
 				request,
 				error: `timeout after ${FLAIR_TIMEOUT_MS}ms`
 			});
 			return null;
 		}
-		captureGemini({ label: 'oracle-flair', request, response: result });
+		captureGemini({ label, request, response: result });
 		// First line only (drops any stray stage-note/preamble the model adds on a new line), with
 		// wrapping quotes stripped. One or two short sentences live on one line. Empty → fall back.
 		const line = (result.text ?? '')
@@ -218,7 +220,7 @@ async function authorLine(
 			.trim();
 		return line === '' ? null : line;
 	} catch (err) {
-		captureGemini({ label: 'oracle-flair', request, error: String(err) });
+		captureGemini({ label, request, error: String(err) });
 		console.error('[oracle] Gemini flair failed:', { model: MODEL, error: err });
 		return null;
 	}
@@ -229,7 +231,12 @@ async function authorLine(
  * /timeout/empty so the caller can fall back to the deterministic line. Never throws.
  */
 export function composeOracleFlair(verdict: string): Promise<string | null> {
-	return authorLine(FLAIR_SYSTEM, `Verdict: ${verdict}\nLine:`, ANSWER_MAX_TOKENS);
+	return authorLine(
+		'oracle-answer-flair',
+		FLAIR_SYSTEM,
+		`Verdict: ${verdict}\nLine:`,
+		ANSWER_MAX_TOKENS
+	);
 }
 
 /**
@@ -238,7 +245,12 @@ export function composeOracleFlair(verdict: string): Promise<string | null> {
  */
 export function composeEndingFlair(outcome: 'win' | 'lose'): Promise<string | null> {
 	const system = outcome === 'win' ? WIN_ENDING_SYSTEM : LOSE_ENDING_SYSTEM;
-	return authorLine(system, 'Speak the closing line now.', ENDING_MAX_TOKENS);
+	return authorLine(
+		outcome === 'win' ? 'oracle-ending-flair' : 'skoll-ending-flair',
+		system,
+		'Speak the closing line now.',
+		ENDING_MAX_TOKENS
+	);
 }
 
 export const interpret: Interpret = async (question) => {

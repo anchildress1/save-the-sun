@@ -310,6 +310,23 @@ describe('POST /api/action', () => {
 		expect(verifyLine(SKOLL_VOICE, data.outcomeFlair.text, data.outcomeFlair.sig)).toBe(true);
 	});
 
+	it('does not mint fresh ending flair for no-op actions after the round is already won', async () => {
+		const { composeEndingFlair } = await import('$lib/server/oracle/gemini');
+		(composeEndingFlair as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+			'The dawn is kept; Sól climbs free.'
+		);
+
+		const win = await json(await call({ type: 'Cast', player: 'Human', runeName: SECRET }));
+		const advanceNoop = await json(await advance());
+		const staleCast = await json(await call({ type: 'Cast', player: 'Human', runeName: SECRET }));
+
+		expect(win.outcomeFlair?.text).toBe('The dawn is kept; Sól climbs free.');
+		expect(advanceNoop.outcomeFlair).toBeUndefined();
+		expect(staleCast.cast).toMatchObject({ ok: false, reason: 'round-over' });
+		expect(staleCast.outcomeFlair).toBeUndefined();
+		expect(composeEndingFlair).toHaveBeenCalledTimes(1);
+	});
+
 	it('omits outcomeFlair when ending authoring fails — client falls back to the fixed beat (ttd:22)', async () => {
 		// composeEndingFlair defaults to null; a winning cast carries no authored line.
 		const data = await json(await call({ type: 'Cast', player: 'Human', runeName: SECRET }));
@@ -538,6 +555,24 @@ describe('POST /api/action', () => {
 			const io = byOwner('Oracle').find(isRawIO)!;
 			expect(io).toMatchObject({ kind: 'llm', part: 'Ask' });
 			expect(io.message).toContain('oracle');
+		});
+
+		it('attributes ending flair raw I/O to the ending speaker on the Cast beat', async () => {
+			skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
+			await ask();
+			runWithSession(SID, () =>
+				captureGemini({
+					label: 'skoll-ending-flair',
+					request: { contents: 'closing gloat' },
+					response: { text: 'The sun is mine.' }
+				})
+			);
+
+			await advance();
+
+			const io = byOwner('Sköll').find((e) => e.message.includes('skoll-ending-flair'))!;
+			expect(io).toMatchObject({ kind: 'llm', owner: 'Sköll', part: 'Cast' });
+			expect(byOwner('Oracle').some((e) => e.message.includes('skoll-ending-flair'))).toBe(false);
 		});
 	});
 

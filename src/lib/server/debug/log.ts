@@ -67,7 +67,13 @@ export function resetLog(sessionId: string): void {
 // gemini.ts has no sessionId, so it tees its raw I/O here and the route drains it. Keyed PER SESSION
 // via an AsyncLocalStorage so concurrent turns never drain each other's I/O.
 export interface GeminiCall {
-	label: 'move' | 'reaction' | 'oracle' | 'oracle-flair';
+	label:
+		| 'move'
+		| 'reaction'
+		| 'oracle'
+		| 'oracle-answer-flair'
+		| 'oracle-ending-flair'
+		| 'skoll-ending-flair';
 	request: unknown;
 	response?: unknown;
 	error?: string;
