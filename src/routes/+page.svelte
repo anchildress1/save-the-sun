@@ -697,6 +697,18 @@
 		answerAudio = d ? deliver(d) : null;
 	}
 
+	// One recovery path for a dropped-but-committed action: resync, and if the reconciled state proves
+	// the move landed (`committed()`), restore its real voiced result. Returns whether it recovered, so
+	// each caller shows its failure line only when it did not.
+	async function recoverFromDrop(committed: () => boolean): Promise<boolean> {
+		const { landed, lastLine } = await reconcile();
+		if (landed && lastLine && committed()) {
+			applyRecoveredLine(lastLine);
+			return true;
+		}
+		return false;
+	}
+
 	// Resync to authoritative server state after a dropped action response. A timed-out or failed POST
 	// aborts the browser fetch, but the server completed the move under `withSessionLock`, so the
 	// engine has moved on — without this the UI strands on a stale turn/board (or a retry that no-ops)
@@ -822,13 +834,11 @@
 			// His move may have landed server-side before the response dropped — resync, so a parked Ask
 			// surfaces its reaction prompt (or a won round its end screen) instead of a retry that no-ops
 			// against the already-advanced turn. Only a turn still genuinely stuck on Sköll keeps the rouse.
-			const { landed, lastLine } = await reconcile();
 			// His winning cast is the one Advance result that voices — recover his cast line so a loss
 			// screen never rises silent. (A parked Ask already restores its prompt via reconcile; a wrong
 			// cast voices nothing, so it falls through to the stall check.)
-			if (landed && lastLine && roundOver && winner === 'Sköll') {
-				applyRecoveredLine(lastLine);
-			} else if (!skollAsking && activePlayer === 'Sköll' && roundStatus === 'active') {
+			const recovered = await recoverFromDrop(() => roundOver && winner === 'Sköll');
+			if (!recovered && !skollAsking && activePlayer === 'Sköll' && roundStatus === 'active') {
 				answer = RITE.wolfStalled;
 				skollStalled = true;
 			}
@@ -1077,15 +1087,10 @@
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
 			console.error('[ui] Ask dispatch failed:', err);
-			// The Ask may have landed and handed the turn to Sköll — resync so the controls reflect whose
-			// turn it really is (runAsk then drives his move) rather than re-enabling Human against it.
-			const { landed, lastLine } = await reconcile();
-			// A committed Ask handed the turn to Sköll (or resolved the round); the dropped response's real
-			// answer is the recovered line, not the false silent line. reconcile re-voices it.
-			if (landed && lastLine && (activePlayer === 'Sköll' || roundOver)) {
-				applyRecoveredLine(lastLine);
+			// The Ask may have landed and handed the turn to Sköll (or resolved the round) — resync and, if
+			// it committed, restore her real answer instead of the false silent line.
+			if (await recoverFromDrop(() => activePlayer === 'Sköll' || roundOver))
 				return { line: answer, consumed: true, voice: null };
-			}
 			answer = RITE.oracleSilent;
 			return { line: RITE.oracleSilent, consumed: false, voice: null };
 		}
@@ -1161,13 +1166,9 @@
 			console.error('[ui] React dispatch failed:', err);
 			// The reaction may have resolved server-side (charge spent, turn advanced) — resync so the
 			// held charges and turn match engine truth instead of stranding the prompt.
-			const { landed, lastLine } = await reconcile();
-			// A committed React closed Sköll's parked Ask (skollAsking clears) — recover its real
+			// A committed React closes Sköll's parked Ask (skollAsking clears) — recover its real
 			// resolution line instead of the false silent line.
-			if (landed && lastLine && !skollAsking) {
-				applyRecoveredLine(lastLine);
-				return answer;
-			}
+			if (await recoverFromDrop(() => !skollAsking)) return answer;
 			answer = RITE.oracleSilent;
 			return RITE.oracleSilent;
 		}
@@ -1299,13 +1300,9 @@
 			console.error('[ui] Cast dispatch failed:', err);
 			// The cast may have committed server-side (it's irreversible) — resync so a win's end screen
 			// and the advanced turn show instead of the controls re-enabling against a decided round.
-			const { landed, lastLine } = await reconcile();
 			// A committed cast resolved the round (win) or handed the turn to Sköll (wrong) — recover its
 			// real outcome instead of the false falters line.
-			if (landed && lastLine && (roundOver || activePlayer === 'Sköll')) {
-				applyRecoveredLine(lastLine);
-				return answer;
-			}
+			if (await recoverFromDrop(() => roundOver || activePlayer === 'Sköll')) return answer;
 			answer = RITE.castFalters;
 			return RITE.castFalters;
 		} finally {
