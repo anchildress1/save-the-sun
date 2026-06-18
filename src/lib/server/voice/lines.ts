@@ -11,6 +11,7 @@ import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { REACTION_LINES, carriesAnswer, type ReactionLineId } from '$lib/voice/reactionLines';
 import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
 import { OUTCOME_LINES, type Outcome, type OutcomeBeat } from '$lib/voice/outcomeLines';
+import { verifyLine } from './sign';
 import { runes } from '$lib/board';
 
 const REFUSAL_CLASSES: ReadonlySet<RefusalClass> = new Set([
@@ -46,7 +47,11 @@ export type LineDescriptor =
 	| { kind: 'cast'; result: 'true' | 'wrong' | 'falters'; rune?: string }
 	// The end-screen outcome (ux-copy §4): one beat of the staged splash copy, voiced in sequence — the
 	// win in the Oracle's voice, the loss in Sköll's, so the player hears who took the day.
-	| { kind: 'outcome'; result: Outcome; beat: OutcomeBeat };
+	| { kind: 'outcome'; result: Outcome; beat: OutcomeBeat }
+	// The Oracle's dramatized answer (ttd:17): authored by Gemini per Ask, so it can't be recomposed
+	// from a descriptor like the others. The server signs it; this voices only when the signature
+	// matches, so the route still admits no arbitrary text — just a server-issued line in her voice.
+	| { kind: 'authored'; text: string; voice: string; sig: string };
 
 // Parse a query and bound it to the real board (runes are 1-6); null on anything malformed or
 // out-of-range. Shared by the answer, Sköll-ask, and scry composers.
@@ -115,12 +120,18 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 			return composeCast(descriptor.result, descriptor.rune);
 		case 'outcome':
 			return composeOutcome(descriptor.result, descriptor.beat);
+		case 'authored':
+			// The gate: voice the authored line only when the server's signature matches it exactly.
+			return verifyLine(descriptor.voice, descriptor.text, descriptor.sig) ? descriptor.text : null;
 	}
 }
 
 /** Which prebuilt voice speaks a descriptor — Sköll's lines (his Ask, the loss) in his voice,
  *  everything else the Oracle's. */
 export function voiceForLine(descriptor: LineDescriptor): string {
+	// An authored line carries its own (signature-bound) voice — composeLine has already verified it by
+	// the time the route reads this, so it's trusted here.
+	if (descriptor.kind === 'authored') return descriptor.voice;
 	const skoll =
 		descriptor.kind === 'skoll-ask' ||
 		descriptor.kind === 'skoll-cast' ||
@@ -172,6 +183,8 @@ export function isLineDescriptor(value: unknown): value is LineDescriptor {
 			return typeof v.result === 'string';
 		case 'outcome':
 			return typeof v.result === 'string' && typeof v.beat === 'string';
+		case 'authored':
+			return typeof v.text === 'string' && typeof v.voice === 'string' && typeof v.sig === 'string';
 		default:
 			return false;
 	}

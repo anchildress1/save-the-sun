@@ -16,6 +16,7 @@ import { resetTtsWindows, TTS_SESSION_LIMIT } from '$lib/server/voice/rateLimit'
 import { refusalLine } from '$lib/server/oracle/oracle';
 import { skollAskEcho, skollCastEcho } from '$lib/server/skoll/skoll';
 import { synthPrompt } from '$lib/server/voice/lines';
+import { signLine } from '$lib/server/voice/sign';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 
 function streamOf(...chunks: string[]) {
@@ -100,6 +101,49 @@ describe('POST /api/voice/tts', () => {
 
 	it('rejects an unshaped descriptor with 400', async () => {
 		const response = await call('bad-shape', { kind: 'whatever' });
+		expect(response.status).toBe(400);
+		expect(tts.synthesizeStream).not.toHaveBeenCalled();
+	});
+
+	it('voices an authored Oracle line carrying a valid signature (ttd:17)', async () => {
+		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm'));
+		const text = 'Yes — the flame-sign burns; Sól reaches for fire.';
+		const body = {
+			kind: 'authored' as const,
+			text,
+			voice: ORACLE_VOICE,
+			sig: signLine(ORACLE_VOICE, text) as string
+		};
+
+		const response = await call('authored', body);
+
+		expect(response.status).toBe(200);
+		// Voiced in her director's-notes, in her voice — the gate admitted it because the sig matched.
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
+			synthPrompt(body, text),
+			ORACLE_VOICE
+		);
+	});
+
+	it('refuses an authored line with a forged signature — the gate admits no arbitrary text', async () => {
+		const response = await call('forged', {
+			kind: 'authored',
+			text: 'Whatever a caller wants spoken for free.',
+			voice: ORACLE_VOICE,
+			sig: 'not-a-real-signature'
+		});
+		expect(response.status).toBe(400);
+		expect(tts.synthesizeStream).not.toHaveBeenCalled();
+	});
+
+	it('refuses an authored line whose text was tampered after signing', async () => {
+		const sig = signLine(ORACLE_VOICE, 'the line the server signed');
+		const response = await call('tampered', {
+			kind: 'authored',
+			text: 'a different line entirely',
+			voice: ORACLE_VOICE,
+			sig
+		});
 		expect(response.status).toBe(400);
 		expect(tts.synthesizeStream).not.toHaveBeenCalled();
 	});

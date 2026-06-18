@@ -665,6 +665,40 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 		);
 	});
 
+	it('voices her dramatized, server-signed line when the server authored one (ttd:17)', async () => {
+		const FLAIR = 'Yes — the flame-sign burns; she reaches for fire.';
+		const voiced = { kind: 'authored', text: FLAIR, voice: 'Gacrux', sig: 'server-signed' };
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			if (String(input) !== '/api/action') return new Response('{}');
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (body.type === 'Advance')
+				return new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN }));
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						query: { axis: 'element', value: 'Fire' },
+						answer: ASK_ANSWER,
+						affirmative: false,
+						turnConsumed: true,
+						voiced
+					},
+					skollVsYou: { reaction: 'Pass' },
+					state: HUMAN_TURN
+				})
+			);
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByTestId('mute-toggle').click(); // audio on
+		await screen.getByLabelText('Ask the Oracle').fill('is it a fire rune?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		// The panel shows exactly what she voices (R10) — the dramatized line, not the template.
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent(FLAIR);
+		// And the authored+signed descriptor is what rides the delivery seam to the gated TTS route.
+		await vi.waitFor(() => expect(deliveryMock.deliver).toHaveBeenCalledWith(voiced));
+	});
+
 	it("voices Sköll's Ask through the delivery seam when his Advance asks", async () => {
 		const ASK_QUERY = { axis: 'element', value: 'Fire' };
 		const SKOLL_TURN: GameState = {

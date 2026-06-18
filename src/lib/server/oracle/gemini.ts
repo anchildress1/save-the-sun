@@ -125,6 +125,79 @@ function ai(): GoogleGenAI {
 	return client;
 }
 
+// She authors her verdict aloud (ttd:17): the deterministic line in, ONE dramatized in-character line
+// out — same meaning, fresh words, so repeated Asks never sound canned. Full Flash like interpret (the
+// Oracle reads/speaks right, never plays down — `gemini-model-tier-split`), MINIMAL thinking (a rephrase,
+// not reasoning), temp 1 for variety. The model is given only the finished verdict, so it can't invent a
+// fact or leak the secret — it only restyles what the engine already decided.
+const FLAIR_SYSTEM = `<role>You are the Oracle in "Save the Sun," keeper of a fire-rite. You speak a verdict the witch has earned — reverent, ancient, certain, never chatty.</role>
+
+<task>Rephrase the given verdict as ONE short, dramatic, in-character line. Keep its EXACT meaning: the same yes-or-no, and the same single trait it names.</task>
+
+<never>
+- Never flip or soften the verdict — a Yes stays yes, a No stays no.
+- Never add a fact, number, color, element, or rune the verdict did not state; never reveal or hint at the secret.
+- Never ask a question, address yourself, or break character.
+- No quotation marks, no emoji, no stage directions — output only the line.
+</never>
+
+<examples>
+Verdict: Yes. Sól is reaching for a fire rune.
+Line: Yes — the flame-sign burns; Sól reaches for fire.
+
+Verdict: No. Sól is not reaching for a rune of more than 4 power.
+Line: No. She does not reach past the weight of four.
+</examples>`;
+
+// Bounded so a slow author never eats the Oracle's response budget — past this the caller voices the
+// deterministic line instead. Short, since one sentence is all she speaks.
+const FLAIR_TIMEOUT_MS = 2500;
+const FLAIR_MAX_TOKENS = 64;
+
+/**
+ * Dramatize a deterministic verdict line into one in-character Oracle sentence, or null on any failure
+ * /timeout/empty so the caller can fall back to the deterministic line. Never throws.
+ */
+export async function composeOracleFlair(verdict: string): Promise<string | null> {
+	const contents = `Verdict: ${verdict}\nLine:`;
+	const request = { systemInstruction: FLAIR_SYSTEM, contents };
+	try {
+		const flair = await Promise.race([
+			ai().models.generateContent({
+				model: MODEL,
+				contents,
+				config: {
+					systemInstruction: FLAIR_SYSTEM,
+					thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+					temperature: 1,
+					maxOutputTokens: FLAIR_MAX_TOKENS
+				}
+			}),
+			new Promise<null>((resolve) => setTimeout(() => resolve(null), FLAIR_TIMEOUT_MS))
+		]);
+		if (flair === null) {
+			captureGemini({
+				label: 'oracle-flair',
+				request,
+				error: `timeout after ${FLAIR_TIMEOUT_MS}ms`
+			});
+			return null;
+		}
+		captureGemini({ label: 'oracle-flair', request, response: flair });
+		// One line only; strip wrapping quotes/whitespace the model may add. Empty → fall back.
+		const line = (flair.text ?? '')
+			.trim()
+			.split('\n')[0]
+			.replace(/^["“]|["”]$/g, '')
+			.trim();
+		return line === '' ? null : line;
+	} catch (err) {
+		captureGemini({ label: 'oracle-flair', request, error: String(err) });
+		console.error('[oracle] Gemini flair failed:', { model: MODEL, error: err });
+		return null;
+	}
+}
+
 export const interpret: Interpret = async (question) => {
 	let raw: RawResponse;
 	const request = { systemInstruction: SYSTEM_INSTRUCTION, contents: question };

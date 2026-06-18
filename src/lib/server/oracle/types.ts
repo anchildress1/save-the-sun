@@ -36,6 +36,10 @@ export type OracleResult =
 			answer: string;
 			affirmative: boolean;
 			turnConsumed: true;
+			// The dramatized, server-signed line to voice instead of the deterministic `answer` (ttd:17).
+			// Absent when flair was skipped or fell back — the client then voices the `answer` template.
+			// Structurally an `authored` LineDescriptor (not imported, to avoid a types↔lines cycle).
+			voiced?: { kind: 'authored'; text: string; voice: string; sig: string };
 	  }
 	| { ok: false; reason: 'refusal'; refusal: RefusalClass; line: string; turnConsumed: false }
 	| { ok: false; reason: 'engine'; engineReason: InvalidReason; turnConsumed: false };

@@ -1048,7 +1048,11 @@
 				// Refusal wins before the answer branch: a refused sign is never voiced as a verdict.
 				outcome = { line: oracle.line, consumed: false, voice: oracleVoice(oracle) };
 			} else if (oracle?.ok) {
-				outcome = { line: oracle.answer, consumed: true, voice: oracleVoice(oracle) };
+				// Her dramatized, server-signed line when the server authored one (ttd:17); else the
+				// deterministic answer. The panel shows exactly what she voices (R10).
+				outcome = oracle.voiced
+					? { line: oracle.voiced.text, consumed: true, voice: oracle.voiced }
+					: { line: oracle.answer, consumed: true, voice: oracleVoice(oracle) };
 			} else if (oracle) {
 				// not-your-turn means the engine has handed the turn to Sköll. System line — not voiced.
 				outcome = {

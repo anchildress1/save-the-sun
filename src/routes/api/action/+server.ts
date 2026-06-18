@@ -10,9 +10,11 @@ import {
 } from '$lib/server/engine/actions';
 import { getEngine, getSkoll, withSessionLock, recordLine } from '$lib/server/engine/session';
 import { composeLine, type LineDescriptor } from '$lib/server/voice/lines';
-import { interpret } from '$lib/server/oracle/gemini';
+import { interpret, composeOracleFlair } from '$lib/server/oracle/gemini';
 import { voiceAnswer, prepareAsk, answerAsk } from '$lib/server/oracle/oracle';
 import type { OracleResult } from '$lib/server/oracle/types';
+import { signLine } from '$lib/server/voice/sign';
+import { ORACLE_VOICE } from '$lib/voice/config';
 import { resolveReaction } from '$lib/server/engine/reactions';
 import {
 	takeSkollTurn,
@@ -95,7 +97,8 @@ function humanAsks(sessionId: string, question: string): void {
 // reaction calls are Sköll's own.
 function geminiEvents(sessionId: string, movePart: TurnPart): void {
 	for (const call of drainGemini(sessionId)) {
-		const oracle = call.label === 'oracle';
+		// Her interpret and her flair are both the Oracle's, on the Ask beat; the move/reaction are his.
+		const oracle = call.label.startsWith('oracle');
 		let part: TurnPart = movePart;
 		if (oracle) part = 'Ask';
 		else if (call.label === 'reaction') part = 'React';
@@ -341,6 +344,17 @@ async function askWithSkollReaction(
 		}
 	}
 
+	// She authors her verdict aloud on a clean answer (ttd:17): when Sköll neither hexed nor scried, the
+	// deterministic line is restyled by Gemini and server-signed, so the route still voices only her own
+	// words — never arbitrary text. A failed/slow author leaves `voiced` unset; the client then voices
+	// the deterministic `answer`. The engine verdict + the log above stay the canonical deterministic truth.
+	if (oracle?.ok && vs.choice === 'Pass') {
+		const flair = await composeOracleFlair(oracle.answer);
+		geminiEvents(sessionId, 'Ask'); // drain the flair call's raw I/O onto this turn's Ask beat
+		const sig = flair ? signLine(ORACLE_VOICE, flair) : null;
+		if (flair && sig) oracle.voiced = { kind: 'authored', text: flair, voice: ORACLE_VOICE, sig };
+	}
+
 	let truth: string;
 	if (vs.killed) truth = 'Hexed by Sköll — the Oracle is silent, her turn spent';
 	else if (oracle?.ok) truth = oracle.answer;
@@ -360,7 +374,11 @@ async function askWithSkollReaction(
 						affirmative: oracle.affirmative
 					}
 				: oracle?.ok
-					? { kind: 'answer', query: prepared.query, affirmative: oracle.affirmative }
+					? (oracle.voiced ?? {
+							kind: 'answer',
+							query: prepared.query,
+							affirmative: oracle.affirmative
+						})
 					: null;
 	rememberLine(sessionId, voice);
 

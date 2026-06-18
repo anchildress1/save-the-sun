@@ -7,8 +7,13 @@ vi.mock('$lib/server/oracle/gemini', () => ({
 		kind: 'query',
 		query: { axis: 'fill', value: 'Light' },
 		paraphrase: 'whether it is light'
-	}))
+	})),
+	// Default: no flair (the deterministic line stands). A test overrides this to prove the authored path.
+	composeOracleFlair: vi.fn(async () => null)
 }));
+
+// The sign gate (sign.ts) reuses this as its HMAC key — set it so an authored line can be signed.
+vi.mock('$env/dynamic/private', () => ({ env: { GEMINI_API_KEY: 'route-test-key' } }));
 
 vi.mock('$lib/server/skoll/gemini', () => ({
 	decideSkollMove: vi.fn(async () => ({ kind: 'cast', runeName: WRONG })),
@@ -20,6 +25,8 @@ import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
 import { resetEngine, getEngine, getSkoll } from '$lib/server/engine/session';
 import { getEvents, captureGemini, runWithSession } from '$lib/server/debug/log';
 import { selectSecret } from '$lib/server/engine/engine';
+import { verifyLine } from '$lib/server/voice/sign';
+import { ORACLE_VOICE } from '$lib/voice/config';
 import { runes } from '$lib/board';
 
 const SEED = 1;
@@ -68,6 +75,30 @@ describe('POST /api/action', () => {
 		// The wolf's move is a SEPARATE request, so the answer comes back alone, his turn pending.
 		expect(data.skoll).toBeUndefined();
 		expect(data.state).toMatchObject({ activePlayer: 'Sköll', status: 'active' });
+	});
+
+	it('voices a Gemini-authored, server-signed line on a clean answer (ttd:17)', async () => {
+		const { composeOracleFlair } = await import('$lib/server/oracle/gemini');
+		(composeOracleFlair as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+			'Yes — the white sign holds; she reaches into light.'
+		);
+
+		const data = await json(await ask());
+
+		expect(data.oracle.voiced).toMatchObject({
+			kind: 'authored',
+			text: 'Yes — the white sign holds; she reaches into light.',
+			voice: ORACLE_VOICE
+		});
+		// The signature is the gate: it verifies for this exact (voice, text) the server authored.
+		expect(verifyLine(ORACLE_VOICE, data.oracle.voiced.text, data.oracle.voiced.sig)).toBe(true);
+	});
+
+	it('omits the authored line when flair fails — the deterministic answer stands (ttd:17)', async () => {
+		// composeOracleFlair defaults to null (no flair); the response carries no signed line to voice.
+		const data = await json(await ask());
+		expect(data.oracle.ok).toBe(true);
+		expect(data.oracle.voiced).toBeUndefined();
 	});
 
 	it('runs Sköll’s turn only on Advance, handing play back after a wrong cast', async () => {
