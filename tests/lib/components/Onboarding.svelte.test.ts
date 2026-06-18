@@ -29,7 +29,7 @@ describe('Onboarding — title screen + first-run tour (S7)', () => {
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 6');
 		await expect
 			.element(screen.getByTestId('step-body'))
-			.toHaveTextContent('Your goal is to name Sól’s true rune before Sköll does');
+			.toHaveTextContent('Your goal is to cast Sól’s true rune before Sköll does');
 
 		await screen.getByRole('button', { name: 'Next' }).click();
 		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('2 / 6');

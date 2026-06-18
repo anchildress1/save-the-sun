@@ -297,8 +297,8 @@ Sól speaks only at victory—the goddess's rarity is the power.
 ### First-run onboarding (one concept per step, dismissable, board visible behind)
 Plain, clear, mechanic-first — flavor stays light so the rules read at a glance. Cast comes last (it's the endgame action).
 
-- **Step 1—The Goal:** "Your goal is to name Sól's true rune before Sköll does. One of the 24 runes is hers — find it first and you win the day; if he names it first, you lose."
-- **Step 2—Ask:** "On your turn, ask the Oracle one yes/no question about the runes — by element, power, light, hue, or a rune by name. She always answers truthfully."
+- **Step 1—The Goal:** "Your goal is to cast Sól's true rune before Sköll does. One of the 24 runes is hers — find it first and you win the day; if Sköll finds it first, you lose."
+- **Step 2—Ask:** "On your turn, ask the Oracle one yes/no question about the runes — by element, power, light, color, or a rune by name. She always answers truthfully."
 - **Step 3—Speak:** "Rather speak than type? Hold the medallion (or the backtick key) and say your question, then release to send. It works just like the text box — and you can answer Sköll by voice too."
 - **Step 4—Read & Cross:** "After each answer, cross off the runes it rules out — tap a rune to mark it. The board never does this for you."
 - **Step 5—Scry & Hex:** "When Sköll questions the Oracle, answer back once — Scry to hear her reply, or Hex to block his question. You get one Scry and one Hex per game."
@@ -378,7 +378,7 @@ Muted is signaled by shape, never color alone: the speaker glyph loses its sound
 
 ## Locked decisions (2026-06-04)
 - **Frame:** the longest day (headline) won through the one short night (nuance).
-- **Traits:** count = "power"; fill = "light/dark" (○ light, ● dark); axes = element, power, light, hue.
+- **Traits:** count = "power"; fill = "light/dark" (○ light, ● dark); axes = element, power, light, color.
 - **Address:** Sköll says "witch" = gender-neutral coven role; Oracle addresses no one.
 - **Reactions:** Scry + Hex are one-use reactions (not cards) that trigger on an Ask; Cast is sacred. Spent reactions remain visible but disabled (no visible spent copy).
 - **Casting a crossed-off rune is legal**—crossing is the player's private aid, never validated.

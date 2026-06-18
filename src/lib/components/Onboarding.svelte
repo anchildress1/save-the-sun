@@ -15,12 +15,12 @@
 			// stays unhighlighted until "Read & Cross."
 			label: 'The Goal',
 			target: null,
-			body: 'Your goal is to name Sól’s true rune before Sköll does. One of the 24 runes is hers — find it first and you win the day; if he names it first, you lose.'
+			body: 'Your goal is to cast Sól’s true rune before Sköll does. One of the 24 runes is hers — find it first and you win the day; if Sköll finds it first, you lose.'
 		},
 		{
 			label: 'Ask',
 			target: '[data-coach="ask"]',
-			body: 'On your turn, ask the Oracle one yes/no question about the runes — by element, power, light, hue, or a rune by name. She always answers truthfully.'
+			body: 'On your turn, ask the Oracle one yes/no question about the runes — by element, power, light, color, or a rune by name. She always answers truthfully.'
 		},
 		{
 			label: 'Speak',
