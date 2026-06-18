@@ -88,9 +88,9 @@ The medallion at the top of the Oracle panel is both the push-to-talk control an
 - **Idle** — disc unveiled, ready (a small mic glyph etched for discoverability).
 - **Recording** — corona flares with the player's voice while the hold is down.
 - **Thinking** — the rune ring orbits while the utterance is transcribed.
-- **Oracle speaking** — corona pulses with her line.
-- **Sköll speaking** — the glow shifts gold→ember **and** the disc deepens toward total eclipse with an ember rim — the sun devoured — so the speaker reads by brightness and shape, never color alone.
-- `prefers-reduced-motion` swaps every pulse/orbit for a static glow intensity.
+- **Oracle speaking** — a steady gold corona while her line plays.
+- **Sköll speaking** — the glow shifts gold→ember **and** the disc deepens toward total eclipse with an ember rim — the sun devoured — so the speaker reads by brightness and shape, never color alone. The indicator follows the delivery queue (which clip is actually sounding), so his ember shows only once his clip plays — never while her line is still being heard.
+- `prefers-reduced-motion` swaps the recording flare and ring orbit for static glow intensities (the speaking states are already steady).
 - Each state carries an ARIA label and a polite live-region announcement; the medallion and the mute toggle sit in one labeled `role="group"` and are keyboard-operable.
 
 ## Every game move is written (R10) ✍️
