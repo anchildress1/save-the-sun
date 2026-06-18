@@ -131,8 +131,9 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 /** Which prebuilt voice speaks a descriptor — Sköll's lines (his Ask, the loss) in his voice,
  *  everything else the Oracle's. */
 export function voiceForLine(descriptor: LineDescriptor): string {
-	// An authored line carries its own (signature-bound) voice — composeLine has already verified it by
-	// the time the route reads this, so it's trusted here.
+	// An authored line carries its own voice. (Not a security check: the TTS route resolves authored
+	// lines by id from the session store and uses the STORED voice — this is just the correct answer
+	// if voiceForLine is ever called on one.)
 	if (descriptor.kind === 'authored') return descriptor.voice;
 	const skoll =
 		descriptor.kind === 'skoll-ask' ||

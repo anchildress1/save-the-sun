@@ -100,10 +100,10 @@ export interface PendingReaction {
 }
 
 /**
- * A Gemini-authored, server-signed closing line voiced on the end screen (ttd:22) — the Oracle's
- * blessing on a win, Sköll's gloat on a loss. Structurally an `authored` LineDescriptor; the client
- * delivers it through the same gated TTS route. Absent when authoring failed (client falls back to the
- * fixed splash beat).
+ * A Gemini-authored closing line voiced on the end screen (ttd:22) — the Oracle's blessing on a win,
+ * Sköll's gloat on a loss. Structurally an `authored` LineDescriptor: its words live in the session's
+ * voice-line store (the TTS route voices them by `id` lookup, never from the wire). Absent when
+ * authoring failed (client falls back to the fixed splash beat).
  */
 export interface AuthoredLine {
 	kind: 'authored';

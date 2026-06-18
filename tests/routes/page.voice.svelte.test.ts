@@ -696,7 +696,7 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
 		// The panel shows exactly what she voices (R10) — the dramatized line, not the template.
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent(FLAIR);
-		// And the authored+signed descriptor is what rides the delivery seam to the gated TTS route.
+		// And the authored descriptor (id-backed) is what rides the delivery seam to the TTS route.
 		await vi.waitFor(() => expect(deliveryMock.deliver).toHaveBeenCalledWith(voiced));
 	});
 

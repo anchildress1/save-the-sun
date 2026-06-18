@@ -14,7 +14,8 @@ vi.mock('$lib/server/oracle/gemini', () => ({
 	composeEndingFlair: vi.fn(async () => null)
 }));
 
-// The sign gate (sign.ts) reuses this as its HMAC key — set it so an authored line can be signed.
+// debug/log.ts reads this to mask the key out of any logged text; provide it so the route's logging
+// path resolves the virtual env module under test. (No signing here — authored lines are store-by-id.)
 vi.mock('$env/dynamic/private', () => ({ env: { GEMINI_API_KEY: 'route-test-key' } }));
 
 vi.mock('$lib/server/skoll/gemini', () => ({
@@ -100,7 +101,7 @@ describe('POST /api/action', () => {
 	});
 
 	it('omits the authored line when flair fails — the deterministic answer stands (ttd:17)', async () => {
-		// composeOracleFlair defaults to null (no flair); the response carries no signed line to voice.
+		// composeOracleFlair defaults to null (no flair); the response carries no authored line to voice.
 		const data = await json(await ask());
 		expect(data.oracle.ok).toBe(true);
 		expect(data.oracle.voiced).toBeUndefined();

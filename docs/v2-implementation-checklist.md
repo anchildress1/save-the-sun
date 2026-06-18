@@ -135,8 +135,8 @@ Every **game move** (R10) is composed server-side, allow-listed (`src/lib/server
 - [x] Director's-notes per voice — Sköll a deep gravelly growl, the Oracle a brisk reverent weight; tuned by ear 2026-06-14
 - [x] Serialized delivery — lines chain on the one shared speaker, so two never interleave (her answer, then his Ask)
 - [x] Sköll's winning cast (dynamic `{Rune}`) — `skoll-cast` descriptor, recomposed server-side from the rune on the `Advance` wire, voiced in his voice
-- [x] The full end-screen sequence — the `outcome` descriptor carries a `beat`; `VOICED_SEQUENCE` voices the staged beats in order (win: verse→coda in her voice; loss: lead→verse→coda in his)
-- [x] Oracle spoken flair (ttd:17) — her clean answer is Gemini-authored and voiced behind a server-signed (`authored`) gate
+- [x] The end-screen voice — the winner speaks ONE Gemini-authored character line (`composeEndingFlair`: Oracle blessing on a win, Sköll gloat on a loss), voiced by id lookup like ttd:17; falls back to a fixed `VOICED_SEQUENCE` punch beat (win→coda, loss→lead) when authoring fails or on a resumed round. The fixed lead/verse/coda stay on-screen text (R10)
+- [x] Oracle spoken flair (ttd:17) — her clean answer is Gemini-authored and voiced by the store-by-id `authored` path (words stashed server-side, voiced by id lookup — never from the wire; no signing)
 - [ ] Deferred (`ttd.md`): the audio-only ambience taunt layer (V3)
 
 ## Order 🧭
