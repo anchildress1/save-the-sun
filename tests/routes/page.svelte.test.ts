@@ -740,6 +740,69 @@ describe('Save the Sun page', () => {
 		expect(pass.disabled).toBe(false);
 	});
 
+	it('keeps a spent Scry spent through a reconcile that lands on a non-parked turn', async () => {
+		// The named bug: a dropped action reconciles to a human turn with no parked Ask, so /api/state
+		// carries no charge state — reconcile must PRESERVE the spent Scry, not re-grant it.
+		const error = expectConsole('error');
+		let askCount = 0;
+		stubFetch(async (url: string, init?: { body?: string }) => {
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 0,
+						roundId: 'test-round',
+						state: HUMAN_TURN,
+						pendingReaction: null
+					})
+				);
+			if (body.type === 'Advance') return new Response(JSON.stringify(advanceAsk()));
+			if (body.type === 'React')
+				return new Response(
+					JSON.stringify(
+						reactResult({
+							hexed: false,
+							scried: { answer: 'Yes. Sól is reaching for a gold rune.' }
+						})
+					)
+				);
+			if (body.type === 'Ask') {
+				askCount += 1;
+				// The second Ask drops mid-flight, forcing the reconcile; the others hand Sköll the turn.
+				if (askCount === 2) return new Response('nope', { status: 500 });
+				return new Response(
+					JSON.stringify({
+						type: 'Ask',
+						oracle: { ok: true, answer: 'No.', turnConsumed: true },
+						skollVsYou: { reaction: 'Pass' },
+						state: SKOLL_TURN
+					})
+				);
+			}
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+
+		// Spend the night's one Scry on Sköll's first Ask.
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Scry' }).click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('his answer is yours.');
+
+		// An Ask drops → reconcile lands on a non-parked human turn (pendingReaction null).
+		await humanAsks(screen);
+		await vi.waitFor(() => expect(error).toHaveBeenCalled());
+
+		// Sköll asks again — the Scry must still read spent, not re-granted by the reconcile.
+		await humanAsks(screen);
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
+		expect(
+			(screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement).disabled
+		).toBe(true);
+		expect(
+			(screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement).disabled
+		).toBe(false);
+	});
+
 	it('kills the question when the human Hexes Sköll Ask', async () => {
 		gameStub({ advance: advanceAsk(), react: reactResult({ hexed: true }) });
 		const screen = render(Page, pageProps);
