@@ -206,4 +206,24 @@ describe('POST /api/voice/tts', () => {
 		expect(response.headers.get('retry-after')).toBe('60');
 		expect(tts.synthesizeStream).toHaveBeenCalledTimes(TTS_SESSION_LIMIT);
 	});
+
+	it('returns a clean 200 NDJSON stream even when the synth generator throws mid-stream', async () => {
+		// The route's start() loops the generator with no try/catch — it relies on synthesizeStream
+		// swallowing its own errors. Prove a generator that yields one chunk then throws still returns the
+		// 200 NDJSON response (the gate already passed); the stream surfaces the failure on read rather
+		// than wedging, and there is no unhandled rejection.
+		tts.synthesizeStream.mockReturnValueOnce(
+			(async function* () {
+				yield 'pcm-a';
+				throw new Error('synth blew up mid-stream');
+			})()
+		);
+
+		const response = await call('mid-stream-throw', { kind: 'refusal', refusal: 'empty' });
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('content-type')).toContain('application/x-ndjson');
+		// The stream errors before close, so draining it rejects with the synth failure (not a hang).
+		await expect(response.text()).rejects.toThrow('synth blew up mid-stream');
+	});
 });

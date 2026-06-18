@@ -25,7 +25,13 @@ vi.mock('$lib/server/skoll/gemini', () => ({
 
 import { POST } from '$routes/api/action/+server';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
-import { resetEngine, getEngine, getSkoll, getVoiceLine } from '$lib/server/engine/session';
+import {
+	resetEngine,
+	getEngine,
+	getSkoll,
+	getVoiceLine,
+	getLastLine
+} from '$lib/server/engine/session';
 import { getEvents, captureGemini, runWithSession } from '$lib/server/debug/log';
 import { selectSecret } from '$lib/server/engine/engine';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
@@ -621,5 +627,36 @@ describe('POST /api/action', () => {
 			await callAs('player-two', { type: 'Cast', player: 'Human', runeName: SECRET })
 		);
 		expect(stillWinnable).toMatchObject({ type: 'Cast', cast: { won: true } });
+	});
+
+	// ttd:29 — every committed voiced move records its line + descriptor so a dropped response recovers
+	// the real result instead of the client's false silent/falters line. The route is where it's written.
+	describe('lastLine recovery wiring (ttd:29)', () => {
+		it('records the answer line + descriptor on a committed human Ask', async () => {
+			await ask(); // a clean answer (Sköll passes by default)
+			const last = getLastLine(SID);
+			expect(last).not.toBeNull();
+			// The query/seed verdict here is "No"; the recovered line is her deterministic answer.
+			expect(last!.text).toMatch(/^(Yes|No)\. Sól is/);
+			expect(last!.voice).toMatchObject({ kind: 'answer' });
+		});
+
+		it('records the cast outcome line + descriptor on a committed human Cast', async () => {
+			await call({ type: 'Cast', player: 'Human', runeName: WRONG }); // a resolved wrong cast
+			const last = getLastLine(SID);
+			expect(last).not.toBeNull();
+			// A wrong cast voices the "wrong" line naming the rune the human cast.
+			expect(last!.voice).toMatchObject({ kind: 'cast', result: 'wrong', rune: WRONG });
+			expect(last!.text).toContain(WRONG);
+		});
+
+		it('does not clobber the prior recorded line on a CrossOff (nothing voiced)', async () => {
+			await ask(); // records her answer line
+			const before = getLastLine(SID);
+			expect(before).not.toBeNull();
+			// A CrossOff voices nothing — rememberLine must be a no-op, leaving the prior line intact.
+			await call({ type: 'CrossOff', player: 'Human', runeId: 1, crossed: true });
+			expect(getLastLine(SID)).toEqual(before);
+		});
 	});
 });

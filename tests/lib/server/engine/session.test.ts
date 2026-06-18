@@ -4,10 +4,15 @@ import {
 	getEngine,
 	getSkoll,
 	getRoundId,
+	getBoardSeed,
 	resetEngine,
 	sessionCount,
+	storeVoiceLine,
+	getVoiceLine,
+	withSessionLock,
 	MAX_SESSIONS
 } from '$lib/server/engine/session';
+import { ORACLE_VOICE } from '$lib/voice/config';
 import { getEvents, logEvent } from '$lib/server/debug/log';
 
 const SEED = 1;
@@ -143,6 +148,29 @@ describe('session engine registry', () => {
 		expect(getRoundId('round-token-victim')).not.toBe(id);
 	});
 
+	it('mints a stable board seed that survives a refresh and isolates per session', () => {
+		const seed = getBoardSeed('board-seed');
+		expect(typeof seed).toBe('number');
+		// A bare getEngine (refresh) keeps the same layout seed — the round resumed.
+		getEngine('board-seed');
+		expect(getBoardSeed('board-seed')).toBe(seed);
+		// A parallel session deals its own board.
+		expect(getBoardSeed('board-seed-other')).not.toBe(seed);
+	});
+
+	it('remints the board seed on a new round so a fresh secret deals a fresh board', () => {
+		const before = getBoardSeed('board-seed-reset');
+		resetEngine('board-seed-reset', SEED);
+		expect(getBoardSeed('board-seed-reset')).not.toBe(before);
+	});
+
+	it('evicts the board seed with its engine', () => {
+		const seed = getBoardSeed('board-seed-victim');
+		for (let i = 0; i <= MAX_SESSIONS; i++) getEngine(`board-flood-${i}`);
+		// Evicted → a fresh seed on next access, not the old one resurrected.
+		expect(getBoardSeed('board-seed-victim')).not.toBe(seed);
+	});
+
 	it('never grows past the session cap', () => {
 		for (let i = 0; i <= MAX_SESSIONS + 10; i++) getEngine(`cap-${i}`);
 		expect(sessionCount()).toBe(MAX_SESSIONS);
@@ -173,5 +201,59 @@ describe('session engine registry', () => {
 
 		// Survived: still the same won round, never reset.
 		expect(getEngine('active-keep').status).toBe('won');
+	});
+
+	// The authored-line store is bounded per round (MAX_VOICE_LINES) so a marathon round can't grow
+	// memory without bound — the oldest id is dropped once over the cap, the recent ones survive.
+	it('drops the oldest authored voice line once past the per-round cap', () => {
+		const MAX_VOICE_LINES = 32;
+		const session = 'voice-line-cap';
+		const oldest = storeVoiceLine(session, 'the first line', ORACLE_VOICE);
+		let newest = oldest;
+		// One more than the cap → the first stored id falls off the front.
+		for (let i = 0; i < MAX_VOICE_LINES; i++) {
+			newest = storeVoiceLine(session, `line ${i}`, ORACLE_VOICE);
+		}
+		expect(getVoiceLine(session, oldest)).toBeNull(); // evicted — the route would refuse it
+		expect(getVoiceLine(session, newest)).toEqual({ text: 'line 31', voice: ORACLE_VOICE });
+	});
+});
+
+describe('withSessionLock', () => {
+	it('serializes overlapping actions for one session — they run in call order', async () => {
+		const order: string[] = [];
+		const gated = (label: string, release: Promise<void>) =>
+			withSessionLock('lock-order', async () => {
+				await release;
+				order.push(label);
+			});
+
+		let releaseFirst: () => void = () => {};
+		const firstGate = new Promise<void>((resolve) => {
+			releaseFirst = resolve;
+		});
+
+		// Fire both back-to-back; the first holds the lock until its gate opens, so the second must wait
+		// behind it even though it has no work of its own to await.
+		const first = gated('first', firstGate);
+		const second = gated('second', Promise.resolve());
+
+		releaseFirst();
+		await Promise.all([first, second]);
+
+		expect(order).toEqual(['first', 'second']);
+	});
+
+	it('does not wedge the queue when an action rejects — the next still runs', async () => {
+		await expect(
+			withSessionLock('lock-reject', async () => {
+				throw new Error('action blew up');
+			})
+		).rejects.toThrow('action blew up');
+
+		// The failed tail must not poison the chain: the next action for the same session still resolves.
+		await expect(withSessionLock('lock-reject', async () => 'recovered')).resolves.toBe(
+			'recovered'
+		);
 	});
 });
