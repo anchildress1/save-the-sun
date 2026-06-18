@@ -419,6 +419,33 @@ describe('Save the Sun page — cast by voice', () => {
 		expect(sentCast).toBe(true);
 	});
 
+	it('drops an armed spoken cast if the player cancels before it resolves', async () => {
+		let resolveCast: (r: Response) => void = () => {};
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const url = String(input);
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (url === '/api/voice/transcribe' && body.mode === 'cast') {
+				return new Promise<Response>((resolve) => {
+					resolveCast = resolve;
+				});
+			}
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // arm
+
+		press(screen);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		release(screen); // transcribe now in flight
+
+		// The player backs out before the transcription returns — the irreversible cast must not land.
+		await screen.getByRole('button', { name: 'Not yet' }).click();
+		resolveCast(new Response(JSON.stringify({ rune: 'Sowilo' })));
+
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+		expect(actionBodies().some((b) => b.type === 'Cast')).toBe(false);
+	});
+
 	it('refuses a cast the model could not match — no Cast dispatched, a notice instead', async () => {
 		mockCastFetch(''); // unclear: matched no board rune
 		const screen = render(Page, pageProps);

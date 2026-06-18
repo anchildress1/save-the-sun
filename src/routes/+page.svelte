@@ -481,9 +481,11 @@
 				const choice = await classifyReactionUtterance(clip.wavBase64);
 				if (fresh()) await respondReaction(choice);
 			} else if (clip && casting) {
-				// Armed by hand: the rune name alone casts (the arm already declared intent).
+				// Armed by hand: the rune name alone casts (the arm already declared intent). Re-check
+				// castMode AFTER the transcribe — "Not yet" clicked mid-flight cancels the arm, and an
+				// irreversible cast must not land after the player backed out.
 				const name = await classifyCastUtterance(clip.wavBase64);
-				if (fresh()) await respondCast(name);
+				if (fresh() && castMode) await respondCast(name);
 			} else if (clip) {
 				// A normal hold is a question — or a hands-free cast when the player explicitly names a
 				// rune. The spoken words never fill the typing box (the route tees what was heard to
@@ -664,13 +666,16 @@
 			clearTimeout(timer);
 		}
 		// A dropped new-game still reset the round server-side — drop the per-round view so crossings,
-		// the voiced line, and the outcome can't resume against a new secret.
+		// the voiced line, and the outcome can't resume against a new secret. A fresh round also restores
+		// both reaction charges.
 		if (snap.roundId !== prevRoundId) {
 			restoreCrossed = [];
 			crossings = [];
 			answer = '';
 			askValue = '';
 			outcomeVoiced = false;
+			heldScry = true;
+			heldHex = true;
 			stopDelivery();
 		}
 		seedOverride = snap.boardSeed;
@@ -678,8 +683,13 @@
 		applyState(snap.state);
 		skollEcho = snap.pendingReaction?.echo ?? '';
 		skollAsking = snap.pendingReaction != null;
-		heldScry = snap.pendingReaction?.held.Scry ?? true;
-		heldHex = snap.pendingReaction?.held.Hex ?? true;
+		// Charge state only rides the snapshot when an Ask is parked. Outside that, /api/state carries no
+		// charges, so preserve what the client already knows (a spent Scry/Hex stays spent) — resetting
+		// to `true` here would re-advertise a power the engine no longer allows.
+		if (snap.pendingReaction) {
+			heldScry = snap.pendingReaction.held.Scry;
+			heldHex = snap.pendingReaction.held.Hex;
+		}
 		skollStalled = false;
 		cancelCast();
 		return true;

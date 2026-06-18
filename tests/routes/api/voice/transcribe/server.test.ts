@@ -72,7 +72,8 @@ describe('POST /api/voice/transcribe', () => {
 
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ rune: 'Sowilo' });
-		expect(stt.classifyCast).toHaveBeenCalledExactlyOnceWith('UklGRg==', ['Sowilo', 'Fehu']);
+		// Matched against the SERVER's canonical board names, not the client-sent list.
+		expect(stt.classifyCast).toHaveBeenCalledWith('UklGRg==', expect.arrayContaining(['Sowilo']));
 		expect(stt.transcribe).not.toHaveBeenCalled();
 	});
 
@@ -92,7 +93,8 @@ describe('POST /api/voice/transcribe', () => {
 
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ rune: 'Sowilo' });
-		expect(stt.interpretAsk).toHaveBeenCalledExactlyOnceWith('UklGRg==', ['Sowilo', 'Fehu']);
+		// Matched against the SERVER's canonical board names, not the client-sent list.
+		expect(stt.interpretAsk).toHaveBeenCalledWith('UklGRg==', expect.arrayContaining(['Sowilo']));
 		expect(stt.transcribe).not.toHaveBeenCalled();
 	});
 

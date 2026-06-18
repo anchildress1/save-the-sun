@@ -8,16 +8,21 @@ import {
 	interpretAsk
 } from '$lib/server/voice/transcribe';
 import { logEvent } from '$lib/server/debug/log';
+import { runes as boardRunes } from '$lib/board';
 import type { RequestHandler } from './$types';
 
 // A held push-to-talk utterance is a base64 WAV; cap it so a malformed/huge payload can't be sent
 // to Gemini. ~5MB base64 ≈ 3.6MB audio ≈ well over a minute at 16kHz mono — plenty for one Ask.
 const MAX_WAV_BASE64 = 5_000_000;
 
+// Cast matching uses the SERVER's canonical rune names, never the client's list — the board always
+// holds these 24, so a malformed client can't pad the Gemini prompt with junk labels under our key.
+const RUNE_NAMES = boardRunes.map((rune) => rune.name);
+
 // Reads a recorded utterance: `ask` (default) transcribes it verbatim into the player's question;
 // `reaction` classifies a reply to Sköll's hanging question into scry/hex/pass (or unclear); `cast`
-// matches a spoken rune name (against the board names the client sends) to commit an armed cast. The
-// browser sends only audio — the engine still runs the same Ask/React/Cast paths the buttons use.
+// matches a spoken rune name (against the server's canonical board names) to commit an armed cast.
+// The browser sends only audio — the engine still runs the same Ask/React/Cast paths the buttons use.
 export const POST: RequestHandler = async ({ request, locals }) => {
 	let body: unknown;
 	try {
@@ -75,7 +80,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	if (mode === 'cast') {
-		const rune = await classifyCast(wavBase64, runes as unknown[] as string[]);
+		const rune = await classifyCast(wavBase64, RUNE_NAMES);
 		logEvent(locals.sessionId, {
 			owner: 'Human',
 			kind: 'input',
@@ -86,10 +91,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ rune });
 	}
 
-	// Default (ask): a question, or a hands-free cast when the player names a board rune. Combined only
-	// when the client sends the board runes to match against; without them it's a plain transcribe.
+	// Default (ask): a question, or a hands-free cast when the player names a board rune. The client
+	// sends `runes` only as the signal that it wants cast detection; the match runs against the
+	// server's canonical names. Without the signal it's a plain transcribe.
 	if (Array.isArray(runes)) {
-		const result = await interpretAsk(wavBase64, runes as string[]);
+		const result = await interpretAsk(wavBase64, RUNE_NAMES);
 		if ('cast' in result) {
 			logEvent(locals.sessionId, {
 				owner: 'Human',

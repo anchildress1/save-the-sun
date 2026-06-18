@@ -446,7 +446,7 @@ test.describe('the night advances', () => {
 		await expect.poll(pageDawnOpacity).toBeGreaterThan(0);
 	});
 
-	test('the night completes on a win — moon fully set, sun risen', async ({ page }) => {
+	test('the night completes on a win — the moon fully sets', async ({ page }) => {
 		await page.route('**/api/action', (route) =>
 			route.fulfill({
 				json: {
@@ -463,10 +463,6 @@ test.describe('the night advances', () => {
 		await page.getByRole('button', { name: 'Name it' }).click();
 
 		// nightT snaps to 1 on a human win: the sky finishes its full 44px descent.
-		await expect
-			.poll(() =>
-				page.locator('.header-background-image').evaluate((el) => getComputedStyle(el).translate)
-			)
-			.toBe('0px 44px');
+		await expect(page.locator('.header-background-image')).toHaveCSS('translate', '0px 44px');
 	});
 });
