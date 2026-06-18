@@ -116,7 +116,7 @@ His **Ask** is now voiced through the shared TTS route in his voice, not a clip 
 
 - [x] His Ask (a game move) is voiced + written — `skoll-ask` line descriptor (`lines.ts`) recomposes his line server-side from the parked `query` via `skollAskEcho`; `tts.ts` voices it in `SKOLL_VOICE`; the page delivers it through the same `deliver()` seam as the Oracle. Written on his frame (`skoll-echo`, R10).
 - [x] One speaker at a time — structural: Oracle + Sköll share the one TTS delivery seam, so his line serializes after hers, never overlapping (R9).
-- [~] His winning cast (a game move naming `{Rune}`) — **deferred**: voice it the same way once the rune rides the `Advance` wire, with a caption (`ttd.md`).
+- [x] His winning cast (a game move naming `{Rune}`) — landed: the rune rides the `Advance` wire (`casts`), the server recomposes his line (`skoll-cast` descriptor), and it's voiced in his voice + captioned on his frame.
 - [~] Taunt/address detection → wolf, idle/hunt ambience triggers — **deferred** with the ambience layer (taunt needs a spoken input; idle is a client timer).
 - [x] Mic discipline during Sköll playback — retired with Live. Sköll and the Oracle now share the one delivery speaker, so their lines serialize through `deliver()`; the medallion mirrors the active speaker from delivery events. No socket, token mint, or mic-forwarding pause exists in the push-to-talk path.
 - Depends: S2, S12
@@ -134,7 +134,10 @@ Every **game move** (R10) is composed server-side, allow-listed (`src/lib/server
 - [x] End-screen outcome — `outcome` descriptor, shared `outcomeLines.ts`: a **win in the Oracle's voice** (victory coda), a **loss in Sköll's** (night-everlasting verse)
 - [x] Director's-notes per voice — Sköll a deep gravelly growl, the Oracle a brisk reverent weight; tuned by ear 2026-06-14
 - [x] Serialized delivery — lines chain on the one shared speaker, so two never interleave (her answer, then his Ask)
-- [ ] Deferred (`ttd.md`): Sköll's winning cast (dynamic `{Rune}`), the audio-only ambience taunt layer, voicing the full Sól victory sequence (only one beat is voiced today)
+- [x] Sköll's winning cast (dynamic `{Rune}`) — `skoll-cast` descriptor, recomposed server-side from the rune on the `Advance` wire, voiced in his voice
+- [x] The full end-screen sequence — the `outcome` descriptor carries a `beat`; `VOICED_SEQUENCE` voices the staged beats in order (win: verse→coda in her voice; loss: lead→verse→coda in his)
+- [x] Oracle spoken flair (ttd:17) — her clean answer is Gemini-authored and voiced behind a server-signed (`authored`) gate
+- [ ] Deferred (`ttd.md`): the audio-only ambience taunt layer (V3)
 
 ## Order 🧭
 
