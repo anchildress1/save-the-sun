@@ -87,6 +87,7 @@
 		noReactionWindow: 'Sköll asks nothing to scry, hex, or pass.',
 		// A spoken reply to Sköll's question the model couldn't read as a reaction — ask again, spend nothing.
 		reactUnclear: 'Scry, hex, or pass — or let his question stand.',
+		castUnclear: 'Name a rune on the board to cast it — or cast by hand.',
 		scrySpent: 'Your scrying is spent for the night.',
 		hexSpent: 'Your hex is spent for the night.',
 		riteDone: 'The longest day is decided — begin anew.',
@@ -367,6 +368,9 @@
 	// Ask) and the round/turn at that moment. A button reaction or any action during the hold then
 	// changes the live state but not these — so the clip resolves as what the player meant, or drops.
 	let holdReacting = false;
+	// A hold begun with a cast armed names the rune to commit (the deliberate arm is the safety step,
+	// so a misheard question can never cast). Fixed at press like holdReacting.
+	let holdCasting = false;
 	let holdToken = '';
 
 	// Drive the medallion's voice from delivery playback: a line begins → its speaker; the queue
@@ -421,8 +425,10 @@
 		if (holdWanted || holdSetupPending || medalState === 'recording' || medalState === 'thinking') {
 			return;
 		}
-		// Fix the hold's intent + freshness at the moment of the press.
+		// Fix the hold's intent + freshness at the moment of the press. Reaction wins over cast (his
+		// question is only open on his turn; cast is armed only on hers, so they never truly overlap).
 		holdReacting = skollAsking;
+		holdCasting = !skollAsking && castMode;
 		holdToken = `${roundId}:${turns}`;
 		holdWanted = true;
 		holdSetupPending = true;
@@ -462,6 +468,7 @@
 		// or any action taken DURING the hold can't reclassify a held scry/hex/pass into an Ask, and the
 		// stale clip is dropped rather than replayed into the moved turn.
 		const reacting = holdReacting;
+		const casting = holdCasting;
 		const token = holdToken;
 		const fresh = () => `${roundId}:${turns}` === token;
 		medalState = 'thinking';
@@ -473,6 +480,9 @@
 			if (clip && reacting) {
 				const choice = await classifyReactionUtterance(clip.wavBase64);
 				if (fresh()) await respondReaction(choice);
+			} else if (clip && casting) {
+				const name = await classifyCastUtterance(clip.wavBase64);
+				if (fresh()) await respondCast(name);
 			} else if (clip) {
 				// Dispatch straight to the engine — the spoken words never fill the typing box (the
 				// transcribe route tees what was heard to /debug for mishear diagnosis). Mirror the typed
@@ -535,6 +545,18 @@
 		}
 	}
 
+	// Match a held cast utterance to a board rune (server constrains the answer to the names we send);
+	// '' on any failure or a name that isn't on the board, so a mishear never commits the cast.
+	async function classifyCastUtterance(wavBase64: string): Promise<string> {
+		const res = await postUtterance({ wavBase64, mode: 'cast', runes: runes.map((r) => r.name) });
+		if (!res?.ok) return '';
+		try {
+			return ((await res.json()) as { rune?: string }).rune ?? '';
+		} catch {
+			return '';
+		}
+	}
+
 	// Run a spoken reaction through the same dispatch the prompt buttons use. Guards mirror the
 	// buttons: a spent scry/hex is refused (not silently passed), and an unread reply asks again
 	// rather than guessing — only the pass is free, and nothing is staked on a mishear.
@@ -559,6 +581,20 @@
 		} finally {
 			pending = false;
 		}
+	}
+
+	// Commit a spoken cast through the same path the board's "Name it" uses. Guards mirror that button:
+	// the cast must still be armed and the turn live; a name that didn't resolve to a board rune asks
+	// again rather than guessing, so the irreversible cast is never staked on a mishear.
+	async function respondCast(name: string) {
+		if (!castMode || pending || !canAct) return;
+		const rune = name ? runes.find((r) => r.name === name) : undefined;
+		if (!rune) {
+			answer = RITE.castUnclear;
+			return;
+		}
+		selectedTargetId = rune.id;
+		await commitCast();
 	}
 
 	// Build the descriptor for the Oracle's own spoken line (answer or refusal) so the delivery

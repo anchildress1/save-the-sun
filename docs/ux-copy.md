@@ -302,7 +302,7 @@ Plain, clear, mechanic-first — flavor stays light so the rules read at a glanc
 - **Step 3—Speak:** "Rather speak than type? Hold the medallion (or the Space bar), say your question, and release to send. It works just like the text box — and you can answer Sköll by voice too."
 - **Step 4—Read & Cross:** "After each answer, cross off the runes it rules out — tap a rune to mark it. The board never does this for you."
 - **Step 5—Scry & Hex:** "When Sköll questions the Oracle, answer back once — Scry to hear her reply, or Hex to block his question. You get one Scry and one Hex per game."
-- **Step 6—Cast:** "When you're sure, cast your rune to name it. Get it right and you win the day; get it wrong and you lose the turn — so cast only when you're certain."
+- **Step 6—Cast:** "When you're sure, choose Cast, then tap the rune or say its name. Get it right and you win the day; get it wrong and you lose the turn — so cast only when you're certain."
 - **Final button:** **"Take up the runes."**
 
 ## 6. Chrome & States

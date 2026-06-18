@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const stt = vi.hoisted(() => ({ transcribe: vi.fn(), classifyReaction: vi.fn() }));
+const stt = vi.hoisted(() => ({
+	transcribe: vi.fn(),
+	classifyReaction: vi.fn(),
+	classifyCast: vi.fn()
+}));
 vi.mock('$lib/server/voice/transcribe', () => ({
 	transcribe: stt.transcribe,
-	classifyReaction: stt.classifyReaction
+	classifyReaction: stt.classifyReaction,
+	classifyCast: stt.classifyCast
 }));
 
 const mock = vi.hoisted(() => ({
@@ -52,6 +57,27 @@ describe('POST /api/voice/transcribe', () => {
 		expect(await response.json()).toEqual({ choice: 'hex' });
 		expect(stt.classifyReaction).toHaveBeenCalledExactlyOnceWith('UklGRg==');
 		expect(stt.transcribe).not.toHaveBeenCalled();
+	});
+
+	it('matches a cast in cast mode against the board runes', async () => {
+		stt.classifyCast.mockResolvedValueOnce('Sowilo');
+
+		const response = await call('cast', {
+			wavBase64: 'UklGRg==',
+			mode: 'cast',
+			runes: ['Sowilo', 'Fehu']
+		});
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ rune: 'Sowilo' });
+		expect(stt.classifyCast).toHaveBeenCalledExactlyOnceWith('UklGRg==', ['Sowilo', 'Fehu']);
+		expect(stt.transcribe).not.toHaveBeenCalled();
+	});
+
+	it('rejects cast mode without a runes array with 400', async () => {
+		const response = await call('cast-no-runes', { wavBase64: 'UklGRg==', mode: 'cast' });
+		expect(response.status).toBe(400);
+		expect(stt.classifyCast).not.toHaveBeenCalled();
 	});
 
 	it('rejects an unknown mode with 400', async () => {

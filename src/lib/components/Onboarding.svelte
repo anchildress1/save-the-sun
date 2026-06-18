@@ -40,7 +40,7 @@
 		{
 			label: 'Cast',
 			target: '[data-coach="cast"]',
-			body: 'When you’re sure, cast your rune to name it. Get it right and you win the day; get it wrong and you lose the turn — so cast only when you’re certain.'
+			body: 'When you’re sure, choose Cast, then tap the rune or say its name. Get it right and you win the day; get it wrong and you lose the turn — so cast only when you’re certain.'
 		}
 	];
 

@@ -325,6 +325,69 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 	});
 });
 
+describe('Save the Sun page — cast by voice', () => {
+	// Cast must be armed first (the deliberate safety step), then the rune named aloud. The server
+	// constrains the match to the board names the client sends, so only a real rune commits.
+	function mockCastFetch(rune: string) {
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const url = String(input);
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (url === '/api/voice/transcribe') {
+				return new Response(JSON.stringify(body.mode === 'cast' ? { rune } : { text: '' }));
+			}
+			if (url === '/api/action') {
+				if (body.type === 'Advance')
+					return new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN }));
+				if (body.type === 'Cast')
+					return new Response(
+						JSON.stringify({ type: 'Cast', cast: { ok: true, won: true }, state: HUMAN_WON })
+					);
+			}
+			return new Response('{}');
+		});
+	}
+
+	it('casts the named rune when a cast is armed and the rune is spoken', async () => {
+		mockCastFetch('Sowilo');
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // arm
+
+		press(screen);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		release(screen);
+
+		await vi.waitFor(() => {
+			const casts = actionBodies().filter((b) => b.type === 'Cast');
+			expect(casts).toHaveLength(1);
+			expect(casts[0].runeName).toBe('Sowilo');
+		});
+		// The hold sent the board's rune names for the server to match against.
+		const sentCast = vi
+			.mocked(fetch)
+			.mock.calls.some(
+				([url, init]) =>
+					String(url) === '/api/voice/transcribe' &&
+					JSON.parse(String((init as RequestInit)?.body ?? '{}')).mode === 'cast'
+			);
+		expect(sentCast).toBe(true);
+	});
+
+	it('refuses a cast the model could not match — no Cast dispatched, a notice instead', async () => {
+		mockCastFetch(''); // unclear: matched no board rune
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+
+		press(screen);
+		release(screen);
+
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+		expect(actionBodies().some((b) => b.type === 'Cast')).toBe(false);
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Name a rune on the board to cast it');
+	});
+});
+
 describe('Save the Sun page — delivery drives the medallion voice', () => {
 	it('mirrors the speaking voice and settles to idle on drain', async () => {
 		const screen = render(Page, pageProps);

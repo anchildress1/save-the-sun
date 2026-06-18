@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { claimTranscribeSlot } from '$lib/server/voice/rateLimit';
-import { transcribe, classifyReaction } from '$lib/server/voice/transcribe';
+import { transcribe, classifyReaction, classifyCast } from '$lib/server/voice/transcribe';
 import { logEvent } from '$lib/server/debug/log';
 import type { RequestHandler } from './$types';
 
@@ -10,8 +10,9 @@ import type { RequestHandler } from './$types';
 const MAX_WAV_BASE64 = 5_000_000;
 
 // Reads a recorded utterance: `ask` (default) transcribes it verbatim into the player's question;
-// `reaction` classifies a reply to Sköll's hanging question into scry/hex/pass (or unclear). The
-// browser sends only audio — the engine still runs the same Ask/React paths the buttons use.
+// `reaction` classifies a reply to Sköll's hanging question into scry/hex/pass (or unclear); `cast`
+// matches a spoken rune name (against the board names the client sends) to commit an armed cast. The
+// browser sends only audio — the engine still runs the same Ask/React/Cast paths the buttons use.
 export const POST: RequestHandler = async ({ request, locals }) => {
 	let body: unknown;
 	try {
@@ -24,7 +25,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	if (typeof body !== 'object' || body === null) {
 		return json({ error: 'Bad request.' }, { status: 400 });
 	}
-	const { wavBase64, mode } = body as { wavBase64?: unknown; mode?: unknown };
+	const { wavBase64, mode, runes } = body as {
+		wavBase64?: unknown;
+		mode?: unknown;
+		runes?: unknown;
+	};
 	if (
 		typeof wavBase64 !== 'string' ||
 		wavBase64.length === 0 ||
@@ -32,8 +37,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	) {
 		return json({ error: 'Bad audio.' }, { status: 400 });
 	}
-	if (mode !== undefined && mode !== 'ask' && mode !== 'reaction') {
+	if (mode !== undefined && mode !== 'ask' && mode !== 'reaction' && mode !== 'cast') {
 		return json({ error: 'Bad mode.' }, { status: 400 });
+	}
+	if (mode === 'cast' && !Array.isArray(runes)) {
+		return json({ error: 'Bad cast targets.' }, { status: 400 });
 	}
 
 	// Fail loudly (503) when voice is unconfigured so a deploy/config gap is visible, and gate the
@@ -59,6 +67,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			message: `heard reaction: ${choice}`
 		});
 		return json({ choice });
+	}
+
+	if (mode === 'cast') {
+		const rune = await classifyCast(wavBase64, runes as unknown[] as string[]);
+		logEvent(locals.sessionId, {
+			owner: 'Human',
+			kind: 'input',
+			part: 'Voice',
+			level: 'info',
+			message: `heard cast: ${rune || '(unclear)'}`
+		});
+		return json({ rune });
 	}
 
 	const text = await transcribe(wavBase64);
