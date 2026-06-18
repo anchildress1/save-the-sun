@@ -1256,10 +1256,13 @@
 </script>
 
 <svelte:head>
-	<!-- Assets the preload scanner can't see: the title splash mounts only after hydration
-	     (Onboarding) and the divider hides behind a CSS var — both paint on first load, so
-	     fetch them with the document instead of after it. -->
-	<link rel="preload" as="image" type="image/webp" href={introSplash} />
+	<!-- Assets the preload scanner can't see (mounted after hydration, or hidden behind a CSS var), so
+	     fetch them with the document instead of after it. The intro splash is the onboarding LCP — only
+	     warm it when onboarding will actually show (a returning player never sees it, so never fetches
+	     it). The divider paints on every load. -->
+	{#if showOnboarding}
+		<link rel="preload" as="image" type="image/webp" href={introSplash} />
+	{/if}
 	<link rel="preload" as="image" type="image/webp" href={uiDivider} />
 </svelte:head>
 
