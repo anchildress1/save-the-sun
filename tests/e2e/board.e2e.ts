@@ -351,7 +351,7 @@ test.describe('first-run onboarding', () => {
 		await expect(page.getByTestId('onboarding')).toHaveCount(0);
 	});
 
-	test('walks the coach-mark tour over the board and takes up the runes', async ({ page }) => {
+	test('walks the coach-mark tour over the board and finds her rune', async ({ page }) => {
 		await page.goto('/');
 		// Scope to the title overlay — a second "How the rite works" lives in the header behind it.
 		await page
@@ -367,14 +367,14 @@ test.describe('first-run onboarding', () => {
 
 		for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Next' }).click();
 		await expect(page.getByTestId('step-count')).toHaveText('5 / 6');
-		await expect(page.getByRole('heading', { name: 'Scry & Hex' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Cast', exact: true })).toBeVisible();
 
 		await page.getByRole('button', { name: 'Next' }).click();
 		await expect(page.getByTestId('step-count')).toHaveText('6 / 6');
-		await expect(page.getByRole('heading', { name: 'Cast', exact: true })).toBeVisible();
-		const takeUp = page.getByRole('button', { name: 'Take up the runes.' });
-		await expect(takeUp).toBeInViewport();
-		await takeUp.click();
+		await expect(page.getByRole('heading', { name: 'Speak' })).toBeVisible();
+		const finish = page.getByRole('button', { name: 'Find her rune.' });
+		await expect(finish).toBeInViewport();
+		await finish.click();
 		await expect(page.getByTestId('onboarding')).toHaveCount(0);
 	});
 
