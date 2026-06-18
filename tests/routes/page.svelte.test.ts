@@ -283,6 +283,37 @@ describe('Save the Sun page', () => {
 			.toHaveTextContent('Sowilo is not the one. The night holds.');
 	});
 
+	it('plays Sköll’s winning cast before the defeat splash, even with audio off', async () => {
+		// Human's wrong cast hands the turn to Sköll; his Advance is a winning cast that ends the round.
+		stubFetch(async (_url: string, init?: { body?: string }) => {
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (body.type === 'Advance')
+				return new Response(
+					JSON.stringify({
+						type: 'Advance',
+						skoll: { casts: { rune: 'Sowilo', echo: 'I name it. Sowilo.' } },
+						state: SKOLL_WON
+					})
+				);
+			return new Response(
+				JSON.stringify({ type: 'Cast', cast: { ok: true, won: false }, state: SKOLL_TURN })
+			);
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+		await screen.getByRole('button', { name: /select sowilo as cast target/i }).click();
+		await screen.getByRole('button', { name: 'Name it' }).click();
+
+		// His cast frame plays first — the end screen is held during the beat, not slammed up instantly.
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('I name it');
+		expect(screen.container.querySelector('[data-testid="end-screen"]')).toBeNull();
+		// Then the defeat splash takes over once the beat ends.
+		await vi.waitFor(
+			() => expect(screen.container.querySelector('[data-testid="end-screen"]')).not.toBeNull(),
+			{ timeout: 3000 }
+		);
+	});
+
 	it('cancels a cast with no turn spent', async () => {
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Cast the rune' }).click();
@@ -474,10 +505,9 @@ describe('Save the Sun page', () => {
 		await expect.element(screen.getByRole('button', { name: 'Cast the rune' })).toBeDisabled();
 	});
 
-	it('raises the sun and voices the victory line in the header on a human win', async () => {
+	it('voices the victory line in the header on a human win', async () => {
 		const screen = render(Page, propsWith(HUMAN_WON));
 		expect(screen.container.querySelector('.header-background-image')).not.toBeNull();
-		expect(screen.container.querySelector('.sun-risen')).not.toBeNull();
 		await expect
 			.element(screen.getByTestId('outcome-line'))
 			.toHaveTextContent('Sól crests the rim of the world.');
@@ -485,10 +515,9 @@ describe('Save the Sun page', () => {
 
 	it('keeps the moon banner on a Sköll win — short tag in the header, no defeat copy in the panel', async () => {
 		const screen = render(Page, propsWith(SKOLL_WON));
-		// No sunrise for a loss — the moonlit background holds. The header carries only the short tag;
-		// the defeat sentence belongs to the end screen alone, never doubled into the Oracle panel.
+		// The moonlit background holds. The header carries only the short tag; the defeat sentence
+		// belongs to the end screen alone, never doubled into the Oracle panel.
 		expect(screen.container.querySelector('.header-background-image')).not.toBeNull();
-		expect(screen.container.querySelector('.sun-risen')).toBeNull();
 		// The loss freezes the night mid-sink — nightT snaps to 1 only when the dawn is won.
 		expect(
 			screen.container
@@ -711,6 +740,69 @@ describe('Save the Sun page', () => {
 		expect(pass.disabled).toBe(false);
 	});
 
+	it('keeps a spent Scry spent through a reconcile that lands on a non-parked turn', async () => {
+		// The named bug: a dropped action reconciles to a human turn with no parked Ask, so /api/state
+		// carries no charge state — reconcile must PRESERVE the spent Scry, not re-grant it.
+		const error = expectConsole('error');
+		let askCount = 0;
+		stubFetch(async (url: string, init?: { body?: string }) => {
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 0,
+						roundId: 'test-round',
+						state: HUMAN_TURN,
+						pendingReaction: null
+					})
+				);
+			if (body.type === 'Advance') return new Response(JSON.stringify(advanceAsk()));
+			if (body.type === 'React')
+				return new Response(
+					JSON.stringify(
+						reactResult({
+							hexed: false,
+							scried: { answer: 'Yes. Sól is reaching for a gold rune.' }
+						})
+					)
+				);
+			if (body.type === 'Ask') {
+				askCount += 1;
+				// The second Ask drops mid-flight, forcing the reconcile; the others hand Sköll the turn.
+				if (askCount === 2) return new Response('nope', { status: 500 });
+				return new Response(
+					JSON.stringify({
+						type: 'Ask',
+						oracle: { ok: true, answer: 'No.', turnConsumed: true },
+						skollVsYou: { reaction: 'Pass' },
+						state: SKOLL_TURN
+					})
+				);
+			}
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+
+		// Spend the night's one Scry on Sköll's first Ask.
+		await humanAsks(screen);
+		await screen.getByRole('button', { name: 'Scry' }).click();
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('his answer is yours.');
+
+		// An Ask drops → reconcile lands on a non-parked human turn (pendingReaction null).
+		await humanAsks(screen);
+		await vi.waitFor(() => expect(error).toHaveBeenCalled());
+
+		// Sköll asks again — the Scry must still read spent, not re-granted by the reconcile.
+		await humanAsks(screen);
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
+		expect(
+			(screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement).disabled
+		).toBe(true);
+		expect(
+			(screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement).disabled
+		).toBe(false);
+	});
+
 	it('kills the question when the human Hexes Sköll Ask', async () => {
 		gameStub({ advance: advanceAsk(), react: reactResult({ hexed: true }) });
 		const screen = render(Page, pageProps);
@@ -849,7 +941,7 @@ describe('Save the Sun page — first-run onboarding (S7)', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByTestId('show-instructions').click();
 		// Straight into the tour (no title screen) on the first concept.
-		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 5');
+		await expect.element(screen.getByTestId('step-count')).toHaveTextContent('1 / 6');
 		expect(screen.container.querySelector('[data-testid="onboarding"]')).not.toBeNull();
 	});
 });
@@ -1101,6 +1193,116 @@ describe('Save the Sun page — Sköll turn reload reconcile', () => {
 		// Exactly one request — the Advance re-drive (gameStub returns advanceAsk only for Advance;
 		// the rendered interrupt proves it was that branch, not a stray player action).
 		expect(spy).toHaveBeenCalledTimes(1);
+	});
+});
+
+// A dropped action RESPONSE (the 30s abort trips, or the network drops) differs from a reload: the
+// server completed the move under withSessionLock, so the engine moved on while the browser gave up.
+// The catch must resync to /api/state or the UI strands on a stale turn/board. These prove it does.
+describe('Save the Sun page — dropped action response reconcile', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+		localStorage.clear();
+	});
+
+	it('surfaces Sköll’s parked Ask when his Advance response drops mid-flight', async () => {
+		const error = expectConsole('error');
+		// The Ask hands the turn to Sköll; his Advance then drops — but the server DID park his Ask, so
+		// /api/state carries the interrupt. The catch must show the reaction prompt, not a rouse retry.
+		stubFetch(async (url: string, init?: { body?: string }) => {
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 0,
+						roundId: 'test-round',
+						state: SKOLL_TURN,
+						pendingReaction: { echo: 'A gold rune. Mine.', held: { Scry: true, Hex: true } }
+					})
+				);
+			const body = init?.body ? JSON.parse(init.body) : {};
+			if (body.type === 'Advance') return new Response('nope', { status: 500 });
+			return new Response(
+				JSON.stringify({
+					type: 'Ask',
+					oracle: {
+						ok: true,
+						answer: 'No. Sól is not reaching for a fire rune.',
+						turnConsumed: true
+					},
+					state: SKOLL_TURN
+				})
+			);
+		});
+		const screen = render(Page, pageProps);
+		await humanAsks(screen);
+		// Resynced to the parked Ask — the interrupt is up, and the dead-end rouse retry is NOT.
+		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
+		await expect.element(screen.getByTestId('skoll-echo')).toHaveTextContent('A gold rune. Mine.');
+		expect(screen.container.querySelector('[data-testid="rouse-wolf"]')).toBeNull();
+		expect(error).toHaveBeenCalled();
+	});
+
+	it('re-keys the board to the new round when a new-game response drops but the server reset', async () => {
+		const error = expectConsole('error');
+		localStorage.setItem(
+			VIEW_STATE_KEY,
+			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: 'old' })
+		);
+		// The POST drops (500), but resetEngine already minted 'next-round' — /api/state proves it, so
+		// the catch resyncs the board to the new secret instead of stranding on the old one.
+		stubFetch(async (url: string) => {
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 99,
+						roundId: 'next-round',
+						state: HUMAN_TURN,
+						pendingReaction: null
+					})
+				);
+			if (url.includes('/api/new-game')) return new Response('nope', { status: 500 });
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Begin another night' }).click();
+		await vi.waitFor(() => {
+			const saved = JSON.parse(localStorage.getItem(VIEW_STATE_KEY) ?? '{}');
+			expect(saved.roundId).toBe('next-round');
+			expect(saved.crossings).toEqual([]);
+		});
+		expect(error).toHaveBeenCalled();
+	});
+
+	it('reports a failed reset when new-game drops and the resync lands on the same round', async () => {
+		const error = expectConsole('error');
+		localStorage.setItem(
+			VIEW_STATE_KEY,
+			JSON.stringify({ roundId: 'test-round', crossings: [1], answer: 'old' })
+		);
+		// The POST drops before resetEngine ran, so /api/state still reports the SAME live round —
+		// nothing reset. The catch must surface the failure, not report success behind a still-active round.
+		stubFetch(async (url: string) => {
+			if (url.includes('/api/state'))
+				return new Response(
+					JSON.stringify({
+						boardSeed: 0,
+						roundId: 'test-round',
+						state: HUMAN_TURN,
+						pendingReaction: null
+					})
+				);
+			if (url.includes('/api/new-game')) return new Response('nope', { status: 500 });
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Begin another night' }).click();
+
+		// The in-world failure shows, and the view stays keyed to the unchanged round (no false reset).
+		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
+		const saved = JSON.parse(localStorage.getItem(VIEW_STATE_KEY) ?? '{}');
+		expect(saved.roundId).toBe('test-round');
+		expect(error).toHaveBeenCalled();
 	});
 });
 

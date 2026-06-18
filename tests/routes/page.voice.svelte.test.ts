@@ -87,10 +87,11 @@ const release = (screen: ReturnType<typeof render>) =>
 	medallion(screen)
 		.element()
 		.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
-const holdSpace = () =>
-	window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
-const releaseSpace = () =>
-	window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Space', bubbles: true }));
+// Page-wide push-to-talk is the backtick (`) — Space is reserved for activating the focused control.
+const holdPtt = () =>
+	window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backquote', bubbles: true }));
+const releasePtt = () =>
+	window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Backquote', bubbles: true }));
 
 // The browser context runs reducedMotion:'reduce' (vite.config.ts), so by default audio is muted
 // (PRD R9). The auto-prime-on-first-gesture path is a non-reduced-motion behavior, so the tests that
@@ -193,21 +194,42 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
 	});
 
-	it('hold Space anywhere records; release asks — the same path as a tap', async () => {
+	it('hold the backtick anywhere records; release asks — the same path as a tap', async () => {
 		const screen = render(Page, pageProps);
-		holdSpace();
+		holdPtt();
 		expect(recorderMock.startRecording).toHaveBeenCalledOnce();
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
-		releaseSpace();
+		releasePtt();
 		await vi.waitFor(() => expect(actionBodies()).toHaveLength(1));
 	});
 
-	it('Space inside the Ask field types normally — it does not record', () => {
+	it('ignores the backtick while the onboarding modal is open', async () => {
+		localStorage.removeItem('save-the-sun:onboarded'); // first run → the title/tour modal shows
 		const screen = render(Page, pageProps);
-		const input = screen.container.querySelector<HTMLInputElement>('#oracle-ask')!;
-		input.focus();
-		window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
+		await expect.element(screen.getByTestId('onboarding')).toBeInTheDocument();
+		holdPtt();
 		expect(recorderMock.startRecording).not.toHaveBeenCalled();
+	});
+
+	it('backtick records even from inside the Ask field — push-to-talk works while typing', async () => {
+		const screen = render(Page, pageProps);
+		screen.container.querySelector<HTMLInputElement>('#oracle-ask')!.focus();
+		holdPtt();
+		expect(recorderMock.startRecording).toHaveBeenCalledOnce();
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		releasePtt();
+	});
+
+	it('the backtick records even when a button has focus — Space could not (it activates the button)', async () => {
+		mockFetch(''); // empty transcript keeps this about the key, not a dispatched Ask
+		const screen = render(Page, pageProps);
+		// A focused control would swallow Space; the page-wide backtick must still start a hold.
+		screen.getByRole('button', { name: 'Cast the rune' }).element().focus();
+		holdPtt();
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		releasePtt();
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+		expect(recorderMock.startRecording).toHaveBeenCalled();
 	});
 
 	it('an empty transcript spends no turn and settles back to idle', async () => {
@@ -246,14 +268,14 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 			.toHaveTextContent('The fire flickered. Hold again to speak.');
 	});
 
-	it('ends a page-level Space hold on keyup even after focus moves to a control', async () => {
+	it('ends a page-level backtick hold on keyup even after focus moves to a control', async () => {
 		const screen = render(Page, pageProps);
 		(document.activeElement as HTMLElement | null)?.blur();
-		holdSpace(); // started from page chrome
+		holdPtt(); // started from page chrome
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
 		// Focus moves into the Ask field mid-hold; the release must still end the recording.
 		screen.container.querySelector<HTMLInputElement>('#oracle-ask')!.focus();
-		releaseSpace();
+		releasePtt();
 		await vi.waitFor(() => expect(recorderMock.stopRecording).toHaveBeenCalled());
 	});
 
@@ -322,6 +344,159 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 		expect(deliveryMock.listeners.size).toBe(0);
 		expect(deliveryMock.disableDelivery).toHaveBeenCalled();
 		expect(recorderMock.closeRecorder).toHaveBeenCalled();
+	});
+});
+
+describe('Save the Sun page — cast by voice', () => {
+	// Cast must be armed first (the deliberate safety step), then the rune named aloud. The server
+	// constrains the match to the board names the client sends, so only a real rune commits.
+	function mockCastFetch(rune: string) {
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const url = String(input);
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (url === '/api/voice/transcribe') {
+				return new Response(JSON.stringify(body.mode === 'cast' ? { rune } : { text: '' }));
+			}
+			if (url === '/api/action') {
+				if (body.type === 'Advance')
+					return new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN }));
+				if (body.type === 'Cast')
+					return new Response(
+						JSON.stringify({ type: 'Cast', cast: { ok: true, won: true }, state: HUMAN_WON })
+					);
+			}
+			return new Response('{}');
+		});
+	}
+
+	it('casts hands-free when the rune is named without arming', async () => {
+		// A normal hold (no Cast button first): the server resolves an explicit spoken cast to a board
+		// rune and the page commits it.
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const url = String(input);
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (url === '/api/voice/transcribe') {
+				return new Response(
+					JSON.stringify(body.runes && !body.mode ? { rune: 'Sowilo' } : { text: '' })
+				);
+			}
+			if (url === '/api/action') {
+				if (body.type === 'Advance')
+					return new Response(JSON.stringify({ type: 'Advance', state: HUMAN_TURN }));
+				if (body.type === 'Cast')
+					return new Response(
+						JSON.stringify({ type: 'Cast', cast: { ok: true, won: true }, state: HUMAN_WON })
+					);
+			}
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+
+		press(screen); // no arming — just hold and name the rune
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		release(screen);
+
+		await vi.waitFor(() => {
+			const casts = actionBodies().filter((b) => b.type === 'Cast');
+			expect(casts).toHaveLength(1);
+			expect(casts[0].runeName).toBe('Sowilo');
+		});
+	});
+
+	it('casts the named rune when a cast is armed and the rune is spoken', async () => {
+		mockCastFetch('Sowilo');
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // arm
+
+		press(screen);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		release(screen);
+
+		await vi.waitFor(() => {
+			const casts = actionBodies().filter((b) => b.type === 'Cast');
+			expect(casts).toHaveLength(1);
+			expect(casts[0].runeName).toBe('Sowilo');
+		});
+		// The hold sent the board's rune names for the server to match against.
+		const sentCast = vi
+			.mocked(fetch)
+			.mock.calls.some(
+				([url, init]) =>
+					String(url) === '/api/voice/transcribe' &&
+					JSON.parse(String((init as RequestInit)?.body ?? '{}')).mode === 'cast'
+			);
+		expect(sentCast).toBe(true);
+	});
+
+	it('drops an armed spoken cast if the player cancels before it resolves', async () => {
+		let resolveCast: (r: Response) => void = () => {};
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const url = String(input);
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (url === '/api/voice/transcribe' && body.mode === 'cast') {
+				return new Promise<Response>((resolve) => {
+					resolveCast = resolve;
+				});
+			}
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // arm
+
+		press(screen);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		release(screen); // transcribe now in flight
+
+		// The player backs out before the transcription returns — the irreversible cast must not land.
+		await screen.getByRole('button', { name: 'Not yet' }).click();
+		resolveCast(new Response(JSON.stringify({ rune: 'Sowilo' })));
+
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+		expect(actionBodies().some((b) => b.type === 'Cast')).toBe(false);
+	});
+
+	it('drops an armed spoken cast after a cancel-then-re-arm before it resolves', async () => {
+		// The boolean castMode is true again after a re-arm — only the arm generation tells the stale
+		// utterance apart, so it must not commit the cast the player abandoned.
+		let resolveCast: (r: Response) => void = () => {};
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const url = String(input);
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (url === '/api/voice/transcribe' && body.mode === 'cast') {
+				return new Promise<Response>((resolve) => {
+					resolveCast = resolve;
+				});
+			}
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // arm
+
+		press(screen);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		release(screen); // transcribe in flight
+
+		await screen.getByRole('button', { name: 'Not yet' }).click(); // cancel
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // re-arm: castMode true again
+		resolveCast(new Response(JSON.stringify({ rune: 'Sowilo' })));
+
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+		expect(actionBodies().some((b) => b.type === 'Cast')).toBe(false);
+	});
+
+	it('refuses a cast the model could not match — no Cast dispatched, a notice instead', async () => {
+		mockCastFetch(''); // unclear: matched no board rune
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+
+		press(screen);
+		release(screen);
+
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+		expect(actionBodies().some((b) => b.type === 'Cast')).toBe(false);
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Name a rune on the board to cast it');
 	});
 });
 

@@ -12,30 +12,35 @@
 	const STEPS = [
 		{
 			// Scene-setting, not a pointer — no anchor, so it opens as a centered intro and the board
-			// stays unhighlighted until "Read & cross."
-			label: 'The stakes',
+			// stays unhighlighted until "Read & Cross."
+			label: 'The Goal',
 			target: null,
-			body: 'Tonight the coven makes one offering to Sól. Name her true rune before Sköll does, and the longest day breaks. Fail, and the wolf swallows the dawn.'
+			body: 'Your goal is to cast Sól’s true rune before Sköll does. One of the 24 runes is hers — find it first and you win the day; if Sköll finds it first, you lose.'
 		},
 		{
 			label: 'Ask',
 			target: '[data-coach="ask"]',
-			body: 'Ask the Oracle yes/no questions about the runes — their element, power, light, hue, or one rune by name. She answers the sign she reads. One question a turn.'
+			body: 'On your turn, ask the Oracle one yes/no question about the runes — by element, power, light, color, or a rune by name. She always answers truthfully.'
 		},
 		{
-			label: 'Read & cross',
+			label: 'Speak',
+			target: '[data-coach="voice"]',
+			body: 'Rather speak than type? Hold the medallion (or the backtick key) and say your question, then release to send. It works just like the text box — and you can answer Sköll by voice too.'
+		},
+		{
+			label: 'Read & Cross',
 			target: '[data-coach="board"]',
-			body: 'Twenty-four runes stand in the open. Cross off what each answer rules out. The crossing is yours — the board never does it for you. That reading is the whole game.'
-		},
-		{
-			label: 'Cast',
-			target: '[data-coach="cast"]',
-			body: "When you're sure, cast a rune. Cast true and dawn is yours. Cast wrong and the turn is gone. Sköll is racing you for the same rune."
+			body: 'After each answer, cross off the runes it rules out — tap a rune to mark it. The board never does this for you.'
 		},
 		{
 			label: 'Scry & Hex',
 			target: '[data-coach="reactions"]',
-			body: 'Sköll asks the Oracle too. When he does, you may answer back once — Scry to overhear her reply, or Hex to silence her and kill his question. One Scry and one Hex a night; a Cast is sacred, never interrupted.'
+			body: 'When Sköll questions the Oracle, answer back once — Scry to hear her reply, or Hex to block his question. You get one Scry and one Hex per game.'
+		},
+		{
+			label: 'Cast',
+			target: '[data-coach="cast"]',
+			body: 'When you’re sure, cast your rune — say “cast” and its name, or choose Cast and tap it. Get it right and you win the day; get it wrong and you lose the turn — so cast only when you’re certain.'
 		}
 	];
 

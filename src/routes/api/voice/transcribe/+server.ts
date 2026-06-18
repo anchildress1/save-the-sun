@@ -1,17 +1,28 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { claimTranscribeSlot } from '$lib/server/voice/rateLimit';
-import { transcribe, classifyReaction } from '$lib/server/voice/transcribe';
+import {
+	transcribe,
+	classifyReaction,
+	classifyCast,
+	interpretAsk
+} from '$lib/server/voice/transcribe';
 import { logEvent } from '$lib/server/debug/log';
+import { runes as boardRunes } from '$lib/board';
 import type { RequestHandler } from './$types';
 
 // A held push-to-talk utterance is a base64 WAV; cap it so a malformed/huge payload can't be sent
 // to Gemini. ~5MB base64 ≈ 3.6MB audio ≈ well over a minute at 16kHz mono — plenty for one Ask.
 const MAX_WAV_BASE64 = 5_000_000;
 
+// Cast matching uses the SERVER's canonical rune names, never the client's list — the board always
+// holds these 24, so a malformed client can't pad the Gemini prompt with junk labels under our key.
+const RUNE_NAMES = boardRunes.map((rune) => rune.name);
+
 // Reads a recorded utterance: `ask` (default) transcribes it verbatim into the player's question;
-// `reaction` classifies a reply to Sköll's hanging question into scry/hex/pass (or unclear). The
-// browser sends only audio — the engine still runs the same Ask/React paths the buttons use.
+// `reaction` classifies a reply to Sköll's hanging question into scry/hex/pass (or unclear); `cast`
+// matches a spoken rune name (against the server's canonical board names) to commit an armed cast.
+// The browser sends only audio — the engine still runs the same Ask/React/Cast paths the buttons use.
 export const POST: RequestHandler = async ({ request, locals }) => {
 	let body: unknown;
 	try {
@@ -24,7 +35,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	if (typeof body !== 'object' || body === null) {
 		return json({ error: 'Bad request.' }, { status: 400 });
 	}
-	const { wavBase64, mode } = body as { wavBase64?: unknown; mode?: unknown };
+	const { wavBase64, mode, runes } = body as {
+		wavBase64?: unknown;
+		mode?: unknown;
+		runes?: unknown;
+	};
 	if (
 		typeof wavBase64 !== 'string' ||
 		wavBase64.length === 0 ||
@@ -32,8 +47,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	) {
 		return json({ error: 'Bad audio.' }, { status: 400 });
 	}
-	if (mode !== undefined && mode !== 'ask' && mode !== 'reaction') {
+	if (mode !== undefined && mode !== 'ask' && mode !== 'reaction' && mode !== 'cast') {
 		return json({ error: 'Bad mode.' }, { status: 400 });
+	}
+	if (mode === 'cast' && !Array.isArray(runes)) {
+		return json({ error: 'Bad cast targets.' }, { status: 400 });
 	}
 
 	// Fail loudly (503) when voice is unconfigured so a deploy/config gap is visible, and gate the
@@ -59,6 +77,43 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			message: `heard reaction: ${choice}`
 		});
 		return json({ choice });
+	}
+
+	if (mode === 'cast') {
+		const rune = await classifyCast(wavBase64, RUNE_NAMES);
+		logEvent(locals.sessionId, {
+			owner: 'Human',
+			kind: 'input',
+			part: 'Voice',
+			level: 'info',
+			message: `heard cast: ${rune || '(unclear)'}`
+		});
+		return json({ rune });
+	}
+
+	// Default (ask): a question, or a hands-free cast when the player names a board rune. The client
+	// sends `runes` only as the signal that it wants cast detection; the match runs against the
+	// server's canonical names. Without the signal it's a plain transcribe.
+	if (Array.isArray(runes)) {
+		const result = await interpretAsk(wavBase64, RUNE_NAMES);
+		if ('cast' in result) {
+			logEvent(locals.sessionId, {
+				owner: 'Human',
+				kind: 'input',
+				part: 'Voice',
+				level: 'info',
+				message: `heard cast: ${result.cast || '(unclear)'}`
+			});
+			return json({ rune: result.cast });
+		}
+		logEvent(locals.sessionId, {
+			owner: 'Human',
+			kind: 'input',
+			part: 'Voice',
+			level: 'info',
+			message: `heard: ${result.text || '(nothing)'}`
+		});
+		return json({ text: result.text });
 	}
 
 	const text = await transcribe(wavBase64);

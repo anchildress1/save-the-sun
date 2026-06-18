@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const stt = vi.hoisted(() => ({ transcribe: vi.fn(), classifyReaction: vi.fn() }));
+const stt = vi.hoisted(() => ({
+	transcribe: vi.fn(),
+	classifyReaction: vi.fn(),
+	classifyCast: vi.fn(),
+	interpretAsk: vi.fn()
+}));
 vi.mock('$lib/server/voice/transcribe', () => ({
 	transcribe: stt.transcribe,
-	classifyReaction: stt.classifyReaction
+	classifyReaction: stt.classifyReaction,
+	classifyCast: stt.classifyCast,
+	interpretAsk: stt.interpretAsk
 }));
 
 const mock = vi.hoisted(() => ({
@@ -51,6 +58,53 @@ describe('POST /api/voice/transcribe', () => {
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ choice: 'hex' });
 		expect(stt.classifyReaction).toHaveBeenCalledExactlyOnceWith('UklGRg==');
+		expect(stt.transcribe).not.toHaveBeenCalled();
+	});
+
+	it('matches a cast in cast mode against the board runes', async () => {
+		stt.classifyCast.mockResolvedValueOnce('Sowilo');
+
+		const response = await call('cast', {
+			wavBase64: 'UklGRg==',
+			mode: 'cast',
+			runes: ['Sowilo', 'Fehu']
+		});
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ rune: 'Sowilo' });
+		// Matched against the SERVER's canonical board names, not the client-sent list.
+		expect(stt.classifyCast).toHaveBeenCalledWith('UklGRg==', expect.arrayContaining(['Sowilo']));
+		expect(stt.transcribe).not.toHaveBeenCalled();
+	});
+
+	it('rejects cast mode without a runes array with 400', async () => {
+		const response = await call('cast-no-runes', { wavBase64: 'UklGRg==', mode: 'cast' });
+		expect(response.status).toBe(400);
+		expect(stt.classifyCast).not.toHaveBeenCalled();
+	});
+
+	it('detects a hands-free cast in ask mode when the board runes are sent', async () => {
+		stt.interpretAsk.mockResolvedValueOnce({ cast: 'Sowilo' });
+
+		const response = await call('hands-free', {
+			wavBase64: 'UklGRg==',
+			runes: ['Sowilo', 'Fehu']
+		});
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ rune: 'Sowilo' });
+		// Matched against the SERVER's canonical board names, not the client-sent list.
+		expect(stt.interpretAsk).toHaveBeenCalledWith('UklGRg==', expect.arrayContaining(['Sowilo']));
+		expect(stt.transcribe).not.toHaveBeenCalled();
+	});
+
+	it('returns transcribed text in ask mode when interpretAsk reads a question', async () => {
+		stt.interpretAsk.mockResolvedValueOnce({ text: 'is it a fire rune' });
+
+		const response = await call('ask-runes', { wavBase64: 'UklGRg==', runes: ['Sowilo'] });
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ text: 'is it a fire rune' });
 		expect(stt.transcribe).not.toHaveBeenCalled();
 	});
 

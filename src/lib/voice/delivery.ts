@@ -30,6 +30,10 @@ const drainWaiters = new Set<() => void>();
 // otherwise the bumped generation only takes effect on the next chunk, wedging the chain.
 const activeFetches = new Set<AbortController>();
 
+// A stream that stalls mid-flight (chunks stop without `done`) would wedge every later deliver().
+// Bound the gap BETWEEN chunks, not the total — long lines legitimately stream over time.
+const TTS_IDLE_TIMEOUT_MS = 10_000;
+
 function abortActiveFetches(): void {
 	for (const controller of activeFetches) controller.abort();
 	activeFetches.clear();
@@ -156,21 +160,32 @@ async function pumpAudio(
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
 	let buffer = '';
-	for (;;) {
-		if (isStale(active, gen)) return abort.abort();
-		const { done, value } = await reader.read();
-		if (done) return;
-		buffer += decoder.decode(value, { stream: true });
-		let nl: number;
-		while ((nl = buffer.indexOf('\n')) >= 0) {
-			const chunk = buffer.slice(0, nl);
-			buffer = buffer.slice(nl + 1);
+	let idle: ReturnType<typeof setTimeout> | undefined;
+	const armIdle = () => {
+		clearTimeout(idle);
+		idle = setTimeout(() => abort.abort(), TTS_IDLE_TIMEOUT_MS);
+	};
+	try {
+		for (;;) {
 			if (isStale(active, gen)) return abort.abort();
-			if (chunk) {
-				setSpeaking(voice);
-				active.enqueue(chunk);
+			armIdle();
+			const { done, value } = await reader.read();
+			clearTimeout(idle); // the chunk landed — the timer measures only the wait BETWEEN chunks, never decode/enqueue
+			if (done) return;
+			buffer += decoder.decode(value, { stream: true });
+			let nl: number;
+			while ((nl = buffer.indexOf('\n')) >= 0) {
+				const chunk = buffer.slice(0, nl);
+				buffer = buffer.slice(nl + 1);
+				if (isStale(active, gen)) return abort.abort();
+				if (chunk) {
+					setSpeaking(voice);
+					active.enqueue(chunk);
+				}
 			}
 		}
+	} finally {
+		clearTimeout(idle);
 	}
 }
 
@@ -212,6 +227,10 @@ async function streamLine(
 	if (isStale(active, gen)) return;
 	const abort = new AbortController();
 	activeFetches.add(abort);
+	// pumpAudio's idle timer only covers gaps once headers arrive — bound the connect/first-byte wait
+	// too, or a fetch that stalls before responding leaves this line awaiting forever and wedges every
+	// later deliver() behind it on the chain. Cleared the moment the response resolves.
+	const connect = setTimeout(() => abort.abort(), TTS_IDLE_TIMEOUT_MS);
 	try {
 		const res = await fetch('/api/voice/tts', {
 			method: 'POST',
@@ -219,10 +238,12 @@ async function streamLine(
 			body: JSON.stringify(descriptor),
 			signal: abort.signal
 		});
+		clearTimeout(connect);
 		if (res.ok && res.body) await pumpAudio(res.body, active, gen, voice, abort);
 	} catch {
 		/* network failure or abort — the panel already carries the line; stay silent */
 	} finally {
+		clearTimeout(connect);
 		activeFetches.delete(abort);
 	}
 }

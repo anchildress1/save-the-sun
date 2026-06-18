@@ -9,8 +9,9 @@ export const SESSION_LIMIT = 10;
 export const GLOBAL_LIMIT = 60;
 
 // TTS delivery: a turn delivers a line or two and most replay from cache (no key burn), so these
-// run looser than minting while still capping a flood of uncached synth calls.
-export const TTS_SESSION_LIMIT = 20;
+// run looser than minting while still capping a flood of uncached synth calls. 30/min ≈ 15 turns of
+// fresh lines — well past real play, with headroom for back-to-back testing.
+export const TTS_SESSION_LIMIT = 30;
 export const TTS_GLOBAL_LIMIT = 200;
 
 // Push-to-talk transcription: every held utterance is a Gemini call (no cache), so cap it near

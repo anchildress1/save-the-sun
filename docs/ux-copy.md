@@ -295,11 +295,14 @@ Sól speaks only at victory—the goddess's rarity is the power.
 - **Secondary:** **"How the rite works"** (opens onboarding)
 
 ### First-run onboarding (one concept per step, dismissable, board visible behind)
-- **Step 1—the stakes:** "Tonight the coven makes one offering to Sól. Name her true rune before Sköll does, and the longest day breaks. Fail, and the wolf swallows the dawn."
-- **Step 2—Ask:** "Ask the Oracle yes/no questions about the runes — their element, power, light, hue, or one rune by name. She answers the sign she reads. One question a turn."
-- **Step 3—read & cross:** "Twenty-four runes stand in the open. Cross off what each answer rules out. The crossing is yours — the board never does it for you. That reading is the whole game."
-- **Step 4—Cast:** "When you're sure, cast a rune. Cast true and dawn is yours. Cast wrong and the turn is gone. Sköll is racing you for the same rune."
-- **Step 5—Scry & Hex:** "Sköll asks the Oracle too. When he does, you may answer back once — Scry to overhear her reply, or Hex to silence her and kill his question. One Scry and one Hex a night; a Cast is sacred, never interrupted."
+Plain, clear, mechanic-first — flavor stays light so the rules read at a glance. Cast comes last (it's the endgame action).
+
+- **Step 1—The Goal:** "Your goal is to cast Sól's true rune before Sköll does. One of the 24 runes is hers — find it first and you win the day; if Sköll finds it first, you lose."
+- **Step 2—Ask:** "On your turn, ask the Oracle one yes/no question about the runes — by element, power, light, color, or a rune by name. She always answers truthfully."
+- **Step 3—Speak:** "Rather speak than type? Hold the medallion (or the backtick key) and say your question, then release to send. It works just like the text box — and you can answer Sköll by voice too."
+- **Step 4—Read & Cross:** "After each answer, cross off the runes it rules out — tap a rune to mark it. The board never does this for you."
+- **Step 5—Scry & Hex:** "When Sköll questions the Oracle, answer back once — Scry to hear her reply, or Hex to block his question. You get one Scry and one Hex per game."
+- **Step 6—Cast:** "When you're sure, cast your rune — say “cast” and its name, or choose Cast and tap it. Get it right and you win the day; get it wrong and you lose the turn — so cast only when you're certain."
 - **Final button:** **"Take up the runes."**
 
 ## 6. Chrome & States
@@ -329,7 +332,7 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 
 ### Eclipse medallion (push-to-talk control)
 
-The medallion is the push-to-talk control: **hold** it (or hold `Space`) to record an Ask, release to send. Its accessible name carries the state plus the hold affordance; the announcement column is the polite live-region line for each transition. Visual states live in `v2-voice-requirements.md` R6.
+The medallion is the push-to-talk control: **hold** it (Space or Enter when it's focused, or the `` ` `` key from anywhere — never page-wide Space, which activates whatever control has focus) to record an Ask, release to send. Its accessible name carries the state plus the hold affordance; the announcement column is the polite live-region line for each transition. Visual states live in `v2-voice-requirements.md` R6.
 
 | State | Button label | Announced |
 |---|---|---|
@@ -375,7 +378,7 @@ Muted is signaled by shape, never color alone: the speaker glyph loses its sound
 
 ## Locked decisions (2026-06-04)
 - **Frame:** the longest day (headline) won through the one short night (nuance).
-- **Traits:** count = "power"; fill = "light/dark" (○ light, ● dark); axes = element, power, light, hue.
+- **Traits:** count = "power"; fill = "light/dark" (○ light, ● dark); axes = element, power, light, color.
 - **Address:** Sköll says "witch" = gender-neutral coven role; Oracle addresses no one.
 - **Reactions:** Scry + Hex are one-use reactions (not cards) that trigger on an Ask; Cast is sacred. Spent reactions remain visible but disabled (no visible spent copy).
 - **Casting a crossed-off rune is legal**—crossing is the player's private aid, never validated.
