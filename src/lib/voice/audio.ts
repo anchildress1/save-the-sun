@@ -69,7 +69,6 @@ export function createSpeaker(): Speaker {
 			node.onended = () => {
 				const idx = queue.indexOf(entry);
 				if (idx >= 0) queue.splice(idx, 1);
-				// Gapless schedule: the new front is what's sounding now, or null when the queue is dry.
 				advanceTo(queue.length ? queue[0].voice : null);
 			};
 			cursor = Math.max(cursor, context.currentTime);

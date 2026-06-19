@@ -1,4 +1,5 @@
-// Push-to-talk capture. Hold to record, release to get a WAV (PCM16 mono @ 16kHz) the transcribe
+// Push-to-talk capture. Hold to record, release to get a WAV (PCM16 mono, 16kHz requested — the
+// actual rate is read back from the AudioContext) the transcribe
 // route accepts. The mic stream is acquired per hold and released on let-go (so Chrome's in-use
 // indicator clears between holds); the AudioContext + worklet are built once and kept alive so a
 // re-acquire pays only getUserMedia, never the worklet load. A denial is remembered so the rite

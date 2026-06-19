@@ -262,7 +262,6 @@ export function whenDrained(timeoutMs: number): Promise<void> {
 			drainWaiters.delete(finish);
 			resolve();
 		};
-		// finish only reads `timer` when it runs (after this line), so the const reference is safe.
 		const timer = setTimeout(finish, timeoutMs);
 		drainWaiters.add(finish);
 	});

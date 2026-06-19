@@ -129,8 +129,7 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 	}
 }
 
-/** Which prebuilt voice speaks a descriptor — Sköll's lines (his Ask, the loss) in his voice,
- *  everything else the Oracle's. */
+/** Maps a descriptor to its prebuilt VoiceId; the who-speaks rule itself lives in speakerOf. */
 export function voiceForLine(descriptor: LineDescriptor): VoiceId {
 	// An authored line carries its own voice. (Not a security check: the TTS route resolves authored
 	// lines by id from the session store and uses the STORED voice — this is just the correct answer

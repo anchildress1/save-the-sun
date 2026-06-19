@@ -16,7 +16,7 @@ const REFUSAL_LINES: Record<RefusalClass, string> = {
 	'engine-error': "The Oracle falls silent — the rite can't reach Sól."
 };
 
-/** The exact refusal line for a class (`ux-copy.md` §1 Refusals). */
+/** Source of truth: `ux-copy.md` §1 Refusals. */
 export function refusalLine(cls: RefusalClass): string {
 	return REFUSAL_LINES[cls];
 }
