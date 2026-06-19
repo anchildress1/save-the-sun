@@ -258,6 +258,29 @@
 		opacity: 1;
 	}
 
+	/* The ember itself prowls: a bright hotspot near the rim rotates around the eclipse edge, so the
+	   RED moves — not the rim glyphs (those spin only while thinking). The dark center holds still;
+	   only the ember travels the circle. */
+	.medallion[data-voice-state='skoll-speaking'] .eclipse-shadow::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: 50%;
+		background: radial-gradient(
+			circle at 50% 9%,
+			rgba(232, 104, 78, 0.95) 0%,
+			rgba(200, 71, 63, 0.35) 13%,
+			transparent 24%
+		);
+		animation: ember-orbit 3.4s linear infinite;
+	}
+
+	@keyframes ember-orbit {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
 	@keyframes sprite-level {
 		from {
 			background-position-x: 0%;
@@ -369,12 +392,6 @@
 		opacity: 0.2;
 	}
 
-	/* Sköll circles: the rune ring orbits the devoured sun while he speaks — the wolf prowling. A
-	   deliberate motion the eclipse can't swallow, since the rim runes turn outside the dark center. */
-	.medallion[data-voice-state='skoll-speaking'] .rune-ring {
-		animation: ring-orbit 14s linear infinite;
-	}
-
 	.medallion[data-voice-state='speaking'] .ring-rune,
 	.medallion[data-voice-state='skoll-speaking'] .ring-rune {
 		opacity: 0.55;
@@ -429,6 +446,10 @@
 
 		.medallion[data-voice-state='recording'] .ring-rune {
 			opacity: 0.85;
+		}
+
+		.medallion[data-voice-state='skoll-speaking'] .eclipse-shadow::after {
+			animation: none;
 		}
 	}
 
