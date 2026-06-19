@@ -59,7 +59,7 @@ jobs:
         id: pw
         # Key the browser cache on the exact installed version: a bump misses (fresh browsers), a
         # match restores them so a healthy run never reaches the network for the download.
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(node -p 'require("@playwright/test/package.json").version')" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         id: playwright-cache
