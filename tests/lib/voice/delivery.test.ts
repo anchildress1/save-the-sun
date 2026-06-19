@@ -79,6 +79,13 @@ describe('delivery seam', () => {
 		expect(audio.speaker.enqueue).not.toHaveBeenCalled();
 	});
 
+	it('does not fetch TTS once a mute has closed the speaker — no Gemini credit for unheard audio', async () => {
+		enableDelivery();
+		disableDelivery(); // the page mutes by closing the speaker, not by gating a gain node
+		await deliver(LINE);
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
 	it('streams the line audio and enqueues each chunk as it arrives', async () => {
 		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm-a', 'pcm-b', 'pcm-c'));
 		enableDelivery();
