@@ -45,7 +45,6 @@ const COLORS = new Set(runes.map((r) => r.color));
 const NAMES = new Set(runes.map((r) => r.name));
 const POWER_OP_SET: ReadonlySet<string> = new Set(POWER_OPS);
 
-// Single-value axes: a {axis, value} query whose value must be in the allowed set.
 const VALUE_AXES: Record<string, ReadonlySet<unknown>> = {
 	element: ELEMENTS,
 	fill: new Set(FILLS),

@@ -30,7 +30,7 @@ let source: MediaStreamAudioSourceNode | null = null;
 let node: AudioWorkletNode | null = null;
 let buffers: Float32Array[] = [];
 let recording = false;
-// A denied/absent mic is terminal for the session (R1): never re-prompt once sealed.
+// A denied/absent mic is terminal for the session: never re-prompt once sealed.
 let sealed: RecorderFailure | null = null;
 // Bumped by closeRecorder so a setup still awaiting permission/worklet when teardown runs discards
 // the stream/context it finally gets instead of storing them onto a torn-down (unmounted) page.

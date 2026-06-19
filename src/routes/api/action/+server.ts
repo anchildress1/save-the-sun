@@ -168,7 +168,7 @@ function castVoiceLine(cast: CastResult, runeName: string): LineDescriptor | nul
 		: { kind: 'cast', result: 'wrong', rune: runeName };
 }
 
-// Author the end-screen closing line for the action that just resolved the round (ttd:22): the
+// Author the end-screen closing line for the action that just resolved the round: the
 // Oracle's blessing on a win, Sköll's gloat on a loss. The words are stashed in the session store and
 // voiced by id; no-op requests after a won round never reach here, so none mint fresh Gemini copy.
 async function authorEnding(
@@ -235,7 +235,7 @@ function skollMoveVoice(out: SkollOutcome): LineDescriptor | null {
 	return null;
 }
 
-// She authors her verdict aloud on a clean answer (ttd:17): when Sköll neither hexed nor scried, the
+// She authors her verdict aloud on a clean answer: when Sköll neither hexed nor scried, the
 // deterministic line is restyled by Gemini and stashed server-side, so the route voices only her own
 // words by id — never arbitrary text. A failed/slow author leaves `voiced` unset; the client then
 // voices the deterministic `answer`. The engine verdict + the answer log stay the canonical truth.
@@ -492,7 +492,7 @@ async function askWithSkollReaction(
 		}
 	}
 
-	// On a clean answer (Sköll passed), she authors her verdict aloud (ttd:17) — sets `oracle.voiced`.
+	// On a clean answer (Sköll passed), she authors her verdict aloud — sets `oracle.voiced`.
 	if (oracle?.ok && vs.choice === 'Pass') await authorAnswerFlair(sessionId, oracle);
 
 	let truth: string;

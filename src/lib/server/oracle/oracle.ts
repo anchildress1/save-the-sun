@@ -90,7 +90,7 @@ export type PreparedAsk =
 
 /**
  * Interpret + validate an Ask, stopping short of resolving it. Splitting this from the answer is
- * what lets a reaction (S6 Hex/Scry) land *between* the query and its answer — a Hex kills the
+ * what lets a reaction (Hex/Scry) land *between* the query and its answer — a Hex kills the
  * question before {@link answerAsk} is ever called.
  */
 export async function prepareAsk(question: string, interpret: Interpret): Promise<PreparedAsk> {

@@ -22,7 +22,7 @@ export type OutcomeBeat = keyof (typeof OUTCOME_LINES)['win']; // 'lead' | 'vers
 // printed on the splash, so voicing all of it is just a long read of static text (~10s in his growl).
 // Voice only the punch: the loss's lead ("Sköll takes the sun.") in Sköll's voice — the headline, not
 // otherwise spoken; the win's coda in the Oracle's (its lead "The rune is true." is already voiced as
-// the cast lands). The other beats stay on-screen text (still written, R10).
+// the cast lands). The other beats stay on-screen text (still written).
 export const VOICED_SEQUENCE = {
 	win: ['coda'],
 	lose: ['lead']

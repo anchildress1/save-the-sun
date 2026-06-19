@@ -159,7 +159,7 @@ export class GameEngine {
 
 	/**
 	 * Open a reaction window around a *pending* Ask — the rival may Scry/Hex it before it is
-	 * answered. Opened by the orchestration when a player declares an Ask (the S6 seam where
+	 * answered. Opened by the orchestration when a player declares an Ask (the seam where
 	 * Sköll Asks and the human reacts), not by `ask` itself, so a Hex resolves before any answer
 	 * is produced. On Hex the answer is never asked for; on Pass/Scry the orchestration resolves
 	 * the Ask after the window closes.

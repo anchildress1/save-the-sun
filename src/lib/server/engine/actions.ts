@@ -63,15 +63,15 @@ export interface GameState {
 }
 
 /**
- * What Sköll did on his turn, attached to the response after the human's action (S6). He either
+ * What Sköll did on his turn, attached to the response after the human's action. He either
  * casts (round may end) or opens a reaction window with his Ask — `asks` present means the client
  * must show the interrupt prompt; his answer is produced only once the human reacts.
  */
 export interface SkollTurn {
 	// `query` rides along so the client can voice his Ask through the TTS route (the server recomposes
-	// his line from it — never arbitrary client text); `echo` is the same line as text (R10).
+	// his line from it — never arbitrary client text); `echo` is the same line as text.
 	asks?: { echo: string; query: Query };
-	// A winning cast is a game move too (R10): `rune` rides along so the client voices his line through
+	// A winning cast is a game move too: `rune` rides along so the client voices his line through
 	// the TTS route (server recomposes), `echo` is the same line as text. Present only when his cast
 	// WON — a wrong cast just hands the turn back, with no line.
 	casts?: { echo: string; rune: string };
@@ -100,7 +100,7 @@ export interface PendingReaction {
 }
 
 /**
- * A Gemini-authored closing line voiced on the end screen (ttd:22) — the Oracle's blessing on a win,
+ * A Gemini-authored closing line voiced on the end screen — the Oracle's blessing on a win,
  * Sköll's gloat on a loss. Structurally an `authored` LineDescriptor: its words live in the session's
  * voice-line store (the TTS route voices them by `id` lookup, never from the wire). Absent when
  * authoring failed (client falls back to the fixed splash beat).

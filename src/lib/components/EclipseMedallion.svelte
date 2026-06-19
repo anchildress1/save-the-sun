@@ -386,7 +386,7 @@
 		display: none;
 	}
 
-	/* Denied (R1): the struck glyph is the shape signal that this is the seal, not idle — and the
+	/* Denied: the struck glyph is the shape signal that this is the seal, not idle — and the
 	   cursor drops the hold affordance with it. */
 	.medallion[data-voice-state='denied'] {
 		cursor: default;
@@ -475,7 +475,7 @@
 		}
 	}
 
-	/* Static glow intensities replace the pulses and orbit (R6). The theme's global near-zero
+	/* Static glow intensities replace the pulses and orbit. The theme's global near-zero
 	   durations aren't enough here: a frozen keyframe could park at its dimmest frame, so the
 	   animations are removed and each state gets a fixed intensity. The disc freezes on its inline
 	   static frame (spriteLevel). */

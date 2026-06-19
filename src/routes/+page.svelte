@@ -81,7 +81,7 @@
 		chooseTarget: 'Choose a rune from the board.',
 		desktopOnly: 'The rite needs a wider sky. Return on a desktop to take up the runes.',
 		castPrompt: (name: string) => `Cast ${name}?`,
-		// Spoken-move guards (S7): engine truth handed to the model when a voiced action can't
+		// Spoken-move guards: engine truth handed to the model when a voiced action can't
 		// run — never shown in the panel, since no move was made.
 		wolfAsking: 'His question hangs — scry, hex, or pass.',
 		noReactionWindow: 'Sköll asks nothing to scry, hex, or pass.',
@@ -92,10 +92,10 @@
 		hexSpent: 'Your hex is spent for the night.',
 		riteDone: 'The longest day is decided — begin anew.',
 		unknownRune: (name: string) => `No rune named ${name} lies on the board.`,
-		// Cast lockout (S9, R5): while a cast's engine round-trip is in flight, every voiced
+		// Cast lockout: while a cast's engine round-trip is in flight, every voiced
 		// command answers with this and dispatches nothing — the cast completes regardless.
 		castSacred: 'The cast is sacred. Hold.',
-		// Spoken-move confirmations (S8): voiced by the Oracle as the tool result when a
+		// Spoken-move confirmations: voiced by the Oracle as the tool result when a
 		// destructive call arms the gate — like the guards, never shown in the panel.
 		// Short by design: the exchanges recur, and a spoken preamble every time wears thin.
 		// The irreversibility doctrine lives in the persona, not the question.
@@ -113,11 +113,11 @@
 		askHintPending: 'The rite is moving. Hold, then ask.',
 		askHintWolf: 'Sköll is moving. Hold, then ask.',
 		askHintOver: 'The rite is over.',
-		// Output mute (R11): the toggle's accessible name carries the action plus the reassurance
+		// Output mute: the toggle's accessible name carries the action plus the reassurance
 		// that nothing is lost — the words still arrive in the panel.
 		muteVoices: 'Silence the voices. Their words still appear in writing.',
 		unmuteVoices: 'Let the voices be heard.',
-		// Push-to-talk (R1): a denied or absent mic seals the medallion; the rite goes on by hand.
+		// Push-to-talk: a denied or absent mic seals the medallion; the rite goes on by hand.
 		micDenied: 'The fire cannot hear you. The rite continues by hand.',
 		// A transient mic failure (not sealed) — the player can hold again to retry.
 		micRetry: 'The fire flickered. Hold again to speak.'
@@ -166,7 +166,7 @@
 	let humanWon = $derived(roundOver && winner === 'Human');
 	let skollWon = $derived(roundOver && winner === 'Sköll');
 	let outcomeLine = $derived(humanWon ? RITE.sunCrests : RITE.skollTakes);
-	// The end-screen rite takes over when the round resolves (S9). It owns the replay surface, so the
+	// The end-screen rite takes over when the round resolves. It owns the replay surface, so the
 	// header's own controls fold away while it is up — one "Begin another night" on screen, not two.
 	// Held back (`endHeld`) until the Oracle's last spoken line has drained, so the splash never stomps
 	// her answer mid-sentence when Sköll's winning cast lands right behind it.
@@ -180,7 +180,7 @@
 	let showEndScreen = $derived(roundOver && !endHeld);
 	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
 
-	// Voice the closing rite once the splash is up (ux-copy §4, ttd:22): the winner speaks ONE authored
+	// Voice the closing rite once the splash is up (ux-copy §4): the winner speaks ONE authored
 	// in-character line — the Oracle's blessing on a win, Sköll's gloat on a loss — carried (as an
 	// `authored` id) on the resolving response. NOT a read of the fixed splash copy (the player reads
 	// that on screen). When no authored line rode the response (authoring failed, or a resumed round),
@@ -250,7 +250,7 @@
 			skollEcho = skoll.asks.echo;
 			skollAsking = true;
 		} else if (skoll.casts) {
-			// His winning cast is a written game move (R10) — his box shows the line he speaks as the
+			// His winning cast is a written game move — his box shows the line he speaks as the
 			// night closes; the end screen rises behind it once it's been heard.
 			skollEcho = skoll.casts.echo;
 			skollAsking = false;
@@ -265,7 +265,7 @@
 	let seedOverride: number | null = $state(null);
 	let boardSeed = $derived(seedOverride ?? data.boardSeed);
 
-	// View-state resume (S8.5): the engine resumes server-side, but the client's presentation — the
+	// View-state resume: the engine resumes server-side, but the client's presentation — the
 	// crossings and the voiced Oracle line — is otherwise thrown away on reload. Persist it keyed by a
 	// stable per-round token (opaque, minted with the round) and restore it on mount.
 	let roundIdOverride: string | null = $state(null);
@@ -449,7 +449,7 @@
 		writeMuted(!audioOn);
 	}
 
-	// Push-to-talk (R1/R6). Hold the medallion (or Space) to record; the mic opens on first hold (one
+	// Push-to-talk. Hold the medallion (or Space) to record; the mic opens on first hold (one
 	// prompt). A denial/absent mic seals it for the session — the medallion goes inert and the rite
 	// continues by hand. Recording is independent of audio output: you can ask with the sound off.
 	async function startHold() {
@@ -697,7 +697,7 @@
 		roundId: string;
 		state: GameState;
 		pendingReaction: { echo: string; held: { Scry: boolean; Hex: boolean } } | null;
-		// The last committed voiced line — the real result a dropped response lost (ttd:29).
+		// The last committed voiced line — the real result a dropped response lost.
 		lastLine: RecoveredLine | null;
 	};
 
@@ -822,7 +822,7 @@
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ type: 'Advance' })
 			});
-			// His gloat for the end screen when this Advance was his winning cast (ttd:22).
+			// His gloat for the end screen when this Advance was his winning cast.
 			if (outcomeFlair) endFlair = outcomeFlair;
 			// His winning cast is a turn that must play. Hold the splash synchronously — BEFORE applyState
 			// flips roundOver — so his cast frame shows first, even with audio off (which would otherwise
@@ -833,7 +833,7 @@
 			}
 			applyState(state);
 			applySkoll(skoll);
-			// His Ask is a game move (R10) — written on his frame and voiced in his own voice through the
+			// His Ask is a game move — written on his frame and voiced in his own voice through the
 			// same delivery seam as the Oracle (a no-op when audio is off). The medallion shows
 			// 'skoll-speaking' from the delivery event while it plays.
 			if (skoll?.asks) void voiceSkoll(skollVoice(skoll.asks.query));
@@ -940,7 +940,7 @@
 		window.addEventListener('blur', onBlur);
 
 		// Audio output is ON by default (honoring a session mute the player set), EXCEPT under
-		// prefers-reduced-motion — the PRD's reduced tier (R9) keeps audio muted. The player can still
+		// prefers-reduced-motion — the PRD's reduced tier keeps audio muted. The player can still
 		// opt in via the toggle. The delivery speaker still needs a user gesture to open (browsers block
 		// an AudioContext otherwise), so prime it on the first interaction — tap or key — then retire.
 		const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1042,7 +1042,7 @@
 		showOnboarding = true;
 	}
 
-	// One Ask path for the typed field and the spoken `ask` tool (S7): identical dispatch,
+	// One Ask path for the typed field and the spoken `ask` tool: identical dispatch,
 	// identical panel updates. `hers` marks lines the Oracle herself voices (answer, refusal) —
 	// system lines stay text-only; `consumed` tells the typed path whether to clear the field.
 	// Never throws: a failed dispatch settles the panel and reports the silent-Oracle line.
@@ -1080,8 +1080,8 @@
 				// Refusal wins before the answer branch: a refused sign is never voiced as a verdict.
 				outcome = { line: oracle.line, consumed: false, voice: oracleVoice(oracle) };
 			} else if (oracle?.ok) {
-				// Her dramatized line when the server authored one this turn (ttd:17, voiced by id lookup);
-				// else the deterministic answer. The panel shows exactly what she voices (R10).
+				// Her dramatized line when the server authored one this turn (voiced by id lookup);
+				// else the deterministic answer. The panel shows exactly what she voices.
 				outcome = oracle.voiced
 					? { line: oracle.voiced.text, consumed: true, voice: oracle.voiced }
 					: { line: oracle.answer, consumed: true, voice: oracleVoice(oracle) };
@@ -1278,7 +1278,7 @@
 				runeName
 			});
 			applyState(state);
-			// Her blessing for the end screen when this cast won (ttd:22); the effect voices it on the splash.
+			// Her blessing for the end screen when this cast won; the effect voices it on the splash.
 			if (outcomeFlair) endFlair = outcomeFlair;
 			let line: string;
 			let voice: LineDescriptor;
@@ -1464,7 +1464,7 @@
 			<div class="oracle-header">
 				<h2 class="oracle-title">The Oracle</h2>
 				<div class="turn-pill-row">
-					<!-- role=status: turn changes are narrated politely without stealing focus (v1.5 SR pass). -->
+					<!-- role=status: turn changes are narrated politely without stealing focus. -->
 					<div
 						class="turn-pill"
 						class:won={humanWon}

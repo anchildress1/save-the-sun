@@ -19,7 +19,7 @@ const skolls = new Map<string, SkollState>();
 // can never leak the answer.
 const roundIds = new Map<string, string>();
 // The public display seed for the on-screen board order, held for the round's lifetime so a
-// reload does not reshuffle. Independent of the secret seed — exposing it can't leak the answer.
+// reload does not reshuffle. Independent of the secret seed (see roundIds).
 const boardSeeds = new Map<string, number>();
 // The last committed voiced line per session (the spoken words + the descriptor that voices them).
 // A >30s-but-successful action drops its response client-side while the server commits under the
@@ -114,7 +114,7 @@ export function resetEngine(sessionId: string, seed?: number): GameEngine {
 /**
  * The session's per-round token for the client's view-state storage key. Stable across a
  * refresh (same round), regenerated on a new round so persisted crossings/transcript never
- * restore onto a fresh secret. Opaque and independent of the secret seed.
+ * restore onto a fresh secret. Opaque.
  */
 export function getRoundId(sessionId: string): string {
 	requireId(sessionId);
@@ -172,7 +172,7 @@ export function getLastLine(sessionId: string): RecoverableLine | null {
 }
 
 /**
- * Stash an authored line for the TTS route to voice by id (ttd:17/ttd:22). Returns the opaque id the
+ * Stash an authored line for the TTS route to voice by id. Returns the opaque id the
  * client echoes back — the words live only here, never on the wire the route trusts. Bounded per round.
  */
 export function storeVoiceLine(

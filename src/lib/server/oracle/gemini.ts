@@ -101,7 +101,7 @@ function ai(): GoogleGenAI {
 	return client;
 }
 
-// She authors her verdict aloud (ttd:17): the deterministic line in, ONE dramatized in-character line
+// She authors her verdict aloud: the deterministic line in, ONE dramatized in-character line
 // out — same meaning, fresh words, so repeated Asks never sound canned. Full Flash like interpret (the
 // Oracle reads/speaks right, never plays down — `gemini-model-tier-split`), MINIMAL thinking (a rephrase,
 // not reasoning), temp 1 for variety. The model is given only the finished verdict, so it can't invent a
@@ -125,10 +125,10 @@ Verdict: No. Sól is not reaching for a rune of more than 4 power.
 Line: No. She does not reach past the weight of four.
 </examples>`;
 
-// The closing rite, spoken in character (ttd:22 — not a read of the fixed splash copy, which the
+// The closing rite, spoken in character (not a read of the fixed splash copy, which the
 // player reads on screen). A fresh authored line per outcome: the Oracle's blessing on a win (Sól rides
 // her voice), Sköll's gloat on a loss. Bounded to exactly one sentence so it runs ~4-5s, never the
-// ~10s of reading the whole verse. The splash text is the written record (R10); this is flavor on top.
+// ~10s of reading the whole verse. The splash text is the written record; this is flavor on top.
 const WIN_ENDING_SYSTEM = `<role>You are the Oracle in "Save the Sun." The witch has cast the true rune and saved Sól; the longest day breaks and the light is kept.</role>
 
 <task>Speak the closing blessing — exactly ONE short, triumphant, in-character sentence marking the sun's return. Luminous, reverent, certain.</task>

@@ -38,7 +38,7 @@ export const MEDALLION_ANNOUNCEMENT = {
 	denied: 'The voice is sealed.'
 } as const satisfies Record<MedallionState, string>;
 
-// Rim glyphs (decorative, reused card assets per R6). Ansuz leads — the rune of the spoken word.
+// Rim glyphs (decorative, reused card assets). Ansuz leads — the rune of the spoken word.
 export const RING_RUNES: readonly RuneName[] = [
 	'Ansuz',
 	'Sowilo',

@@ -17,7 +17,7 @@ export interface Speaker {
 	 *  starting or ending), not by enqueue, so the indicator tracks who is actually being heard:
 	 *  his clip shows only once hers has played out, even though both were queued up front. */
 	onSpeaking(callback: (voice: string) => void): void;
-	/** Output mute (R11): silence playback without touching the queue. Audio still decodes and
+	/** Output mute: silence playback without touching the queue. Audio still decodes and
 	 *  drains on schedule, so `busy`, the callbacks, and caption turn-timing are unchanged — only
 	 *  the sound is gated. */
 	setMuted(muted: boolean): void;

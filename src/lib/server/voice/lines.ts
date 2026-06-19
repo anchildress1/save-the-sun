@@ -33,10 +33,10 @@ const MAX_POWER = 6;
 export type LineDescriptor =
 	| { kind: 'refusal'; refusal: string }
 	| { kind: 'answer'; query: unknown; affirmative: boolean }
-	// Sköll's Ask (a game move, R10): his first-person line composed from the same query the engine
+	// Sköll's Ask (a game move): his first-person line composed from the same query the engine
 	// parked, so the route still voices only a server-owned line — never arbitrary client text.
 	| { kind: 'skoll-ask'; query: unknown }
-	// Sköll's winning cast (a game move, R10): his line composed from the rune he named, validated
+	// Sköll's winning cast (a game move): his line composed from the rune he named, validated
 	// against the board so the route still voices only a server-owned line — just in his voice.
 	| { kind: 'skoll-cast'; rune: unknown }
 	// A reaction resolution (Scry/Hex/Pass, ux-copy §3): the fixed framing from REACTION_LINES, plus
@@ -48,7 +48,7 @@ export type LineDescriptor =
 	// The end-screen outcome (ux-copy §4): one beat of the staged splash copy, voiced in sequence — the
 	// win in the Oracle's voice, the loss in Sköll's, so the player hears who took the day.
 	| { kind: 'outcome'; result: Outcome; beat: OutcomeBeat }
-	// A Gemini-authored line (ttd:17/ttd:22): dynamic, so it can't be recomposed from a descriptor like
+	// A Gemini-authored line: dynamic, so it can't be recomposed from a descriptor like
 	// the others. The words live server-side, keyed by `id`; the route voices them by id lookup, never
 	// from the wire — same "client never supplies the words" invariant as every other descriptor. `voice`
 	// drives the medallion client-side; `text` is the display copy (the route ignores it, voicing the

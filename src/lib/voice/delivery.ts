@@ -105,7 +105,7 @@ export function deliveryReady(): boolean {
 }
 
 /**
- * Silence/unsilence delivered audio without dropping the queue (R11): captions are untouched.
+ * Silence/unsilence delivered audio without dropping the queue: captions are untouched.
  * Remembered for a speaker opened later, so the preference survives across enable/disable.
  */
 export function setDeliveryMuted(next: boolean): void {
