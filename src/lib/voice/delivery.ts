@@ -74,8 +74,11 @@ function goIdle(): void {
 	emit({ type: 'idle' });
 }
 
-// The queue ran dry naturally (every node ended) — settle to idle and release whenDrained waiters.
+// The speaker's queue ran dry. A delivery still streaming more chunks (pendingDeliveries > 0) means
+// this is only a mid-stream gap — the inter-chunk wait outran the queued audio — not the end, so hold
+// the waiters until the last line finishes (retirePending settles them when the fetch completes).
 function handleDrained(): void {
+	if (pendingDeliveries > 0) return;
 	goIdle();
 	flushDrainWaiters();
 }

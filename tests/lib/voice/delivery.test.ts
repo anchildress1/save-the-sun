@@ -344,6 +344,42 @@ describe('delivery seam', () => {
 		expect(drained).toBe(true);
 	});
 
+	it('does not release whenDrained on a mid-stream dry queue while a delivery is still streaming', async () => {
+		let releaseSecond: () => void = () => {};
+		const body = new ReadableStream<Uint8Array>({
+			async start(controller) {
+				const enc = new TextEncoder();
+				controller.enqueue(enc.encode('first\n'));
+				await new Promise<void>((resolve) => {
+					releaseSecond = resolve;
+				});
+				controller.enqueue(enc.encode('second\n'));
+				controller.close();
+			}
+		});
+		vi.mocked(fetch).mockResolvedValueOnce(new Response(body));
+		enableDelivery();
+
+		const inflight = deliver(LINE);
+		let drained = false;
+		const gate = whenDrained(10_000).then(() => {
+			drained = true;
+		});
+
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first', 'oracle'));
+		// The speaker's queue runs dry mid-stream (the inter-chunk gap outran the queued audio). With
+		// the deliver still fetching the next chunk, this must NOT release the hold.
+		fireDrain();
+		await Promise.resolve();
+		expect(drained).toBe(false);
+
+		// Finish the stream; the final drain (pendingDeliveries === 0) releases the hold.
+		releaseSecond();
+		await inflight;
+		await gate;
+		expect(drained).toBe(true);
+	});
+
 	it('a body-less 200 releases whenDrained on completion, not via the timeout', async () => {
 		vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 200 }));
 		enableDelivery();
