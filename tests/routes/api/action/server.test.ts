@@ -115,19 +115,17 @@ describe('POST /api/action', () => {
 	});
 
 	it('serializes overlapping POSTs for one session — the lock is wired into the route', async () => {
-		// Hold the first turn's interpret open, then prove a second concurrent POST can't run its own
-		// interpret until the first fully settles. Without withSessionLock both would interleave.
-		const events: string[] = [];
+		// Hold the first (live) ask's interpret open; the second ask is queued behind the session lock
+		// and can't run until the first settles. Once it does, the first has consumed the turn, so the
+		// second resolves as a stale not-your-turn — proving the two never interleaved.
 		let release: () => void = () => {};
 		const held = new Promise<void>((resolve) => (release = resolve));
-		let first = true;
+		let firstInterpret = true;
 		vi.mocked(interpret).mockImplementation(async () => {
-			events.push('start');
-			if (first) {
-				first = false;
+			if (firstInterpret) {
+				firstInterpret = false;
 				await held;
 			}
-			events.push('end');
 			return {
 				kind: 'query',
 				query: { axis: 'fill', value: 'Light' },
@@ -139,13 +137,33 @@ describe('POST /api/action', () => {
 		const p1 = ask();
 		const p2 = ask();
 
-		await vi.waitFor(() => expect(events).toContain('start'));
-		await new Promise((resolve) => setTimeout(resolve, 10)); // room for an un-serialized second call
-		expect(events).toEqual(['start']); // the lock kept the second POST out while the first ran
+		await vi.waitFor(() => expect(interpret).toHaveBeenCalledTimes(1)); // p1's interpret is in flight
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		let p2done = false;
+		void Promise.resolve(p2).then(() => (p2done = true));
+		await Promise.resolve();
+		expect(p2done).toBe(false); // p2 can't complete while p1 holds the lock
 
 		release();
-		await Promise.all([p1, p2]);
-		expect(events).toEqual(['start', 'end', 'start', 'end']); // strictly one turn after another
+		const [r1, r2] = await Promise.all([p1, p2]);
+		// p1 answered live; p2 ran only AFTER p1 committed the turn, so it's a stale not-your-turn —
+		// never interleaved. interpret ran once (the live ask); the stale one is refused before Gemini.
+		expect((await r1.json()).oracle).toMatchObject({ ok: true });
+		expect((await r2.json()).oracle).toMatchObject({ ok: false, engineReason: 'not-your-turn' });
+		expect(interpret).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not charge the Ask quota for a stale ask refused before Gemini', async () => {
+		// A non-empty ask while it is NOT the human's live turn (Sköll active) is refused from engine
+		// state before interpret — it must not spend the Ask quota, or a stale tab could deny real turns.
+		await ask(); // turn now sits with Sköll
+		for (let i = 0; i < ASK_SESSION_LIMIT + 5; i++) {
+			const stale = await json(await ask());
+			expect(stale.oracle).toMatchObject({ ok: false, engineReason: 'not-your-turn' });
+		}
+		// The full Ask allowance survives — a fresh live ask still answers.
+		resetEngine(SID, SEED);
+		expect((await json(await ask())).oracle).toMatchObject({ ok: true });
 	});
 
 	it('voices a Gemini-authored line, stored by id, on a clean answer (ttd:17)', async () => {

@@ -291,21 +291,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		error(400, 'Malformed action payload.');
 	}
 
-	// Ask is the one client-triggerable type that fans out to several Gemini calls; cap it so a
-	// scripted client can't drain the shared key. Only a NON-EMPTY ask reaches Gemini — an empty
-	// question short-circuits to the cheap `empty` refusal before interpret runs (in both the live
-	// and stale paths) — so empty asks must not burn the quota, or a flood of them would deny real
-	// players. (Advance only reaches Gemini on Sköll's own turn, and the rest are deterministic.)
-	if (body.type === 'Ask' && (body as { question: string }).question.trim() !== '') {
-		const verdict = claimOracleSlot(locals.sessionId);
-		if (!verdict.ok) {
-			return json(
-				{ error: 'The Oracle needs a moment. Try again shortly.' },
-				{ status: 429, headers: { 'retry-after': String(verdict.retryAfterSeconds) } }
-			);
-		}
-	}
-
 	// runWithSession scopes any raw Gemini I/O teed this turn to THIS session's sink, never another's.
 	return withSessionLock(locals.sessionId, () =>
 		runWithSession(locals.sessionId, () => resolveAction(body, locals.sessionId))
@@ -424,6 +409,17 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 		engine.status === 'active' &&
 		engine.activePlayer === 'Human'
 	) {
+		// Charge the Ask quota only here — for the live, non-empty ask that actually fans out to several
+		// Gemini calls. An empty ask short-circuits to the cheap refusal, and a stale ask is refused from
+		// engine state before interpret, so neither reaches Gemini or should burn the shared budget.
+		if (action.question.trim() !== '') {
+			const verdict = claimOracleSlot(sessionId);
+			if (!verdict.ok)
+				return json(
+					{ error: 'The Oracle needs a moment. Try again shortly.' },
+					{ status: 429, headers: { 'retry-after': String(verdict.retryAfterSeconds) } }
+				);
+		}
 		return askWithSkollReaction(sessionId, engine, skoll, action.question);
 	}
 

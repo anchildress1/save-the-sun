@@ -157,11 +157,24 @@ export type ActionResponse<T extends ActionResult['type'] = ActionResult['type']
 /** Route one action to the engine/Oracle. */
 export async function handleAction(action: GameAction, deps: ActionDeps): Promise<ActionResult> {
 	switch (action.type) {
-		case 'Ask':
+		case 'Ask': {
+			// A stale Ask — not this player's live, active turn — can't commit, so refuse it from the
+			// engine state BEFORE the Gemini interpret. A stale tab (Sköll's turn, or a won round) then
+			// can't drain the shared key or the Ask quota on a request that was never going to land.
+			const engine = deps.engine;
+			if (engine.status !== 'active' || engine.activePlayer !== action.player) {
+				const engineReason: 'round-over' | 'not-your-turn' =
+					engine.status !== 'active' ? 'round-over' : 'not-your-turn';
+				return {
+					type: 'Ask',
+					oracle: { ok: false, reason: 'engine', engineReason, turnConsumed: false }
+				};
+			}
 			return {
 				type: 'Ask',
-				oracle: await runOracle(deps.engine, action.player, action.question, deps.interpret)
+				oracle: await runOracle(engine, action.player, action.question, deps.interpret)
 			};
+		}
 		case 'Cast':
 			return { type: 'Cast', cast: deps.engine.cast(action.player, action.runeName) };
 		case 'CrossOff':
