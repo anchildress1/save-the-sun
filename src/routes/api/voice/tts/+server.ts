@@ -100,7 +100,15 @@ function streamLine({ voice, synthText, synthMayCache, fallbackPrompt }: Plan): 
 			};
 			try {
 				const voiced = await pump(synthText, synthMayCache);
-				if (!voiced && fallbackPrompt && synthText !== fallbackPrompt) {
+				// Only replay an ALREADY-cached fallback — a fresh synth here would be a second uncapped
+				// Gemini call past the one slot this request claimed. Uncached, stay silent (the panel
+				// carries the line); the deterministic line gets cached via normal voicing elsewhere.
+				if (
+					!voiced &&
+					fallbackPrompt &&
+					synthText !== fallbackPrompt &&
+					isCached(fallbackPrompt, voice)
+				) {
 					await pump(fallbackPrompt, true);
 				}
 			} catch {

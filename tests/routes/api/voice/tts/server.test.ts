@@ -150,16 +150,19 @@ describe('POST /api/voice/tts', () => {
 		);
 	});
 
-	it('voices the deterministic fallback when the authored synth makes no audio (quota 429)', async () => {
+	it('replays the cached fallback when the authored synth makes no audio', async () => {
 		const authored = 'Yes — the flame-sign flares; Sól reaches for fire.';
 		const fallback = 'Yes. She reaches for the fire rune.';
-		const id = storeVoiceLine('authored-429', authored, ORACLE_VOICE, fallback);
-		// Authored (unique) yields nothing — its synth 429'd; the deterministic line then voices.
+		const fallbackPrompt = synthPrompt(ORACLE_VOICE, fallback);
+		const id = storeVoiceLine('authored-fb', authored, ORACLE_VOICE, fallback);
+		// The deterministic fallback is already cached; the authored synth yields nothing (a mid-stream
+		// failure), so the cached fallback replays free — no second uncapped Gemini call.
+		tts.isCached.mockImplementation((text) => text === fallbackPrompt);
 		tts.synthesizeStream
 			.mockReturnValueOnce(streamOf()) // authored: no audio
-			.mockReturnValueOnce(streamOf('pcm')); // fallback: the cacheable clip
+			.mockReturnValueOnce(streamOf('pcm')); // fallback: the cached clip replays
 
-		const response = await call('authored-429', {
+		const response = await call('authored-fb', {
 			kind: 'authored',
 			id,
 			voice: ORACLE_VOICE,
@@ -172,15 +175,28 @@ describe('POST /api/voice/tts', () => {
 			1,
 			synthPrompt(ORACLE_VOICE, authored),
 			ORACLE_VOICE,
-			false // authored is unique — never cached
+			false
 		);
-		// The fallback is the deterministic line, voiced cacheable so it replays free while quota stays out.
-		expect(tts.synthesizeStream).toHaveBeenNthCalledWith(
-			2,
-			synthPrompt(ORACLE_VOICE, fallback),
-			ORACLE_VOICE,
-			true
-		);
+		expect(tts.synthesizeStream).toHaveBeenNthCalledWith(2, fallbackPrompt, ORACLE_VOICE, true);
+	});
+
+	it('stays silent — no second synth — when the authored synth fails and the fallback is uncached', async () => {
+		const authored = 'Yes — flare, unique.';
+		const id = storeVoiceLine('authored-nofb', authored, ORACLE_VOICE, 'Yes. Plain, uncached.');
+		// Nothing cached (default). The authored synth yields nothing, so the route must NOT start a
+		// second, uncapped synth for the fallback — it stays silent (the panel carries the line).
+		tts.synthesizeStream.mockReturnValueOnce(streamOf()); // authored: no audio
+
+		const response = await call('authored-nofb', {
+			kind: 'authored',
+			id,
+			voice: ORACLE_VOICE,
+			text: authored
+		});
+
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('');
+		expect(tts.synthesizeStream).toHaveBeenCalledTimes(1); // only the authored attempt, no fallback synth
 	});
 
 	it('gates an authored line even when its prompt collides with the cache — keyless yields 503, not a silent 200', async () => {
