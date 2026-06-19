@@ -3,8 +3,8 @@ import { logEvent } from '$lib/server/debug/log';
 import { claimVoiceDebugSlot } from '$lib/server/voice/rateLimit';
 import type { RequestHandler } from './$types';
 
-// Tee for the browser-side voice session into the /debug stream. Bounded twice: the message cap
-// here and the log's own 200-event trim.
+// Tee for the browser-side voice session into the /debug stream. Bounded by the message cap here,
+// the rate limiter, and the log's own 200-event trim.
 const LEVELS = new Set(['info', 'error']);
 const MAX_MESSAGE_CHARS = 300;
 const MAX_DATA_CHARS = 1_000;

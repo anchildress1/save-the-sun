@@ -64,7 +64,6 @@
 		} else {
 			crossedOff.add(id);
 
-			// Cross-off stinger animation
 			if (card) {
 				gsap.fromTo(
 					card,

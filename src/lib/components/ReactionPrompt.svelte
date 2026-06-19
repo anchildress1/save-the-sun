@@ -16,9 +16,9 @@
 		busy?: boolean;
 	} = $props();
 
-	// One source for each choice's tooltip and its described-by. The active buttons carry a title for
-	// mouse users; aria-describedby reads the same hint to keyboard/screen-reader users — exactly when
-	// the window is open and the hint matters most, not only on hover.
+	// One source for each choice's tooltip and its described-by. A title shows the hint on hover; the
+	// sr-only span + aria-describedby read it to SR users while the button is actionable. A spent
+	// button is disabled, so its hint isn't announced — its unavailability is the message then.
 	const HINTS = {
 		Scry: 'When your rival asks, hear the answer too.',
 		Hex: "When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted.",

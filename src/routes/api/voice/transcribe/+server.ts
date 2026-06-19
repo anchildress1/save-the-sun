@@ -24,7 +24,7 @@ const RUNE_NAMES = boardRunes.map((rune) => rune.name);
 
 // Read the body as text, capped at maxBytes — enforced WHILE streaming, so a chunked request or one
 // with a missing/garbled Content-Length can't slip an oversized payload past a header check. null once
-// the cap is exceeded (the read is aborted without buffering the rest).
+// the cap is exceeded (the read is cancelled, so no further chunks are pulled).
 async function readCappedBody(request: Request, maxBytes: number): Promise<string | null> {
 	const reader = request.body?.getReader();
 	if (!reader) return '';

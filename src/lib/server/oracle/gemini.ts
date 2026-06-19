@@ -192,7 +192,7 @@ async function authorLine(
 		}
 		captureGemini({ label, request, response: result });
 		// First line only (drops any stray stage-note/preamble the model adds on a new line), with
-		// wrapping quotes stripped. One or two short sentences live on one line. Empty → fall back.
+		// wrapping quotes stripped. The authored line lives on one line. Empty → fall back.
 		const line = (result.text ?? '')
 			.trim()
 			.split('\n')[0]
@@ -239,9 +239,10 @@ export async function composeEndingFlair(outcome: 'win' | 'lose'): Promise<strin
 // The ending narration is exactly one sentence (the splash carries the full verse on screen). The
 // prompt asks for one; this trims a model that returns two to the first. A linear scan (not a lazy
 // regex, which Sonar flags as backtracking-prone): stop at the first terminator run that is a real
-// boundary — followed by whitespace + a capital (the next sentence) or the end — so a dramatic
-// mid-line "..." or an exclamation like "Sól!" is preserved, not cut. NOT applied to the answer
-// flair, which opens with its own "Yes."/"No." sentence by design.
+// boundary — whitespace + a capital (the next sentence), the end, or a lone period before whitespace
+// (a model that drops the capital still gets trimmed) — so a dramatic mid-line "..." or an exclamation
+// like "Sól!" is preserved, not cut. NOT applied to the answer flair, which opens with its own
+// "Yes."/"No." sentence by design.
 function firstSentence(line: string): string {
 	let i = 0;
 	while (i < line.length) {

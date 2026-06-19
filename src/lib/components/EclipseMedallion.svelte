@@ -26,8 +26,8 @@
 
 	let sealed = $derived(current === 'denied');
 
-	// Disc frame: the state's fixed glow level. Speaking holds a steady lit disc — the indicator's
-	// motion is the discrete switch between voices as the delivery queue plays, not an audio pulse.
+	// Disc frame: the state's fixed brightness step. The speaking/recording motion is a CSS loop on the
+	// disc (sprite-level), not a JS/audio pulse; this value is the still frame it holds under reduced motion.
 	let level = $derived(spriteLevel(current));
 
 	// pointerdown begins the hold; release/leave/cancel ends it. Guarded against a denied mic and

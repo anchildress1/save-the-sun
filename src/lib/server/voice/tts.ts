@@ -43,6 +43,7 @@ function ai(apiKey: string): GoogleGenAI {
  * Stream one allow-listed line as base64 PCM chunks. Replays a cached clip's chunks when one
  * exists; otherwise streams from Gemini, accumulating the chunks to cache only on a clean finish.
  * Yields nothing (silent) when the key is missing or synthesis fails — the panel still has the line.
+ * @param cacheable false for an authored one-off line — skips both the cache replay and storage.
  */
 export async function* synthesizeStream(
 	text: string,

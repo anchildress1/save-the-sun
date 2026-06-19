@@ -89,7 +89,8 @@ function remember(sessionId: string, engine: GameEngine): GameEngine {
 	if (engines.size > MAX_SESSIONS) {
 		// Evict the oldest session that is NOT mid-turn. Evicting a locked one would detach the engine
 		// an in-flight request still holds and mint a fresh secret under it, restarting that round
-		// mid-flight. If every session is locked (implausible), skip — the map runs briefly over cap.
+		// mid-flight. If every session is locked (implausible), skip — the map stays over cap until a
+		// later access finds an unlocked session.
 		for (const lru of engines.keys()) {
 			if (locks.has(lru)) continue;
 			engines.delete(lru);
