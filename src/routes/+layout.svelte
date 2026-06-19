@@ -5,7 +5,6 @@
 	import imFellEnglishFont from '$lib/assets/fonts/im-fell-english-latin.woff2?url&no-inline';
 	import imFellEnglishItalicFont from '$lib/assets/fonts/im-fell-english-italic-latin.woff2?url&no-inline';
 	import imFellEnglishScFont from '$lib/assets/fonts/im-fell-english-sc-latin.woff2?url&no-inline';
-	import ogImage from '$lib/assets-webp/banners/intro-splash.webp?url&no-inline';
 	import buttonBorder from '$lib/assets-webp/ui/button-border.webp?url&no-inline';
 
 	let { children } = $props();
@@ -18,8 +17,8 @@
 		'A free browser deduction game for the longest day. Question the Oracle, read the signs, and name the true rune before Sköll the wolf swallows the sun.';
 	const OG_IMAGE_ALT =
 		'A rune stone blazing with golden light at sunrise while Sköll, the great wolf, watches from a dark ridge.';
-	// .pathname, not .href: the client bundle imports the asset absolute, and .href would let hydration rewrite the tag to the page origin.
-	const ogImageUrl = SITE_URL + new URL(ogImage, SITE_URL).pathname;
+	// Temp social banner served from static/ at the web root; absolute URL so unfurl bots can fetch it.
+	const ogImageUrl = `${SITE_URL}/social-banner.jpg`;
 </script>
 
 <svelte:head>
@@ -56,6 +55,8 @@
 	<link rel="canonical" href="{SITE_URL}/" />
 	<meta name="description" content={DESCRIPTION} />
 	<meta name="author" content="Ashley Childress" />
+	<!-- Competition demo: keep it out of search indexes. Social unfurl bots still render the OG card. -->
+	<meta name="robots" content="noindex, nofollow" />
 
 	<meta property="og:type" content="website" />
 	<meta property="og:site_name" content={TITLE} />
@@ -64,9 +65,9 @@
 	<meta property="og:url" content="{SITE_URL}/" />
 	<meta property="og:locale" content="en_US" />
 	<meta property="og:image" content={ogImageUrl} />
-	<meta property="og:image:type" content="image/webp" />
-	<meta property="og:image:width" content="1440" />
-	<meta property="og:image:height" content="900" />
+	<meta property="og:image:type" content="image/jpeg" />
+	<meta property="og:image:width" content="1376" />
+	<meta property="og:image:height" content="768" />
 	<meta property="og:image:alt" content={OG_IMAGE_ALT} />
 
 	<meta name="twitter:card" content="summary_large_image" />
