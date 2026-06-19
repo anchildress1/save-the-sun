@@ -315,6 +315,10 @@
 	function voiceSkoll(descriptor: LineDescriptor): Promise<void> {
 		if (audioReady) return deliver(descriptor);
 		if (!audioOn) return Promise.resolve();
+		// Only one line can wait for the first gesture. A second supersedes it — settle the dropped
+		// one's promise so a caller awaiting it (the end-screen hold via answerAudio) doesn't stall to
+		// the hold cap.
+		pendingSkollResolve?.();
 		pendingSkollVoice = descriptor;
 		return new Promise<void>((resolve) => {
 			pendingSkollResolve = resolve;
@@ -390,6 +394,9 @@
 	let medalState = $state<MedallionState>('idle');
 	// One quiet line when the mic is denied/absent; the button game is unaffected.
 	let voiceNotice = $state('');
+	// Set by readUtterance on a transcribe 429 so finishHold skips the respond path — a react/cast
+	// fallback would otherwise read as a player mishear on top of the throttle notice. Reset per hold.
+	let voiceThrottled = false;
 	// Audio preference + speaker readiness (voice-as-delivery). The preference can be on before the
 	// browser lets us open an AudioContext; delivery should spend one-shot lines only once ready.
 	let audioOn = $state(false);
@@ -510,6 +517,7 @@
 		const casting = holdCasting;
 		const token = holdToken;
 		const fresh = () => `${roundId}:${turns}` === token;
+		voiceThrottled = false;
 		medalState = 'thinking';
 		try {
 			const clip = await stopRecording();
@@ -518,13 +526,15 @@
 			releaseRecorder();
 			if (clip && reacting) {
 				const choice = await classifyReactionUtterance(clip.wavBase64);
-				if (fresh()) await respondReaction(choice);
+				// Skip the respond on a throttle — its 'unclear' fallback would blame the player for a
+				// server 429, on top of the voice notice already shown.
+				if (fresh() && !voiceThrottled) await respondReaction(choice);
 			} else if (clip && casting) {
 				// Armed by hand: the rune name alone casts (the arm already declared intent). Re-check the
 				// arm generation AFTER the transcribe — "Not yet" (or a cancel-then-re-arm) bumps it, so an
 				// irreversible cast can't land against an arm the player abandoned.
 				const name = await classifyCastUtterance(clip.wavBase64);
-				if (fresh() && castArm === holdCastArm) await respondCast(name);
+				if (fresh() && castArm === holdCastArm && !voiceThrottled) await respondCast(name);
 			} else if (clip) {
 				// A normal hold is a question — or a hands-free cast when the player explicitly names a
 				// rune. The spoken words never fill the typing box (the route tees what was heard to
@@ -582,13 +592,17 @@
 	): Promise<T> {
 		const res = await postUtterance(body);
 		if (res?.status === 429) {
-			// An intentional STT throttle, not silence — surface the retry guidance in the voice notice.
+			// An intentional STT throttle, not silence: flag it (so finishHold won't blame the player on
+			// a react/cast read) and surface the retry guidance.
+			voiceThrottled = true;
 			voiceNotice = RITE.voiceBusy;
 			return fallback;
 		}
 		if (!res?.ok) return fallback;
 		try {
-			return pick((await res.json()) as Record<string, unknown>) ?? fallback;
+			const result = pick((await res.json()) as Record<string, unknown>) ?? fallback;
+			voiceNotice = ''; // a clean read clears any stale voice/mic notice
+			return result;
 		} catch {
 			return fallback;
 		}
@@ -1154,6 +1168,9 @@
 	}
 
 	async function submitAsk() {
+		// Mirror the voiced path's gate — the disabled input is presentation, not a real guard, so a
+		// programmatic or race-y submit can't slip an Ask in mid-move or while a cast is armed.
+		if (pending || castMode || !canAct) return;
 		const question = askValue.trim();
 		if (question === '') {
 			// An empty Ask never consumes a turn — gated client-side, no dispatch.

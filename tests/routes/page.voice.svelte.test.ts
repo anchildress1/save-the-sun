@@ -1023,6 +1023,24 @@ describe('Save the Sun page — spoken reaction to Sköll', () => {
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
 	});
 
+	it('a throttled (429) reply shows the voice notice, never the player-blaming unclear line', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(JSON.stringify({ error: 'busy' }), { status: 429 });
+			return new Response('{}');
+		});
+		const screen = render(Page, reactionProps());
+		await holdRelease(screen);
+
+		await expect
+			.element(screen.getByTestId('voice-notice'))
+			.toHaveTextContent('The fire needs a moment');
+		// The throttle is the rite's fault, not the player's — the "try again" blame line must NOT show.
+		await expect.element(screen.getByTestId('answer')).not.toHaveTextContent('Scry, hex, or pass');
+		expect(actionBodies()).toHaveLength(0);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
 	it('treats an out-of-set reaction choice as unclear — asks again', async () => {
 		vi.mocked(fetch).mockImplementation(async (input) => {
 			if (String(input) === '/api/voice/transcribe')
