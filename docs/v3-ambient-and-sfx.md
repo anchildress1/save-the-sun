@@ -123,7 +123,7 @@ Short, non-vocal, latency-critical one-shots. **Not TTS** — a shipped sound-de
 
 We will likely not implement V3. These are the seams v2 must **not** close off, so V3 is additive rather than a refactor. Each is cheap to honor now and expensive to retrofit.
 
-1. **Source-agnostic playback.** `Speaker` (`src/lib/voice/audio.ts`) plays PCM16@24kHz chunks only (`enqueue(base64Pcm)`). V3 clips/SFX are decoded buffers. Keep the gain + analyser + context **mechanics decoupled from the PCM-chunk assumption** so a `playBuffer(AudioBuffer)` path can be added beside `enqueue` without rewriting the speaker. Do not bake "audio == streamed TTS PCM" into the speaker's contract.
+1. **Source-agnostic playback.** `Speaker` (`src/lib/voice/audio.ts`) plays streamed PCM16@24kHz voice chunks tagged with their speaker (`enqueue(base64Pcm, voice)`). V3 clips/SFX are decoded buffers. Keep the gain/context mechanics and speaking-indicator callbacks **decoupled from the PCM-chunk assumption** so a `playBuffer(AudioBuffer)` path can be added beside `enqueue` without rewriting the speaker. Do not bake "audio == streamed TTS PCM" into the speaker's contract.
 
 2. **Mute is the shared audio authority.** The S11 mute preference lives in `sessionStorage` (external to any speaker) — keep it that way. All three buses (added later) consult the same key. Do not couple mute to the Voice speaker instance such that a second bus can't read it.
 
