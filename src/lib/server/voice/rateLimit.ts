@@ -1,5 +1,17 @@
-// Fixed-window abuse guards for the voice surfaces. In-memory is deliberate: the service runs
-// at most 2 instances, so the worst case is 2x these ceilings — still a hard cap on key burn.
+// Fixed-window abuse guards for the voice surfaces. In-memory and per-instance: the service runs
+// at most 2 instances, so the worst case is 2x these ceilings. The synth/transcribe ceilings exist
+// to trip BEFORE Google's own quota — set them to (the key's model RPM / running instances) so a
+// 429 surfaces as our clean "try again" instead of a doomed request, and one player can't drain the
+// shared key for everyone.
+
+import { env } from '$env/dynamic/private';
+
+/** A positive-integer override (`raw`, from the environment) or the fallback — so a deployment aligns
+ *  a ceiling to its key's actual quota (free vs paid tier) without a code change. */
+export const resolveLimit = (raw: string | undefined, fallback: number): number => {
+	const value = Number(raw);
+	return Number.isInteger(value) && value > 0 ? value : fallback;
+};
 
 const WINDOW_MS = 60_000;
 
@@ -8,16 +20,19 @@ const WINDOW_MS = 60_000;
 export const SESSION_LIMIT = 10;
 export const GLOBAL_LIMIT = 60;
 
-// TTS delivery: a turn delivers a line or two and most replay from cache (no key burn), so these
-// run looser than minting while still capping a flood of uncached synth calls. 30/min ≈ 15 turns of
-// fresh lines — well past real play, with headroom for back-to-back testing.
-export const TTS_SESSION_LIMIT = 30;
-export const TTS_GLOBAL_LIMIT = 200;
+// TTS synth: only UNCACHED lines claim a slot (cached replays are free), so the budget is Google's
+// fresh-synth RPM for the TTS preview model — a tight, unpublished ceiling. The old 200/min sat far
+// above it, so we rubber-stamped requests Google then 429'd. Defaults track the free-tier reality
+// (~10 RPM); raise via env on a paid key. The per-session slice caps one player below the global so
+// a single session can't drain the shared key.
+export const TTS_SESSION_LIMIT = resolveLimit(env.TTS_SESSION_LIMIT, 4);
+export const TTS_GLOBAL_LIMIT = resolveLimit(env.TTS_GLOBAL_LIMIT, 10);
 
-// Push-to-talk transcription: every held utterance is a Gemini call (no cache), so cap it near
-// minting — a legit player asks a handful of times a minute.
-export const STT_SESSION_LIMIT = 15;
-export const STT_GLOBAL_LIMIT = 120;
+// Push-to-talk transcription: every held utterance is an uncached Gemini call. (Note: the interpret
+// and flair calls draw on the same Flash quota and are still uncapped — a separate scaling gap.)
+// Same free-tier-sized defaults, env-tunable.
+export const STT_SESSION_LIMIT = resolveLimit(env.STT_SESSION_LIMIT, 4);
+export const STT_GLOBAL_LIMIT = resolveLimit(env.STT_GLOBAL_LIMIT, 10);
 
 interface Window {
 	count: number;

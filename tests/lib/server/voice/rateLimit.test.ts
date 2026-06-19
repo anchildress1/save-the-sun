@@ -7,11 +7,26 @@ import {
 	claimTtsSlot,
 	resetTtsWindows,
 	TTS_SESSION_LIMIT,
-	TTS_GLOBAL_LIMIT
+	TTS_GLOBAL_LIMIT,
+	resolveLimit
 } from '$lib/server/voice/rateLimit';
 
 const T0 = 1_000_000;
 const WINDOW_MS = 60_000;
+
+describe('resolveLimit', () => {
+	it('takes a positive-integer env override', () => {
+		expect(resolveLimit('25', 10)).toBe(25);
+	});
+
+	it('falls back when the value is missing, non-numeric, non-integer, or not positive', () => {
+		expect(resolveLimit(undefined, 10)).toBe(10); // unset
+		expect(resolveLimit('abc', 10)).toBe(10); // NaN
+		expect(resolveLimit('3.5', 10)).toBe(10); // not an integer
+		expect(resolveLimit('0', 10)).toBe(10); // not positive
+		expect(resolveLimit('-4', 10)).toBe(10); // negative
+	});
+});
 
 function drainSession(sessionId: string, now: number) {
 	for (let i = 0; i < SESSION_LIMIT; i++) {
