@@ -449,9 +449,9 @@
 		writeMuted(!audioOn);
 	}
 
-	// Push-to-talk. Hold the medallion (or Space) to record; the mic opens on first hold (one
-	// prompt). A denial/absent mic seals it for the session — the medallion goes inert and the rite
-	// continues by hand. Recording is independent of audio output: you can ask with the sound off.
+	// Push-to-talk. Hold the medallion — or the backtick anywhere — to record; the mic opens on first
+	// hold (one prompt). A denial/absent mic seals it for the session — the medallion goes inert and the
+	// rite continues by hand. Recording is independent of audio output: you can ask with the sound off.
 	async function startHold() {
 		if (recorderSealed()) {
 			medalState = 'denied';
