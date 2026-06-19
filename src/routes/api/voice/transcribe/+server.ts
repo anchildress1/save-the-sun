@@ -36,7 +36,7 @@ async function readCappedBody(request: Request, maxBytes: number): Promise<strin
 		if (done) return text + decoder.decode();
 		bytes += value.byteLength;
 		if (bytes > maxBytes) {
-			await reader.cancel();
+			await reader.cancel().catch(() => {}); // a cancel that rejects must still yield a clean 413
 			return null;
 		}
 		text += decoder.decode(value, { stream: true });
