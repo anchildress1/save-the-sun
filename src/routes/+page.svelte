@@ -295,9 +295,10 @@
 		if (restored && !skollStalled) writeViewState(roundId, snapshot);
 	});
 
-	// The most recent Oracle line's audio (or null when none/text-only). Not reactive — just a handle
-	// the end-screen hold awaits so the splash never preempts her final answer.
-	let answerAudio: Promise<void> | null = null;
+	// The most recent Oracle line's audio (or null when none/text-only). The end-screen hold effect
+	// awaits it and tracks it reactively, so a freshly assigned line re-runs the hold instead of
+	// depending on every assigner also flipping another tracked signal in the same tick.
+	let answerAudio = $state<Promise<void> | null>(null);
 
 	// A Sköll line generated before the speaker is open (a reload that resumes on his turn re-drives his
 	// move in onMount, before the first gesture) is held here and voiced once audio is ready, so it isn't
@@ -337,8 +338,6 @@
 			skollCastPending = false;
 			return;
 		}
-		// answerAudio is a plain handle, not reactive; the effect re-runs on roundOver/audioOn/cast, by
-		// when it's set.
 		const holdForAudio = audioOn && answerAudio !== null;
 		const holdForBeat = !audioOn && skollCastPending;
 		if (!holdForAudio && !holdForBeat) {
