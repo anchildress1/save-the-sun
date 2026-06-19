@@ -240,12 +240,27 @@ export async function composeEndingFlair(outcome: 'win' | 'lose'): Promise<strin
 }
 
 // The ending narration is exactly one sentence (the splash carries the full verse on screen). The
-// prompt asks for one; this trims a model that returns two to the first. The boundary terminator must
-// be followed by whitespace + a capital (the next sentence) or the end — so a dramatic mid-line "..."
-// or an exclamation like "Sól!" is preserved, not cut. NOT applied to the answer flair, which opens
-// with its own "Yes."/"No." sentence by design.
+// prompt asks for one; this trims a model that returns two to the first. A linear scan (not a lazy
+// regex, which Sonar flags as backtracking-prone): stop at the first terminator run that is a real
+// boundary — followed by whitespace + a capital (the next sentence) or the end — so a dramatic
+// mid-line "..." or an exclamation like "Sól!" is preserved, not cut. NOT applied to the answer
+// flair, which opens with its own "Yes."/"No." sentence by design.
 function firstSentence(line: string): string {
-	return line.match(/^.*?[.!?]+(?=\s+["“]?\p{Lu}|\s*$)/u)?.[0]?.trim() ?? line;
+	let i = 0;
+	while (i < line.length) {
+		if (line[i] !== '.' && line[i] !== '!' && line[i] !== '?') {
+			i++;
+			continue;
+		}
+		// Consume a run of terminators so a mid-line "..." or "!?" stays whole.
+		let end = i;
+		while (end + 1 < line.length && '.!?'.includes(line[end + 1])) end++;
+		const rest = line.slice(end + 1);
+		// A real boundary: end of line, or whitespace then an optional quote then a capital letter.
+		if (rest === '' || /^\s+["“]?\p{Lu}/u.test(rest)) return line.slice(0, end + 1).trim();
+		i = end + 1;
+	}
+	return line;
 }
 
 export const interpret: Interpret = async (question) => {
