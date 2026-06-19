@@ -237,6 +237,53 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
 	});
 
+	it('treats a failed transcribe (non-ok) as nothing heard — no Ask, settles idle', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe') return new Response('boom', { status: 500 });
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		press(screen);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		release(screen);
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies()).toHaveLength(0);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('treats an unparseable transcribe body as nothing heard', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			// 200 OK, but the body throws on .json() — the read must degrade, not surface garbage.
+			if (String(input) === '/api/voice/transcribe') return new Response('<<not json>>');
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		press(screen);
+		release(screen);
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies()).toHaveLength(0);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('treats a transcribe response with neither text nor rune as an empty ask', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe') return new Response('{}'); // ok JSON, no fields
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		press(screen);
+		release(screen);
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies()).toHaveLength(0);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
 	it('seals the medallion when the mic is denied — one notice, button game untouched', async () => {
 		recorderMock.startRecording.mockResolvedValueOnce({ ok: false, reason: 'denied' });
 		const screen = render(Page, pageProps);
@@ -489,6 +536,25 @@ describe('Save the Sun page — cast by voice', () => {
 		await expect
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('Name a rune on the board to cast it');
+	});
+
+	it('treats a spoken cast with no rune field as off-board — commits nothing', async () => {
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(body.mode === 'cast' ? '{}' : JSON.stringify({ text: '' }));
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // arm cast mode
+
+		press(screen);
+		release(screen);
+
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies().some((b) => b.type === 'Cast')).toBe(false);
 	});
 });
 
@@ -889,6 +955,20 @@ describe('Save the Sun page — spoken reaction to Sköll', () => {
 			.toHaveTextContent('Scry, hex, or pass — or let his question stand.');
 		expect(actionBodies()).toHaveLength(0); // no React, no Ask
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('treats a reaction reply with no choice field as unclear — asks again, spends nothing', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe') return new Response('{}'); // reaction mode, no choice
+			return new Response('{}');
+		});
+		const screen = render(Page, reactionProps());
+		await holdRelease(screen);
+
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Scry, hex, or pass — or let his question stand.');
+		expect(actionBodies()).toHaveLength(0);
 	});
 
 	it('refuses a spoken scry whose charge is spent — never silently passes', async () => {

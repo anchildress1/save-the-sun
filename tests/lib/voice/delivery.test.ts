@@ -28,7 +28,7 @@ import {
 	resetDelivery,
 	type DeliveryEvent
 } from '$lib/voice/delivery';
-import { SKOLL_VOICE } from '$lib/voice/config';
+import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 
 const LINE = { kind: 'refusal', refusal: 'empty' } as const;
 
@@ -429,6 +429,30 @@ describe('delivery speaking events', () => {
 
 		// The voice tag is what the speaker later announces — Ask + loss are his, the win is hers.
 		expect(audio.speaker.enqueue.mock.calls.map((c) => c[1])).toEqual(['skoll', 'oracle', 'skoll']);
+	});
+
+	it('skips an empty NDJSON line without enqueuing it as a clip', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm-a', '', 'pcm-b'));
+		enableDelivery();
+
+		await deliver(LINE);
+
+		// The blank line between chunks is dropped, never enqueued as an empty clip.
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['pcm-a', 'pcm-b']);
+	});
+
+	it('tags an authored Oracle line as hers', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm'));
+		enableDelivery();
+
+		await deliver({
+			kind: 'authored',
+			id: 'vl-oracle-1',
+			voice: ORACLE_VOICE,
+			text: 'The sun holds — for now.'
+		});
+
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[1])).toEqual(['oracle']);
 	});
 
 	it('tags authored Sköll lines as his', async () => {

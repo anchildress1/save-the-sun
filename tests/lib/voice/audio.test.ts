@@ -108,6 +108,22 @@ describe('createSpeaker', () => {
 		expect(speaking.mock.calls).toEqual([['oracle'], ['skoll']]);
 	});
 
+	it('ignores a duplicate onended for a clip already removed from the queue', () => {
+		const speaker = createSpeaker();
+		const context = FakeAudioContext.instances[0];
+		const drained = vi.fn();
+		speaker.onDrained(drained);
+		speaker.enqueue(pcmBase64(1), 'oracle');
+		const [only] = context.sources;
+		only.onended!(); // removes the entry; queue dry → drained
+		expect(drained).toHaveBeenCalledTimes(1);
+		// A late/duplicate onended for the same (already-removed) clip finds idx < 0 — a no-op, never a
+		// second splice or a double-drain.
+		only.onended!();
+		expect(drained).toHaveBeenCalledTimes(1);
+		expect(speaker.busy).toBe(false);
+	});
+
 	it('starts silent when created muted and restores full gain on unmute', () => {
 		const speaker = createSpeaker(true);
 		const master = FakeAudioContext.instances[0].gains[0];
