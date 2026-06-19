@@ -25,7 +25,6 @@
 	// updates never reshuffle the board.
 	let board = $derived(shuffledBoard(boardSeed));
 
-	// Local state for crossed-off runes
 	let crossedOff = new SvelteSet<number>();
 	// The armed cast target — only this card highlights; the rest of the board is untouched.
 	let selectedId: number | null = $state(null);
@@ -60,7 +59,6 @@
 		const card = gridContainer.querySelector(`.rune-card[data-rune-id="${id}"]`);
 		if (card) clearCardAnimation(card);
 
-		// Normal cross-off mode
 		if (crossedOff.has(id)) {
 			crossedOff.delete(id);
 		} else {
