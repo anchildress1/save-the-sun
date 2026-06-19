@@ -14,6 +14,10 @@ import type { RequestHandler } from './$types';
 // A held push-to-talk utterance is a base64 WAV; cap it so a malformed/huge payload can't be sent
 // to Gemini. ~5MB base64 ≈ 3.6MB audio ≈ well over a minute at 16kHz mono — plenty for one Ask.
 const MAX_WAV_BASE64 = 5_000_000;
+// Reject an oversized body by its declared size BEFORE request.json() buffers it into memory — the
+// base64 cap above only fires after the whole payload is already parsed. Margin covers the JSON keys
+// and the optional rune list around the audio field.
+const MAX_REQUEST_BYTES = MAX_WAV_BASE64 + 16_384;
 
 // Cast matching uses the SERVER's canonical rune names, never the client's list — the board always
 // holds these 24, so a malformed client can't pad the Gemini prompt with junk labels under our key.
@@ -24,6 +28,11 @@ const RUNE_NAMES = boardRunes.map((rune) => rune.name);
 // matches a spoken rune name (against the server's canonical board names) to commit an armed cast.
 // The browser sends only audio — the engine still runs the same Ask/React/Cast paths the buttons use.
 export const POST: RequestHandler = async ({ request, locals }) => {
+	const declaredBytes = Number(request.headers.get('content-length'));
+	if (Number.isFinite(declaredBytes) && declaredBytes > MAX_REQUEST_BYTES) {
+		return json({ error: 'Payload too large.' }, { status: 413 });
+	}
+
 	let body: unknown;
 	try {
 		body = await request.json();
