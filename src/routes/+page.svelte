@@ -60,6 +60,7 @@
 		riteMoving: 'The rite is moving. Hold.',
 		oracleSilent: "The Oracle falls silent — the rite can't reach Sól.",
 		oracleBusy: 'The Oracle needs a moment. Ask again shortly.',
+		voiceBusy: 'The fire needs a moment. Speak again shortly.',
 		castFalters: CAST_FALTERS,
 		wrongCast: wrongCastLine,
 		runeTrue: CAST_TRUE,
@@ -488,6 +489,7 @@
 			await finishHold();
 			return;
 		}
+		voiceNotice = ''; // a fresh hold clears any prior mic/voice notice
 		medalState = 'recording';
 	}
 
@@ -579,6 +581,11 @@
 		pick: (data: Record<string, unknown>) => T | null | undefined
 	): Promise<T> {
 		const res = await postUtterance(body);
+		if (res?.status === 429) {
+			// An intentional STT throttle, not silence — surface the retry guidance in the voice notice.
+			voiceNotice = RITE.voiceBusy;
+			return fallback;
+		}
 		if (!res?.ok) return fallback;
 		try {
 			return pick((await res.json()) as Record<string, unknown>) ?? fallback;

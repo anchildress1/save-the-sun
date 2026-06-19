@@ -301,6 +301,23 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
 	});
 
+	it('surfaces a transcribe 429 as a voice notice, not silence', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(JSON.stringify({ error: 'busy' }), { status: 429 });
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		press(screen);
+		release(screen);
+
+		await expect
+			.element(screen.getByTestId('voice-notice'))
+			.toHaveTextContent('The fire needs a moment');
+		expect(actionBodies()).toHaveLength(0); // the throttled speech never became an Ask
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
 	it('seals the medallion when the mic is denied — one notice, button game untouched', async () => {
 		recorderMock.startRecording.mockResolvedValueOnce({ ok: false, reason: 'denied' });
 		const screen = render(Page, pageProps);
