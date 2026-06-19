@@ -23,23 +23,23 @@ const MAX_REQUEST_BYTES = MAX_WAV_BASE64 + 16_384;
 // holds these 24, so a malformed client can't pad the Gemini prompt with junk labels under our key.
 const RUNE_NAMES = boardRunes.map((rune) => rune.name);
 
-// Reads a recorded utterance: `ask` (default) transcribes it verbatim into the player's question;
-// `reaction` classifies a reply to Sköll's hanging question into scry/hex/pass (or unclear); `cast`
-// matches a spoken rune name (against the server's canonical board names) to commit an armed cast.
-// The browser sends only audio — the engine still runs the same Ask/React/Cast paths the buttons use.
-export const POST: RequestHandler = async ({ request, locals }) => {
-	const declaredBytes = Number(request.headers.get('content-length'));
-	if (Number.isFinite(declaredBytes) && declaredBytes > MAX_REQUEST_BYTES) {
-		return json({ error: 'Payload too large.' }, { status: 413 });
-	}
+type Mode = 'ask' | 'reaction' | 'cast';
+interface ParsedRequest {
+	wavBase64: string;
+	mode: Mode | undefined;
+	runes: unknown;
+}
 
+// Parse and validate the request envelope — JSON shape plus the audio/mode/cast fields. Returns a
+// ready-to-send 4xx Response on any violation, or the validated fields. Kept out of POST so the
+// handler's complexity stays on the read modes, not the guards.
+async function parseRequest(request: Request): Promise<Response | ParsedRequest> {
 	let body: unknown;
 	try {
 		body = await request.json();
 	} catch {
 		return json({ error: 'Bad request.' }, { status: 400 });
 	}
-
 	// A bare JSON `null` / non-object parses fine but would throw on destructure — treat it as a 400.
 	if (typeof body !== 'object' || body === null) {
 		return json({ error: 'Bad request.' }, { status: 400 });
@@ -62,6 +62,29 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	if (mode === 'cast' && !Array.isArray(runes)) {
 		return json({ error: 'Bad cast targets.' }, { status: 400 });
 	}
+	return { wavBase64, mode, runes };
+}
+
+// Tee what was heard to /debug so a mishear is diagnosable — it never fills the player's typing box,
+// but the spoken intent is visible in the stream that follows the rite's truth.
+function teeHeard(sessionId: string, message: string): void {
+	logEvent(sessionId, { owner: 'Human', kind: 'input', part: 'Voice', level: 'info', message });
+}
+
+// Reads a recorded utterance: `ask` (default) transcribes it verbatim into the player's question;
+// `reaction` classifies a reply to Sköll's hanging question into scry/hex/pass (or unclear); `cast`
+// matches a spoken rune name (against the server's canonical board names) to commit an armed cast.
+// The browser sends only audio — the engine still runs the same Ask/React/Cast paths the buttons use.
+export const POST: RequestHandler = async ({ request, locals }) => {
+	// NaN (missing/garbage header) and 0 are both < the cap, so they fall through to the parse + the
+	// base64 length check; only an honestly-declared oversized body is refused before buffering.
+	if (Number(request.headers.get('content-length')) > MAX_REQUEST_BYTES) {
+		return json({ error: 'Payload too large.' }, { status: 413 });
+	}
+
+	const parsed = await parseRequest(request);
+	if (parsed instanceof Response) return parsed;
+	const { wavBase64, mode, runes } = parsed;
 
 	// Fail loudly (503) when voice is unconfigured so a deploy/config gap is visible, and gate the
 	// Gemini call behind the per-session/global limiter (a denial spends nothing).
@@ -74,29 +97,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		);
 	}
 
-	// Tee what was heard to /debug so a mishear is diagnosable — it never fills the player's typing
-	// box, but the spoken intent is visible in the stream that follows the rite's truth.
 	if (mode === 'reaction') {
 		const choice = await classifyReaction(wavBase64);
-		logEvent(locals.sessionId, {
-			owner: 'Human',
-			kind: 'input',
-			part: 'Voice',
-			level: 'info',
-			message: `heard reaction: ${choice}`
-		});
+		teeHeard(locals.sessionId, `heard reaction: ${choice}`);
 		return json({ choice });
 	}
 
 	if (mode === 'cast') {
 		const rune = await classifyCast(wavBase64, RUNE_NAMES);
-		logEvent(locals.sessionId, {
-			owner: 'Human',
-			kind: 'input',
-			part: 'Voice',
-			level: 'info',
-			message: `heard cast: ${rune || '(unclear)'}`
-		});
+		teeHeard(locals.sessionId, `heard cast: ${rune || '(unclear)'}`);
 		return json({ rune });
 	}
 
@@ -106,32 +115,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	if (Array.isArray(runes)) {
 		const result = await interpretAsk(wavBase64, RUNE_NAMES);
 		if ('cast' in result) {
-			logEvent(locals.sessionId, {
-				owner: 'Human',
-				kind: 'input',
-				part: 'Voice',
-				level: 'info',
-				message: `heard cast: ${result.cast || '(unclear)'}`
-			});
+			teeHeard(locals.sessionId, `heard cast: ${result.cast || '(unclear)'}`);
 			return json({ rune: result.cast });
 		}
-		logEvent(locals.sessionId, {
-			owner: 'Human',
-			kind: 'input',
-			part: 'Voice',
-			level: 'info',
-			message: `heard: ${result.text || '(nothing)'}`
-		});
+		teeHeard(locals.sessionId, `heard: ${result.text || '(nothing)'}`);
 		return json({ text: result.text });
 	}
 
 	const text = await transcribe(wavBase64);
-	logEvent(locals.sessionId, {
-		owner: 'Human',
-		kind: 'input',
-		part: 'Voice',
-		level: 'info',
-		message: `heard: ${text || '(nothing)'}`
-	});
+	teeHeard(locals.sessionId, `heard: ${text || '(nothing)'}`);
 	return json({ text });
 };
