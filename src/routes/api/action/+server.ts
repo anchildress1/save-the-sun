@@ -21,6 +21,7 @@ import { interpret, composeOracleFlair, composeEndingFlair } from '$lib/server/o
 import { voiceAnswer, prepareAsk, answerAsk } from '$lib/server/oracle/oracle';
 import type { OracleResult } from '$lib/server/oracle/types';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
+import { OUTCOME_LINES, VOICED_SEQUENCE } from '$lib/voice/outcomeLines';
 import { resolveReaction } from '$lib/server/engine/reactions';
 import type { Query } from '$lib/server/engine/queries';
 import {
@@ -178,8 +179,10 @@ async function authorEnding(
 	if (text === null) return undefined;
 	const voice = outcome === 'win' ? ORACLE_VOICE : SKOLL_VOICE;
 	// Stash the words server-side; the wire carries only the id (+ voice/text for the client), and the
-	// TTS route voices it by id lookup — never from the wire.
-	const id = storeVoiceLine(sessionId, text, voice);
+	// TTS route voices it by id lookup — never from the wire. The deterministic splash beat is the
+	// cacheable fallback if the authored synth 429s.
+	const fallback = OUTCOME_LINES[outcome][VOICED_SEQUENCE[outcome][0]];
+	const id = storeVoiceLine(sessionId, text, voice, fallback);
 	return { kind: 'authored', id, voice, text };
 }
 
@@ -254,7 +257,7 @@ async function authorAnswerFlair(
 		console.warn(`[oracle] flair dropped — verdict not preserved: ${JSON.stringify(flair)}`);
 		return;
 	}
-	const id = storeVoiceLine(sessionId, flair, ORACLE_VOICE);
+	const id = storeVoiceLine(sessionId, flair, ORACLE_VOICE, oracle.answer);
 	oracle.voiced = { kind: 'authored', id, voice: ORACLE_VOICE, text: flair };
 }
 

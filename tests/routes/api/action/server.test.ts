@@ -35,6 +35,7 @@ import {
 import { getEvents, captureGemini, runWithSession } from '$lib/server/debug/log';
 import { selectSecret } from '$lib/server/engine/engine';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
+import { OUTCOME_LINES, VOICED_SEQUENCE } from '$lib/voice/outcomeLines';
 import { runes } from '$lib/board';
 
 const SEED = 1;
@@ -100,10 +101,12 @@ describe('POST /api/action', () => {
 			voice: ORACLE_VOICE
 		});
 		// The words live in the session store, keyed by the id on the wire — the route voices them by
-		// lookup, never from the wire. The stored line matches the display text.
+		// lookup, never from the wire. The stored line matches the display text; the deterministic answer
+		// rides along as the cacheable fallback the TTS route voices if the authored synth 429s.
 		expect(getVoiceLine(SID, data.oracle.voiced.id)).toEqual({
 			text: 'No — the white sign stays cold; Sól does not reach into light.',
-			voice: ORACLE_VOICE
+			voice: ORACLE_VOICE,
+			fallback: data.oracle.answer
 		});
 	});
 
@@ -322,7 +325,8 @@ describe('POST /api/action', () => {
 		});
 		expect(getVoiceLine(SID, data.outcomeFlair.id)).toEqual({
 			text: 'The dawn is kept; Sól climbs free.',
-			voice: ORACLE_VOICE
+			voice: ORACLE_VOICE,
+			fallback: OUTCOME_LINES.win[VOICED_SEQUENCE.win[0]] // the deterministic splash beat
 		});
 	});
 
@@ -344,7 +348,8 @@ describe('POST /api/action', () => {
 		});
 		expect(getVoiceLine(SID, data.outcomeFlair.id)).toEqual({
 			text: 'The sun is mine. Your night has no morning.',
-			voice: SKOLL_VOICE
+			voice: SKOLL_VOICE,
+			fallback: OUTCOME_LINES.lose[VOICED_SEQUENCE.lose[0]] // the deterministic splash beat
 		});
 	});
 

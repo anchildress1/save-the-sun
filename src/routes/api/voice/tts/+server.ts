@@ -28,11 +28,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	// don't compose to an allow-listed line) is refused BEFORE any quota spend.
 	let line: string | null;
 	let voice: string;
+	// Set only for an authored line: its deterministic counterpart, voiced if the authored synth 429s.
+	let fallbackPrompt: string | null = null;
 	if (body.kind === 'authored') {
 		const stored = getVoiceLine(locals.sessionId, body.id);
 		if (stored === null) return badLine();
 		line = stored.text;
 		voice = stored.voice;
+		fallbackPrompt = synthPrompt(voice, stored.fallback);
 	} else {
 		line = composeLine(body);
 		if (line === null) return badLine();
@@ -65,10 +68,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream<Uint8Array>({
 		async start(controller) {
-			try {
-				for await (const chunk of synthesizeStream(prompt, voice, cacheable)) {
+			const pump = async (text: string, mayCache: boolean): Promise<boolean> => {
+				let voiced = false;
+				for await (const chunk of synthesizeStream(text, voice, mayCache)) {
 					controller.enqueue(encoder.encode(chunk + '\n'));
+					voiced = true;
 				}
+				return voiced;
+			};
+			try {
+				// An authored line is unique and never cached, so it dies first under quota. When its synth
+				// makes no audio, voice the deterministic counterpart instead — it's cacheable, so once
+				// synthesized it replays free even while quota stays exhausted.
+				const voiced = await pump(prompt, cacheable);
+				if (!voiced && fallbackPrompt) await pump(fallbackPrompt, true);
 			} catch {
 				/* torn stream / client gone — audio is best-effort past here */
 			} finally {

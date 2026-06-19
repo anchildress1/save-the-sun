@@ -213,14 +213,18 @@ describe('session engine registry', () => {
 	it('drops the oldest authored voice line once past the per-round cap', () => {
 		const MAX_VOICE_LINES = 32;
 		const session = 'voice-line-cap';
-		const oldest = storeVoiceLine(session, 'the first line', ORACLE_VOICE);
+		const oldest = storeVoiceLine(session, 'the first line', ORACLE_VOICE, 'plain first');
 		let newest = oldest;
 		// One more than the cap → the first stored id falls off the front.
 		for (let i = 0; i < MAX_VOICE_LINES; i++) {
-			newest = storeVoiceLine(session, `line ${i}`, ORACLE_VOICE);
+			newest = storeVoiceLine(session, `line ${i}`, ORACLE_VOICE, `plain ${i}`);
 		}
 		expect(getVoiceLine(session, oldest)).toBeNull(); // evicted — the route would refuse it
-		expect(getVoiceLine(session, newest)).toEqual({ text: 'line 31', voice: ORACLE_VOICE });
+		expect(getVoiceLine(session, newest)).toEqual({
+			text: 'line 31',
+			voice: ORACLE_VOICE,
+			fallback: 'plain 31'
+		});
 	});
 });
 

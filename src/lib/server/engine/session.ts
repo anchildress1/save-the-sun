@@ -38,6 +38,8 @@ const lastLines = new Map<string, RecoverableLine>();
 export interface AuthoredVoiceLine {
 	text: string;
 	voice: string;
+	// The deterministic, cacheable line the TTS route voices when this authored synth makes no audio.
+	fallback: string;
 }
 const MAX_VOICE_LINES = 32;
 const voiceLines = new Map<string, Map<string, AuthoredVoiceLine>>();
@@ -178,11 +180,16 @@ export function getLastLine(sessionId: string): RecoverableLine | null {
  * Stash an authored line for the TTS route to voice by id (ttd:17/ttd:22). Returns the opaque id the
  * client echoes back — the words live only here, never on the wire the route trusts. Bounded per round.
  */
-export function storeVoiceLine(sessionId: string, text: string, voice: string): string {
+export function storeVoiceLine(
+	sessionId: string,
+	text: string,
+	voice: string,
+	fallback: string
+): string {
 	requireId(sessionId);
 	const id = crypto.randomUUID();
 	const lines = voiceLines.get(sessionId) ?? new Map<string, AuthoredVoiceLine>();
-	lines.set(id, { text, voice });
+	lines.set(id, { text, voice, fallback });
 	// Insertion-ordered: drop the oldest once over the cap so a marathon round can't grow unbounded.
 	if (lines.size > MAX_VOICE_LINES) lines.delete(lines.keys().next().value as string);
 	voiceLines.set(sessionId, lines);

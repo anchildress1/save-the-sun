@@ -109,7 +109,7 @@ describe('POST /api/voice/tts', () => {
 	it('voices an authored line by id lookup from the session store (ttd:17)', async () => {
 		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm'));
 		const text = 'Yes — the flame-sign burns; Sól reaches for fire.';
-		const id = storeVoiceLine('authored-sess', text, ORACLE_VOICE);
+		const id = storeVoiceLine('authored-sess', text, ORACLE_VOICE, 'Yes. She reaches for fire.');
 
 		const response = await call('authored-sess', {
 			kind: 'authored',
@@ -130,7 +130,7 @@ describe('POST /api/voice/tts', () => {
 	it('voices the STORED words, never the wire text — the route admits no arbitrary text', async () => {
 		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm'));
 		const stored = 'No. She does not reach into fire.';
-		const id = storeVoiceLine('authored-sess2', stored, ORACLE_VOICE);
+		const id = storeVoiceLine('authored-sess2', stored, ORACLE_VOICE, 'No. Not fire.');
 
 		// A caller tampers the wire text, keeping a real id — the route must voice the STORED line.
 		await call('authored-sess2', {
@@ -147,6 +147,49 @@ describe('POST /api/voice/tts', () => {
 		);
 	});
 
+	it('voices the deterministic fallback when the authored synth makes no audio (quota 429)', async () => {
+		const authored = 'Yes — the flame-sign flares; Sól reaches for fire.';
+		const fallback = 'Yes. She reaches for the fire rune.';
+		const id = storeVoiceLine('authored-429', authored, ORACLE_VOICE, fallback);
+		// Authored (unique) yields nothing — its synth 429'd; the deterministic line then voices.
+		tts.synthesizeStream
+			.mockReturnValueOnce(streamOf()) // authored: no audio
+			.mockReturnValueOnce(streamOf('pcm')); // fallback: the cacheable clip
+
+		const response = await call('authored-429', {
+			kind: 'authored',
+			id,
+			voice: ORACLE_VOICE,
+			text: authored
+		});
+
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('pcm\n');
+		expect(tts.synthesizeStream).toHaveBeenNthCalledWith(
+			1,
+			synthPrompt(ORACLE_VOICE, authored),
+			ORACLE_VOICE,
+			false // authored is unique — never cached
+		);
+		// The fallback is the deterministic line, voiced cacheable so it replays free while quota stays out.
+		expect(tts.synthesizeStream).toHaveBeenNthCalledWith(
+			2,
+			synthPrompt(ORACLE_VOICE, fallback),
+			ORACLE_VOICE,
+			true
+		);
+	});
+
+	it('never reaches for the fallback when the authored synth voices', async () => {
+		const authored = 'No — she turns from the flame.';
+		const id = storeVoiceLine('authored-ok', authored, ORACLE_VOICE, 'No. Not fire.');
+		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm')); // authored voiced
+
+		await call('authored-ok', { kind: 'authored', id, voice: ORACLE_VOICE, text: authored });
+
+		expect(tts.synthesizeStream).toHaveBeenCalledTimes(1); // the deterministic line is untouched
+	});
+
 	it('refuses an authored line whose id is unknown to the session (no store entry)', async () => {
 		const response = await call('authored-sess3', {
 			kind: 'authored',
@@ -159,7 +202,7 @@ describe('POST /api/voice/tts', () => {
 	});
 
 	it('does not cross sessions — an id stored for one session is unknown to another', async () => {
-		const id = storeVoiceLine('owner-sess', 'her line', ORACLE_VOICE);
+		const id = storeVoiceLine('owner-sess', 'her line', ORACLE_VOICE, 'her plain line');
 		const response = await call('other-sess', {
 			kind: 'authored',
 			id,
