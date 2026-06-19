@@ -28,12 +28,13 @@ export const TTS_GLOBAL_LIMIT = resolveLimit(env.TTS_GLOBAL_LIMIT, 10);
 export const STT_SESSION_LIMIT = resolveLimit(env.STT_SESSION_LIMIT, 4);
 export const STT_GLOBAL_LIMIT = resolveLimit(env.STT_GLOBAL_LIMIT, 10);
 
-// A live Ask fans out to several Gemini calls (Oracle interpret + flair, Sköll reaction) on the same
-// Flash quota as voice, with no audio required to trigger it. Sized above real play — an Ask
-// round-trips in seconds, so a human can't approach it — to stop a scripted client from hammering the
-// turn endpoint and draining the shared key. Env-tunable for a stricter or paid-tier key.
-export const ASK_SESSION_LIMIT = resolveLimit(env.ASK_SESSION_LIMIT, 20);
-export const ASK_GLOBAL_LIMIT = resolveLimit(env.ASK_GLOBAL_LIMIT, 60);
+// A live Ask fans out to ~3 Gemini calls (Oracle interpret + flair, Sköll reaction) on the same Flash
+// quota as voice, with no audio required to trigger it. These are REQUEST budgets, so the effective
+// Gemini-call ceiling is ~3x lower — sized so a human (an Ask round-trips in seconds) never trips them
+// while a scripted client can't fan a flood of fresh-session asks into a multiple of the call budget.
+// Env-tunable for a stricter or paid-tier key.
+export const ASK_SESSION_LIMIT = resolveLimit(env.ASK_SESSION_LIMIT, 8);
+export const ASK_GLOBAL_LIMIT = resolveLimit(env.ASK_GLOBAL_LIMIT, 24);
 
 interface Window {
 	count: number;
