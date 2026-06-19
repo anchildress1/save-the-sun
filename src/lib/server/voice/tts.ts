@@ -32,12 +32,18 @@ function ai(apiKey: string): GoogleGenAI {
  * exists; otherwise streams from Gemini, accumulating the chunks to cache only on a clean finish.
  * Yields nothing (silent) when the key is missing or synthesis fails — the panel still has the line.
  */
-export async function* synthesizeStream(text: string, voice: string): AsyncGenerator<string> {
+export async function* synthesizeStream(
+	text: string,
+	voice: string,
+	cacheable = true
+): AsyncGenerator<string> {
 	const key = cacheKey(voice, text);
-	const cached = cache.get(key);
-	if (cached !== undefined) {
-		yield* cached;
-		return;
+	if (cacheable) {
+		const cached = cache.get(key);
+		if (cached !== undefined) {
+			yield* cached;
+			return;
+		}
 	}
 
 	if (!env.GEMINI_API_KEY) {
@@ -58,12 +64,14 @@ export async function* synthesizeStream(text: string, voice: string): AsyncGener
 		for await (const part of stream) {
 			const data = part.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 			if (data) {
-				chunks.push(data);
+				if (cacheable) chunks.push(data);
 				yield data;
 			}
 		}
 		// Cache only a complete clip — a stream that errored mid-flight must not replay truncated.
-		if (chunks.length > 0) cache.set(key, chunks);
+		// Authored lines (Gemini-written, unique every call) are never cacheable: a unique key can't
+		// replay, so caching only grows memory unbounded for the life of the process.
+		if (cacheable && chunks.length > 0) cache.set(key, chunks);
 	} catch (err) {
 		// Keep the stack but mask it — an SDK error can embed the request URL, and with it the key.
 		const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);

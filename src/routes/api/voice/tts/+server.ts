@@ -38,6 +38,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		if (line === null) return badLine();
 		voice = voiceForLine(body);
 	}
+	// Authored lines are unique per call, so they're never cacheable — a unique key can't replay, and
+	// caching it would only grow memory for the life of the process.
+	const cacheable = body.kind !== 'authored';
 	// The synthesis prompt wraps the line in its speaker's director's-notes (both voices, never bare).
 	const prompt = synthPrompt(voice, line);
 
@@ -56,14 +59,25 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	// NDJSON: one base64 PCM chunk per line. A synth failure mid-stream ends it early — the audio is
-	// best-effort (the panel already carries the text) past this point.
+	// best-effort (the panel already carries the text) past this point. The pump is guarded so a client
+	// disconnect (enqueue on a torn stream) closes deliberately instead of escaping as an unhandled
+	// rejection — matching every other voice path, which degrades on purpose, not by accident.
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream<Uint8Array>({
 		async start(controller) {
-			for await (const chunk of synthesizeStream(prompt, voice)) {
-				controller.enqueue(encoder.encode(chunk + '\n'));
+			try {
+				for await (const chunk of synthesizeStream(prompt, voice, cacheable)) {
+					controller.enqueue(encoder.encode(chunk + '\n'));
+				}
+			} catch {
+				/* torn stream / client gone — audio is best-effort past here */
+			} finally {
+				try {
+					controller.close();
+				} catch {
+					/* already errored or closed */
+				}
 			}
-			controller.close();
 		}
 	});
 

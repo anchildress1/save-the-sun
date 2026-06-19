@@ -57,7 +57,8 @@ describe('POST /api/voice/tts', () => {
 		// Her line is synthesized wrapped in the Oracle's director's-notes, in her voice.
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			synthPrompt(ORACLE_VOICE, refusalLine('empty')),
-			ORACLE_VOICE
+			ORACLE_VOICE,
+			true // a recomposed line caches and replays
 		);
 	});
 
@@ -73,7 +74,7 @@ describe('POST /api/voice/tts', () => {
 		const prompt = synthPrompt(SKOLL_VOICE, line);
 		expect(prompt).not.toBe(line);
 		expect(prompt).toContain(`"${line}"`);
-		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE);
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE, true);
 	});
 
 	it('voices Sköll’s winning cast in his voice, naming the board rune', async () => {
@@ -85,7 +86,7 @@ describe('POST /api/voice/tts', () => {
 		expect(response.status).toBe(200);
 		const prompt = synthPrompt(SKOLL_VOICE, line);
 		expect(prompt).toContain(`"${line}"`);
-		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE);
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE, true);
 	});
 
 	it('rejects a Sköll cast that names no board rune with 400', async () => {
@@ -121,7 +122,8 @@ describe('POST /api/voice/tts', () => {
 		// Voiced in her director's-notes, in her voice — the route resolved the words from the store by id.
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			synthPrompt(ORACLE_VOICE, text),
-			ORACLE_VOICE
+			ORACLE_VOICE,
+			false // an authored line is unique — never cached
 		);
 	});
 
@@ -140,7 +142,8 @@ describe('POST /api/voice/tts', () => {
 
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			synthPrompt(ORACLE_VOICE, stored),
-			ORACLE_VOICE
+			ORACLE_VOICE,
+			false // an authored line is unique — never cached
 		);
 	});
 
@@ -207,11 +210,11 @@ describe('POST /api/voice/tts', () => {
 		expect(tts.synthesizeStream).toHaveBeenCalledTimes(TTS_SESSION_LIMIT);
 	});
 
-	it('returns a clean 200 NDJSON stream even when the synth generator throws mid-stream', async () => {
-		// The route's start() loops the generator with no try/catch — it relies on synthesizeStream
-		// swallowing its own errors. Prove a generator that yields one chunk then throws still returns the
-		// 200 NDJSON response (the gate already passed); the stream surfaces the failure on read rather
-		// than wedging, and there is no unhandled rejection.
+	it('closes the stream cleanly when the synth generator throws mid-stream — no unhandled rejection', async () => {
+		// The route guards the pump: a generator that yields one chunk then throws (a torn stream / client
+		// disconnect) is caught and the stream is closed deliberately, matching every other voice path.
+		// The response stays a 200 NDJSON carrying the chunk that did arrive; draining it resolves rather
+		// than rejecting or hanging.
 		tts.synthesizeStream.mockReturnValueOnce(
 			(async function* () {
 				yield 'pcm-a';
@@ -223,7 +226,7 @@ describe('POST /api/voice/tts', () => {
 
 		expect(response.status).toBe(200);
 		expect(response.headers.get('content-type')).toContain('application/x-ndjson');
-		// The stream errors before close, so draining it rejects with the synth failure (not a hang).
-		await expect(response.text()).rejects.toThrow('synth blew up mid-stream');
+		// The pre-throw chunk lands; the throw is swallowed and the stream closed — the drain resolves.
+		expect(await response.text()).toBe('pcm-a\n');
 	});
 });

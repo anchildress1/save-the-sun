@@ -117,7 +117,17 @@ describe('synthesizeStream', () => {
 
 		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([]);
 		expect(sdk.GoogleGenAI).not.toHaveBeenCalled();
-		expect(vi.mocked(console.error).mock.calls.flat().join(' ')).toContain('not configured');
+	});
+
+	it('does not cache an uncacheable (authored) line — a unique clip can never replay', async () => {
+		sdk.generateContentStream.mockResolvedValue(streamOf('a', 'b'));
+		const line = 'No, she does not reach for the color of the deep.';
+
+		expect(await collect(synthesizeStream(line, ORACLE_VOICE, false))).toEqual(['a', 'b']);
+		expect(isCached(line, ORACLE_VOICE)).toBe(false); // never stored — no memory accrual
+		// A second call re-synthesizes; there is no cached clip to replay.
+		await collect(synthesizeStream(line, ORACLE_VOICE, false));
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
 	});
 
 	it('masks the key and stops when the stream rejects', async () => {
