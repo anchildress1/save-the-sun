@@ -569,44 +569,49 @@
 		}
 	}
 
-	// Read a normal hold: a question, or a hands-free cast when the player names a board rune. Sends the
+	// Read a held clip through the transcribe route, mapping the JSON with `pick`. Falls back on a
+	// non-ok response, a parse failure, or a missing field — so a mishear or dropped call never
+	// silently spends a charge or stakes a cast. (`?? fallback` keeps an intentional empty cast '' —
+	// only null/undefined coalesces, not the empty string the server returns for a refused cast.)
+	async function readUtterance<T>(
+		body: object,
+		fallback: T,
+		pick: (data: Record<string, unknown>) => T | null | undefined
+	): Promise<T> {
+		const res = await postUtterance(body);
+		if (!res?.ok) return fallback;
+		try {
+			return pick((await res.json()) as Record<string, unknown>) ?? fallback;
+		} catch {
+			return fallback;
+		}
+	}
+
+	// A normal hold: a question, or a hands-free cast when the player names a board rune. Sends the
 	// board names so the server can match a spoken cast; a `cast` result (even '') means cast intent,
 	// so it routes to respondCast rather than being re-read as a question. Degrades to an empty Ask.
-	async function interpretUtterance(
-		wavBase64: string
-	): Promise<{ cast: string } | { text: string }> {
-		const res = await postUtterance({ wavBase64, runes: runes.map((r) => r.name) });
-		if (!res?.ok) return { text: '' };
-		try {
-			const data = (await res.json()) as { rune?: string; text?: string };
-			return typeof data.rune === 'string' ? { cast: data.rune } : { text: data.text ?? '' };
-		} catch {
-			return { text: '' };
-		}
+	function interpretUtterance(wavBase64: string): Promise<{ cast: string } | { text: string }> {
+		return readUtterance({ wavBase64, runes: runes.map((r) => r.name) }, { text: '' }, (d) =>
+			typeof d.rune === 'string' ? { cast: d.rune } : { text: (d.text as string) ?? '' }
+		);
 	}
 
-	// Classify a held reply to Sköll's hanging question into a reaction; `unclear` on any failure, so
+	// A held reply to Sköll's hanging question, classified into a reaction; `unclear` on any failure so
 	// a misheard or dropped call never silently spends a one-use charge.
-	async function classifyReactionUtterance(wavBase64: string): Promise<SpokenReaction> {
-		const res = await postUtterance({ wavBase64, mode: 'reaction' });
-		if (!res?.ok) return 'unclear';
-		try {
-			return ((await res.json()) as { choice?: SpokenReaction }).choice ?? 'unclear';
-		} catch {
-			return 'unclear';
-		}
+	function classifyReactionUtterance(wavBase64: string): Promise<SpokenReaction> {
+		return readUtterance(
+			{ wavBase64, mode: 'reaction' },
+			'unclear',
+			(d) => d.choice as SpokenReaction
+		);
 	}
 
-	// Match a held cast utterance to a board rune (server constrains the answer to the names we send);
-	// '' on any failure or a name that isn't on the board, so a mishear never commits the cast.
-	async function classifyCastUtterance(wavBase64: string): Promise<string> {
-		const res = await postUtterance({ wavBase64, mode: 'cast', runes: runes.map((r) => r.name) });
-		if (!res?.ok) return '';
-		try {
-			return ((await res.json()) as { rune?: string }).rune ?? '';
-		} catch {
-			return '';
-		}
+	// A held cast matched to a board rune (server constrains the answer to the names we send); '' on
+	// any failure or an off-board name, so a mishear never commits the cast.
+	function classifyCastUtterance(wavBase64: string): Promise<string> {
+		return readUtterance({ wavBase64, mode: 'cast', runes: runes.map((r) => r.name) }, '', (d) =>
+			d.rune === undefined ? '' : (d.rune as string)
+		);
 	}
 
 	// Run a spoken reaction through the same dispatch the prompt buttons use. Guards mirror the
@@ -734,6 +739,22 @@
 		return false;
 	}
 
+	// Zero the per-round presentation state for a fresh secret — the single list of what a new round
+	// clears, so a new field can't be forgotten in one of the two reset paths (reconcile, new-game).
+	// (skollEcho/skollAsking are NOT reset here: new-game clears them, reconcile sets them from the
+	// snapshot — so each path owns those two explicitly.)
+	function resetForNewRound() {
+		restoreCrossed = [];
+		crossings = [];
+		answer = '';
+		askValue = '';
+		heldScry = true;
+		heldHex = true;
+		outcomeVoiced = false;
+		endFlair = null;
+		stopDelivery();
+	}
+
 	// Resync to authoritative server state after a dropped action response. A timed-out or failed POST
 	// aborts the browser fetch, but the server completed the move under `withSessionLock`, so the
 	// engine has moved on — without this the UI strands on a stale turn/board (or a retry that no-ops)
@@ -755,17 +776,7 @@
 		// A dropped new-game still reset the round server-side — drop the per-round view so crossings,
 		// the voiced line, and the outcome can't resume against a new secret. A fresh round also restores
 		// both reaction charges.
-		if (snap.roundId !== prevRoundId) {
-			restoreCrossed = [];
-			crossings = [];
-			answer = '';
-			askValue = '';
-			outcomeVoiced = false;
-			endFlair = null;
-			heldScry = true;
-			heldHex = true;
-			stopDelivery();
-		}
+		if (snap.roundId !== prevRoundId) resetForNewRound();
 		seedOverride = snap.boardSeed;
 		roundIdOverride = snap.roundId;
 		applyState(snap.state);
@@ -1236,19 +1247,10 @@
 			// effect overwrites the single record with the fresh round's empty state — stale marks never
 			// resume. (`crossings` here is the parent's mirror, distinct from the grid's own crossedOff.)
 			roundIdOverride = nextRoundId;
-			restoreCrossed = [];
-			crossings = [];
-			answer = '';
-			askValue = '';
+			resetForNewRound();
+			// New-game also clears his parked Ask (reconcile instead restores it from the snapshot).
 			skollEcho = '';
 			skollAsking = false;
-			heldScry = true;
-			heldHex = true;
-			outcomeVoiced = false; // the fresh round re-arms the end-screen outcome voice
-			endFlair = null;
-			// Drop any still-playing/queued Oracle line from the round just ended — TTS delivery is
-			// fire-and-forget, so without this a prior answer could bleed over the fresh blank round.
-			stopDelivery();
 			applyState(state);
 			cancelCast();
 			return true;
