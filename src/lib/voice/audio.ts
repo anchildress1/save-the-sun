@@ -3,35 +3,35 @@
 // stays testable without a browser.
 
 import { SPEAKER_SAMPLE_RATE } from './config';
+import type { DeliveryVoice } from './speaker';
 
 export interface Speaker {
 	/** PCM16 @24kHz; scheduled gaplessly after the queue tail, never mixed. */
-	enqueue(base64Pcm: string, voice: string): void;
+	enqueue(base64Pcm: string, voice: DeliveryVoice): void;
 	/** Drops the queue without firing onDrained/onSpeaking — a barge-in, not a natural end. */
 	stop(): void;
 	readonly busy: boolean;
 	/** Called whenever playback runs dry naturally (not via stop). */
 	onDrained(callback: () => void): void;
-	/** Called when the voice currently SOUNDING changes — driven by playback boundaries (a clip
-	 *  starting or ending), not by enqueue, so the indicator tracks who is actually being heard:
-	 *  his clip shows only once hers has played out, even though both were queued up front. */
-	onSpeaking(callback: (voice: string) => void): void;
+	/** Fires at playback boundaries (a clip start/end), not at enqueue — so it tracks the voice
+	 *  actually being heard, not the order clips were queued. */
+	onSpeaking(callback: (voice: DeliveryVoice) => void): void;
 	close(): void;
 }
 
 export function createSpeaker(): Speaker {
 	const context = new AudioContext({ sampleRate: SPEAKER_SAMPLE_RATE });
 	void context.resume();
-	// Scheduled nodes in play order, each tagged with its voice. The front is what's sounding now.
-	const queue: { node: AudioBufferSourceNode; voice: string }[] = [];
+	// Play order; the front of the queue is the voice currently sounding.
+	const queue: { node: AudioBufferSourceNode; voice: DeliveryVoice }[] = [];
 	let cursor = 0;
-	let playingVoice: string | null = null;
+	let playingVoice: DeliveryVoice | null = null;
 	let drained: (() => void) | null = null;
-	let speaking: ((voice: string) => void) | null = null;
+	let speaking: ((voice: DeliveryVoice) => void) | null = null;
 
 	// Move the indicator to whatever voice now holds the front of the queue (null = dry). Called at
 	// real playback boundaries, so the heard voice — not the enqueue order — drives the medallion.
-	function advanceTo(voice: string | null): void {
+	function advanceTo(voice: DeliveryVoice | null): void {
 		if (voice === playingVoice) return;
 		playingVoice = voice;
 		if (voice === null) drained?.();

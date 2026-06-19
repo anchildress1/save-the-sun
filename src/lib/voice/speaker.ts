@@ -7,7 +7,10 @@ import { SKOLL_VOICE } from '$lib/voice/config';
  * (`voiceForLine`) and the client medallion (`delivery`) both read, so they can never disagree about
  * who is speaking. Type-only import of the descriptor shape keeps this client-safe.
  */
-export function speakerOf(descriptor: LineDescriptor): 'oracle' | 'skoll' {
+/** The two delivery-layer voice tags the medallion mirrors (distinct from the prebuilt VoiceId). */
+export type DeliveryVoice = 'oracle' | 'skoll';
+
+export function speakerOf(descriptor: LineDescriptor): DeliveryVoice {
 	if (descriptor.kind === 'authored') return descriptor.voice === SKOLL_VOICE ? 'skoll' : 'oracle';
 	if (descriptor.kind === 'skoll-ask' || descriptor.kind === 'skoll-cast') return 'skoll';
 	if (descriptor.kind === 'outcome' && descriptor.result === 'lose') return 'skoll';

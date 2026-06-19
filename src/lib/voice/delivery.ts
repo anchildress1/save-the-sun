@@ -8,10 +8,9 @@
 
 import { createSpeaker, type Speaker } from './audio';
 import type { LineDescriptor } from '$lib/server/voice/lines';
-import { speakerOf } from '$lib/voice/speaker';
+import { speakerOf, type DeliveryVoice } from '$lib/voice/speaker';
 
-/** Which prebuilt voice a delivered line carries — the medallion shows the speaker. */
-export type DeliveryVoice = 'oracle' | 'skoll';
+export type { DeliveryVoice };
 export type DeliveryEvent = { type: 'speaking'; voice: DeliveryVoice } | { type: 'idle' };
 export type DeliveryListener = (event: DeliveryEvent) => void;
 
@@ -98,7 +97,7 @@ export function enableDelivery(): void {
 	speaker.onDrained(handleDrained);
 	// The speaker reports the voice actually sounding (playback-driven), so the indicator flips to
 	// Sköll only once his clip starts — not when his chunks were queued behind her still-playing line.
-	speaker.onSpeaking((voice) => setSpeaking(voice as DeliveryVoice));
+	speaker.onSpeaking((voice) => setSpeaking(voice));
 }
 
 /** Whether a gesture has opened the speaker — audio plays only once this is true. */
@@ -110,6 +109,7 @@ export function deliveryReady(): boolean {
 export function disableDelivery(): void {
 	generation++; // invalidate any in-flight deliver() so its late chunks never reach a new speaker
 	abortActiveFetches(); // cut a stalled read now, not on its next (maybe-never) chunk
+	pendingDeliveries = 0; // the round is dead; don't let aborted fetches keep whenDrained() waiting
 	speaker?.close();
 	speaker = null;
 	goIdle();
@@ -122,6 +122,7 @@ export function disableDelivery(): void {
 export function stopDelivery(): void {
 	generation++;
 	abortActiveFetches(); // cut a stalled read now, not on its next (maybe-never) chunk
+	pendingDeliveries = 0; // abandoned round; an aborted fetch's late retire must not strand whenDrained()
 	speaker?.stop();
 	goIdle();
 	flushDrainWaiters(); // stop() does not fire onDrained — release waiters here
@@ -205,6 +206,7 @@ export function deliver(descriptor: LineDescriptor): Promise<void> {
 }
 
 function retirePending(): void {
+	if (pendingDeliveries === 0) return; // a teardown already zeroed it; a late aborted-fetch settle is a no-op
 	pendingDeliveries--;
 	if (pendingDeliveries === 0 && !speaker?.busy) handleDrained();
 }
