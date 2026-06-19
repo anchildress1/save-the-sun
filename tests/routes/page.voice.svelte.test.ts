@@ -284,6 +284,23 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
 	});
 
+	it('treats a non-string text from a garbled transcribe as an empty ask — never a crash', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			// A number where text is expected would crash on `.trim()` without the type guard.
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(JSON.stringify({ text: 123 }));
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		press(screen);
+		release(screen);
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies()).toHaveLength(0);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
 	it('seals the medallion when the mic is denied — one notice, button game untouched', async () => {
 		recorderMock.startRecording.mockResolvedValueOnce({ ok: false, reason: 'denied' });
 		const screen = render(Page, pageProps);
@@ -536,6 +553,27 @@ describe('Save the Sun page — cast by voice', () => {
 		await expect
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('Name a rune on the board to cast it');
+	});
+
+	it('treats a non-string rune from the cast read as off-board — commits nothing', async () => {
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(
+					body.mode === 'cast' ? JSON.stringify({ rune: 123 }) : JSON.stringify({ text: '' })
+				);
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+
+		press(screen);
+		release(screen);
+
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies().some((b) => b.type === 'Cast')).toBe(false);
 	});
 
 	it('treats a spoken cast with no rune field as off-board — commits nothing', async () => {
@@ -955,6 +993,21 @@ describe('Save the Sun page — spoken reaction to Sköll', () => {
 			.toHaveTextContent('Scry, hex, or pass — or let his question stand.');
 		expect(actionBodies()).toHaveLength(0); // no React, no Ask
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('treats an out-of-set reaction choice as unclear — asks again', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(JSON.stringify({ choice: 'bogus' }));
+			return new Response('{}');
+		});
+		const screen = render(Page, reactionProps());
+		await holdRelease(screen);
+
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Scry, hex, or pass — or let his question stand.');
+		expect(actionBodies()).toHaveLength(0);
 	});
 
 	it('treats a reaction reply with no choice field as unclear — asks again, spends nothing', async () => {

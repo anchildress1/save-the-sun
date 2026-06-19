@@ -590,26 +590,31 @@
 	// board names so the server can match a spoken cast; a `cast` result (even '') means cast intent,
 	// so it routes to respondCast rather than being re-read as a question. Degrades to an empty Ask.
 	function interpretUtterance(wavBase64: string): Promise<{ cast: string } | { text: string }> {
+		// Trust no field's type: a garbled response with a non-string `text` (or `rune`) must degrade to
+		// an empty ask, not propagate a number into `heard.text.trim()` and crash the client.
 		return readUtterance({ wavBase64, runes: runes.map((r) => r.name) }, { text: '' }, (d) =>
-			typeof d.rune === 'string' ? { cast: d.rune } : { text: (d.text as string) ?? '' }
+			typeof d.rune === 'string'
+				? { cast: d.rune }
+				: { text: typeof d.text === 'string' ? d.text : '' }
 		);
 	}
 
 	// A held reply to Sköll's hanging question, classified into a reaction; `unclear` on any failure so
 	// a misheard or dropped call never silently spends a one-use charge.
 	function classifyReactionUtterance(wavBase64: string): Promise<SpokenReaction> {
-		return readUtterance(
-			{ wavBase64, mode: 'reaction' },
-			'unclear',
-			(d) => d.choice as SpokenReaction
-		);
+		// Validate against the known set — an unexpected value (wrong type, or a word outside the four)
+		// degrades to `unclear` (asks again) instead of indexing the reaction map with garbage.
+		return readUtterance({ wavBase64, mode: 'reaction' }, 'unclear', (d) => {
+			const c = d.choice;
+			return c === 'scry' || c === 'hex' || c === 'pass' || c === 'unclear' ? c : 'unclear';
+		});
 	}
 
 	// A held cast matched to a board rune (server constrains the answer to the names we send); '' on
 	// any failure or an off-board name, so a mishear never commits the cast.
 	function classifyCastUtterance(wavBase64: string): Promise<string> {
 		return readUtterance({ wavBase64, mode: 'cast', runes: runes.map((r) => r.name) }, '', (d) =>
-			d.rune === undefined ? '' : (d.rune as string)
+			typeof d.rune === 'string' ? d.rune : ''
 		);
 	}
 
