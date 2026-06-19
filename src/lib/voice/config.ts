@@ -7,6 +7,10 @@ export const ORACLE_VOICE = 'Gacrux';
 // Oracle, just with this voice — first-person, predatory (Cast Voice Charter).
 export const SKOLL_VOICE = 'Algieba'; // smooth — distinct from the Oracle's Gacrux
 
+// The only legal TTS voices across the synth path (audio playback tags clips with the separate
+// 'oracle'|'skoll' DeliveryVoice instead).
+export type VoiceId = typeof ORACLE_VOICE | typeof SKOLL_VOICE;
+
 // Both voices' lines are synthesized key-side here. Returns PCM16 mono @ SPEAKER_SAMPLE_RATE.
 export const TTS_MODEL = 'gemini-3.1-flash-tts-preview';
 

@@ -7,7 +7,7 @@ import { parseQuery } from '$lib/server/engine/queries';
 import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
 import { skollAskEcho, skollCastEcho } from '$lib/server/skoll/skoll';
 import type { RefusalClass } from '$lib/server/oracle/types';
-import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
+import { ORACLE_VOICE, SKOLL_VOICE, type VoiceId } from '$lib/voice/config';
 import { speakerOf } from '$lib/voice/speaker';
 import { REACTION_LINES, carriesAnswer, type ReactionLineId } from '$lib/voice/reactionLines';
 import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
@@ -131,11 +131,12 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 
 /** Which prebuilt voice speaks a descriptor — Sköll's lines (his Ask, the loss) in his voice,
  *  everything else the Oracle's. */
-export function voiceForLine(descriptor: LineDescriptor): string {
+export function voiceForLine(descriptor: LineDescriptor): VoiceId {
 	// An authored line carries its own voice. (Not a security check: the TTS route resolves authored
 	// lines by id from the session store and uses the STORED voice — this is just the correct answer
 	// if voiceForLine is ever called on one.)
-	if (descriptor.kind === 'authored') return descriptor.voice;
+	if (descriptor.kind === 'authored')
+		return descriptor.voice === SKOLL_VOICE ? SKOLL_VOICE : ORACLE_VOICE;
 	return speakerOf(descriptor) === 'skoll' ? SKOLL_VOICE : ORACLE_VOICE;
 }
 

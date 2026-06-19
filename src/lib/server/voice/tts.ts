@@ -5,7 +5,7 @@
 
 import { GoogleGenAI, Modality } from '@google/genai';
 import { env } from '$env/dynamic/private';
-import { TTS_MODEL } from '$lib/voice/config';
+import { TTS_MODEL, type VoiceId } from '$lib/voice/config';
 import { maskApiKey } from '$lib/server/debug/log';
 
 // Keyed by voice + text: the Oracle and Sköll speak different lines, but a shared line in two voices
@@ -17,12 +17,16 @@ const cacheKey = (voice: string, text: string) => `${voice}\n${text}`;
 // PCM clips are large, and nothing else evicts them for the life of the process.
 const MAX_CLIPS = 128;
 
-// Store a finished clip; an uncacheable (authored, unique) or empty one is dropped. Insertion-ordered,
-// so once over the cap the oldest falls off the front.
-function remember(key: string, chunks: string[], cacheable: boolean): void {
-	if (!cacheable || chunks.length === 0) return;
+// Store a finished clip; an empty one is dropped — a synth that yielded nothing, or an uncacheable
+// authored line whose chunks were never accumulated. Insertion-ordered, so once over the cap the
+// oldest falls off the front.
+function remember(key: string, chunks: string[]): void {
+	if (chunks.length === 0) return;
 	cache.set(key, chunks);
-	if (cache.size > MAX_CLIPS) cache.delete(cache.keys().next().value as string);
+	if (cache.size > MAX_CLIPS) {
+		const oldest = cache.keys().next().value;
+		if (oldest !== undefined) cache.delete(oldest);
+	}
 }
 
 /** Whether this exact line+voice is already synthesized — a cached replay costs no Gemini call, so the
@@ -47,7 +51,7 @@ function ai(apiKey: string): GoogleGenAI {
  */
 export async function* synthesizeStream(
 	text: string,
-	voice: string,
+	voice: VoiceId,
 	cacheable = true
 ): AsyncGenerator<string> {
 	const key = cacheKey(voice, text);
@@ -84,7 +88,7 @@ export async function* synthesizeStream(
 		// Cache only a complete clip — a stream that errored mid-flight must not replay truncated.
 		// Authored lines (Gemini-written, unique every call) are never cacheable: a unique key can't
 		// replay, so caching only grows memory unbounded for the life of the process.
-		remember(key, chunks, cacheable);
+		remember(key, chunks);
 	} catch (err) {
 		// Keep the stack but mask it — an SDK error can embed the request URL, and with it the key.
 		const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);

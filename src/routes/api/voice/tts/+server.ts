@@ -10,6 +10,7 @@ import {
 } from '$lib/server/voice/lines';
 import { getVoiceLine } from '$lib/server/engine/session';
 import { synthesizeStream, isCached } from '$lib/server/voice/tts';
+import type { VoiceId } from '$lib/voice/config';
 import type { RequestHandler } from './$types';
 
 const badLine = () => json({ error: 'Unknown voice line.' }, { status: 400 });
@@ -18,14 +19,14 @@ const badLine = () => json({ error: 'Unknown voice line.' }, { status: 400 });
 // so they can never replay); `fallbackPrompt` is their deterministic counterpart, voiced if the
 // authored synth is blocked or makes no audio.
 interface Resolved {
-	voice: string;
+	voice: VoiceId;
 	prompt: string;
 	cacheable: boolean;
 	fallbackPrompt: string | null;
 }
 
 interface Plan {
-	voice: string;
+	voice: VoiceId;
 	synthText: string;
 	synthMayCache: boolean;
 	fallbackPrompt: string | null;

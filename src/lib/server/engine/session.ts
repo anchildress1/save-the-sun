@@ -5,6 +5,7 @@ import { GameEngine, selectSecret } from './engine';
 import { freshSkollState, type SkollState } from '$lib/server/skoll/skoll';
 import { resetLog, logEvent } from '$lib/server/debug/log';
 import type { LineDescriptor } from '$lib/server/voice/lines';
+import type { VoiceId } from '$lib/voice/config';
 
 // LRU-capped so abandoned rounds can't grow memory without bound — Map insertion order makes the
 // first key the least-recently-used; every access re-inserts to the end. 1000 is far above any
@@ -37,7 +38,7 @@ const lastLines = new Map<string, RecoverableLine>();
 // round authors a handful; the per-session map is bounded and cleared with the round.
 export interface AuthoredVoiceLine {
 	text: string;
-	voice: string;
+	voice: VoiceId;
 	// The deterministic, cacheable line the TTS route voices when this authored synth makes no audio.
 	fallback: string;
 }
@@ -183,7 +184,7 @@ export function getLastLine(sessionId: string): RecoverableLine | null {
 export function storeVoiceLine(
 	sessionId: string,
 	text: string,
-	voice: string,
+	voice: VoiceId,
 	fallback: string
 ): string {
 	requireId(sessionId);
