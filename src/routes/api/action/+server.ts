@@ -409,12 +409,7 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 
 	// Gated on it actually being the human's live turn, so a stale Ask (Sköll's turn, or a resolved
 	// round) falls through with NO side effects rather than opening a window or spending a charge.
-	if (
-		action.type === 'Ask' &&
-		action.player === 'Human' &&
-		engine.status === 'active' &&
-		engine.activePlayer === 'Human'
-	) {
+	if (action.type === 'Ask' && engine.status === 'active' && engine.activePlayer === 'Human') {
 		// Charge the Ask quota only here — for the live, non-empty ask that actually fans out to several
 		// Gemini calls. An empty ask short-circuits to the cheap refusal, and a stale ask is refused from
 		// engine state before interpret, so neither reaches Gemini or should burn the shared budget.
