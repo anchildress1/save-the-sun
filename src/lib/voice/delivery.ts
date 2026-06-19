@@ -8,7 +8,7 @@
 
 import { createSpeaker, type Speaker } from './audio';
 import type { LineDescriptor } from '$lib/server/voice/lines';
-import { SKOLL_VOICE } from '$lib/voice/config';
+import { speakerOf } from '$lib/voice/speaker';
 
 /** Which prebuilt voice a delivered line carries — the medallion shows the speaker. */
 export type DeliveryVoice = 'oracle' | 'skoll';
@@ -69,15 +69,6 @@ function goIdle(): void {
 	if (speakingVoice === null) return;
 	speakingVoice = null;
 	emit({ type: 'idle' });
-}
-
-// Mirrors the server's voiceForLine (lines.ts) — kept client-side so the indicator never pulls
-// server code into the bundle. Sköll's Ask and the loss outcome are his; everything else hers.
-function speakerFor(descriptor: LineDescriptor): DeliveryVoice {
-	if (descriptor.kind === 'skoll-ask' || descriptor.kind === 'skoll-cast') return 'skoll';
-	if (descriptor.kind === 'outcome' && descriptor.result === 'lose') return 'skoll';
-	if (descriptor.kind === 'authored' && descriptor.voice === SKOLL_VOICE) return 'skoll';
-	return 'oracle';
 }
 
 // The queue ran dry naturally (every node ended) — settle to idle and release whenDrained waiters.
@@ -206,7 +197,7 @@ export function deliver(descriptor: LineDescriptor): Promise<void> {
 	// stop/disable while it waits its turn behind an in-flight line bumps generation, and the queued
 	// line must then drop (isStale) instead of fetching/playing into the fresh round.
 	const gen = generation;
-	const voice = speakerFor(descriptor);
+	const voice = speakerOf(descriptor);
 	const run = chain.then(() => streamLine(descriptor, active, gen, voice));
 	chain = run.catch(() => {});
 	return run;

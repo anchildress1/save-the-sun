@@ -8,6 +8,7 @@ import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
 import { skollAskEcho, skollCastEcho } from '$lib/server/skoll/skoll';
 import type { RefusalClass } from '$lib/server/oracle/types';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
+import { speakerOf } from '$lib/voice/speaker';
 import { REACTION_LINES, carriesAnswer, type ReactionLineId } from '$lib/voice/reactionLines';
 import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
 import { OUTCOME_LINES, type Outcome, type OutcomeBeat } from '$lib/voice/outcomeLines';
@@ -135,11 +136,7 @@ export function voiceForLine(descriptor: LineDescriptor): string {
 	// lines by id from the session store and uses the STORED voice — this is just the correct answer
 	// if voiceForLine is ever called on one.)
 	if (descriptor.kind === 'authored') return descriptor.voice;
-	const skoll =
-		descriptor.kind === 'skoll-ask' ||
-		descriptor.kind === 'skoll-cast' ||
-		(descriptor.kind === 'outcome' && descriptor.result === 'lose');
-	return skoll ? SKOLL_VOICE : ORACLE_VOICE;
+	return speakerOf(descriptor) === 'skoll' ? SKOLL_VOICE : ORACLE_VOICE;
 }
 
 // Director's-notes prompts the TTS model reads as a delivery instruction, speaking only the quoted
