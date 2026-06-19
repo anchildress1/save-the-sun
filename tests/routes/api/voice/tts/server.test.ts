@@ -20,6 +20,7 @@ import { refusalLine } from '$lib/server/oracle/oracle';
 import { skollAskEcho, skollCastEcho } from '$lib/server/skoll/skoll';
 import { synthPrompt } from '$lib/server/voice/lines';
 import { storeVoiceLine } from '$lib/server/engine/session';
+import { getEvents } from '$lib/server/debug/log';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 
 function streamOf(...chunks: string[]) {
@@ -61,7 +62,8 @@ describe('POST /api/voice/tts', () => {
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			synthPrompt(ORACLE_VOICE, refusalLine('empty')),
 			ORACLE_VOICE,
-			true // a recomposed line caches and replays
+			true, // a recomposed line caches and replays
+			'happy'
 		);
 	});
 
@@ -77,7 +79,7 @@ describe('POST /api/voice/tts', () => {
 		const prompt = synthPrompt(SKOLL_VOICE, line);
 		expect(prompt).not.toBe(line);
 		expect(prompt).toContain(`"${line}"`);
-		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE, true);
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE, true, 'wolf');
 	});
 
 	it('voices Sköll’s winning cast in his voice, naming the board rune', async () => {
@@ -89,7 +91,12 @@ describe('POST /api/voice/tts', () => {
 		expect(response.status).toBe(200);
 		const prompt = synthPrompt(SKOLL_VOICE, line);
 		expect(prompt).toContain(`"${line}"`);
-		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(prompt, SKOLL_VOICE, true);
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
+			prompt,
+			SKOLL_VOICE,
+			true,
+			'wolf-cast'
+		);
 	});
 
 	it('rejects a Sköll cast that names no board rune with 400', async () => {
@@ -109,6 +116,29 @@ describe('POST /api/voice/tts', () => {
 		expect(tts.synthesizeStream).not.toHaveBeenCalled();
 	});
 
+	it('tees the voice outcome to /debug so a silent Oracle is diagnosable', async () => {
+		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm'));
+		const ok = await call('log-ok', { kind: 'refusal', refusal: 'empty' });
+		await ok.text(); // consume the stream so its start() runs and the outcome logs
+		expect(
+			getEvents('log-ok').some((e) => e.part === 'Voice' && /TTS — voiced/.test(e.message))
+		).toBe(true);
+
+		// An unresolvable line used to 400 silently — now it leaves a trace to follow.
+		const res = await call('log-bad', {
+			kind: 'authored',
+			id: 'nope',
+			voice: ORACLE_VOICE,
+			text: 'x'
+		});
+		expect(res.status).toBe(400);
+		expect(
+			getEvents('log-bad').some(
+				(e) => e.level === 'warn' && /TTS — refused.*unknown/.test(e.message)
+			)
+		).toBe(true);
+	});
+
 	it('voices an authored line by id lookup from the session store (ttd:17)', async () => {
 		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm'));
 		const text = 'Yes — the flame-sign burns; Sól reaches for fire.';
@@ -126,7 +156,8 @@ describe('POST /api/voice/tts', () => {
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			synthPrompt(ORACLE_VOICE, text),
 			ORACLE_VOICE,
-			false // an authored line is unique — never cached
+			false, // an authored line is unique — never cached
+			'authored-sess'
 		);
 	});
 
@@ -146,7 +177,8 @@ describe('POST /api/voice/tts', () => {
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			synthPrompt(ORACLE_VOICE, stored),
 			ORACLE_VOICE,
-			false // an authored line is unique — never cached
+			false, // an authored line is unique — never cached
+			'authored-sess2'
 		);
 	});
 
@@ -175,9 +207,16 @@ describe('POST /api/voice/tts', () => {
 			1,
 			synthPrompt(ORACLE_VOICE, authored),
 			ORACLE_VOICE,
-			false
+			false,
+			'authored-fb'
 		);
-		expect(tts.synthesizeStream).toHaveBeenNthCalledWith(2, fallbackPrompt, ORACLE_VOICE, true);
+		expect(tts.synthesizeStream).toHaveBeenNthCalledWith(
+			2,
+			fallbackPrompt,
+			ORACLE_VOICE,
+			true,
+			'authored-fb'
+		);
 	});
 
 	it('stays silent — no second synth — when the authored synth fails and the fallback is uncached', async () => {
@@ -251,7 +290,8 @@ describe('POST /api/voice/tts', () => {
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			fallbackPrompt,
 			ORACLE_VOICE,
-			true
+			true,
+			'authored-q'
 		);
 	});
 
@@ -275,7 +315,8 @@ describe('POST /api/voice/tts', () => {
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			fallbackPrompt,
 			ORACLE_VOICE,
-			true
+			true,
+			'authored-keyless'
 		);
 	});
 

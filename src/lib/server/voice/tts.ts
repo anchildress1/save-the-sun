@@ -5,8 +5,8 @@
 
 import { GoogleGenAI, Modality } from '@google/genai';
 import { env } from '$env/dynamic/private';
-import { TTS_MODEL, type VoiceId } from '$lib/voice/config';
-import { maskApiKey } from '$lib/server/debug/log';
+import { TTS_MODEL, SKOLL_VOICE, type VoiceId } from '$lib/voice/config';
+import { maskApiKey, logEvent } from '$lib/server/debug/log';
 
 // Keyed by voice + text: the Oracle and Sköll speak different lines, but a shared line in two voices
 // must cache as two clips, not collide.
@@ -52,7 +52,8 @@ function ai(apiKey: string): GoogleGenAI {
 export async function* synthesizeStream(
 	text: string,
 	voice: VoiceId,
-	cacheable = true
+	cacheable = true,
+	sessionId?: string
 ): AsyncGenerator<string> {
 	const key = cacheKey(voice, text);
 	if (cacheable) {
@@ -92,7 +93,17 @@ export async function* synthesizeStream(
 	} catch (err) {
 		// Keep the stack but mask it — an SDK error can embed the request URL, and with it the key.
 		const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
-		console.error('[voice] TTS synth failed:', maskApiKey(detail));
+		const masked = maskApiKey(detail);
+		console.error('[voice] TTS synth failed:', masked);
+		// Tee the failure to /debug too — the panel keeps the text, so without this the silence is invisible.
+		if (sessionId)
+			logEvent(sessionId, {
+				owner: voice === SKOLL_VOICE ? 'Sköll' : 'Oracle',
+				kind: 'llm',
+				part: 'Voice',
+				level: 'error',
+				message: `TTS synth failed: ${masked.split('\n')[0]}`
+			});
 	}
 }
 
