@@ -225,10 +225,6 @@
 		animation: sprite-level 1.1s steps(12, jump-none) infinite alternate;
 	}
 
-	/* Speaking: the disc frame is driven by the live output level (--sprite-level, set per frame from
-	   RMS in script) — no CSS loop, so the strip pulses with the actual voice. Reduced motion holds
-	   the static frame (the live level isn't sampled then). */
-
 	/* Ember shift for the wolf — paired with the deepening eclipse below, never the only signal. */
 	.medallion[data-voice-state='skoll-speaking'] .disc {
 		filter: hue-rotate(-40deg) saturate(1.25);
@@ -360,17 +356,23 @@
 		opacity: 0.55;
 	}
 
-	/* Speaking: the sun itself breathes — the disc cycles its brightness strip (the inner glow the
-	   player reads), a calm ping-pong decoupled from the audio. The corona stays a soft static halo so
-	   the movement reads on the disc, not the outer spill. Reduced motion holds the disc on its peak. */
+	/* Speaking: the sun breathes from the inside — the disc cycles its brightness strip, the same inner
+	   pulse as recording (gold/ember, not blue). The corona drops to a faint halo so the movement reads
+	   ON the disc, not as an outer glow. Reduced motion holds the disc on its peak. */
 	.medallion[data-voice-state='speaking'] .disc,
 	.medallion[data-voice-state='skoll-speaking'] .disc {
-		animation: sprite-level 2s steps(12, jump-none) infinite alternate;
+		animation: sprite-level 1.3s steps(12, jump-none) infinite alternate;
 	}
 
 	.medallion[data-voice-state='speaking'] .corona,
 	.medallion[data-voice-state='skoll-speaking'] .corona {
-		opacity: 0.4;
+		opacity: 0.2;
+	}
+
+	/* Sköll circles: the rune ring orbits the devoured sun while he speaks — the wolf prowling. A
+	   deliberate motion the eclipse can't swallow, since the rim runes turn outside the dark center. */
+	.medallion[data-voice-state='skoll-speaking'] .rune-ring {
+		animation: ring-orbit 14s linear infinite;
 	}
 
 	.medallion[data-voice-state='speaking'] .ring-rune,
