@@ -277,6 +277,10 @@ async function planMove(
 	try {
 		const raw = await decide(payload);
 		const move = validateMove(raw);
+		// Record any legal cross-offs he reasoned BEFORE the move is accepted or rejected — a
+		// guard-forced (cornered) or malformed move can still carry valid eliminations, and dropping
+		// them desyncs his sheet from the facts the demo shows.
+		for (const id of legalCrossOffs(raw.crossOff)) state.crossed.add(id);
 		// Convergence guard (server-authoritative): once a SINGLE rune can still be the secret the answer
 		// is already decided, so anything but casting that rune wastes the turn — force the cast whether he
 		// asked the meaningless lone-survivor question OR cast some already-dead rune. At two he keeps his
@@ -287,7 +291,6 @@ async function planMove(
 			survivors.length <= 1 &&
 			!(move.kind === 'cast' && move.runeName === survivors[0]?.name);
 		if (move && !cornered) {
-			for (const id of legalCrossOffs(raw.crossOff)) state.crossed.add(id);
 			if (dev && state.crossed.size)
 				console.debug(`[skoll] sheet: ${[...state.crossed].join(',')}`);
 			// His thinking trace when the model returns one; otherwise the facts he reasoned from.
