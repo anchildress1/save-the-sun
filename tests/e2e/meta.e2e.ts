@@ -17,7 +17,10 @@ test.describe('social embed metadata', () => {
 		expect(await meta(page, 'property="og:type"')).toBe('website');
 		expect(await meta(page, 'property="og:url"')).toBe(`${SITE_URL}/`);
 		expect(await meta(page, 'property="og:description"')).toMatch(/deduction game/);
-		expect(await meta(page, 'property="og:image"')).toMatch(new RegExp(`^${SITE_URL}/.+\\.webp$`));
+		expect(await meta(page, 'property="og:image"')).toBe(`${SITE_URL}/social-banner.jpg`);
+		expect(await meta(page, 'property="og:image:type"')).toBe('image/jpeg');
+		expect(await meta(page, 'property="og:image:width"')).toBe('1376');
+		expect(await meta(page, 'property="og:image:height"')).toBe('768');
 		expect(await meta(page, 'property="og:image:alt"')).toBeTruthy();
 	});
 
@@ -25,7 +28,8 @@ test.describe('social embed metadata', () => {
 	test('SSR HTML carries the OG tags crawlers actually see', async ({ request }) => {
 		const html = await (await request.get('/')).text();
 		expect(html).toContain(`<meta property="og:url" content="${SITE_URL}/"`);
-		expect(html).toMatch(new RegExp(`property="og:image" content="${SITE_URL}/[^"]+\\.webp"`));
+		expect(html).toContain(`<meta property="og:image" content="${SITE_URL}/social-banner.jpg"`);
+		expect(html).toContain('<meta property="og:image:type" content="image/jpeg"');
 	});
 
 	test('og:image resolves on the served build', async ({ page, request }) => {
