@@ -349,6 +349,26 @@ describe('delivery seam', () => {
 		expect(drained).toBe(true);
 	});
 
+	it('releases whenDrained at once after a stop during an in-flight delivery — the dead round resets pending', async () => {
+		let releaseFetch: (res: Response) => void = () => {};
+		vi.mocked(fetch).mockReturnValueOnce(
+			new Promise<Response>((resolve) => {
+				releaseFetch = resolve;
+			})
+		);
+		enableDelivery();
+		audio.speaker.busy = false;
+
+		const inflight = deliver(LINE); // fetch in flight → pendingDeliveries = 1
+		stopDelivery(); // abandons the round — pending must reset so a "hold until heard" can't strand
+
+		await expect(whenDrained(10_000)).resolves.toBeUndefined(); // immediate, not stuck behind the abort
+
+		releaseFetch(ndjsonResponse('late')); // the aborted fetch settling must not drive the counter negative
+		await inflight;
+		await expect(whenDrained(10_000)).resolves.toBeUndefined();
+	});
+
 	it('does not release whenDrained on a mid-stream dry queue while a delivery is still streaming', async () => {
 		let releaseSecond: () => void = () => {};
 		const body = new ReadableStream<Uint8Array>({

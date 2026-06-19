@@ -50,6 +50,17 @@ describe('POST /api/voice/transcribe', () => {
 		expect(stt.transcribe).toHaveBeenCalledExactlyOnceWith('UklGRg==');
 	});
 
+	it('returns a clean 503 when a Gemini call throws — not an unstructured 500', async () => {
+		stt.transcribe.mockRejectedValueOnce(new Error('provider exploded'));
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		const response = await call('boom', { wavBase64: 'UklGRg==' });
+
+		expect(response.status).toBe(503);
+		expect((await response.json()).error).toContain('unavailable');
+		errorSpy.mockRestore();
+	});
+
 	it('classifies a reaction in reaction mode', async () => {
 		stt.classifyReaction.mockResolvedValueOnce('hex');
 

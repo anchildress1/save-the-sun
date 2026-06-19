@@ -30,6 +30,16 @@ describe('resolveLimit', () => {
 		expect(resolveLimit('0', 10)).toBe(10); // not positive
 		expect(resolveLimit('-4', 10)).toBe(10); // negative
 	});
+
+	it('warns on a defined-but-rejected override, but stays silent for an unset value', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		expect(resolveLimit('1O', 10)).toBe(10); // typo (letter O) → a silent default would hide it
+		expect(warn).toHaveBeenCalledTimes(1);
+		expect(warn.mock.calls[0][0]).toContain('1O');
+		resolveLimit(undefined, 10); // unset is the normal case — no noise
+		expect(warn).toHaveBeenCalledTimes(1);
+		warn.mockRestore();
+	});
 });
 
 function drainSession(sessionId: string, now: number) {
