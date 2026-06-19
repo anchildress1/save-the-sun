@@ -199,6 +199,13 @@ describe('composeEndingFlair (ttd:22)', () => {
 		expect(await composeEndingFlair('lose')).toBe('The sun is mine.');
 	});
 
+	it('trims a two-sentence ending even when the model drops the capital on the second', async () => {
+		sdk.generateContent.mockResolvedValueOnce({
+			text: 'The sun is mine. your night has no morning.'
+		});
+		expect(await composeEndingFlair('lose')).toBe('The sun is mine.');
+	});
+
 	it('keeps one dramatic sentence whole — a mid-line ellipsis is not a sentence boundary', async () => {
 		sdk.generateContent.mockResolvedValueOnce({ text: 'Rise, Sól... the long day is yours!' });
 		expect(await composeEndingFlair('win')).toBe('Rise, Sól... the long day is yours!');

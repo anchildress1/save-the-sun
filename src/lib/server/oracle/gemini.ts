@@ -253,8 +253,13 @@ function firstSentence(line: string): string {
 		let end = i;
 		while (end + 1 < line.length && '.!?'.includes(line[end + 1])) end++;
 		const rest = line.slice(end + 1);
-		// A real boundary: end of line, or whitespace then an optional quote then a capital letter.
-		if (rest === '' || /^\s+["“]?\p{Lu}/u.test(rest)) return line.slice(0, end + 1).trim();
+		// A real boundary: end of line; whitespace then an optional quote then a capital (next sentence);
+		// or a SINGLE period then whitespace even before a lowercase word (a model that drops the capital
+		// still gets trimmed to one sentence). A run like "..." or a "Sól!" still needs the capital, so
+		// dramatic mid-line punctuation stays whole.
+		const singlePeriod = end === i && line[i] === '.';
+		if (rest === '' || /^\s+["“]?\p{Lu}/u.test(rest) || (singlePeriod && /^\s/.test(rest)))
+			return line.slice(0, end + 1).trim();
 		i = end + 1;
 	}
 	return line;
