@@ -336,6 +336,8 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 
 The medallion is the push-to-talk control: **hold** it (Space or Enter when it's focused, or the `` ` `` key from anywhere — never page-wide Space, which activates whatever control has focus) to record an Ask, release to send. Its accessible name carries the state plus the hold affordance; the announcement column is the polite live-region line for each transition. Visual states live in `v2-voice-requirements.md` R6.
 
+Hovering or focusing the disc (while live, not sealed) reveals a small hint — **"Hold to speak, or hold `` ` ``"** — so the page-wide backtick key is discoverable, not buried. The hint is also the button's `aria-describedby`, so it is read on focus, not only seen on hover.
+
 | State | Button label | Announced |
 |---|---|---|
 | Idle (ready — hold to speak) | **"Hold to speak to the Oracle."** | "Ready to hear you." |

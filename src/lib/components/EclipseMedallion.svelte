@@ -88,6 +88,7 @@
 		data-voice-state={current}
 		aria-label={MEDALLION_LABEL[current]}
 		aria-disabled={sealed}
+		aria-describedby={sealed ? undefined : 'mic-hint'}
 		style="--ring-step: {360 /
 			RING_RUNES.length}deg; --sprite-level: {level}; --sprite-size: {SPRITE_LEVELS *
 			100}%; --sprite-peak: {SPRITE_LEVELS - 1}"
@@ -133,12 +134,59 @@
 		</span>
 	</button>
 	<span class="sr-only" role="status" data-testid="medallion-status">{announced}</span>
+	<!-- Discoverability for the page-wide push-to-talk key: a hover/focus hint that the backtick holds
+	     too. Also the button's aria-describedby, so it is read on focus, not just seen on hover. Hidden
+	     while sealed — the key does nothing without a mic. -->
+	{#if !sealed}
+		<span class="mic-hint" id="mic-hint">
+			Hold to speak, or hold <kbd aria-label="the backtick key">`</kbd>
+		</span>
+	{/if}
 </div>
 
 <style>
 	.medallion-wrap {
 		display: flex;
 		justify-content: center;
+		position: relative;
+	}
+
+	/* Hover/focus hint that the backtick key holds the mic too. Hidden until the disc is hovered or
+	   focused; pointer-events off so it never blocks the hold gesture. */
+	.mic-hint {
+		position: absolute;
+		top: calc(100% + 0.4rem);
+		left: 50%;
+		transform: translateX(-50%) translateY(0.15rem);
+		z-index: 5;
+		white-space: nowrap;
+		padding: 0.3rem 0.55rem;
+		border: 1px solid var(--gold-dim);
+		border-radius: 0.4rem;
+		background: rgba(6, 9, 18, 0.92);
+		color: var(--gold-bright);
+		font-size: 0.72rem;
+		line-height: 1;
+		opacity: 0;
+		pointer-events: none;
+		transition:
+			opacity 0.16s ease,
+			transform 0.16s ease;
+	}
+
+	.mic-hint kbd {
+		font-family: inherit;
+		font-size: 0.78rem;
+		padding: 0 0.28rem;
+		border: 1px solid var(--gold-dim);
+		border-radius: 0.25rem;
+		background: rgba(217, 169, 74, 0.12);
+	}
+
+	.medallion:hover ~ .mic-hint,
+	.medallion:focus-visible ~ .mic-hint {
+		opacity: 1;
+		transform: translateX(-50%) translateY(0);
 	}
 
 	.medallion {

@@ -226,3 +226,20 @@ describe('EclipseMedallion — state announcements', () => {
 		expect(status.element().getAttribute('role')).toBe('status');
 	});
 });
+
+describe('EclipseMedallion — backtick hint', () => {
+	it('shows the backtick hold-hint and describes it to the button while live', () => {
+		const { screen, button } = renderMedallion('idle');
+		const hint = screen.container.querySelector('#mic-hint');
+		expect(hint).not.toBeNull();
+		expect(hint?.textContent).toContain('`');
+		// Read on focus, not only seen on hover.
+		expect(button.getAttribute('aria-describedby')).toBe('mic-hint');
+	});
+
+	it('drops the hint while sealed — the key does nothing without a mic', () => {
+		const { screen, button } = renderMedallion('denied');
+		expect(screen.container.querySelector('#mic-hint')).toBeNull();
+		expect(button.getAttribute('aria-describedby')).toBeNull();
+	});
+});
