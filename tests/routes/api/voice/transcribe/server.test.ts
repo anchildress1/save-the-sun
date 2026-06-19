@@ -172,18 +172,11 @@ describe('POST /api/voice/transcribe', () => {
 		expect(stt.transcribe).not.toHaveBeenCalled();
 	});
 
-	it('rejects a body whose declared size is over the request cap with 413, before parsing', async () => {
-		// The guard trusts content-length (MAX_WAV_BASE64 5_000_000 + 16_384 margin) so it can refuse
-		// before request.json() buffers the body — declare oversized, with a small actual payload.
-		const request = new Request('http://localhost/api/voice/transcribe', {
-			method: 'POST',
-			headers: { 'content-length': String(5_000_000 + 16_384 + 1) },
-			body: JSON.stringify({ wavBase64: 'UklGRg==' })
-		});
-		const response = await POST({
-			locals: { sessionId: 'flooder' },
-			request
-		} as unknown as Parameters<typeof POST>[0]);
+	it('rejects a body over the request cap with 413, enforced while streaming (no Content-Length trust)', async () => {
+		// The cap (MAX_WAV_BASE64 5_000_000 + 16_384 margin) is enforced as the body streams in, so a
+		// chunked or Content-Length-less request can't slip an oversized payload past a header check.
+		const huge = 'a'.repeat(5_000_000 + 16_384 + 1_000);
+		const response = await call('flooder', { wavBase64: huge });
 		expect(response.status).toBe(413);
 		expect(stt.transcribe).not.toHaveBeenCalled();
 	});
