@@ -111,8 +111,14 @@ const tts = createLimiter('TTS', TTS_SESSION_LIMIT, TTS_GLOBAL_LIMIT);
 const transcribe = createLimiter('transcribe', STT_SESSION_LIMIT, STT_GLOBAL_LIMIT);
 const oracle = createLimiter('Ask', ASK_SESSION_LIMIT, ASK_GLOBAL_LIMIT);
 // The /debug voice tee is cheap but unauthenticated and feeds the public demo stream — bound it so a
-// client can't flood the operator's view. Generous: a normal session tees a handful of events a turn.
-const voiceDebug = createLimiter('voice-debug', 30, 120);
+// client can't flood the operator's view. Generous defaults: a normal session tees a handful a turn.
+export const VOICE_DEBUG_SESSION_LIMIT = resolveLimit(env.VOICE_DEBUG_SESSION_LIMIT, 30);
+export const VOICE_DEBUG_GLOBAL_LIMIT = resolveLimit(env.VOICE_DEBUG_GLOBAL_LIMIT, 120);
+const voiceDebug = createLimiter(
+	'voice-debug',
+	VOICE_DEBUG_SESSION_LIMIT,
+	VOICE_DEBUG_GLOBAL_LIMIT
+);
 
 /** Claim one TTS-synth slot for the session; a denial consumes nothing. */
 export const claimTtsSlot = tts.claim;
