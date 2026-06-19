@@ -7,8 +7,11 @@ vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
 
 import { POST } from '$routes/api/voice/debug/+server';
 import { getEvents, resetLog } from '$lib/server/debug/log';
+import { resetVoiceDebugWindows } from '$lib/server/voice/rateLimit';
 
 const SID = 'voice-debug-route';
+// Matches the voiceDebug per-session ceiling in rateLimit.ts.
+const DEBUG_SESSION_LIMIT = 30;
 
 function call(body: BodyInit, sessionId = SID) {
 	const request = new Request('http://localhost/api/voice/debug', { method: 'POST', body });
@@ -20,6 +23,7 @@ const post = (event: unknown, sessionId = SID) => call(JSON.stringify(event), se
 describe('POST /api/voice/debug', () => {
 	beforeEach(() => {
 		resetLog(SID);
+		resetVoiceDebugWindows(); // the tee limiter is module state — clear it between cases
 	});
 
 	it('tees a client voice event into the session log under the Voice part', async () => {
@@ -56,6 +60,21 @@ describe('POST /api/voice/debug', () => {
 	it('truncates an oversized message to 300 chars', async () => {
 		await post({ level: 'info', message: 'x'.repeat(400) });
 		expect(getEvents(SID)[0].message).toHaveLength(300);
+	});
+
+	it('rate-limits a flood of tee events with a retry-after, sparing other sessions', async () => {
+		for (let i = 0; i < DEBUG_SESSION_LIMIT; i++) {
+			expect((await post({ level: 'info', message: `e${i}` })).status).toBe(204);
+		}
+		const denied = await post({ level: 'info', message: 'one too many' });
+		expect(denied.status).toBe(429);
+		expect(Number(denied.headers.get('retry-after'))).toBeGreaterThan(0);
+
+		// A different session is unaffected by one client's flood.
+		expect((await post({ level: 'info', message: 'fresh' }, 'voice-debug-bystander')).status).toBe(
+			204
+		);
+		resetLog('voice-debug-bystander');
 	});
 
 	it('isolates sessions', async () => {

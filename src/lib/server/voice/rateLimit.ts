@@ -104,6 +104,9 @@ function createLimiter(label: string, sessionLimit: number, globalLimit: number)
 const tts = createLimiter('TTS', TTS_SESSION_LIMIT, TTS_GLOBAL_LIMIT);
 const transcribe = createLimiter('transcribe', STT_SESSION_LIMIT, STT_GLOBAL_LIMIT);
 const oracle = createLimiter('Ask', ASK_SESSION_LIMIT, ASK_GLOBAL_LIMIT);
+// The /debug voice tee is cheap but unauthenticated and feeds the public demo stream — bound it so a
+// client can't flood the operator's view. Generous: a normal session tees a handful of events a turn.
+const voiceDebug = createLimiter('voice-debug', 30, 120);
 
 /** Claim one TTS-synth slot for the session; a denial consumes nothing. */
 export const claimTtsSlot = tts.claim;
@@ -119,3 +122,8 @@ export const resetTranscribeWindows = transcribe.reset;
 export const claimOracleSlot = oracle.claim;
 /** Test isolation only — the windows are module state shared across a test file. */
 export const resetOracleWindows = oracle.reset;
+
+/** Claim one /debug voice-tee slot for the session; a denial consumes nothing. */
+export const claimVoiceDebugSlot = voiceDebug.claim;
+/** Test isolation only — the windows are module state shared across a test file. */
+export const resetVoiceDebugWindows = voiceDebug.reset;
