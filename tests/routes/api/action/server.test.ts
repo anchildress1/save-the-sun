@@ -24,6 +24,7 @@ vi.mock('$lib/server/skoll/gemini', () => ({
 }));
 
 import { POST } from '$routes/api/action/+server';
+import { interpret } from '$lib/server/oracle/gemini';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
 import {
 	resetEngine,
@@ -97,6 +98,40 @@ describe('POST /api/action', () => {
 		const denied = await ask();
 		expect(denied.status).toBe(429);
 		expect(Number(denied.headers.get('retry-after'))).toBeGreaterThan(0);
+	});
+
+	it('serializes overlapping POSTs for one session — the lock is wired into the route', async () => {
+		// Hold the first turn's interpret open, then prove a second concurrent POST can't run its own
+		// interpret until the first fully settles. Without withSessionLock both would interleave.
+		const events: string[] = [];
+		let release: () => void = () => {};
+		const held = new Promise<void>((resolve) => (release = resolve));
+		let first = true;
+		vi.mocked(interpret).mockImplementation(async () => {
+			events.push('start');
+			if (first) {
+				first = false;
+				await held;
+			}
+			events.push('end');
+			return {
+				kind: 'query',
+				query: { axis: 'fill', value: 'Light' },
+				paraphrase: 'whether it is light'
+			};
+		});
+
+		resetEngine(SID, SEED);
+		const p1 = ask();
+		const p2 = ask();
+
+		await vi.waitFor(() => expect(events).toContain('start'));
+		await new Promise((resolve) => setTimeout(resolve, 10)); // room for an un-serialized second call
+		expect(events).toEqual(['start']); // the lock kept the second POST out while the first ran
+
+		release();
+		await Promise.all([p1, p2]);
+		expect(events).toEqual(['start', 'end', 'start', 'end']); // strictly one turn after another
 	});
 
 	it('voices a Gemini-authored line, stored by id, on a clean answer (ttd:17)', async () => {

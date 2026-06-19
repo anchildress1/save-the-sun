@@ -169,6 +169,19 @@ describe('composeLine', () => {
 		).toBeNull();
 	});
 
+	// The route resolves authored lines by id from the per-session store and never trusts the wire's
+	// words — composeLine must refuse to synthesize the descriptor's text directly.
+	it('never voices an authored line from the descriptor', () => {
+		expect(
+			composeLine({
+				kind: 'authored',
+				id: 'vl-1',
+				voice: 'any-voice',
+				text: 'client-supplied words that must never be synthesized'
+			})
+		).toBeNull();
+	});
+
 	// Allow-list IDs are matched by own-property only — an inherited key (e.g. a prototype method
 	// name) must be rejected with null, never resolve to a function the route would synthesize.
 	it('rejects an inherited-property id for react and outcome', () => {
