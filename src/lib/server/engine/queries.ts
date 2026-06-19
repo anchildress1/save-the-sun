@@ -11,8 +11,8 @@ import { runes, type Rune } from '$lib/board';
 export type PowerOp = 'eq' | 'lt' | 'lte' | 'gt' | 'gte';
 
 // The closed sets the engine referees on — exported as the single source for the Gemini schemas and
-// prompts, so what the models are told can't drift from what parseQuery accepts. Mutable string
-// arrays to match the board trait constants (ELEMENTS/COLORS) used the same way in those enums.
+// prompts, so what the models are told can't drift from what parseQuery accepts. Mutable arrays (not
+// `as const`) so they pass straight into the response schema's `enum`, which wants a string[].
 export const POWER_OPS: PowerOp[] = ['eq', 'lt', 'lte', 'gt', 'gte'];
 export const FILLS: string[] = ['Light', 'Dark'];
 
