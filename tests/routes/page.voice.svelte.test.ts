@@ -983,6 +983,17 @@ describe('Save the Sun page — spoken reaction to Sköll', () => {
 			.toHaveTextContent("You close the Oracle's lips; his turn dies with the question.");
 	});
 
+	it('classifies a spoken pass and dispatches it — letting the question stand', async () => {
+		mockReaction('pass', { hexed: false });
+		const screen = render(Page, reactionProps());
+		await holdRelease(screen);
+
+		await vi.waitFor(() =>
+			expect(actionBodies()).toContainEqual({ type: 'React', player: 'Human', reaction: 'Pass' })
+		);
+		expect(actionBodies().some((b) => b.type === 'Ask')).toBe(false);
+	});
+
 	it('an unclear reply asks again and spends nothing', async () => {
 		mockReaction('unclear');
 		const screen = render(Page, reactionProps());

@@ -108,6 +108,40 @@ describe('POST /api/voice/transcribe', () => {
 		expect(stt.transcribe).not.toHaveBeenCalled();
 	});
 
+	// The debug tee renders an empty classifier result as '(unclear)' / '(nothing)' — exercise the
+	// fallback side of each so a mishear is still diagnosable in the stream.
+	it('tees an unclear cast (empty match) in cast mode', async () => {
+		stt.classifyCast.mockResolvedValueOnce('');
+		const response = await call('cast-unclear', {
+			wavBase64: 'UklGRg==',
+			mode: 'cast',
+			runes: ['Sowilo']
+		});
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ rune: '' });
+	});
+
+	it('tees an unclear hands-free cast (empty match) in ask mode', async () => {
+		stt.interpretAsk.mockResolvedValueOnce({ cast: '' });
+		const response = await call('ask-cast-unclear', { wavBase64: 'UklGRg==', runes: ['Sowilo'] });
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ rune: '' });
+	});
+
+	it('tees nothing-heard when interpretAsk reads an empty question', async () => {
+		stt.interpretAsk.mockResolvedValueOnce({ text: '' });
+		const response = await call('ask-empty', { wavBase64: 'UklGRg==', runes: ['Sowilo'] });
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ text: '' });
+	});
+
+	it('tees nothing-heard when a plain transcribe returns empty', async () => {
+		stt.transcribe.mockResolvedValueOnce('');
+		const response = await call('plain-empty', { wavBase64: 'UklGRg==' });
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ text: '' });
+	});
+
 	it('rejects an unknown mode with 400', async () => {
 		const response = await call('bad-mode', { wavBase64: 'UklGRg==', mode: 'shout' });
 		expect(response.status).toBe(400);
