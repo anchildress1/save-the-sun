@@ -8,13 +8,10 @@ import { env } from '$env/dynamic/private';
 import { ELEMENTS, COLORS, RUNE_NAMES as NAMES } from '$lib/board';
 import { captureGemini } from '$lib/server/debug/log';
 import type { GeminiCall } from '$lib/server/debug/log';
-import { queryFromFields, type PowerOp } from '$lib/server/engine/queries';
+import { queryFromFields, POWER_OPS, FILLS, type PowerOp } from '$lib/server/engine/queries';
 import type { Interpretation, Interpret, RefusalClass } from './types';
 
 const MODEL = 'gemini-3.5-flash';
-
-const FILLS: string[] = ['Light', 'Dark'];
-const POWER_OPS: PowerOp[] = ['eq', 'lt', 'lte', 'gt', 'gte'];
 
 const SYSTEM_INSTRUCTION = `You are the Oracle in "Save the Sun," a rite where a witch hunts one secret rune by asking yes/no questions about its traits. You do NOT know the secret and you never answer the question yourself — you only read the witch's words into exactly one structured query, or refuse.
 

@@ -6,7 +6,7 @@ import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { env } from '$env/dynamic/private';
 import { ELEMENTS, COLORS, RUNE_NAMES as NAMES } from '$lib/board';
 import { captureGemini } from '$lib/server/debug/log';
-import { queryFromFields, type PowerOp } from '$lib/server/engine/queries';
+import { queryFromFields, POWER_OPS, FILLS, type PowerOp } from '$lib/server/engine/queries';
 import type {
 	RawSkollDecision,
 	SkollDecide,
@@ -19,9 +19,6 @@ import type {
 // A weaker model plays looser, hunch-driven, like the twelve-year-old he's meant to be. (The Oracle is
 // the opposite case — it parses, so it runs full gemini-3.5-flash; the lite tier is Sköll's alone.)
 const MODEL = 'gemini-3.1-flash-lite';
-
-const FILLS: string[] = ['Light', 'Dark'];
-const POWER_OPS: PowerOp[] = ['eq', 'lt', 'lte', 'gt', 'gte'];
 
 const SYSTEM_INSTRUCTION = `<role>
 You are Sköll, the wolf who hunts the sun, racing a witch to name one secret rune among the 24 on the board. You are an impatient twelve-year-old, playing out loud.
