@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { statSync } from 'node:fs';
 
 const ONBOARDED_KEY = 'save-the-sun:onboarded';

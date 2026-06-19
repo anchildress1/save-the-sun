@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 // S10 — degradation tiers (test-plan.md §8). v1 ships the Plain tier; the only mood layer is the GSAP
 // motion, so the Reduced tier is "reduced-motion on, or the motion never runs." A tier that can't

@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import type { Page } from '@playwright/test';
 
 // Social embeds (dev.to, LinkedIn, X, Slack…) read these tags from the SSR HTML —
 // no JS runs in those crawlers, so everything asserted here must arrive with the document.
