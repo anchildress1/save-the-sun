@@ -275,7 +275,6 @@
 		animation: sprite-level 1.1s steps(12, jump-none) infinite alternate;
 	}
 
-	/* Ember shift for the wolf — paired with the deepening eclipse below, never the only signal. */
 	.medallion[data-voice-state='skoll-speaking'] .disc {
 		filter: hue-rotate(-40deg) saturate(1.25);
 	}

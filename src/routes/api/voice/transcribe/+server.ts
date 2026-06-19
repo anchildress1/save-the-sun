@@ -31,8 +31,7 @@ interface ParsedRequest {
 }
 
 // Parse and validate the request envelope — JSON shape plus the audio/mode/cast fields. Returns a
-// ready-to-send 4xx Response on any violation, or the validated fields. Kept out of POST so the
-// handler's complexity stays on the read modes, not the guards.
+// ready-to-send 4xx Response on any violation, or the validated fields.
 async function parseRequest(request: Request): Promise<Response | ParsedRequest> {
 	let body: unknown;
 	try {

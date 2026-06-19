@@ -280,8 +280,8 @@
 	// the panel and pill agree; a Sköll win leaves the last voiced line alone (restored from the
 	// saved view) — the end screen owns the defeat text, and the panel must not repeat it.
 	let answer = $state(
-		untrack(
-			() => (data.state.status === 'won' && data.state.winner === 'Human' ? RITE.runeTrue : '') // blank until the Oracle has a response to voice (or the saved view restores one)
+		untrack(() =>
+			data.state.status === 'won' && data.state.winner === 'Human' ? RITE.runeTrue : ''
 		)
 	);
 
@@ -590,8 +590,7 @@
 	// board names so the server can match a spoken cast; a `cast` result (even '') means cast intent,
 	// so it routes to respondCast rather than being re-read as a question. Degrades to an empty Ask.
 	function interpretUtterance(wavBase64: string): Promise<{ cast: string } | { text: string }> {
-		// Trust no field's type: a garbled response with a non-string `text` (or `rune`) must degrade to
-		// an empty ask, not propagate a number into `heard.text.trim()` and crash the client.
+		// Trust no field's type — a non-string text/rune degrades to an empty ask, not a crash.
 		return readUtterance({ wavBase64, runes: runes.map((r) => r.name) }, { text: '' }, (d) =>
 			typeof d.rune === 'string'
 				? { cast: d.rune }

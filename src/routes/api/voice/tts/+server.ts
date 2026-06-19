@@ -24,7 +24,6 @@ interface Resolved {
 	fallbackPrompt: string | null;
 }
 
-// What to synthesize and whether that synth may cache its output.
 interface Plan {
 	voice: string;
 	synthText: string;
@@ -53,11 +52,9 @@ function resolveLine(body: LineDescriptor, sessionId: string): Resolved | null {
 	return { voice, prompt: synthPrompt(voice, line), cacheable: true, fallbackPrompt: null };
 }
 
-// Decide what this request voices, or a 4xx to return. A cacheable line already in the cache replays
-// for free — no key, no slot. Otherwise a fresh synth is needed: gate it on the key and the limiter.
-// An authored line never replays from its own unique prompt (cacheable=false makes synthesizeStream
-// skip the cache and always call Gemini), so it always faces the gate; on a block its deterministic
-// counterpart replays instead when THAT is already cached, rather than going silent.
+// A cached cacheable line replays free (no key, no slot). Otherwise gate a fresh synth on the key +
+// limiter. An authored line never replays from its own unique prompt (cacheable=false skips the cache),
+// so it always faces the gate; on a block, a cached deterministic counterpart replays before going silent.
 function planSynth(resolved: Resolved, sessionId: string): Plan | Response {
 	const { voice, prompt, cacheable, fallbackPrompt } = resolved;
 	const plan = (synthText: string, synthMayCache: boolean): Plan => ({

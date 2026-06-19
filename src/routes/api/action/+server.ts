@@ -176,7 +176,7 @@ async function authorEnding(
 	outcome: 'win' | 'lose'
 ): Promise<AuthoredLine | undefined> {
 	const text = await composeEndingFlair(outcome);
-	geminiEvents(sessionId, 'Cast'); // a Gemini call happened — tee its raw I/O to the debug log
+	geminiEvents(sessionId, 'Cast');
 	if (text === null) return undefined;
 	const voice = outcome === 'win' ? ORACLE_VOICE : SKOLL_VOICE;
 	// Stash the words server-side; the wire carries only the id (+ voice/text for the client), and the
@@ -252,7 +252,7 @@ async function authorAnswerFlair(
 	oracle: Extract<OracleResult, { ok: true }>
 ): Promise<void> {
 	const flair = await composeOracleFlair(oracle.answer);
-	geminiEvents(sessionId, 'Ask'); // drain the flair call's raw I/O onto this turn's Ask beat
+	geminiEvents(sessionId, 'Ask');
 	if (!flair) return;
 	if (!flairKeepsVerdict(flair, oracle.affirmative)) {
 		console.warn(`[oracle] flair dropped — verdict not preserved: ${JSON.stringify(flair)}`);
@@ -382,7 +382,7 @@ async function resolveOther(
 ): Promise<Response> {
 	const result = await handleAction(action, { engine, interpret });
 	if (result.type === 'Ask') {
-		geminiEvents(sessionId, 'Ask'); // a stale Ask still ran interpret — drain its raw I/O
+		geminiEvents(sessionId, 'Ask');
 		rememberLine(sessionId, oracleVoiceLine(result.oracle));
 	}
 	if (result.type === 'Cast') {

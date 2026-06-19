@@ -1,10 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 
-// Mock the Gemini-backed voice routes for every e2e test, so the suite never reaches a live synth or
-// transcription (page.route intercepts in the browser — the request never leaves for the server).
-// The deterministic answer comes from each test's own /api/action stub; the voice layer only needs to
-// not call out. `/voice/tts` returns an empty NDJSON stream (no audio — the panel already carries the
-// line); the rest return a benign empty JSON. Auto-applied via the page fixture so no test can forget.
+// Auto-stub the voice routes so no e2e test reaches a live synth/transcribe: /voice/tts returns an
+// empty NDJSON stream (the panel already carries the line), the rest a benign empty JSON.
 export const test = base.extend({
 	page: async ({ page }, use) => {
 		await page.route('**/api/voice/**', (route) =>
