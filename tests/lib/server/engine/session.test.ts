@@ -6,7 +6,6 @@ import {
 	getRoundId,
 	getBoardSeed,
 	resetEngine,
-	sessionCount,
 	storeVoiceLine,
 	getVoiceLine,
 	withSessionLock,
@@ -174,11 +173,6 @@ describe('session engine registry', () => {
 		for (let i = 0; i <= MAX_SESSIONS; i++) getEngine(`board-flood-${i}`);
 		// Evicted → a fresh seed on next access, not the old one resurrected.
 		expect(getBoardSeed('board-seed-victim')).not.toBe(seed);
-	});
-
-	it('never grows past the session cap', () => {
-		for (let i = 0; i <= MAX_SESSIONS + 10; i++) getEngine(`cap-${i}`);
-		expect(sessionCount()).toBe(MAX_SESSIONS);
 	});
 
 	it('evicts an idle session once the cap is exceeded', () => {

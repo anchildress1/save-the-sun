@@ -153,11 +153,6 @@ export function getSkoll(sessionId: string): SkollState {
 	return state;
 }
 
-/** Live session count — bounded by MAX_SESSIONS. */
-export function sessionCount(): number {
-	return engines.size;
-}
-
 /**
  * Record the line a just-committed action voiced, so a dropped response can recover the real result.
  * Call on every committed *voiced* move (Ask answer/refusal, reaction resolution, cast outcome, his
