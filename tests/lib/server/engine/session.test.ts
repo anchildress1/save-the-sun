@@ -202,6 +202,23 @@ describe('session engine registry', () => {
 		expect(getEngine('active-keep').status).toBe('won');
 	});
 
+	it('never evicts the oldest session while it holds an in-flight lock', async () => {
+		resetEngine('locked', SEED);
+		const engine = getEngine('locked'); // oldest entry — the LRU eviction would normally target it
+		// Wire the gate synchronously (executor runs now) so release() isn't a no-op stub when called.
+		let release: () => void = () => {};
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const held = withSessionLock('locked', () => gate);
+
+		// Overflow the cap while 'locked' is mid-turn. Without the lock skip it would be evicted and a
+		// fresh secret minted under the request still holding it.
+		for (let i = 0; i <= MAX_SESSIONS; i++) getEngine(`flood-${i}`);
+
+		expect(getEngine('locked')).toBe(engine); // same instance — never detached
+		release();
+		await held;
+	});
+
 	// The authored-line store is bounded per round (MAX_VOICE_LINES) so a marathon round can't grow
 	// memory without bound — the oldest id is dropped once over the cap, the recent ones survive.
 	it('drops the oldest authored voice line once past the per-round cap', () => {

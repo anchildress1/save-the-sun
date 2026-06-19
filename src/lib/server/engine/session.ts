@@ -87,12 +87,16 @@ function remember(sessionId: string, engine: GameEngine): GameEngine {
 	engines.delete(sessionId);
 	engines.set(sessionId, engine);
 	if (engines.size > MAX_SESSIONS) {
-		// size > cap ⇒ the registry is non-empty, so the first key always exists.
-		const [lru] = engines.keys();
-		engines.delete(lru);
-		evictRoundState(lru);
-		// Rare, but the resulting fresh-secret-on-next-access desync is otherwise invisible.
-		console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
+		// Evict the oldest session that is NOT mid-turn. Evicting a locked one would detach the engine
+		// an in-flight request still holds and mint a fresh secret under it, restarting that round
+		// mid-flight. If every session is locked (implausible), skip — the map runs briefly over cap.
+		for (const lru of engines.keys()) {
+			if (locks.has(lru)) continue;
+			engines.delete(lru);
+			evictRoundState(lru);
+			console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
+			break;
+		}
 	}
 	return engine;
 }
