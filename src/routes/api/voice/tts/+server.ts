@@ -1,70 +1,95 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { claimTtsSlot } from '$lib/server/voice/rateLimit';
-import { composeLine, isLineDescriptor, voiceForLine, synthPrompt } from '$lib/server/voice/lines';
+import {
+	composeLine,
+	isLineDescriptor,
+	voiceForLine,
+	synthPrompt,
+	type LineDescriptor
+} from '$lib/server/voice/lines';
 import { getVoiceLine } from '$lib/server/engine/session';
 import { synthesizeStream, isCached } from '$lib/server/voice/tts';
 import type { RequestHandler } from './$types';
 
 const badLine = () => json({ error: 'Unknown voice line.' }, { status: 400 });
 
-// Voices one server-owned line as a stream of base64 PCM chunks the browser's speaker plays as they
-// arrive — so the Oracle starts speaking at the first chunk, not after the whole clip. The browser
-// sends a descriptor (the "line ID"), never free text: the server composes the exact words from the
-// allow-list, so this route can't be turned into a free arbitrary-text TTS endpoint.
-export const POST: RequestHandler = async ({ request, locals }) => {
-	let body: unknown;
-	try {
-		body = await request.json();
-	} catch {
-		return badLine();
-	}
+// The resolved words for a descriptor. `cacheable` is false only for authored lines (unique per call,
+// so they can never replay); `fallbackPrompt` is their deterministic counterpart, voiced if the
+// authored synth is blocked or makes no audio.
+interface Resolved {
+	voice: string;
+	prompt: string;
+	cacheable: boolean;
+	fallbackPrompt: string | null;
+}
 
-	if (!isLineDescriptor(body)) return badLine();
+// What to synthesize and whether that synth may cache its output.
+interface Plan {
+	voice: string;
+	synthText: string;
+	synthMayCache: boolean;
+	fallbackPrompt: string | null;
+}
 
-	// Two resolution paths, ONE invariant — the client never supplies the words. An `authored` line
-	// (Gemini-written, dynamic) is looked up by id from this session's store; everything else recomposes
-	// from the descriptor. A well-shaped descriptor that resolves to nothing (unknown id, or values that
-	// don't compose to an allow-listed line) is refused BEFORE any quota spend.
-	let line: string | null;
-	let voice: string;
-	// Set only for an authored line: its deterministic counterpart, voiced if the authored synth 429s.
-	let fallbackPrompt: string | null = null;
+// Resolve a descriptor to its words + voice — by id from the session store for an authored line, or
+// recomposed from the allow-list otherwise. null when it maps to no allow-listed line (refuse before
+// any quota spend). The client never supplies the words: this is what keeps the route from becoming a
+// free arbitrary-text TTS endpoint.
+function resolveLine(body: LineDescriptor, sessionId: string): Resolved | null {
 	if (body.kind === 'authored') {
-		const stored = getVoiceLine(locals.sessionId, body.id);
-		if (stored === null) return badLine();
-		line = stored.text;
-		voice = stored.voice;
-		fallbackPrompt = synthPrompt(voice, stored.fallback);
-	} else {
-		line = composeLine(body);
-		if (line === null) return badLine();
-		voice = voiceForLine(body);
+		const stored = getVoiceLine(sessionId, body.id);
+		if (stored === null) return null;
+		return {
+			voice: stored.voice,
+			prompt: synthPrompt(stored.voice, stored.text),
+			cacheable: false,
+			fallbackPrompt: synthPrompt(stored.voice, stored.fallback)
+		};
 	}
-	// Authored lines are unique per call, so they're never cacheable — a unique key can't replay, and
-	// caching it would only grow memory for the life of the process.
-	const cacheable = body.kind !== 'authored';
-	// The synthesis prompt wraps the line in its speaker's director's-notes (both voices, never bare).
-	const prompt = synthPrompt(voice, line);
+	const line = composeLine(body);
+	if (line === null) return null;
+	const voice = voiceForLine(body);
+	return { voice, prompt: synthPrompt(voice, line), cacheable: true, fallbackPrompt: null };
+}
 
-	// A cached line replays from memory — no Gemini call — so it skips both the synth budget and the
-	// key requirement. Only an uncached line costs a synth: gate it, and fail loudly (503, not a silent
-	// empty 200) when voice is unconfigured so a deploy/config failure is visible.
-	if (!isCached(prompt, voice)) {
-		if (!env.GEMINI_API_KEY) return json({ error: 'Voice is unavailable.' }, { status: 503 });
-		const verdict = claimTtsSlot(locals.sessionId);
-		if (!verdict.ok) {
-			return json(
+// Decide what this request voices, or a 4xx to return. A cacheable line already in the cache replays
+// for free — no key, no slot. Otherwise a fresh synth is needed: gate it on the key and the limiter.
+// An authored line never replays from its own unique prompt (cacheable=false makes synthesizeStream
+// skip the cache and always call Gemini), so it always faces the gate; on a block its deterministic
+// counterpart replays instead when THAT is already cached, rather than going silent.
+function planSynth(resolved: Resolved, sessionId: string): Plan | Response {
+	const { voice, prompt, cacheable, fallbackPrompt } = resolved;
+	const plan = (synthText: string, synthMayCache: boolean): Plan => ({
+		voice,
+		synthText,
+		synthMayCache,
+		fallbackPrompt
+	});
+	if (cacheable && isCached(prompt, voice)) return plan(prompt, true);
+
+	const fallbackReplay =
+		fallbackPrompt !== null && isCached(fallbackPrompt, voice) ? fallbackPrompt : null;
+	if (!env.GEMINI_API_KEY) {
+		return fallbackReplay
+			? plan(fallbackReplay, true)
+			: json({ error: 'Voice is unavailable.' }, { status: 503 });
+	}
+	const verdict = claimTtsSlot(sessionId);
+	if (verdict.ok) return plan(prompt, cacheable);
+	return fallbackReplay
+		? plan(fallbackReplay, true)
+		: json(
 				{ error: 'Too many voice requests. Try again shortly.' },
 				{ status: 429, headers: { 'retry-after': String(verdict.retryAfterSeconds) } }
 			);
-		}
-	}
+}
 
-	// NDJSON: one base64 PCM chunk per line. A synth failure mid-stream ends it early — the audio is
-	// best-effort (the panel already carries the text) past this point. The pump is guarded so a client
-	// disconnect (enqueue on a torn stream) closes deliberately instead of escaping as an unhandled
-	// rejection — matching every other voice path, which degrades on purpose, not by accident.
+// Stream the planned line as NDJSON base64 PCM chunks the browser plays as they arrive. A synth that
+// makes no audio (a mid-stream 429, key gone) falls back to the cacheable counterpart unless that's
+// already what we're voicing. The pump is guarded so a torn stream / client disconnect closes
+// deliberately instead of escaping as an unhandled rejection — audio is best-effort past the panel text.
+function streamLine({ voice, synthText, synthMayCache, fallbackPrompt }: Plan): Response {
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream<Uint8Array>({
 		async start(controller) {
@@ -77,11 +102,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				return voiced;
 			};
 			try {
-				// An authored line is unique and never cached, so it dies first under quota. When its synth
-				// makes no audio, voice the deterministic counterpart instead — it's cacheable, so once
-				// synthesized it replays free even while quota stays exhausted.
-				const voiced = await pump(prompt, cacheable);
-				if (!voiced && fallbackPrompt) await pump(fallbackPrompt, true);
+				const voiced = await pump(synthText, synthMayCache);
+				if (!voiced && fallbackPrompt && synthText !== fallbackPrompt) {
+					await pump(fallbackPrompt, true);
+				}
 			} catch {
 				/* torn stream / client gone — audio is best-effort past here */
 			} finally {
@@ -93,8 +117,26 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		}
 	});
-
 	return new Response(stream, {
 		headers: { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store' }
 	});
+}
+
+// Voices one server-owned line as a stream of base64 PCM chunks the browser's speaker plays as they
+// arrive — so the Oracle starts speaking at the first chunk, not after the whole clip. The browser
+// sends a descriptor (the "line ID"), never free text.
+export const POST: RequestHandler = async ({ request, locals }) => {
+	let body: unknown;
+	try {
+		body = await request.json();
+	} catch {
+		return badLine();
+	}
+	if (!isLineDescriptor(body)) return badLine();
+
+	const resolved = resolveLine(body, locals.sessionId);
+	if (resolved === null) return badLine();
+
+	const plan = planSynth(resolved, locals.sessionId);
+	return plan instanceof Response ? plan : streamLine(plan);
 };

@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const tts = vi.hoisted(() => ({ synthesizeStream: vi.fn(), isCached: vi.fn(() => false) }));
+const tts = vi.hoisted(() => ({
+	synthesizeStream: vi.fn(),
+	isCached: vi.fn<(text: string, voice: string) => boolean>(() => false)
+}));
 vi.mock('$lib/server/voice/tts', () => ({
 	synthesizeStream: tts.synthesizeStream,
 	isCached: tts.isCached
@@ -175,6 +178,86 @@ describe('POST /api/voice/tts', () => {
 		expect(tts.synthesizeStream).toHaveBeenNthCalledWith(
 			2,
 			synthPrompt(ORACLE_VOICE, fallback),
+			ORACLE_VOICE,
+			true
+		);
+	});
+
+	it('gates an authored line even when its prompt collides with the cache — keyless yields 503, not a silent 200', async () => {
+		const authored = 'Yes — a coincidental cache hit.';
+		const authoredPrompt = synthPrompt(ORACLE_VOICE, authored);
+		const id = storeVoiceLine(
+			'authored-collide',
+			authored,
+			ORACLE_VOICE,
+			'Yes. Uncached fallback.'
+		);
+		// The authored prompt *looks* cached, but it never replays from its own (unique) prompt, so the
+		// gate must still run; its fallback is uncached and the key is gone.
+		tts.isCached.mockImplementation((text: string) => text === authoredPrompt);
+		mock.env.GEMINI_API_KEY = undefined;
+
+		const response = await call('authored-collide', {
+			kind: 'authored',
+			id,
+			voice: ORACLE_VOICE,
+			text: authored
+		});
+
+		expect(response.status).toBe(503);
+		expect(tts.synthesizeStream).not.toHaveBeenCalled();
+	});
+
+	it('serves the cached fallback when an authored line is quota-denied, not a silent 429', async () => {
+		const authored = 'Yes — unique every call.';
+		const fallback = 'Yes. The plain truth.';
+		const fallbackPrompt = synthPrompt(ORACLE_VOICE, fallback);
+		const id = storeVoiceLine('authored-q', authored, ORACLE_VOICE, fallback);
+		// Only the deterministic fallback is cached; the authored prompt and the drain lines are not.
+		tts.isCached.mockImplementation((text: string) => text === fallbackPrompt);
+		tts.synthesizeStream.mockImplementation(() => streamOf('pcm'));
+
+		// Spend the per-session synth quota on uncached lines.
+		for (let i = 0; i < TTS_SESSION_LIMIT; i++) {
+			expect((await call('authored-q', { kind: 'refusal', refusal: 'empty' })).status).toBe(200);
+		}
+		tts.synthesizeStream.mockClear();
+
+		// Quota-denied — but the fallback is cached, so it replays free (200) instead of going silent.
+		const response = await call('authored-q', {
+			kind: 'authored',
+			id,
+			voice: ORACLE_VOICE,
+			text: authored
+		});
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('pcm\n');
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
+			fallbackPrompt,
+			ORACLE_VOICE,
+			true
+		);
+	});
+
+	it('voices the cached fallback for an authored line when the key is unset, not 503', async () => {
+		const authored = 'Yes — authored, keyless.';
+		const fallback = 'Yes. Plain, cached.';
+		const fallbackPrompt = synthPrompt(ORACLE_VOICE, fallback);
+		const id = storeVoiceLine('authored-keyless', authored, ORACLE_VOICE, fallback);
+		tts.isCached.mockImplementation((text: string) => text === fallbackPrompt);
+		tts.synthesizeStream.mockImplementation(() => streamOf('pcm'));
+		mock.env.GEMINI_API_KEY = undefined;
+
+		const response = await call('authored-keyless', {
+			kind: 'authored',
+			id,
+			voice: ORACLE_VOICE,
+			text: authored
+		});
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('pcm\n');
+		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
+			fallbackPrompt,
 			ORACLE_VOICE,
 			true
 		);
