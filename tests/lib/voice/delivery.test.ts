@@ -369,6 +369,35 @@ describe('delivery seam', () => {
 		await expect(whenDrained(10_000)).resolves.toBeUndefined();
 	});
 
+	it("a stopped round's late retirement does not strand the next round in whenDrained", async () => {
+		let releaseNext: (res: Response) => void = () => {};
+		vi.mocked(fetch).mockReturnValueOnce(
+			new Promise<Response>((resolve) => {
+				releaseNext = resolve;
+			})
+		);
+		enableDelivery();
+		audio.speaker.busy = false;
+
+		deliver(LINE); // round A
+		stopDelivery(); // abandon A — generation bumps, pending resets; A's queued line goes stale
+		const next = deliver(LINE); // round B — its fetch is the held one below
+
+		// A's stale line settles and retires; with the generation-scoped guard that retire is a no-op,
+		// so B's slot survives. Wait for B's fetch so A has already settled by then.
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+		let drained = false;
+		void whenDrained(10_000).then(() => {
+			drained = true;
+		});
+		await Promise.resolve();
+		expect(drained).toBe(false); // B is still outstanding — A's stale retire must not have zeroed it
+
+		releaseNext(ndjsonResponse('b'));
+		await next;
+		await expect(whenDrained(10_000)).resolves.toBeUndefined();
+	});
+
 	it('does not release whenDrained on a mid-stream dry queue while a delivery is still streaming', async () => {
 		let releaseSecond: () => void = () => {};
 		const body = new ReadableStream<Uint8Array>({

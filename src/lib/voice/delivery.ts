@@ -201,12 +201,18 @@ export function deliver(descriptor: LineDescriptor): Promise<void> {
 	// Retire this line's pending slot once it settles. A line that produced no audio — a body-less
 	// 200, or a failed/aborted fetch — never makes the speaker busy, so no onDrained would fire to
 	// release whenDrained() waiters: settle them here when nothing is left queued or playing.
-	void run.then(retirePending, retirePending);
+	void run.then(
+		() => retirePending(gen),
+		() => retirePending(gen)
+	);
 	return run;
 }
 
-function retirePending(): void {
-	if (pendingDeliveries === 0) return; // a teardown already zeroed it; a late aborted-fetch settle is a no-op
+function retirePending(gen: number): void {
+	// Tie the retirement to the generation this delivery was queued in. A stop/disable zeroed the
+	// counter and bumped the generation, so a late settle from that torn-down round must not decrement
+	// a FRESH round's count — that would resolve whenDrained() while the new round's audio is still live.
+	if (gen !== generation) return;
 	pendingDeliveries--;
 	if (pendingDeliveries === 0 && !speaker?.busy) handleDrained();
 }
