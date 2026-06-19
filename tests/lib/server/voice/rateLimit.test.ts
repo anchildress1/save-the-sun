@@ -1,4 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Pin the env so the TTS/STT ceilings resolve to their defaults (4/10). The limits are computed at
+// module load from $env/dynamic/private, so a developer's exported TTS_SESSION_LIMIT (etc.) would
+// otherwise make this suite non-deterministic.
+vi.mock('$env/dynamic/private', () => ({ env: {} }));
+
 import {
 	claimTtsSlot,
 	resetTtsWindows,
