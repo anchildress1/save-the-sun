@@ -7,6 +7,8 @@ REGION="${REGION:-us-east1}"
 PORT="3000"
 SA_NAME="${SERVICE_NAME}-run"
 SECRET_GEMINI="SAVE_THE_SUN_GEMINI_API_KEY"
+# Billing labels stamped on every resource so spend is attributable per-app in the billing console.
+RESOURCE_LABELS="app=${SERVICE_NAME},managed-by=deploy-script"
 
 RULE="═══════════════════════════════════════════════════════════"
 
@@ -89,11 +91,16 @@ if ! gcloud artifacts repositories describe "${REPO_NAME}" \
     --repository-format=docker \
     --location="${REGION}" \
     --description="Docker images for ${SERVICE_NAME}" \
+    --labels="${RESOURCE_LABELS}" \
     --quiet
   echo "  Created"
 else
   echo "  Exists"
 fi
+
+# Label idempotently so a repo created before labels existed still gets attributed.
+gcloud artifacts repositories update "${REPO_NAME}" --location="${REGION}" \
+  --update-labels="${RESOURCE_LABELS}" --quiet >/dev/null 2>&1 || true
 
 # Keep only the 3 most recent versions; GC the rest. Stops images piling up forever.
 echo "» Applying cleanup policy (keep 3 most recent)..."
@@ -103,10 +110,17 @@ gcloud artifacts repositories set-cleanup-policies "${REPO_NAME}" \
   --no-dry-run \
   --quiet
 
-# ─── Build ──────────────────────────────────────────────────────────────────────
-IMAGE="${REPO_PATH}/${SERVICE_NAME}:latest"
+# ─── Build (immutable SHA tag + a floating :latest) ─────────────────────────────
+# An immutable per-commit tag makes each deploy a distinct image the cleanup policy can age out —
+# not a single :latest that silently orphans the prior digest on every build.
+GIT_SHA="$(git rev-parse --short=12 HEAD 2>/dev/null || echo manual)"
+[[ -z "$(git status --porcelain 2>/dev/null)" ]] || GIT_SHA="${GIT_SHA}-dirty"
+IMAGE="${REPO_PATH}/${SERVICE_NAME}:${GIT_SHA}"
+LATEST="${REPO_PATH}/${SERVICE_NAME}:latest"
 echo "» Building image: ${IMAGE}"
 gcloud builds submit --tag "${IMAGE}" --quiet
+# Float :latest to this build for humans / quick rollback reference.
+gcloud artifacts docker tags add "${IMAGE}" "${LATEST}" --quiet
 
 # ─── Deploy (cost-optimized: scale to zero, small ceiling) ──────────────────────
 echo "» Deploying to Cloud Run..."
@@ -123,6 +137,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --concurrency 80 \
   --timeout 60s \
   --cpu-boost \
+  --labels="${RESOURCE_LABELS}" \
   --set-secrets="GEMINI_API_KEY=${SECRET_GEMINI}:latest" \
   --quiet
 
