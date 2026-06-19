@@ -23,11 +23,17 @@ const WINDOW_MS = 60_000;
 export const TTS_SESSION_LIMIT = resolveLimit(env.TTS_SESSION_LIMIT, 4);
 export const TTS_GLOBAL_LIMIT = resolveLimit(env.TTS_GLOBAL_LIMIT, 10);
 
-// Push-to-talk transcription: every held utterance is an uncached Gemini call. (Note: the interpret
-// and flair calls draw on the same Flash quota and are still uncapped — a separate scaling gap.)
-// Same free-tier-sized defaults, env-tunable.
+// Push-to-talk transcription: every held utterance is an uncached Gemini call. Same free-tier-sized
+// defaults, env-tunable.
 export const STT_SESSION_LIMIT = resolveLimit(env.STT_SESSION_LIMIT, 4);
 export const STT_GLOBAL_LIMIT = resolveLimit(env.STT_GLOBAL_LIMIT, 10);
+
+// A live Ask fans out to several Gemini calls (Oracle interpret + flair, Sköll reaction) on the same
+// Flash quota as voice, with no audio required to trigger it. Sized above real play — an Ask
+// round-trips in seconds, so a human can't approach it — to stop a scripted client from hammering the
+// turn endpoint and draining the shared key. Env-tunable for a stricter or paid-tier key.
+export const ASK_SESSION_LIMIT = resolveLimit(env.ASK_SESSION_LIMIT, 20);
+export const ASK_GLOBAL_LIMIT = resolveLimit(env.ASK_GLOBAL_LIMIT, 60);
 
 interface Window {
 	count: number;
@@ -97,6 +103,7 @@ function createLimiter(label: string, sessionLimit: number, globalLimit: number)
 
 const tts = createLimiter('TTS', TTS_SESSION_LIMIT, TTS_GLOBAL_LIMIT);
 const transcribe = createLimiter('transcribe', STT_SESSION_LIMIT, STT_GLOBAL_LIMIT);
+const oracle = createLimiter('Ask', ASK_SESSION_LIMIT, ASK_GLOBAL_LIMIT);
 
 /** Claim one TTS-synth slot for the session; a denial consumes nothing. */
 export const claimTtsSlot = tts.claim;
@@ -107,3 +114,8 @@ export const resetTtsWindows = tts.reset;
 export const claimTranscribeSlot = transcribe.claim;
 /** Test isolation only — the windows are module state shared across a test file. */
 export const resetTranscribeWindows = transcribe.reset;
+
+/** Claim one Ask-turn slot for the session; a denial consumes nothing. */
+export const claimOracleSlot = oracle.claim;
+/** Test isolation only — the windows are module state shared across a test file. */
+export const resetOracleWindows = oracle.reset;

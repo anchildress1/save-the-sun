@@ -17,6 +17,7 @@ import {
 	storeVoiceLine
 } from '$lib/server/engine/session';
 import { composeLine, type LineDescriptor } from '$lib/server/voice/lines';
+import { claimOracleSlot } from '$lib/server/voice/rateLimit';
 import { interpret, composeOracleFlair, composeEndingFlair } from '$lib/server/oracle/gemini';
 import { voiceAnswer, prepareAsk, answerAsk } from '$lib/server/oracle/oracle';
 import type { OracleResult } from '$lib/server/oracle/types';
@@ -288,6 +289,19 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	// Advance carries no payload; every other type must be a well-formed action.
 	if ((body.type as string) !== 'Advance' && !isAction(body)) {
 		error(400, 'Malformed action payload.');
+	}
+
+	// Ask is the one client-triggerable type that fans out to several Gemini calls; cap it so a
+	// scripted client can't drain the shared key. (Advance only reaches Gemini when it's actually
+	// Sköll's turn — once per turn — and the other types are deterministic, so they need no gate.)
+	if (body.type === 'Ask') {
+		const verdict = claimOracleSlot(locals.sessionId);
+		if (!verdict.ok) {
+			return json(
+				{ error: 'The Oracle needs a moment. Try again shortly.' },
+				{ status: 429, headers: { 'retry-after': String(verdict.retryAfterSeconds) } }
+			);
+		}
 	}
 
 	// runWithSession scopes any raw Gemini I/O teed this turn to THIS session's sink, never another's.

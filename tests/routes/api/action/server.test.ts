@@ -33,6 +33,7 @@ import {
 	getLastLine
 } from '$lib/server/engine/session';
 import { getEvents, captureGemini, runWithSession } from '$lib/server/debug/log';
+import { resetOracleWindows, ASK_SESSION_LIMIT } from '$lib/server/voice/rateLimit';
 import { selectSecret } from '$lib/server/engine/engine';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { OUTCOME_LINES, VOICED_SEQUENCE } from '$lib/voice/outcomeLines';
@@ -70,6 +71,7 @@ describe('POST /api/action', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		resetEngine(SID, SEED);
+		resetOracleWindows(); // the Ask limiter is module state — clear it so cases don't share a window
 		skollDecides(async () => ({ kind: 'cast', runeName: WRONG })); // default: Sköll misplays a cast
 		skollReacts(async () => ({ reaction: 'Pass' })); // default: Sköll lets the human's Ask pass
 	});
@@ -84,6 +86,17 @@ describe('POST /api/action', () => {
 		// The wolf's move is a SEPARATE request, so the answer comes back alone, his turn pending.
 		expect(data.skoll).toBeUndefined();
 		expect(data.state).toMatchObject({ activePlayer: 'Sköll', status: 'active' });
+	});
+
+	it('rate-limits the Ask turn once the session window is spent, with a retry-after', async () => {
+		for (let i = 0; i < ASK_SESSION_LIMIT; i++) {
+			resetEngine(SID, SEED); // each Ask consumes the live human turn — re-arm it
+			expect((await ask()).status).toBe(200);
+		}
+		resetEngine(SID, SEED);
+		const denied = await ask();
+		expect(denied.status).toBe(429);
+		expect(Number(denied.headers.get('retry-after'))).toBeGreaterThan(0);
 	});
 
 	it('voices a Gemini-authored line, stored by id, on a clean answer (ttd:17)', async () => {
