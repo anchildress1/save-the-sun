@@ -8,11 +8,11 @@
 </p>
 
 <p align="center">
-  <img alt="CI GHA Status" src="https://img.shields.io/github/actions/workflow/status/anchildress1/save-the-sun/.github%2Fworkflows%2Fci.yml?style=for-the-badge&logo=github&label=CI" />
-  <img alt="CodeQL GHA Status" src="https://img.shields.io/github/actions/workflow/status/anchildress1/save-the-sun/.github%2Fworkflows%2Fcodeql.yml?style=for-the-badge&logo=github&label=CodeQL" />
+  <img alt="CI GHA Status" src="https://img.shields.io/github/actions/workflow/status/anchildress1/save-the-sun/.github%2Fworkflows%2Fci.yml?branch=main&style=for-the-badge&logo=github&label=CI" />
+  <img alt="CodeQL GHA Status" src="https://img.shields.io/github/actions/workflow/status/anchildress1/save-the-sun/.github%2Fworkflows%2Fcodeql.yml?branch=main&style=for-the-badge&logo=github&label=CodeQL" />
   <br/>
-  <img alt="Sonar Quality Gate" src="https://img.shields.io/sonar/quality_gate/anchildress1_save-the-sun?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge" />
-  <img alt="Sonar Coverage" src="https://img.shields.io/sonar/coverage/anchildress1_save-the-sun?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&color=limegreen" />
+  <img alt="Sonar Quality Gate" src="https://img.shields.io/sonar/quality_gate/anchildress1_save-the-sun?branch=main&server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge" />
+  <img alt="Sonar Coverage" src="https://img.shields.io/sonar/coverage/anchildress1_save-the-sun?branch=main&server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&color=limegreen" />
   <img alt="Lighthouse accessibility score 100, enforced pre-push" src="https://img.shields.io/badge/Lighthouse_a11y-100-limegreen?style=for-the-badge&logo=lighthouse" />
 </p>
 
