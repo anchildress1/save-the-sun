@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { statSync } from 'node:fs';
 
 const ONBOARDED_KEY = 'save-the-sun:onboarded';
 
@@ -304,7 +305,8 @@ test.describe('the live board (past the title screen)', () => {
 		// Let the GSAP entrance settle so the artifact shows the resting board.
 		await expect(page.locator('.rune-card-wrapper').last()).toHaveCSS('opacity', '1');
 		await page.screenshot({ path: testInfo.outputPath('board.png'), fullPage: true });
-		expect(testInfo.outputPath('board.png')).toContain('board.png');
+		// The artifact is the value — assert it was actually written with content, not just named.
+		expect(statSync(testInfo.outputPath('board.png')).size).toBeGreaterThan(0);
 	});
 
 	// Visual artifacts for the crossed + armed board states (the [V] grid-state coverage). Kept as
@@ -325,7 +327,7 @@ test.describe('the live board (past the title screen)', () => {
 		await expect(page.locator('.rune-card[data-rune-name="Dagaz"].selected')).toBeVisible();
 		await page.screenshot({ path: testInfo.outputPath('board-armed.png'), fullPage: true });
 
-		expect(testInfo.outputPath('board-armed.png')).toContain('board-armed.png');
+		expect(statSync(testInfo.outputPath('board-armed.png')).size).toBeGreaterThan(0);
 	});
 });
 
@@ -440,9 +442,10 @@ test.describe('the night advances', () => {
 		await page.getByRole('button', { name: 'Ask the Oracle' }).click();
 		await expect(page.getByTestId('answer')).toContainText('fire rune');
 
-		// Sinks, but never the full 44px band mid-game — only a won dawn completes the descent.
+		// Sinks, but never the full 44px band mid-game — only a won dawn completes the descent. Polled,
+		// not a single mid-animation sample, so a GSAP frame can't flake the upper bound.
 		await expect.poll(skyY).toBeGreaterThan(0);
-		expect(await skyY()).toBeLessThan(44);
+		await expect.poll(skyY).toBeLessThan(44);
 		await expect.poll(pageDawnOpacity).toBeGreaterThan(0);
 	});
 
