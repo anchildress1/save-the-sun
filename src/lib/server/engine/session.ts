@@ -214,3 +214,15 @@ export function withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Pro
 	});
 	return result;
 }
+
+/** Test isolation only — wipe the whole per-session registry so module singleton state can't leak
+ *  between tests (the eviction and lifecycle suites assert against a clean map). */
+export function resetSessionRegistry(): void {
+	engines.clear();
+	skolls.clear();
+	roundIds.clear();
+	boardSeeds.clear();
+	lastLines.clear();
+	voiceLines.clear();
+	locks.clear();
+}

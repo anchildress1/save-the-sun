@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { GameEngine, selectSecret } from '$lib/server/engine/engine';
 import {
 	getEngine,
@@ -10,6 +10,7 @@ import {
 	storeVoiceLine,
 	getVoiceLine,
 	withSessionLock,
+	resetSessionRegistry,
 	MAX_SESSIONS
 } from '$lib/server/engine/session';
 import { ORACLE_VOICE } from '$lib/voice/config';
@@ -18,6 +19,10 @@ import { getEvents, logEvent } from '$lib/server/debug/log';
 const SEED = 1;
 const A = 'session-a';
 const B = 'session-b';
+
+// The registry is module-singleton state — reset before every test so the eviction and lifecycle
+// assertions don't depend on run order (or break under a stray .only / --shuffle).
+beforeEach(resetSessionRegistry);
 
 describe('session engine registry', () => {
 	it('lazily creates one engine per session and memoizes it', () => {
