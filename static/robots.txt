@@ -1,26 +1,5 @@
-# Competition demo — not for search indexing or general crawling. Deny everyone EXCEPT the
-# link-unfurl bots, so a shared link still renders its social card but nothing else crawls the site.
-
-User-agent: Twitterbot
-Disallow:
-
-User-agent: facebookexternalhit
-Disallow:
-
-User-agent: Slackbot-LinkExpanding
-Disallow:
-
-User-agent: Discordbot
-Disallow:
-
-User-agent: LinkedInBot
-Disallow:
-
-User-agent: TelegramBot
-Disallow:
-
-User-agent: WhatsApp
-Disallow:
-
+# Public demo — crawl and index freely. Social unfurl bots and search engines are all welcome.
 User-agent: *
-Disallow: /
+Allow: /
+
+Sitemap: https://savethesun.anchildress1.dev/sitemap.xml

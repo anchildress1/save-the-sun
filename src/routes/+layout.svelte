@@ -19,6 +19,27 @@
 		'A rune stone blazing with golden light at sunrise while Sköll, the great wolf, watches from a dark ridge.';
 	// Temp social banner served from static/ at the web root; absolute URL so unfurl bots can fetch it.
 	const ogImageUrl = `${SITE_URL}/social-banner.jpg`;
+
+	// Structured data crawlers can actually read: a free, browser-playable deduction game
+	// (schema.org/VideoGame). `<` is escaped so a value could never break out of the script tag below.
+	const jsonLd = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'VideoGame',
+		name: TITLE,
+		description: DESCRIPTION,
+		url: `${SITE_URL}/`,
+		image: ogImageUrl,
+		author: { '@type': 'Person', name: 'Ashley Childress' },
+		genre: 'Deduction',
+		applicationCategory: 'Game',
+		operatingSystem: 'Web browser',
+		inLanguage: 'en',
+		offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
+	}).replace(/</g, '\\u003c');
+	// Built from a tag variable so the opening/closing script-tag tokens never appear literally in
+	// this component source — Svelte would otherwise read them as a second top-level script element.
+	const SCRIPT_TAG = 'script';
+	const jsonLdScript = `<${SCRIPT_TAG} type="application/ld+json">${jsonLd}</${SCRIPT_TAG}>`;
 </script>
 
 <svelte:head>
@@ -55,8 +76,7 @@
 	<link rel="canonical" href="{SITE_URL}/" />
 	<meta name="description" content={DESCRIPTION} />
 	<meta name="author" content="Ashley Childress" />
-	<!-- Competition demo: keep it out of search indexes. Social unfurl bots still render the OG card. -->
-	<meta name="robots" content="noindex, nofollow" />
+	<meta name="robots" content="index, follow" />
 
 	<meta property="og:type" content="website" />
 	<meta property="og:site_name" content={TITLE} />
@@ -75,6 +95,9 @@
 	<meta name="twitter:description" content={DESCRIPTION} />
 	<meta name="twitter:image" content={ogImageUrl} />
 	<meta name="twitter:image:alt" content={OG_IMAGE_ALT} />
+
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted, build-time constants; `<` escaped above -->
+	{@html jsonLdScript}
 </svelte:head>
 
 {@render children()}
