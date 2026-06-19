@@ -10,7 +10,12 @@ import { env } from '$env/dynamic/private';
  *  a ceiling to its key's actual quota (free vs paid tier) without a code change. */
 export const resolveLimit = (raw: string | undefined, fallback: number): number => {
 	const value = Number(raw);
-	return Number.isInteger(value) && value > 0 ? value : fallback;
+	if (Number.isInteger(value) && value > 0) return value;
+	// A defined-but-rejected override (e.g. "1O", "0", "5.5") is almost always a typo. Fall back, but
+	// say so — a silent default reads as "the operator tuned this" when they didn't.
+	if (raw !== undefined && raw !== '')
+		console.warn(`[rateLimit] ignoring invalid limit "${raw}"; using ${fallback}`);
+	return fallback;
 };
 
 const WINDOW_MS = 60_000;
