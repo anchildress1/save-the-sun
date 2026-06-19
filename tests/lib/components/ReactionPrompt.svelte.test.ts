@@ -30,8 +30,9 @@ describe('ReactionPrompt — the human-side interrupt on Sköll’s Ask (S5)', (
 		expect(onReact).toHaveBeenCalledWith('Pass');
 	});
 
-	it('keeps a spent reaction visible, disabled, and marked spent', async () => {
-		const screen = render(ReactionPrompt, { held: { Scry: false, Hex: true }, onReact: vi.fn() });
+	it('keeps a spent reaction announced (aria-disabled, not removed) and inert', async () => {
+		const onReact = vi.fn();
+		const screen = render(ReactionPrompt, { held: { Scry: false, Hex: true }, onReact });
 		const labels = [...screen.container.querySelectorAll('button')].map((b) =>
 			b.textContent?.trim()
 		);
@@ -39,9 +40,14 @@ describe('ReactionPrompt — the human-side interrupt on Sköll’s Ask (S5)', (
 		const scry = screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement;
 		const hex = screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement;
 		const pass = screen.getByRole('button', { name: 'Pass' }).element() as HTMLButtonElement;
-		expect(scry.disabled).toBe(true);
+		// Spent stays focusable and in the a11y tree (aria-disabled, not hard-disabled), so a screen
+		// reader still announces the option existed — but the click is inert.
+		expect(scry.disabled).toBe(false);
+		expect(scry.getAttribute('aria-disabled')).toBe('true');
 		expect(scry.classList).toContain('reaction-choice--spent');
 		expect(Number(getComputedStyle(scry).opacity)).toBeLessThan(0.7);
+		await scry.click();
+		expect(onReact).not.toHaveBeenCalled();
 		expect(hex.disabled).toBe(false);
 		expect(pass.disabled).toBe(false);
 	});
@@ -86,8 +92,8 @@ describe('ReactionPrompt — the human-side interrupt on Sköll’s Ask (S5)', (
 		const hex = screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement;
 		const pass = screen.getByRole('button', { name: 'Pass' }).element() as HTMLButtonElement;
 
-		expect(scry.disabled).toBe(true);
-		expect(hex.disabled).toBe(true);
+		expect(scry.getAttribute('aria-disabled')).toBe('true');
+		expect(hex.getAttribute('aria-disabled')).toBe('true');
 		expect(pass.disabled).toBe(false);
 		await pass.click();
 		expect(onReact).toHaveBeenCalledWith('Pass');

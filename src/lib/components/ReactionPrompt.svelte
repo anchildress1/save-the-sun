@@ -17,8 +17,8 @@
 	} = $props();
 
 	// One source for each choice's tooltip and its described-by. A title shows the hint on hover; the
-	// sr-only span + aria-describedby read it to SR users while the button is actionable. A spent
-	// button is disabled, so its hint isn't announced — its unavailability is the message then.
+	// sr-only span + aria-describedby read it to SR users. A spent Scry/Hex stays aria-disabled (not
+	// `disabled`) so it keeps its place in the a11y tree — the player still hears the option existed.
 	const HINTS = {
 		Scry: 'When your rival asks, hear the answer too.',
 		Hex: "When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted.",
@@ -39,8 +39,9 @@
 			type="button"
 			title={HINTS.Scry}
 			aria-describedby="reaction-hint-scry"
-			disabled={busy || !held.Scry}
-			onclick={() => onReact('Scry')}
+			disabled={busy}
+			aria-disabled={!held.Scry}
+			onclick={() => held.Scry && onReact('Scry')}
 		>
 			Scry
 		</button>
@@ -50,8 +51,9 @@
 			type="button"
 			title={HINTS.Hex}
 			aria-describedby="reaction-hint-hex"
-			disabled={busy || !held.Hex}
-			onclick={() => onReact('Hex')}
+			disabled={busy}
+			aria-disabled={!held.Hex}
+			onclick={() => held.Hex && onReact('Hex')}
 		>
 			Hex
 		</button>

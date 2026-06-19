@@ -734,7 +734,7 @@ describe('Save the Sun page', () => {
 		const hex = screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement;
 		const pass = screen.getByRole('button', { name: 'Pass' }).element() as HTMLButtonElement;
 
-		expect(scry.disabled).toBe(true);
+		expect(scry.getAttribute('aria-disabled')).toBe('true');
 		expect(scry.classList).toContain('reaction-choice--spent');
 		expect(hex.disabled).toBe(false);
 		expect(pass.disabled).toBe(false);
@@ -796,8 +796,10 @@ describe('Save the Sun page', () => {
 		await humanAsks(screen);
 		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
 		expect(
-			(screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement).disabled
-		).toBe(true);
+			(screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement).getAttribute(
+				'aria-disabled'
+			)
+		).toBe('true');
 		expect(
 			(screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement).disabled
 		).toBe(false);
@@ -1441,7 +1443,7 @@ describe('Save the Sun page — dropped action response reconcile', () => {
 		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
 		const scry = screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement;
 		const hex = screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement;
-		expect(scry.disabled).toBe(true); // spent
+		expect(scry.getAttribute('aria-disabled')).toBe('true'); // spent
 		expect(hex.disabled).toBe(false); // untouched
 		expect(error).toHaveBeenCalled();
 	});
