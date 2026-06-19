@@ -30,6 +30,9 @@ const drainWaiters = new Set<() => void>();
 // In-flight TTS fetches, reachable so stop/disable can abort a read that's stalled mid-stream —
 // otherwise the bumped generation only takes effect on the next chunk, wedging the chain.
 const activeFetches = new Set<AbortController>();
+// Lines that have been queued but not yet finished streaming. A deliver() fetches before any chunk
+// is enqueued, so the speaker isn't busy during that window — whenDrained() must still wait on it.
+let pendingDeliveries = 0;
 
 // A stream that stalls mid-flight (chunks stop without `done`) would wedge every later deliver().
 // Bound the gap BETWEEN chunks, not the total — long lines legitimately stream over time.
@@ -198,9 +201,19 @@ export function deliver(descriptor: LineDescriptor): Promise<void> {
 	// line must then drop (isStale) instead of fetching/playing into the fresh round.
 	const gen = generation;
 	const voice = speakerOf(descriptor);
+	pendingDeliveries++;
 	const run = chain.then(() => streamLine(descriptor, active, gen, voice));
 	chain = run.catch(() => {});
+	// Retire this line's pending slot once it settles. A line that produced no audio — a body-less
+	// 200, or a failed/aborted fetch — never makes the speaker busy, so no onDrained would fire to
+	// release whenDrained() waiters: settle them here when nothing is left queued or playing.
+	void run.then(retirePending, retirePending);
 	return run;
+}
+
+function retirePending(): void {
+	pendingDeliveries--;
+	if (pendingDeliveries === 0 && !speaker?.busy) handleDrained();
 }
 
 async function streamLine(
@@ -241,8 +254,10 @@ async function streamLine(
  * full-screen takeover (the end-of-round splash) until her last line has actually been heard.
  */
 export function whenDrained(timeoutMs: number): Promise<void> {
-	const active = speaker;
-	if (!active?.busy) return Promise.resolve();
+	// A deliver() still fetching has no audio queued yet, so the speaker isn't busy — but the line is
+	// coming. Hold while any delivery is outstanding, not only while audio is actively playing, or a
+	// "hold until heard" caller resolves before the first chunk ever lands.
+	if (pendingDeliveries === 0 && !speaker?.busy) return Promise.resolve();
 	return new Promise((resolve) => {
 		let settled = false;
 		const finish = () => {
@@ -264,6 +279,7 @@ export function resetDelivery(): void {
 	muted = false;
 	chain = Promise.resolve();
 	speakingVoice = null;
+	pendingDeliveries = 0;
 	listeners.clear();
 	drainWaiters.clear();
 	activeFetches.clear();

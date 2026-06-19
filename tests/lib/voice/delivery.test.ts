@@ -319,6 +319,49 @@ describe('delivery seam', () => {
 		}
 	});
 
+	it('whenDrained holds for a line still fetching before any chunk is queued', async () => {
+		let releaseFetch: (res: Response) => void = () => {};
+		vi.mocked(fetch).mockReturnValueOnce(
+			new Promise<Response>((resolve) => {
+				releaseFetch = resolve;
+			})
+		);
+		enableDelivery();
+		audio.speaker.busy = false; // no chunks queued yet — the old busy-only gate would resolve early
+
+		const inflight = deliver(LINE);
+		let drained = false;
+		const gate = whenDrained(10_000).then(() => {
+			drained = true;
+		});
+
+		await Promise.resolve();
+		expect(drained).toBe(false); // the line is still in flight; the hold must not release yet
+
+		releaseFetch(ndjsonResponse('pcm-a'));
+		await inflight;
+		await gate;
+		expect(drained).toBe(true);
+	});
+
+	it('a body-less 200 releases whenDrained on completion, not via the timeout', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 200 }));
+		enableDelivery();
+		audio.speaker.busy = false;
+
+		const inflight = deliver(LINE);
+		let drained = false;
+		// A 10s fallback that this test never advances: resolving proves completion settled it, not the timer.
+		const gate = whenDrained(10_000).then(() => {
+			drained = true;
+		});
+
+		await inflight;
+		await gate;
+		expect(drained).toBe(true);
+		expect(audio.speaker.enqueue).not.toHaveBeenCalled();
+	});
+
 	it('stopDelivery drops the queue without closing the speaker', () => {
 		enableDelivery();
 		stopDelivery();
