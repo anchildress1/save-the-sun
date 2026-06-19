@@ -83,18 +83,30 @@ export async function classifyReaction(wavBase64: string): Promise<SpokenReactio
 	return word === 'scry' || word === 'hex' || word === 'pass' ? word : 'unclear';
 }
 
+// The board names the model may pick from — non-empty strings only. Shared by the spoken cast and the
+// hands-free ask-or-cast paths so both filter and match identically.
+function boardNames(runes: string[]): string[] {
+	return runes.filter((name) => typeof name === 'string' && name.trim() !== '');
+}
+
+// Resolve a lowercased spoken name to its verbatim board rune, or '' when it matches none — so a
+// mishear or off-board word never stakes the irreversible cast.
+function matchBoardRune(names: string[], said: string): string {
+	return names.find((name) => name.toLowerCase() === said) ?? '';
+}
+
 /**
  * Match a spoken cast to one of the board's runes. Returns the verbatim board name, or '' when the
  * model's answer matches no listed rune (a mishear, "unclear", or a failed/keyless call) — so a
  * destructive, irreversible cast never fires on a guess.
  */
 export async function classifyCast(wavBase64: string, runes: string[]): Promise<string> {
-	const names = runes.filter((name) => typeof name === 'string' && name.trim() !== '');
+	const names = boardNames(runes);
 	if (names.length === 0) return '';
 	const said = (
 		await runAudioPrompt(wavBase64, CAST_INSTRUCTION.replace('{NAMES}', names.join(', ')))
 	).toLowerCase();
-	return names.find((name) => name.toLowerCase() === said) ?? '';
+	return matchBoardRune(names, said);
 }
 
 // The normal hold is usually a question, but the player may declare a cast hands-free. One call
@@ -117,7 +129,7 @@ export async function interpretAsk(
 	wavBase64: string,
 	runes: string[]
 ): Promise<{ cast: string } | { text: string }> {
-	const names = runes.filter((name) => typeof name === 'string' && name.trim() !== '');
+	const names = boardNames(runes);
 	if (names.length === 0) return { text: await transcribe(wavBase64) };
 	const raw = (
 		await runAudioPrompt(wavBase64, ASK_OR_CAST_INSTRUCTION.replace('{NAMES}', names.join(', ')))
@@ -126,7 +138,7 @@ export async function interpretAsk(
 	// is a needless ReDoS surface. Anything without the prefix is a question, verbatim.
 	if (!raw.toLowerCase().startsWith('cast:')) return { text: raw };
 	const said = raw.slice('cast:'.length).trim().toLowerCase();
-	return { cast: names.find((name) => name.toLowerCase() === said) ?? '' };
+	return { cast: matchBoardRune(names, said) };
 }
 
 /** Test isolation only — the client is module state shared across a test file. */
