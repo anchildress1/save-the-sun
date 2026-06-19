@@ -5,10 +5,9 @@
 import { SPEAKER_SAMPLE_RATE } from './config';
 
 export interface Speaker {
-	/** Queue one base64 PCM16@24kHz chunk, tagged with the voice it belongs to, to play seamlessly
-	 *  after whatever is queued. */
+	/** PCM16 @24kHz; scheduled gaplessly after the queue tail, never mixed. */
 	enqueue(base64Pcm: string, voice: string): void;
-	/** Stop now, drop the queue. Does not fire the drain or speaking callbacks. */
+	/** Drops the queue without firing onDrained/onSpeaking — a barge-in, not a natural end. */
 	stop(): void;
 	readonly busy: boolean;
 	/** Called whenever playback runs dry naturally (not via stop). */
