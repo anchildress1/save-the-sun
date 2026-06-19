@@ -164,7 +164,7 @@ export async function handleAction(action: GameAction, deps: ActionDeps): Promis
 			const engine = deps.engine;
 			if (engine.status !== 'active' || engine.activePlayer !== action.player) {
 				const engineReason: 'round-over' | 'not-your-turn' =
-					engine.status !== 'active' ? 'round-over' : 'not-your-turn';
+					engine.status === 'active' ? 'not-your-turn' : 'round-over';
 				return {
 					type: 'Ask',
 					oracle: { ok: false, reason: 'engine', engineReason, turnConsumed: false }
