@@ -7,7 +7,7 @@ import {
 	classifyCast,
 	interpretAsk
 } from '$lib/server/voice/transcribe';
-import { logEvent } from '$lib/server/debug/log';
+import { logEvent, maskApiKey } from '$lib/server/debug/log';
 import { runes as boardRunes } from '$lib/board';
 import type { RequestHandler } from './$types';
 
@@ -47,7 +47,9 @@ type Mode = 'ask' | 'reaction' | 'cast';
 interface ParsedRequest {
 	wavBase64: string;
 	mode: Mode | undefined;
-	runes: unknown;
+	// The client's `runes` is only ever a "detect a spoken cast" signal — the match runs against the
+	// server's canonical names, never the client's list — so it collapses to a boolean here.
+	wantsCastDetection: boolean;
 }
 
 // Parse and validate the request envelope — JSON shape plus the audio/mode/cast fields. Returns a
@@ -83,7 +85,7 @@ async function parseRequest(request: Request): Promise<Response | ParsedRequest>
 	if (mode === 'cast' && !Array.isArray(runes)) {
 		return json({ error: 'Bad cast targets.' }, { status: 400 });
 	}
-	return { wavBase64, mode, runes };
+	return { wavBase64, mode, wantsCastDetection: Array.isArray(runes) };
 }
 
 // Tee what was heard to /debug so a mishear is diagnosable — it never fills the player's typing box,
@@ -99,7 +101,7 @@ function teeHeard(sessionId: string, message: string): void {
 export const POST: RequestHandler = async ({ request, locals }) => {
 	const parsed = await parseRequest(request);
 	if (parsed instanceof Response) return parsed;
-	const { wavBase64, mode, runes } = parsed;
+	const { wavBase64, mode, wantsCastDetection } = parsed;
 
 	// Fail loudly (503) when voice is unconfigured so a deploy/config gap is visible, and gate the
 	// Gemini call behind the per-session/global limiter (a denial spends nothing).
@@ -112,32 +114,39 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		);
 	}
 
-	if (mode === 'reaction') {
-		const choice = await classifyReaction(wavBase64);
-		teeHeard(locals.sessionId, `heard reaction: ${choice}`);
-		return json({ choice });
-	}
-
-	if (mode === 'cast') {
-		const rune = await classifyCast(wavBase64, RUNE_NAMES);
-		teeHeard(locals.sessionId, `heard cast: ${rune || '(unclear)'}`);
-		return json({ rune });
-	}
-
-	// Default (ask): a question, or a hands-free cast when the player names a board rune. The client
-	// sends `runes` only as the signal that it wants cast detection; the match runs against the
-	// server's canonical names. Without the signal it's a plain transcribe.
-	if (Array.isArray(runes)) {
-		const result = await interpretAsk(wavBase64, RUNE_NAMES);
-		if ('cast' in result) {
-			teeHeard(locals.sessionId, `heard cast: ${result.cast || '(unclear)'}`);
-			return json({ rune: result.cast });
+	try {
+		if (mode === 'reaction') {
+			const choice = await classifyReaction(wavBase64);
+			teeHeard(locals.sessionId, `heard reaction: ${choice}`);
+			return json({ choice });
 		}
-		teeHeard(locals.sessionId, `heard: ${result.text || '(nothing)'}`);
-		return json({ text: result.text });
-	}
 
-	const text = await transcribe(wavBase64);
-	teeHeard(locals.sessionId, `heard: ${text || '(nothing)'}`);
-	return json({ text });
+		if (mode === 'cast') {
+			const rune = await classifyCast(wavBase64, RUNE_NAMES);
+			teeHeard(locals.sessionId, `heard cast: ${rune || '(unclear)'}`);
+			return json({ rune });
+		}
+
+		// Default (ask): a question, or a hands-free cast when the player names a board rune. The match
+		// runs against the server's canonical names; without the signal it's a plain transcribe.
+		if (wantsCastDetection) {
+			const result = await interpretAsk(wavBase64, RUNE_NAMES);
+			if ('cast' in result) {
+				teeHeard(locals.sessionId, `heard cast: ${result.cast || '(unclear)'}`);
+				return json({ rune: result.cast });
+			}
+			teeHeard(locals.sessionId, `heard: ${result.text || '(nothing)'}`);
+			return json({ text: result.text });
+		}
+
+		const text = await transcribe(wavBase64);
+		teeHeard(locals.sessionId, `heard: ${text || '(nothing)'}`);
+		return json({ text });
+	} catch (err) {
+		// A provider/network failure must surface as a clean 503, not an unstructured 500 - and the SDK
+		// error can embed the request URL (and key), so mask before logging.
+		const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
+		console.error('[voice] transcribe failed:', maskApiKey(detail));
+		return json({ error: 'Voice is briefly unavailable. Try again.' }, { status: 503 });
+	}
 };
