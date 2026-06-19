@@ -1992,6 +1992,13 @@
 		z-index: 4;
 	}
 
+	/* Lift the voice controls above the decorative divider (and header): the medallion's hover hint
+	   overflows the disc downward, and at the shared z-index:2 the later divider painted over it,
+	   striking the text through. Above them, the hint reads cleanly. */
+	.oracle-panel > .voice-stack {
+		z-index: 5;
+	}
+
 	/* Name left, turn pill + AI note right — one line instead of two stacked rows. Wrap is
 	   the escape hatch for the long end-of-round pill texts, not the everyday case. */
 	.oracle-header {
