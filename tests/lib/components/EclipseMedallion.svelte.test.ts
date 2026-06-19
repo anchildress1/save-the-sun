@@ -134,24 +134,32 @@ describe('EclipseMedallion — state visuals', () => {
 		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.4);
 	});
 
-	it('deepens the disc toward eclipse only while Sköll speaks — a brightness signal, not color alone', () => {
-		const { button } = renderMedallion('skoll-speaking');
-		expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('1');
-		expect(getComputedStyle(button).getPropertyValue('--corona-rgb').trim()).toBe('200, 71, 63');
+	const coronaOf = (state: MedallionState) =>
+		getComputedStyle(renderMedallion(state).button).getPropertyValue('--corona-rgb').trim();
+
+	it('gives recording, the Oracle, and Sköll three distinct corona hues — none mistaken for another', () => {
+		// The contract is distinctness (input ≠ Oracle ≠ wolf), not the exact CSS hex — a palette tweak
+		// must not fail this while the signal still reads.
+		const hues = [coronaOf('recording'), coronaOf('speaking'), coronaOf('skoll-speaking')];
+		expect(new Set(hues).size).toBe(3);
+		expect(hues).not.toContain('');
 	});
 
-	it('paints the player input silver-blue while recording — its own voice, not the Oracle gold', () => {
-		const { button } = renderMedallion('recording');
-		expect(getComputedStyle(button).getPropertyValue('--corona-rgb').trim()).toBe('150, 185, 225');
-		expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('0');
-	});
-
-	it('keeps the gold palette and hides the eclipse for the Oracle-side states', () => {
-		// Recording (input, silver-blue) and Sköll (ember) carry their own hues — the rest stay gold.
+	it('shares one gold corona across the Oracle-side states; recording and Sköll carry their own', () => {
+		const gold = coronaOf('speaking');
 		for (const state of ALL_STATES.filter((s) => s !== 'skoll-speaking' && s !== 'recording')) {
-			const { button } = renderMedallion(state);
-			expect(getComputedStyle(button).getPropertyValue('--corona-rgb').trim()).toBe('217, 169, 74');
-			expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('0');
+			expect(coronaOf(state)).toBe(gold); // idle/thinking/speaking/denied all the Oracle's hue
+		}
+		expect(coronaOf('recording')).not.toBe(gold);
+		expect(coronaOf('skoll-speaking')).not.toBe(gold);
+	});
+
+	it('deepens the disc toward eclipse only while Sköll speaks — a shape signal, not color alone', () => {
+		const shadowOf = (state: MedallionState) =>
+			getComputedStyle(layer(renderMedallion(state).button, '.eclipse-shadow')).opacity;
+		expect(shadowOf('skoll-speaking')).toBe('1');
+		for (const state of ALL_STATES.filter((s) => s !== 'skoll-speaking')) {
+			expect(shadowOf(state)).toBe('0');
 		}
 	});
 });

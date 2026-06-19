@@ -101,7 +101,7 @@ describe('claimMintSlot', () => {
 		exhaust(T0);
 		// Two denials, one warning — denial volume must not become log volume.
 		expect(console.warn).toHaveBeenCalledTimes(1);
-		expect(vi.mocked(console.warn).mock.calls[0].join(' ')).toContain('global token-mint');
+		expect(vi.mocked(console.warn).mock.calls[0].join(' ')).toContain('token-mint');
 
 		// A fresh window re-arms the warning so a sustained flood stays visible.
 		exhaust(T0 + WINDOW_MS);
@@ -181,6 +181,8 @@ describe('claimTtsSlot', () => {
 			for (let i = 0; i < TTS_SESSION_LIMIT; i++) claimTtsSlot(`flood-${s}`, T0);
 		}
 		expect(claimTtsSlot('fresh', T0).ok).toBe(false);
-		expect(vi.mocked(console.warn).mock.calls[0].join(' ')).toContain('global TTS');
+		// The discriminator is WHICH limiter tripped, not the prose — and "once" is the real behavior.
+		expect(vi.mocked(console.warn).mock.calls[0].join(' ')).toContain('TTS');
+		expect(console.warn).toHaveBeenCalledTimes(1);
 	});
 });

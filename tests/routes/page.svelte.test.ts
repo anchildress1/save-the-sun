@@ -445,9 +445,11 @@ describe('Save the Sun page', () => {
 		const pageShell = screen.container.querySelector('main') as HTMLElement;
 		const header = screen.container.querySelector('.rite-header') as HTMLElement;
 		expect(pageShell.style.getPropertyValue('--night-t')).toMatch(/^0\.\d{3}$/);
-		expect(getComputedStyle(pageShell, '::before').backgroundImage).toContain('rgba(220, 171, 73');
+		// The gradient renders (not 'none') and is visible — but don't pin its exact dawn color, a CSS
+		// literal a palette tweak would break with no behavior change.
+		expect(getComputedStyle(pageShell, '::before').backgroundImage).not.toBe('none');
 		expect(Number(getComputedStyle(pageShell, '::before').opacity)).toBeGreaterThan(0);
-		expect(getComputedStyle(header, '::after').backgroundImage).toContain('rgba(220, 171, 73');
+		expect(getComputedStyle(header, '::after').backgroundImage).not.toBe('none');
 		expect(Number(getComputedStyle(header, '::after').opacity)).toBeGreaterThan(0);
 	});
 
