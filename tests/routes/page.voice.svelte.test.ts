@@ -2,6 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Page from '$routes/+page.svelte';
 import type { GameState } from '$lib/server/engine/actions';
+import { HUMAN_TURN, SKOLL_TURN, HUMAN_WON, ASK_ANSWER, props } from '../helpers/gameFixtures';
 
 // Push-to-talk + delivery, mocked at the module boundary: these tests assert the page wires the
 // recorder, the transcribe route, and the delivery seam — not that a real mic or AudioContext opens.
@@ -38,21 +39,7 @@ vi.mock('$lib/voice/recorder', () => recorderMock);
 type DeliveryEvent = { type: 'speaking'; voice: 'oracle' | 'skoll' } | { type: 'idle' };
 const emitDelivery = (event: DeliveryEvent) => deliveryMock.emit(event);
 
-const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
-const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 4 };
-const pageProps = {
-	data: {
-		boardSeed: 0,
-		roundId: 'test-round',
-		state: HUMAN_TURN,
-		pendingReaction: null,
-		lastLine: null
-	},
-	params: {},
-	form: null
-};
-
-const ASK_ANSWER = 'No. Sól is not reaching for a fire rune.';
+const pageProps = props(HUMAN_TURN);
 
 // Default fetch: transcribe returns a question, an Ask answers, everything else is empty.
 function mockFetch(transcript = 'is it a fire rune') {
@@ -617,12 +604,6 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 	it('queues a Sköll Ask resumed before the speaker opens, voicing it on the first gesture', async () => {
 		allowMotion(); // audio defaults on
 		const ASK_QUERY = { axis: 'element', value: 'Fire' };
-		const SKOLL_TURN: GameState = {
-			activePlayer: 'Sköll',
-			status: 'active',
-			winner: null,
-			turns: 1
-		};
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
 			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
@@ -734,12 +715,6 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 
 	it("voices Sköll's Ask through the delivery seam when his Advance asks", async () => {
 		const ASK_QUERY = { axis: 'element', value: 'Fire' };
-		const SKOLL_TURN: GameState = {
-			activePlayer: 'Sköll',
-			status: 'active',
-			winner: null,
-			turns: 1
-		};
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
 			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
@@ -826,12 +801,6 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 
 	it('holds the end-screen for a winning cast resumed before the speaker, then plays it on first gesture', async () => {
 		allowMotion(); // audio defaults on
-		const SKOLL_TURN: GameState = {
-			activePlayer: 'Sköll',
-			status: 'active',
-			winner: null,
-			turns: 1
-		};
 		const WON_TURN: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 2 };
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
