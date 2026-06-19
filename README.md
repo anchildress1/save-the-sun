@@ -169,11 +169,12 @@ make dev                     # vite dev server
 
 ## Configuration
 
-| Variable         | Required | What it does                                                                                                |
-| ---------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
-| `GEMINI_API_KEY` | Yes      | Server-side only — powers the Oracle and Sköll. Get one at [AI Studio](https://aistudio.google.com/apikey). |
+| Variable                                             | Required | What it does                                                                                                                                                                                |
+| ---------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY`                                     | Yes      | Server-side only — powers the Oracle and Sköll. Get one at [AI Studio](https://aistudio.google.com/apikey).                                                                                 |
+| `TTS_*` · `STT_*` · `ASK_*` · `VOICE_DEBUG_*` limits | No       | Per-minute, per-instance ceilings for the in-memory abuse guard, sized so the limiter trips before Google's quota and no one client can drain the shared key. Defaults track the free tier. |
 
-Local secrets live in `.env` (gitignored). Deployed, the key rides Google Secret Manager via [`deploy.sh`](deploy.sh).
+Local secrets live in `.env` (gitignored); the rate-limit knobs are documented there too. Deployed, the key rides Google Secret Manager and any limit overrides set in your shell are forwarded to Cloud Run — both via [`deploy.sh`](deploy.sh).
 
 ---
 
