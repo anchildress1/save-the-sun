@@ -291,6 +291,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		error(400, 'Malformed action payload.');
 	}
 
+	// The client only ever acts as the Human; Sköll's turn runs server-side through Advance. Reject any
+	// action claiming to be Sköll, or a direct POST could drive his Gemini-backed Ask off the quota.
+	if ((body.type as string) !== 'Advance' && body.player !== 'Human') {
+		error(400, 'Only the Human may act.');
+	}
+
 	// runWithSession scopes any raw Gemini I/O teed this turn to THIS session's sink, never another's.
 	return withSessionLock(locals.sessionId, () =>
 		runWithSession(locals.sessionId, () => resolveAction(body, locals.sessionId))

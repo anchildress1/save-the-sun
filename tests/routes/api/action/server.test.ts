@@ -524,6 +524,17 @@ describe('POST /api/action', () => {
 		});
 	});
 
+	it('rejects a non-Advance action claiming to be Sköll — the client only ever acts as the Human', async () => {
+		// Sköll is a valid player (passes the shape check) but his turn runs server-side through Advance;
+		// a direct POST as Sköll would drive his Gemini-backed Ask off the quota.
+		await expect(
+			call({ type: 'Ask', player: 'Sköll', question: 'is it a fire rune?' })
+		).rejects.toMatchObject({
+			status: 400,
+			body: expect.objectContaining({ message: 'Only the Human may act.' })
+		});
+	});
+
 	// Debug log — the chronological stream the /debug view reads. Three orthogonal facts per event:
 	// owner (who), kind (input · llm · deterministic), part (turn phase). A verdict is the ENGINE's,
 	// never the actor's; the inference that reached a move is its own owner.
