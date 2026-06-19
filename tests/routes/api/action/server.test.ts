@@ -100,6 +100,20 @@ describe('POST /api/action', () => {
 		expect(Number(denied.headers.get('retry-after'))).toBeGreaterThan(0);
 	});
 
+	it('never charges the Ask limiter for an empty question — it short-circuits before Gemini', async () => {
+		// Empty asks return the cheap `empty` refusal with no Gemini call, so a flood of them must not
+		// spend the quota real asks need (or a client could deny every player for the window).
+		for (let i = 0; i < ASK_SESSION_LIMIT + 5; i++) {
+			resetEngine(SID, SEED);
+			const res = await call({ type: 'Ask', player: 'Human', question: '   ' });
+			expect(res.status).toBe(200);
+			expect((await res.json()).oracle).toMatchObject({ ok: false });
+		}
+		// The full Ask allowance is intact — a real ask still answers.
+		resetEngine(SID, SEED);
+		expect((await ask()).status).toBe(200);
+	});
+
 	it('serializes overlapping POSTs for one session — the lock is wired into the route', async () => {
 		// Hold the first turn's interpret open, then prove a second concurrent POST can't run its own
 		// interpret until the first fully settles. Without withSessionLock both would interleave.

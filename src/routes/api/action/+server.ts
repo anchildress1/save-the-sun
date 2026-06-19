@@ -292,9 +292,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	// Ask is the one client-triggerable type that fans out to several Gemini calls; cap it so a
-	// scripted client can't drain the shared key. (Advance only reaches Gemini when it's actually
-	// Sköll's turn — once per turn — and the other types are deterministic, so they need no gate.)
-	if (body.type === 'Ask') {
+	// scripted client can't drain the shared key. Only a NON-EMPTY ask reaches Gemini — an empty
+	// question short-circuits to the cheap `empty` refusal before interpret runs (in both the live
+	// and stale paths) — so empty asks must not burn the quota, or a flood of them would deny real
+	// players. (Advance only reaches Gemini on Sköll's own turn, and the rest are deterministic.)
+	if (body.type === 'Ask' && (body as { question: string }).question.trim() !== '') {
 		const verdict = claimOracleSlot(locals.sessionId);
 		if (!verdict.ok) {
 			return json(
