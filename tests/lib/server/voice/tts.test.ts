@@ -160,4 +160,18 @@ describe('synthesizeStream', () => {
 		]);
 		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
 	});
+
+	it('caps the clip cache, evicting the oldest so memory stays bounded', async () => {
+		const MAX_CLIPS = 128;
+		// A fresh generator per call — a single shared one would be exhausted after the first synth.
+		sdk.generateContentStream.mockImplementation(async () => streamOf('pcm'));
+		const oldest = 'clip 0';
+		// Fill exactly to the cap, then one past it — the very first clip falls off the front.
+		for (let i = 0; i < MAX_CLIPS; i++) await collect(synthesizeStream(`clip ${i}`, ORACLE_VOICE));
+		expect(isCached(oldest, ORACLE_VOICE)).toBe(true);
+
+		await collect(synthesizeStream(`clip ${MAX_CLIPS}`, ORACLE_VOICE));
+		expect(isCached(oldest, ORACLE_VOICE)).toBe(false); // evicted
+		expect(isCached(`clip ${MAX_CLIPS}`, ORACLE_VOICE)).toBe(true); // the newest survives
+	});
 });
