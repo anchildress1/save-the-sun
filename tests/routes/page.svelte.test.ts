@@ -321,6 +321,17 @@ describe('Save the Sun page', () => {
 		expect(error).toHaveBeenCalledWith('[ui] Ask dispatch failed:', expect.any(Error));
 	});
 
+	it('shows the needs-a-moment line on a 429 throttle, not the silent outage', async () => {
+		// An Ask-limiter 429 is an intentional throttle — surface the retry guidance, no error trace.
+		stubFetch(async () => new Response(JSON.stringify({ error: 'busy' }), { status: 429 }));
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it gold?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('The Oracle needs a moment');
+	});
+
 	// S11: the error path swaps only the voiced line — a failed dispatch must never cost
 	// the player their board state. Crossings and the turn survive the Oracle falling silent.
 	it('preserves crossings and turn state when the Ask dispatch fails', async () => {

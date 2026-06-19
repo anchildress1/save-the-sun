@@ -59,6 +59,7 @@
 		wolfMoving: 'The wolf is moving. Hold.',
 		riteMoving: 'The rite is moving. Hold.',
 		oracleSilent: "The Oracle falls silent — the rite can't reach Sól.",
+		oracleBusy: 'The Oracle needs a moment. Ask again shortly.',
 		castFalters: CAST_FALTERS,
 		wrongCast: wrongCastLine,
 		runeTrue: CAST_TRUE,
@@ -687,7 +688,12 @@
 		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
 		try {
 			const res = await fetch(url, { ...init, signal: abort.signal });
-			if (!res.ok) throw new Error(`${init?.method ?? 'GET'} ${url} rejected (${res.status})`);
+			if (!res.ok) {
+				// Carry the status so a caller can tell an intentional throttle (429) from a real failure.
+				const err = new Error(`${init?.method ?? 'GET'} ${url} rejected (${res.status})`);
+				(err as Error & { status: number }).status = res.status;
+				throw err;
+			}
 			return (await res.json()) as T;
 		} finally {
 			clearTimeout(timer);
@@ -1103,6 +1109,12 @@
 			answer = outcome.line;
 			return outcome;
 		} catch (err) {
+			// An intentional Ask throttle (429), not an outage: the turn never landed, so surface the
+			// retry guidance instead of the false Oracle-silent line and don't run the drop-recovery.
+			if ((err as { status?: number })?.status === 429) {
+				answer = RITE.oracleBusy;
+				return { line: RITE.oracleBusy, consumed: false, voice: null };
+			}
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
 			console.error('[ui] Ask dispatch failed:', err);
