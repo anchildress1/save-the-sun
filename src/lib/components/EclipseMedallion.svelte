@@ -76,8 +76,10 @@
 		else setTimeout(load, 500);
 	});
 
-	// Re-announces only when the line changes, so a steady state never re-narrates.
-	let announced = $derived(MEDALLION_ANNOUNCEMENT[current]);
+	// Re-announces only when the line changes, so a steady state never re-narrates. The sealed state
+	// is left to the page's voice-notice live region (which carries the actionable "continues by
+	// hand") — narrating it here too would double-speak the same denial to a screen reader.
+	let announced = $derived(sealed ? '' : MEDALLION_ANNOUNCEMENT[current]);
 </script>
 
 <div class="medallion-wrap">

@@ -233,6 +233,17 @@ describe('EclipseMedallion — state announcements', () => {
 
 		expect(status.element().getAttribute('role')).toBe('status');
 	});
+
+	it('leaves the sealed state silent — the page voice-notice narrates the denial, not a double-speak', async () => {
+		const screen = render(EclipseMedallion, {
+			state: 'denied' as MedallionState,
+			onHoldStart: vi.fn(),
+			onHoldEnd: vi.fn()
+		});
+		// The struck mic glyph still shows the seal visually; the announcement is left empty so a
+		// screen reader hears the denial once, from the voice-notice, not twice.
+		expect(screen.getByTestId('medallion-status').element().textContent).toBe('');
+	});
 });
 
 describe('EclipseMedallion — backtick hint', () => {
