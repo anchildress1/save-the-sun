@@ -55,8 +55,37 @@ jobs:
       - name: Typecheck
         run: make typecheck
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+      - name: Resolve Playwright version
+        id: pw
+        # Key the browser cache on the exact installed version: a bump misses (fresh browsers), a
+        # match restores them so a healthy run never reaches the network for the download.
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Install Playwright (chromium only)
+        # The suite drives chromium only (vitest browser tests + e2e), so install just that — fewer
+        # browsers and system libs to fetch. Bounded + retried: a transient apt/mirror hang must fail
+        # THIS step fast and self-heal, not stall until the job timeout cancels the whole run (which
+        # reads as a CI failure, not the infra flake it is). Browsers restore from the cache on a hit;
+        # the apt system libs reinstall every run, so the retry is what guards the flaky part.
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if timeout 180 pnpm exec playwright install --with-deps chromium; then
+              exit 0
+            fi
+            echo "::warning::playwright install attempt ${attempt} failed or timed out; retrying"
+            sleep 10
+          done
+          echo "::error::playwright install failed after 3 attempts"
+          exit 1
 
       - name: Unit Tests
         run: make test
