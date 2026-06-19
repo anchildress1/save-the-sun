@@ -15,11 +15,6 @@ export const resolveLimit = (raw: string | undefined, fallback: number): number 
 
 const WINDOW_MS = 60_000;
 
-// Token minting: a legit player re-wakes the medallion at most ~6x/min (silence timeout), so 10
-// is headroom.
-export const SESSION_LIMIT = 10;
-export const GLOBAL_LIMIT = 60;
-
 // TTS synth: only UNCACHED lines claim a slot (cached replays are free), so the budget is Google's
 // fresh-synth RPM for the TTS preview model — a tight, unpublished ceiling. The old 200/min sat far
 // above it, so we rubber-stamped requests Google then 429'd. Defaults track the free-tier reality
@@ -100,14 +95,8 @@ function createLimiter(label: string, sessionLimit: number, globalLimit: number)
 	};
 }
 
-const mint = createLimiter('token-mint', SESSION_LIMIT, GLOBAL_LIMIT);
 const tts = createLimiter('TTS', TTS_SESSION_LIMIT, TTS_GLOBAL_LIMIT);
 const transcribe = createLimiter('transcribe', STT_SESSION_LIMIT, STT_GLOBAL_LIMIT);
-
-/** Claim one token-mint slot for the session; a denial consumes nothing. */
-export const claimMintSlot = mint.claim;
-/** Test isolation only — the windows are module state shared across a test file. */
-export const resetMintWindows = mint.reset;
 
 /** Claim one TTS-synth slot for the session; a denial consumes nothing. */
 export const claimTtsSlot = tts.claim;
