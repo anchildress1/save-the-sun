@@ -122,6 +122,21 @@ gcloud builds submit --tag "${IMAGE}" --quiet
 # Float :latest to this build for humans / quick rollback reference.
 gcloud artifacts docker tags add "${IMAGE}" "${LATEST}" --quiet
 
+# Forward any rate-limit overrides set in the environment so the Gemini ceiling can be clamped at
+# deploy time — no code change. Unset vars fall through to the in-app defaults. --set-env-vars makes
+# the deployed set match the shell exactly, so unsetting one and redeploying reverts it to default.
+RUNTIME_ENV=""
+for var in TTS_SESSION_LIMIT TTS_GLOBAL_LIMIT STT_SESSION_LIMIT STT_GLOBAL_LIMIT \
+  ASK_SESSION_LIMIT ASK_GLOBAL_LIMIT VOICE_DEBUG_SESSION_LIMIT VOICE_DEBUG_GLOBAL_LIMIT; do
+  [[ -n "${!var:-}" ]] && RUNTIME_ENV="${RUNTIME_ENV:+${RUNTIME_ENV},}${var}=${!var}"
+done
+if [[ -n "${RUNTIME_ENV}" ]]; then
+  ENV_FLAG=(--set-env-vars="${RUNTIME_ENV}")
+  echo "» Rate-limit overrides: ${RUNTIME_ENV}"
+else
+  ENV_FLAG=(--clear-env-vars)
+fi
+
 # ─── Deploy (cost-optimized: scale to zero, small ceiling) ──────────────────────
 echo "» Deploying to Cloud Run..."
 gcloud run deploy "${SERVICE_NAME}" \
@@ -138,6 +153,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --timeout 60s \
   --cpu-boost \
   --labels="${RESOURCE_LABELS}" \
+  "${ENV_FLAG[@]}" \
   --set-secrets="GEMINI_API_KEY=${SECRET_GEMINI}:latest" \
   --quiet
 
