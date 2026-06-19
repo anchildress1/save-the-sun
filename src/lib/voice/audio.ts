@@ -16,21 +16,12 @@ export interface Speaker {
 	 *  starting or ending), not by enqueue, so the indicator tracks who is actually being heard:
 	 *  his clip shows only once hers has played out, even though both were queued up front. */
 	onSpeaking(callback: (voice: string) => void): void;
-	/** Output mute: silence playback without touching the queue. Audio still decodes and
-	 *  drains on schedule, so `busy`, the callbacks, and caption turn-timing are unchanged — only
-	 *  the sound is gated. */
-	setMuted(muted: boolean): void;
 	close(): void;
 }
 
-export function createSpeaker(muted = false): Speaker {
+export function createSpeaker(): Speaker {
 	const context = new AudioContext({ sampleRate: SPEAKER_SAMPLE_RATE });
 	void context.resume();
-	// A master gain between the sources and the output is the mute seam: gain 0 silences whatever
-	// is scheduled without dropping buffers, so unmuting mid-line resumes cleanly.
-	const master = context.createGain();
-	master.gain.value = muted ? 0 : 1;
-	master.connect(context.destination);
 	// Scheduled nodes in play order, each tagged with its voice. The front is what's sounding now.
 	const queue: { node: AudioBufferSourceNode; voice: string }[] = [];
 	let cursor = 0;
@@ -73,7 +64,7 @@ export function createSpeaker(muted = false): Speaker {
 			for (let i = 0; i < pcm.length; i++) channel[i] = pcm[i] / 0x8000;
 			const node = context.createBufferSource();
 			node.buffer = buffer;
-			node.connect(master);
+			node.connect(context.destination);
 			const entry = { node, voice };
 			node.onended = () => {
 				const idx = queue.indexOf(entry);
@@ -98,9 +89,6 @@ export function createSpeaker(muted = false): Speaker {
 		},
 		onSpeaking(callback) {
 			speaking = callback;
-		},
-		setMuted(next) {
-			master.gain.value = next ? 0 : 1;
 		},
 		close() {
 			stop();

@@ -16,7 +16,6 @@ export type DeliveryEvent = { type: 'speaking'; voice: DeliveryVoice } | { type:
 export type DeliveryListener = (event: DeliveryEvent) => void;
 
 let speaker: Speaker | null = null;
-let muted = false;
 // Bumped by stop/disable so an in-flight deliver() that is still fetching drops its remaining chunks
 // instead of playing a stale line over a fresh round (or a torn-down page).
 let generation = 0;
@@ -95,7 +94,7 @@ function flushDrainWaiters(): void {
  */
 export function enableDelivery(): void {
 	if (speaker) return;
-	speaker = createSpeaker(muted);
+	speaker = createSpeaker();
 	speaker.onDrained(handleDrained);
 	// The speaker reports the voice actually sounding (playback-driven), so the indicator flips to
 	// Sköll only once his clip starts — not when his chunks were queued behind her still-playing line.
@@ -105,15 +104,6 @@ export function enableDelivery(): void {
 /** Whether a gesture has opened the speaker — audio plays only once this is true. */
 export function deliveryReady(): boolean {
 	return speaker !== null;
-}
-
-/**
- * Silence/unsilence delivered audio without dropping the queue: captions are untouched.
- * Remembered for a speaker opened later, so the preference survives across enable/disable.
- */
-export function setDeliveryMuted(next: boolean): void {
-	muted = next;
-	speaker?.setMuted(next);
 }
 
 /** Close the speaker and drop it; a later {@link enableDelivery} reopens one. */
@@ -279,7 +269,6 @@ export function whenDrained(timeoutMs: number): Promise<void> {
 /** Test isolation only — module state shared across a test file. */
 export function resetDelivery(): void {
 	speaker = null;
-	muted = false;
 	chain = Promise.resolve();
 	speakingVoice = null;
 	pendingDeliveries = 0;

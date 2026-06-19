@@ -4,7 +4,6 @@ const audio = vi.hoisted(() => {
 	const speaker = {
 		enqueue: vi.fn(),
 		stop: vi.fn(),
-		setMuted: vi.fn(),
 		close: vi.fn(),
 		onDrained: vi.fn(),
 		onSpeaking: vi.fn(),
@@ -21,7 +20,6 @@ import {
 	disableDelivery,
 	stopDelivery,
 	deliveryReady,
-	setDeliveryMuted,
 	deliver,
 	whenDrained,
 	subscribeDelivery,
@@ -416,17 +414,6 @@ describe('delivery seam', () => {
 	it('stopDelivery is a no-op with no speaker open', () => {
 		expect(() => stopDelivery()).not.toThrow();
 		expect(audio.speaker.stop).not.toHaveBeenCalled();
-	});
-
-	it('applies mute to a live speaker and remembers it for a later one', () => {
-		enableDelivery();
-		setDeliveryMuted(true);
-		expect(audio.speaker.setMuted).toHaveBeenCalledWith(true);
-
-		disableDelivery();
-		enableDelivery();
-		// The reopened speaker starts muted from the remembered preference.
-		expect(audio.createSpeaker).toHaveBeenLastCalledWith(true);
 	});
 });
 
