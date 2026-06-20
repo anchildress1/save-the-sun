@@ -33,6 +33,12 @@ function logVoice(
 	});
 }
 
+function denialReason(status: number): string {
+	if (status === 429) return 'rate-limited';
+	if (status === 503) return 'unavailable (no key)';
+	return 'refused';
+}
+
 // The resolved words for a descriptor. `cacheable` is false only for authored lines (unique per call,
 // so they can never replay); `fallbackPrompt` is their deterministic counterpart, voiced if the
 // authored synth is blocked or makes no audio.
@@ -183,13 +189,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	const plan = planSynth(resolved, sessionId);
 	if (plan instanceof Response) {
-		const why =
-			plan.status === 429
-				? 'rate-limited'
-				: plan.status === 503
-					? 'unavailable (no key)'
-					: 'refused';
-		logVoice(sessionId, 'warn', `not voiced (${why})`, resolved.voice);
+		logVoice(sessionId, 'warn', `not voiced (${denialReason(plan.status)})`, resolved.voice);
 		return plan;
 	}
 	return streamLine(plan, sessionId);

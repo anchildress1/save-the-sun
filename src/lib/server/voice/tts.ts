@@ -43,6 +43,22 @@ function ai(apiKey: string): GoogleGenAI {
 	return client;
 }
 
+// A synth failure is masked (an SDK error can embed the key) and teed to /debug — without this the
+// Oracle's silence is invisible there while the panel still shows her text.
+function logSynthFailure(sessionId: string | undefined, voice: VoiceId, err: unknown): void {
+	const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
+	const masked = maskApiKey(detail);
+	console.error('[voice] TTS synth failed:', masked);
+	if (sessionId)
+		logEvent(sessionId, {
+			owner: voice === SKOLL_VOICE ? 'Sköll' : 'Oracle',
+			kind: 'llm',
+			part: 'Voice',
+			level: 'error',
+			message: `TTS synth failed: ${masked.split('\n')[0]}`
+		});
+}
+
 /**
  * Stream one allow-listed line as base64 PCM chunks. Replays a cached clip's chunks when one
  * exists; otherwise streams from Gemini, accumulating the chunks to cache only on a clean finish.
@@ -91,19 +107,8 @@ export async function* synthesizeStream(
 		// replay, so caching only grows memory unbounded for the life of the process.
 		remember(key, chunks);
 	} catch (err) {
-		// Keep the stack but mask it — an SDK error can embed the request URL, and with it the key.
-		const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
-		const masked = maskApiKey(detail);
-		console.error('[voice] TTS synth failed:', masked);
-		// Tee the failure to /debug too — the panel keeps the text, so without this the silence is invisible.
-		if (sessionId)
-			logEvent(sessionId, {
-				owner: voice === SKOLL_VOICE ? 'Sköll' : 'Oracle',
-				kind: 'llm',
-				part: 'Voice',
-				level: 'error',
-				message: `TTS synth failed: ${masked.split('\n')[0]}`
-			});
+		// Mask + tee the failure (helper keeps this generator's complexity down) — best-effort past here.
+		logSynthFailure(sessionId, voice, err);
 	}
 }
 
