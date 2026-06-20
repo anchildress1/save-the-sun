@@ -187,10 +187,10 @@ make dev                     # vite dev server
 
 ## Configuration
 
-| Variable                                             | Required | What it does                                                                                                                                                                                |
-| ---------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GEMINI_API_KEY`                                     | Yes      | Server-side only — powers the Oracle and Sköll. Get one at [AI Studio](https://aistudio.google.com/apikey).                                                                                 |
-| `TTS_*` · `STT_*` · `ASK_*` · `VOICE_DEBUG_*` limits | No       | Per-minute, per-instance ceilings for the in-memory abuse guard, sized so the limiter trips before Google's quota and no one client can drain the shared key. Defaults track the free tier. |
+| Variable                                      | Required | What it does                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY`                              | Yes      | Server-side only — powers the Oracle and Sköll. Get one at [AI Studio](https://aistudio.google.com/apikey).                                                                                                                                                                                                                           |
+| `TTS_*` · `STT_*` · `ASK_*` · `LITE_*` limits | No       | Per-minute, per-instance ceilings for the in-memory abuse guard — one bucket per surface (`ASK_*` the Oracle/flash budget, `LITE_*` Sköll's flash-lite, plus TTS and transcribe), keyed by client+session. Sized so a whole game never throttles and the limiter trips before Google's quota; the billing cap is the hard spend stop. |
 
 Local secrets live in `.env` (gitignored); the rate-limit knobs are documented there too. Deployed, the key rides Google Secret Manager and any limit overrides set in your shell are forwarded to Cloud Run — both via [`deploy.sh`](deploy.sh).
 
