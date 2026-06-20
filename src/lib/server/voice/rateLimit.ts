@@ -1,98 +1,78 @@
-// Fixed-window abuse guards for the voice surfaces. In-memory and per-instance: the service runs
-// at most 2 instances, so the worst case is 2x these ceilings. The synth/transcribe ceilings exist
-// to trip BEFORE Google's own quota — set them to (the key's model RPM / running instances) so a
-// 429 surfaces as our clean "try again" instead of a doomed request, and one player can't drain the
-// shared key for everyone.
+// Abuse guards for Gemini surfaces. In-memory and per-instance, tuned for a single-instance demo service.
+// The key is a request fingerprint (ip + session), so repeated hits against one source share the budget.
 
 import { env } from '$env/dynamic/private';
 
-/** A positive-integer override (`raw`, from the environment) or the fallback — so a deployment aligns
- *  a ceiling to its key's actual quota (free vs paid tier) without a code change. */
 export const resolveLimit = (raw: string | undefined, fallback: number): number => {
 	const value = Number(raw);
 	if (Number.isInteger(value) && value > 0) return value;
-	// A defined-but-rejected override (e.g. "1O", "0", "5.5") is almost always a typo. Fall back, but
-	// say so — a silent default reads as "the operator tuned this" when they didn't.
 	if (raw !== undefined && raw !== '')
-		console.warn(`[rateLimit] ignoring invalid limit "${raw}"; using ${fallback}`);
+		console.warn(`[rateLimit] invalid limit "${raw}"; using ${fallback}`);
 	return fallback;
 };
 
-const WINDOW_MS = 60_000;
-
-// TTS synth: only UNCACHED lines claim a slot (cached replays are free). The synth REQUEST fires the
-// instant a line is delivered — NOT when its audio plays — so a player clicking briskly through a game
-// queues dozens of fresh synths within one window while the audio drains over minutes. A single full
-// game can need 70+ fresh synths, so a per-burst ceiling throttles legit solo play mid-game. Size the
-// SESSION limit above a WHOLE game (not a turn), with a global ceiling as the cross-session abuse
-// backstop. The billing cap is the real spend stop; env-tune these to the key's actual TTS RPM.
 export const TTS_SESSION_LIMIT = resolveLimit(env.TTS_SESSION_LIMIT, 150);
 export const TTS_GLOBAL_LIMIT = resolveLimit(env.TTS_GLOBAL_LIMIT, 450);
 
-// Push-to-talk transcription: every held utterance is one uncached Gemini call. Lower volume than TTS
-// (one per spoken Ask, not per move), but a voice-heavy player still needs headroom. Env-tunable.
 export const STT_SESSION_LIMIT = resolveLimit(env.STT_SESSION_LIMIT, 15);
 export const STT_GLOBAL_LIMIT = resolveLimit(env.STT_GLOBAL_LIMIT, 60);
 
-// A live Ask fans out to ~3 Gemini calls (Oracle interpret + flair, Sköll reaction) on the same Flash
-// quota as voice, with no audio required to trigger it. These are REQUEST budgets, so the effective
-// Gemini-call ceiling is ~3x lower — sized so a human (an Ask round-trips in seconds) never trips them
-// while a scripted client can't fan a flood of fresh-session asks into a multiple of the call budget.
-// Env-tunable for a stricter or paid-tier key.
 export const ASK_SESSION_LIMIT = resolveLimit(env.ASK_SESSION_LIMIT, 12);
 export const ASK_GLOBAL_LIMIT = resolveLimit(env.ASK_GLOBAL_LIMIT, 48);
 
-interface Window {
+export const LITE_SESSION_LIMIT = resolveLimit(env.LITE_SESSION_LIMIT, 90);
+export const LITE_GLOBAL_LIMIT = resolveLimit(env.LITE_GLOBAL_LIMIT, 300);
+
+const WINDOW_MS = 60_000;
+
+type RateVerdict = { ok: true } | { ok: false; retryAfterSeconds: number };
+
+interface WindowState {
 	count: number;
 	start: number;
 }
 
-export type RateVerdict = { ok: true } | { ok: false; retryAfterSeconds: number };
+interface Limiter {
+	claim(key: string, now?: number): RateVerdict;
+	reset(): void;
+}
 
-function denied(window: Window, now: number): RateVerdict {
+function denied(window: WindowState, now: number): RateVerdict {
 	return {
 		ok: false,
 		retryAfterSeconds: Math.max(1, Math.ceil((window.start + WINDOW_MS - now) / 1000))
 	};
 }
 
-interface Limiter {
-	claim(sessionId: string, now?: number): RateVerdict;
-	reset(): void;
-}
-
-// One fixed-window limiter: a per-session ceiling under a shared global ceiling. `label` only
-// shapes the once-per-window operator warning when the global window trips.
 function createLimiter(label: string, sessionLimit: number, globalLimit: number): Limiter {
-	const sessions = new Map<string, Window>();
-	let global: Window = { count: 0, start: 0 };
-	// Once per window: a global trip means abuse or a runaway client — operators must see it —
-	// but logging every denied request would make the log itself a flood surface.
+	const sessions = new Map<string, WindowState>();
+	let global: WindowState = { count: 0, start: 0 };
 	let globalTripLogged = false;
 
+	function resetWindow(now: number): void {
+		if (global.start !== 0 && now - global.start < WINDOW_MS) return;
+		global = { count: 0, start: now };
+		globalTripLogged = false;
+		for (const [id, window] of sessions) {
+			if (now - window.start >= WINDOW_MS) sessions.delete(id);
+		}
+	}
+
 	return {
-		claim(sessionId, now = Date.now()) {
-			if (now - global.start >= WINDOW_MS) {
-				global = { count: 0, start: now };
-				globalTripLogged = false;
-				// Sweep stale per-session windows on global rollover so the map stays bounded
-				// without a per-call scan.
-				for (const [id, window] of sessions) {
-					if (now - window.start >= WINDOW_MS) sessions.delete(id);
-				}
-			}
+		claim(key, now = Date.now()) {
+			resetWindow(now);
 			if (global.count >= globalLimit) {
 				if (!globalTripLogged) {
 					globalTripLogged = true;
-					console.warn(`[voice] global ${label} window exhausted — denying all sessions`);
+					console.warn(`[voice] global ${label} window exhausted`);
 				}
 				return denied(global, now);
 			}
 
-			let session = sessions.get(sessionId);
+			let session = sessions.get(key);
 			if (!session || now - session.start >= WINDOW_MS) {
 				session = { count: 0, start: now };
-				sessions.set(sessionId, session);
+				sessions.set(key, session);
 			}
 			if (session.count >= sessionLimit) return denied(session, now);
 
@@ -108,21 +88,40 @@ function createLimiter(label: string, sessionLimit: number, globalLimit: number)
 	};
 }
 
-const tts = createLimiter('TTS', TTS_SESSION_LIMIT, TTS_GLOBAL_LIMIT);
-const transcribe = createLimiter('transcribe', STT_SESSION_LIMIT, STT_GLOBAL_LIMIT);
-const oracle = createLimiter('Ask', ASK_SESSION_LIMIT, ASK_GLOBAL_LIMIT);
+const ttsLimiter = createLimiter('TTS', TTS_SESSION_LIMIT, TTS_GLOBAL_LIMIT);
+const sttLimiter = createLimiter('stt', STT_SESSION_LIMIT, STT_GLOBAL_LIMIT);
+const flashLimiter = createLimiter('flash', ASK_SESSION_LIMIT, ASK_GLOBAL_LIMIT);
+const liteLimiter = createLimiter('lite', LITE_SESSION_LIMIT, LITE_GLOBAL_LIMIT);
 
-/** Claim one TTS-synth slot for the session; a denial consumes nothing. */
-export const claimTtsSlot = tts.claim;
-/** Test isolation only — the windows are module state shared across a test file. */
-export const resetTtsWindows = tts.reset;
+/**
+ * Build a stable abuse key from network/client fingerprint + browser session.
+ * Use this instead of session-only keys if one source is the attack vector.
+ */
+export const buildLimiterKey = (address: string | undefined, sessionId: string): string =>
+	`${address || 'unknown'}:${sessionId || 'nosession'}`;
 
-/** Claim one push-to-talk transcription slot for the session; a denial consumes nothing. */
-export const claimTranscribeSlot = transcribe.claim;
-/** Test isolation only — the windows are module state shared across a test file. */
-export const resetTranscribeWindows = transcribe.reset;
+export const claimTtsSlot = (key: string, now?: number): RateVerdict => ttsLimiter.claim(key, now);
+export const claimTranscribeSlot = (key: string, now?: number): RateVerdict =>
+	sttLimiter.claim(key, now);
 
-/** Claim one Ask-turn slot for the session; a denial consumes nothing. */
-export const claimOracleSlot = oracle.claim;
-/** Test isolation only — the windows are module state shared across a test file. */
-export const resetOracleWindows = oracle.reset;
+export const claimOracleSlot = (key: string, now?: number): RateVerdict =>
+	flashLimiter.claim(key, now);
+export const claimLiteSlot = (key: string, now?: number): RateVerdict =>
+	liteLimiter.claim(key, now);
+
+/** Shared test hook points to reset all Gemini windows. */
+export const resetOracleWindows = (): void => {
+	flashLimiter.reset();
+};
+
+export const resetTtsWindows = (): void => {
+	ttsLimiter.reset();
+};
+
+export const resetTranscribeWindows = (): void => {
+	sttLimiter.reset();
+};
+
+export const resetLiteWindows = (): void => {
+	liteLimiter.reset();
+};

@@ -21,8 +21,8 @@ const CAST_INSTRUCTION =
 
 let client: GoogleGenAI | null = null;
 function ai(apiKey: string): GoogleGenAI {
-	// 3 backoff attempts (408/429/5xx) — a single blip shouldn't drop the player's spoken turn.
-	client ??= new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 3 } } });
+	// 1 attempt; limiter-level throttles keep abuse down and prevent retry amplification.
+	client ??= new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 1 } } });
 	return client;
 }
 

@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { claimTranscribeSlot } from '$lib/server/voice/rateLimit';
+import { buildLimiterKey, claimTranscribeSlot } from '$lib/server/voice/rateLimit';
 import {
 	transcribe,
 	classifyReaction,
@@ -98,7 +98,7 @@ function teeHeard(sessionId: string, message: string): void {
 // `reaction` classifies a reply to Sköll's hanging question into scry/hex/pass (or unclear); `cast`
 // matches a spoken rune name (against the server's canonical board names) to commit an armed cast.
 // The browser sends only audio — the engine still runs the same Ask/React/Cast paths the buttons use.
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, getClientAddress }) => {
 	const parsed = await parseRequest(request);
 	if (parsed instanceof Response) return parsed;
 	const { wavBase64, mode, wantsCastDetection } = parsed;
@@ -106,7 +106,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	// Fail loudly (503) when voice is unconfigured so a deploy/config gap is visible, and gate the
 	// Gemini call behind the per-session/global limiter (a denial spends nothing).
 	if (!env.GEMINI_API_KEY) return json({ error: 'Voice is unavailable.' }, { status: 503 });
-	const verdict = claimTranscribeSlot(locals.sessionId);
+	const limitKey = buildLimiterKey(
+		typeof getClientAddress === 'function' ? getClientAddress() : undefined,
+		locals.sessionId
+	);
+	const verdict = claimTranscribeSlot(limitKey);
 	if (!verdict.ok) {
 		return json(
 			{ error: 'Too many voice requests. Try again shortly.' },

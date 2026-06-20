@@ -93,10 +93,10 @@ function normalize(raw: RawResponse): Interpretation {
 
 let client: GoogleGenAI | null = null;
 function ai(): GoogleGenAI {
-	// 3 backoff attempts (408/429/5xx) — a rate-limit blip shouldn't silence the Oracle mid-rite.
+	// 1 attempt; limiter-level throttles keep abuse down and prevent SDK retry amplification.
 	client ??= new GoogleGenAI({
 		apiKey: env.GEMINI_API_KEY,
-		httpOptions: { retryOptions: { attempts: 3 } }
+		httpOptions: { retryOptions: { attempts: 1 } }
 	});
 	return client;
 }

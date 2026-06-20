@@ -581,4 +581,33 @@ describe('delivery speaking events', () => {
 		fireDrain();
 		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }]);
 	});
+
+	it('de-dupes a repeat of the same voice — only a switch re-emits', () => {
+		enableDelivery();
+		const events = collect();
+
+		fireSpeaking('oracle');
+		fireSpeaking('oracle'); // same voice already sounding → no second emit
+		fireSpeaking('skoll'); // a switch re-emits
+		expect(events).toEqual([
+			{ type: 'speaking', voice: 'oracle' },
+			{ type: 'speaking', voice: 'skoll' }
+		]);
+	});
+
+	it('a throwing subscriber is logged and never starves the others', () => {
+		enableDelivery();
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const seen: DeliveryEvent[] = [];
+		subscribeDelivery(() => {
+			throw new Error('listener boom');
+		});
+		subscribeDelivery((e) => seen.push(e));
+
+		fireSpeaking('oracle');
+
+		expect(seen).toEqual([{ type: 'speaking', voice: 'oracle' }]); // the good one still heard it
+		expect(errSpy).toHaveBeenCalledWith('[delivery] listener threw:', expect.any(Error));
+		errSpy.mockRestore();
+	});
 });

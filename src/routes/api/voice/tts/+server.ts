@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { claimTtsSlot } from '$lib/server/voice/rateLimit';
+import { buildLimiterKey, claimTtsSlot } from '$lib/server/voice/rateLimit';
 import {
 	composeLine,
 	isLineDescriptor,
@@ -33,10 +33,9 @@ function logVoice(
 	});
 }
 
+// planSynth only ever denies with 429 (limiter) or 503 (no key) — those are the two reasons.
 function denialReason(status: number): string {
-	if (status === 429) return 'rate-limited';
-	if (status === 503) return 'unavailable (no key)';
-	return 'refused';
+	return status === 429 ? 'rate-limited' : 'unavailable (no key)';
 }
 
 // The resolved words for a descriptor. `cacheable` is false only for authored lines (unique per call,
@@ -80,7 +79,7 @@ function resolveLine(body: LineDescriptor, sessionId: string): Resolved | null {
 // A cached cacheable line replays free (no key, no slot). Otherwise gate a fresh synth on the key +
 // limiter. An authored line never replays from its own unique prompt (cacheable=false skips the cache),
 // so it always faces the gate; on a block, a cached deterministic counterpart replays before going silent.
-function planSynth(resolved: Resolved, sessionId: string): Plan | Response {
+function planSynth(resolved: Resolved, sessionId: string, limitKey: string): Plan | Response {
 	const { voice, prompt, cacheable, fallbackPrompt } = resolved;
 	const plan = (synthText: string, synthMayCache: boolean): Plan => ({
 		voice,
@@ -97,7 +96,7 @@ function planSynth(resolved: Resolved, sessionId: string): Plan | Response {
 			? plan(fallbackReplay, true)
 			: json({ error: 'Voice is unavailable.' }, { status: 503 });
 	}
-	const verdict = claimTtsSlot(sessionId);
+	const verdict = claimTtsSlot(limitKey);
 	if (verdict.ok) return plan(prompt, cacheable);
 	return fallbackReplay
 		? plan(fallbackReplay, true)
@@ -171,7 +170,7 @@ function streamLine(
 // Voices one server-owned line as a stream of base64 PCM chunks the browser's speaker plays as they
 // arrive — so the Oracle starts speaking at the first chunk, not after the whole clip. The browser
 // sends a descriptor (the "line ID"), never free text.
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, getClientAddress }) => {
 	let body: unknown;
 	try {
 		body = await request.json();
@@ -187,7 +186,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return badLine();
 	}
 
-	const plan = planSynth(resolved, sessionId);
+	const limitKey = buildLimiterKey(
+		typeof getClientAddress === 'function' ? getClientAddress() : undefined,
+		sessionId
+	);
+
+	const plan = planSynth(resolved, sessionId, limitKey);
 	if (plan instanceof Response) {
 		logVoice(sessionId, 'warn', `not voiced (${denialReason(plan.status)})`, resolved.voice);
 		return plan;
