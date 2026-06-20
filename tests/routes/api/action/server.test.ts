@@ -560,7 +560,7 @@ describe('POST /api/action', () => {
 			expect(secretEv.data).toMatchObject({ secret: SECRET, seed: SEED });
 		});
 
-		it('splits a human Ask into her input, the Oracle’s reading and answer, and the engine’s verdict', async () => {
+		it('splits a human Ask into her input, the Oracle’s reading, and the engine’s verdict', async () => {
 			await ask();
 			// Her raw free-text — hers (input), distinct from the Oracle's reading of it.
 			const human = byOwner('Human').at(-1)!;
@@ -568,16 +568,13 @@ describe('POST /api/action', () => {
 			expect(human.message).toContain('is it light?');
 			expect(human.data).toMatchObject({ question: 'is it light?' });
 			// The Oracle's LLM reading — its own event, not bolted onto the engine's verdict.
-			const reading = byOwner('Oracle').find((e) => e.part === 'Ask')!;
+			const reading = byOwner('Oracle').find((e) => e.message.includes('reads it as'))!;
 			expect(reading).toMatchObject({ kind: 'llm', part: 'Ask' });
 			expect(reading.message).toContain('whether it is light'); // the Oracle's read, in the message
 			expect(reading.data).toMatchObject({ query: { axis: 'fill', value: 'Light' } });
-			// Her spoken answer — the Oracle's own event, separate from the engine's verdict below.
-			const answer = byOwner('Oracle').find((e) => e.part === 'Answer')!;
-			expect(answer).toMatchObject({ kind: 'deterministic', part: 'Answer' });
-			expect(answer.message).toMatch(/^answers: (Yes|No)\. Sól is/);
-			expect(answer.data).toHaveProperty('affirmative');
-			// The verdict is the engine fact — deterministic, no inference attached.
+			// The deterministic answer is the ENGINE's verdict, logged once at the point it's decided —
+			// never relabeled as a separate Oracle "answer" row.
+			expect(byOwner('Oracle').some((e) => e.part === 'Answer')).toBe(false);
 			const v = lastVerdict();
 			expect(v).toMatchObject({ kind: 'deterministic', part: 'Ask' });
 			expect(v.data).toBeUndefined();
