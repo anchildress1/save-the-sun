@@ -22,7 +22,11 @@ const mock = vi.hoisted(() => ({
 vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
 
 import { synthesizeStream, isCached, resetTtsCache } from '$lib/server/voice/tts';
-import { ORACLE_VOICE, SKOLL_VOICE, TTS_MODEL } from '$lib/voice/config';
+import { ORACLE_VOICE, SKOLL_VOICE, TTS_MODEL, TTS_FALLBACK_MODEL } from '$lib/voice/config';
+import { getEvents } from '$lib/server/debug/log';
+
+// The SDK throws an ApiError carrying the HTTP code on `.status`; 429 is the shared-quota throttle.
+const rateLimit = () => Object.assign(new Error('429 RESOURCE_EXHAUSTED'), { status: 429 });
 
 // A Gemini stream is an async iterable of parts; each part may carry one inline-audio chunk.
 function streamOf(...chunks: (string | null)[]) {
@@ -159,6 +163,50 @@ describe('synthesizeStream', () => {
 			'whole-b'
 		]);
 		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
+	});
+
+	it('falls back to the older model when the primary 429s before any audio', async () => {
+		sdk.generateContentStream.mockRejectedValueOnce(rateLimit());
+		sdk.generateContentStream.mockResolvedValueOnce(streamOf('fb-a', 'fb-b'));
+
+		const chunks = await collect(
+			synthesizeStream('I wake with the fire.', ORACLE_VOICE, true, 's1')
+		);
+
+		expect(chunks).toEqual(['fb-a', 'fb-b']); // the line still speaks, in the same voice
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
+		expect(sdk.generateContentStream).toHaveBeenNthCalledWith(
+			1,
+			expect.objectContaining({ model: TTS_MODEL })
+		);
+		expect(sdk.generateContentStream).toHaveBeenNthCalledWith(
+			2,
+			expect.objectContaining({ model: TTS_FALLBACK_MODEL })
+		);
+		// The fallback clip caches under the same key — a replay costs no further synth.
+		expect(isCached('I wake with the fire.', ORACLE_VOICE)).toBe(true);
+		// The swap is teed to /debug as a warn, not a silent degrade.
+		const tee = getEvents('s1').at(-1);
+		expect(tee).toMatchObject({ level: 'warn', part: 'Voice' });
+		expect(tee?.message).toContain(TTS_FALLBACK_MODEL);
+	});
+
+	it('does not fall back once audio has streamed — no double-speak in the other model', async () => {
+		const partial429 = (async function* () {
+			yield { candidates: [{ content: { parts: [{ inlineData: { data: 'mid' } }] } }] };
+			throw rateLimit();
+		})();
+		sdk.generateContentStream.mockResolvedValueOnce(partial429);
+
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual(['mid']);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(1); // the second model is never tried
+	});
+
+	it('does not fall back on a non-rate-limit failure', async () => {
+		sdk.generateContentStream.mockRejectedValueOnce(new Error('500 internal'));
+
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([]);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(1); // a 500 is terminal, not a fallback
 	});
 
 	it('caps the clip cache, evicting the oldest so memory stays bounded', async () => {

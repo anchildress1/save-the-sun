@@ -5,7 +5,7 @@
 
 import { GoogleGenAI, Modality } from '@google/genai';
 import { env } from '$env/dynamic/private';
-import { TTS_MODEL, SKOLL_VOICE, type VoiceId } from '$lib/voice/config';
+import { TTS_MODEL, TTS_FALLBACK_MODEL, SKOLL_VOICE, type VoiceId } from '$lib/voice/config';
 import { maskApiKey, logEvent } from '$lib/server/debug/log';
 
 // Keyed by voice + text: the Oracle and Sköll speak different lines, but a shared line in two voices
@@ -41,6 +41,21 @@ function ai(apiKey: string): GoogleGenAI {
 	// dropping to text-only — without the amplification a higher count piles onto a throttled key.
 	client ??= new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 2 } } });
 	return client;
+}
+
+// The SDK's ApiError carries the HTTP code on `.status`; 429 is the shared-quota throttle we fall back on.
+const isRateLimited = (err: unknown): boolean => (err as { status?: number })?.status === 429;
+
+// Tee the model swap to /debug so a quota fallback is visible, not a silent degrade to the older voice.
+function logFallback(sessionId: string | undefined, voice: VoiceId): void {
+	if (!sessionId) return;
+	logEvent(sessionId, {
+		owner: voice === SKOLL_VOICE ? 'Sköll' : 'Oracle',
+		kind: 'llm',
+		part: 'Voice',
+		level: 'warn',
+		message: `TTS rate-limited on ${TTS_MODEL}; retrying on ${TTS_FALLBACK_MODEL}`
+	});
 }
 
 // A synth failure is masked (an SDK error can embed the key) and teed to /debug — without this the
@@ -85,30 +100,44 @@ export async function* synthesizeStream(
 		return;
 	}
 
-	const chunks: string[] = [];
-	try {
-		const stream = await ai(env.GEMINI_API_KEY).models.generateContentStream({
-			model: TTS_MODEL,
-			contents: [{ role: 'user', parts: [{ text }] }],
-			config: {
-				responseModalities: [Modality.AUDIO],
-				speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
+	// Primary then fallback: the older model is tried only when the primary 429s before a single chunk —
+	// once audio is on the wire, switching models would re-speak the line in the other voice.
+	const models = [TTS_MODEL, TTS_FALLBACK_MODEL];
+	for (let i = 0; i < models.length; i++) {
+		const chunks: string[] = [];
+		let voiced = false;
+		try {
+			const stream = await ai(env.GEMINI_API_KEY).models.generateContentStream({
+				model: models[i],
+				contents: [{ role: 'user', parts: [{ text }] }],
+				config: {
+					responseModalities: [Modality.AUDIO],
+					speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
+				}
+			});
+			for await (const part of stream) {
+				const data = part.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+				if (data) {
+					voiced = true;
+					if (cacheable) chunks.push(data);
+					yield data;
+				}
 			}
-		});
-		for await (const part of stream) {
-			const data = part.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-			if (data) {
-				if (cacheable) chunks.push(data);
-				yield data;
+			// Cache only a complete clip — a stream that errored mid-flight must not replay truncated.
+			// Authored lines (Gemini-written, unique every call) are never cacheable: a unique key can't
+			// replay, so caching only grows memory unbounded for the life of the process.
+			remember(key, chunks);
+			return;
+		} catch (err) {
+			// A pre-audio 429 with a model still to try drops to the fallback; anything else (or a tear
+			// after audio already played) is the end — mask + tee, best-effort past here.
+			if (!voiced && isRateLimited(err) && i < models.length - 1) {
+				logFallback(sessionId, voice);
+				continue;
 			}
+			logSynthFailure(sessionId, voice, err);
+			return;
 		}
-		// Cache only a complete clip — a stream that errored mid-flight must not replay truncated.
-		// Authored lines (Gemini-written, unique every call) are never cacheable: a unique key can't
-		// replay, so caching only grows memory unbounded for the life of the process.
-		remember(key, chunks);
-	} catch (err) {
-		// Mask + tee the failure (helper keeps this generator's complexity down) — best-effort past here.
-		logSynthFailure(sessionId, voice, err);
 	}
 }
 

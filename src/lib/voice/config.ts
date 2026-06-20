@@ -14,6 +14,10 @@ export type VoiceId = typeof ORACLE_VOICE | typeof SKOLL_VOICE;
 // Both voices' lines are synthesized key-side here. Returns PCM16 mono @ SPEAKER_SAMPLE_RATE.
 export const TTS_MODEL = 'gemini-3.1-flash-tts-preview';
 
+// Fallback synth model, tried only when the primary 429s before any audio streams — the older preview
+// shares the voice + audio contract but draws a separate quota, so a throttled line still speaks.
+export const TTS_FALLBACK_MODEL = 'gemini-2.5-flash-preview-tts';
+
 // Push-to-talk transcription: a held recording (WAV) is sent to this model server-side and turned
 // into the player's Ask text. A general flash model with audio understanding.
 export const STT_MODEL = 'gemini-3.5-flash';
