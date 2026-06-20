@@ -124,9 +124,9 @@ function geminiIO(sessionId: string): Record<string, unknown> {
 	if (calls.length === 0) return {};
 	if (calls.length > 1) return { calls };
 	const [call] = calls;
-	return call.error !== undefined
-		? { request: call.request, error: call.error }
-		: { request: call.request, response: call.response };
+	return call.error === undefined
+		? { request: call.request, response: call.response }
+		: { request: call.request, error: call.error };
 }
 
 const hasContent = (data: Record<string, unknown>): boolean => Object.keys(data).length > 0;
@@ -469,6 +469,27 @@ async function resolveAction(
 	return resolveOther(sessionId, engine, action, limitKey);
 }
 
+// Charge the human's live Ask against the Oracle (Flash) budget — only a non-empty ask that actually
+// fans out to Gemini. Empty/stale asks short-circuit before Gemini, so they spend nothing. Returns a
+// 429 Response when the window is spent, else null to proceed.
+function chargeAskQuota(question: string, limitKey: string): Response | null {
+	if (question.trim() === '') return null;
+	const verdict = claimOracleSlot(limitKey);
+	if (verdict.ok) return null;
+	return json(
+		{ error: 'The Oracle needs a moment. Try again shortly.' },
+		{ status: 429, headers: { 'retry-after': String(verdict.retryAfterSeconds) } }
+	);
+}
+
+// The engine's canonical verdict for an Ask: a Hex silenced her, her answer on a clean read, or the
+// engine declining the ask.
+function askTruth(killed: boolean, oracle: OracleResult | undefined): string {
+	if (killed) return 'Hexed by Sköll — the Oracle is silent, her turn spent';
+	if (oracle?.ok) return oracle.answer;
+	return 'engine declined the Ask';
+}
+
 async function askWithSkollReaction(
 	sessionId: string,
 	engine: GameEngine,
@@ -476,15 +497,8 @@ async function askWithSkollReaction(
 	question: string,
 	limitKey: string
 ) {
-	const trimmed = question.trim();
-	if (trimmed !== '') {
-		const verdict = claimOracleSlot(limitKey);
-		if (!verdict.ok)
-			return json(
-				{ error: 'The Oracle needs a moment. Try again shortly.' },
-				{ status: 429, headers: { 'retry-after': String(verdict.retryAfterSeconds) } }
-			);
-	}
+	const denied = chargeAskQuota(question, limitKey);
+	if (denied) return denied;
 
 	const prepared = await prepareAsk(question, interpret);
 	humanAsks(sessionId, question);
@@ -561,11 +575,7 @@ async function askWithSkollReaction(
 	// On a clean answer (Sköll passed), she authors her verdict aloud — sets `oracle.voiced`.
 	if (oracle?.ok && vs.choice === 'Pass') await authorAnswerFlair(sessionId, oracle);
 
-	let truth: string;
-	if (vs.killed) truth = 'Hexed by Sköll — the Oracle is silent, her turn spent';
-	else if (oracle?.ok) truth = oracle.answer;
-	else truth = 'engine declined the Ask';
-	engineVerdict(sessionId, 'Ask', truth);
+	engineVerdict(sessionId, 'Ask', askTruth(vs.killed, oracle));
 
 	// Mirror the line the client voices for this outcome (his Hex/Scry framing, or her answer on a
 	// Pass), so a dropped Ask response recovers it instead of the false silent line.

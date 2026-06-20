@@ -108,7 +108,7 @@ function normalizeAddress(value: string | null | undefined): string | undefined 
 	if (!normalized) return undefined;
 	const first = normalized.split(',')[0]?.trim();
 	if (!first || first.toLowerCase() === UNKNOWN_ADDRESS) return undefined;
-	if (first[0] === '"' && first.at(-1) === '"') return first.slice(1, -1).trim();
+	if (first.startsWith('"') && first.endsWith('"')) return first.slice(1, -1).trim();
 	return first;
 }
 
