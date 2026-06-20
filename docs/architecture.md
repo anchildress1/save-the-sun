@@ -41,7 +41,7 @@ flowchart TB
         Log["debug/log.ts<br/>per-session event stream"]
     end
 
-    Gemini["Gemini API<br/>Oracle — gemini-3.5-flash · Sköll — gemini-3.1-flash-lite<br/>transcribe — gemini-3.5-flash · TTS — gemini-3.1-flash-tts-preview"]
+    Gemini["Gemini API<br/>Oracle — gemini-3.5-flash · Sköll — gemini-3.1-flash-lite<br/>transcribe — gemini-3.5-flash · TTS — gemini-3.1-flash-tts-preview primary, gemini-2.5-flash-preview-tts fallback"]
 
     Page --> Action
     Page --> NewGame

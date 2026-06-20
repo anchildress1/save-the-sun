@@ -112,7 +112,7 @@ describe('/debug view', () => {
 		expect(card.querySelector('.msg')?.textContent).toContain('raw Gemini move call');
 	});
 
-	it('collapses any event with data by default and toggles open/closed on click', async () => {
+	it('collapses every entry by default and toggles open/closed on click', async () => {
 		const gemini: DebugEvent = {
 			seq: 7,
 			owner: 'Sköll',
@@ -122,23 +122,22 @@ describe('/debug view', () => {
 			message: 'raw Gemini move call',
 			data: { request: { contents: 'board…' }, response: { text: '{}' } }
 		};
-		const screen = renderWith([floor, gemini]);
-		const { container } = screen;
-		// The parsed turn info (head + message) stays visible; only the data payload hides.
-		expect(container.textContent).toContain('raw Gemini move call');
-		const allDetails = container.querySelectorAll<HTMLDetailsElement>('details.io');
-		// Both events have data — both get an expander; all collapsed by default.
+		const { container } = renderWith([floor, gemini]);
+		// One collapsible row per entry — data or not — so a 100-entry game stays a scannable list.
+		const allDetails = container.querySelectorAll<HTMLDetailsElement>('details.entry');
 		expect(allDetails).toHaveLength(2);
-		for (const d of allDetails) expect(d.open).toBe(false);
-		// Gemini entries use a specific summary; other data entries use the generic one.
-		expect(screen.getByText('full request / response')).toBeDefined();
-		expect(screen.getByText('details')).toBeDefined();
-		// Input [floor(2), gemini(7)] newest-first → DOM order [gemini, floor] — gemini is allDetails[0].
-		const geminiDetails = allDetails[0]!;
-		await screen.getByText('full request / response').click();
-		expect(geminiDetails.open).toBe(true);
-		await screen.getByText('full request / response').click();
-		expect(geminiDetails.open).toBe(false);
+		for (const d of allDetails) expect(d.open).toBe(false); // collapsed by default
+		// Newest-first: [gemini(7), floor(2)] → gemini is allDetails[0].
+		const geminiEntry = allDetails[0]!;
+		// Collapsed, the message rides the summary preview; the raw I/O <pre> lives in the body.
+		expect(geminiEntry.querySelector('.msg-preview')?.textContent).toContain(
+			'raw Gemini move call'
+		);
+		const summary = geminiEntry.querySelector('summary')!;
+		summary.click();
+		expect(geminiEntry.open).toBe(true);
+		summary.click();
+		expect(geminiEntry.open).toBe(false);
 	});
 
 	it('renders an event as a message + JSON detail, flagging warn', async () => {
@@ -166,6 +165,11 @@ describe('/debug view', () => {
 	it('surfaces the session id so it can be copied onto a watching screen', () => {
 		const { container } = renderWith([verdict], 'abc-123');
 		expect(container.querySelector('.session code')?.textContent).toBe('abc-123');
+	});
+
+	it('omits the session line when there is no session id', () => {
+		const { container } = renderWith([verdict], '');
+		expect(container.querySelector('.session')).toBeNull();
 	});
 
 	it('polls /api/debug for the browser’s own cookie session', async () => {
@@ -211,6 +215,35 @@ describe('/debug view', () => {
 		unmount();
 	});
 
+	it('updates a row in place when a new round reuses its seq with new content', async () => {
+		// A new round resets the log (resetLog) and re-counts from seq 1, so a poll can return the same
+		// seq carrying a different owner/kind/level — the keyed row must update in place, not go stale.
+		vi.useRealTimers();
+		const next = {
+			events: [
+				{
+					seq: 1,
+					owner: 'Sköll',
+					kind: 'llm',
+					part: 'Cast',
+					level: 'warn',
+					message: 'new round, same seq'
+				} as DebugEvent
+			]
+		};
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response(JSON.stringify(next)))
+		);
+		const { container, unmount } = renderWith([verdict]); // seq 1: Engine · deterministic · info
+		await expect
+			.poll(() => container.querySelector('.who')?.textContent, { timeout: 3000 })
+			.toBe('Sköll');
+		expect(container.querySelector('.kind-badge')?.textContent).toContain('Gemini'); // kind info→llm
+		expect(container.querySelector('.badge.warn')).not.toBeNull(); // the level badge now shows
+		unmount();
+	});
+
 	it('wraps long raw I/O instead of overflowing the page horizontally', async () => {
 		// A realistic raw gemini event: a long unbroken token (base64-like) + a long prose string.
 		const heavy: DebugEvent = {
@@ -226,8 +259,8 @@ describe('/debug view', () => {
 			}
 		};
 		const { container } = renderWith([heavy]);
-		// Raw I/O ships collapsed; open it — the wrap contract applies to the expanded view.
-		container.querySelector<HTMLDetailsElement>('details.io')!.open = true;
+		// Raw I/O ships collapsed; open the entry — the wrap contract applies to the expanded view.
+		container.querySelector<HTMLDetailsElement>('details.entry')!.open = true;
 		const pre = container.querySelector<HTMLElement>('pre')!;
 		await expect.element(pre).toBeInTheDocument();
 		// The long pre must not be wider than its card, and the page must not scroll sideways.

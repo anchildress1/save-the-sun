@@ -366,6 +366,14 @@ describe('POST /api/action', () => {
 		expect(data.skollVsYou).toEqual({ reaction: 'Hex' });
 		expect(data.oracle).toBeUndefined(); // silenced — no Oracle line
 		expect(data.state.activePlayer).toBe('Sköll'); // her turn spent → his to take on Advance
+		// The Hex outcome's verdict is the engine's, logged at the kill — deterministic, owner Engine,
+		// never relabeled as an Oracle row.
+		const verdict = getEvents(SID)
+			.filter((e) => e.owner === 'Engine' && e.part === 'Ask')
+			.at(-1)!;
+		expect(verdict).toMatchObject({ kind: 'deterministic', part: 'Ask' });
+		expect(verdict.message).toContain('Hexed');
+		expect(getEvents(SID).some((e) => e.owner === 'Oracle' && e.part === 'Answer')).toBe(false);
 	});
 
 	it('lets Sköll Scry the human Ask — she still gets her answer, he overhears it', async () => {
@@ -560,24 +568,22 @@ describe('POST /api/action', () => {
 			expect(secretEv.data).toMatchObject({ secret: SECRET, seed: SEED });
 		});
 
-		it('splits a human Ask into her input, the Oracle’s reading and answer, and the engine’s verdict', async () => {
+		it('splits a human Ask into her input, the Oracle’s reading, and the engine’s verdict', async () => {
 			await ask();
 			// Her raw free-text — hers (input), distinct from the Oracle's reading of it.
 			const human = byOwner('Human').at(-1)!;
 			expect(human).toMatchObject({ kind: 'input', part: 'Ask' });
 			expect(human.message).toContain('is it light?');
 			expect(human.data).toMatchObject({ question: 'is it light?' });
-			// The Oracle's LLM reading — its own event, not bolted onto the engine's verdict.
-			const reading = byOwner('Oracle').find((e) => e.part === 'Ask')!;
+			// The Oracle's LLM reading — its own event, not bolted onto the engine's verdict. Selected by
+			// structured fields (first llm/Ask = the read, logged before the flair), not display copy.
+			const reading = byOwner('Oracle').find((e) => e.kind === 'llm' && e.part === 'Ask')!;
 			expect(reading).toMatchObject({ kind: 'llm', part: 'Ask' });
 			expect(reading.message).toContain('whether it is light'); // the Oracle's read, in the message
 			expect(reading.data).toMatchObject({ query: { axis: 'fill', value: 'Light' } });
-			// Her spoken answer — the Oracle's own event, separate from the engine's verdict below.
-			const answer = byOwner('Oracle').find((e) => e.part === 'Answer')!;
-			expect(answer).toMatchObject({ kind: 'deterministic', part: 'Answer' });
-			expect(answer.message).toMatch(/^answers: (Yes|No)\. Sól is/);
-			expect(answer.data).toHaveProperty('affirmative');
-			// The verdict is the engine fact — deterministic, no inference attached.
+			// The deterministic answer is the ENGINE's verdict, logged once at the point it's decided —
+			// never relabeled as a separate Oracle "answer" row.
+			expect(byOwner('Oracle').some((e) => e.part === 'Answer')).toBe(false);
 			const v = lastVerdict();
 			expect(v).toMatchObject({ kind: 'deterministic', part: 'Ask' });
 			expect(v.data).toBeUndefined();

@@ -120,9 +120,9 @@ describe('POST /api/voice/tts', () => {
 		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm'));
 		const ok = await call('log-ok', { kind: 'refusal', refusal: 'empty' });
 		await ok.text(); // consume the stream so its start() runs and the outcome logs
-		expect(
-			getEvents('log-ok').some((e) => e.part === 'Voice' && /TTS — voiced/.test(e.message))
-		).toBe(true);
+		// The tee carries the spoken line, so two different lines in one voice read apart.
+		const voiced = getEvents('log-ok').find((e) => e.part === 'Voice');
+		expect(voiced?.message).toBe(`TTS — voiced: "${refusalLine('empty')}"`);
 
 		// An unresolvable line used to 400 silently — now it leaves a trace to follow.
 		const res = await call('log-bad', {
@@ -137,6 +137,32 @@ describe('POST /api/voice/tts', () => {
 				(e) => e.level === 'warn' && /TTS — refused.*unknown/.test(e.message)
 			)
 		).toBe(true);
+	});
+
+	it('tees a silent outcome when the synth makes no audio and there is no fallback', async () => {
+		tts.synthesizeStream.mockReturnValueOnce(streamOf()); // a composed line, synth yields nothing
+		const res = await call('silent', { kind: 'refusal', refusal: 'empty' });
+		await res.text();
+		const voiced = getEvents('silent').find((e) => e.part === 'Voice');
+		expect(voiced).toMatchObject({ level: 'warn' });
+		expect(voiced?.message).toBe('TTS — synth produced no audio — silent');
+	});
+
+	it('distinguishes two different lines in one voice — his cast and his Ask read apart', async () => {
+		// The end of a Sköll win voices two of his lines back to back; the tee must tell them apart
+		// instead of logging both as an indistinguishable bare "voiced".
+		tts.synthesizeStream.mockImplementation(() => streamOf('pcm'));
+		const castLine = skollCastEcho('Sowilo');
+		const query = { axis: 'element', value: 'Fire' };
+		const askLine = skollAskEcho(query as Parameters<typeof skollAskEcho>[0]);
+
+		await (await call('two-skoll', { kind: 'skoll-cast', rune: 'Sowilo' })).text();
+		await (await call('two-skoll', { kind: 'skoll-ask', query })).text();
+
+		const voiced = getEvents('two-skoll')
+			.filter((e) => e.part === 'Voice')
+			.map((e) => e.message);
+		expect(voiced).toEqual([`TTS — voiced: "${castLine}"`, `TTS — voiced: "${askLine}"`]);
 	});
 
 	it('voices an authored line by id lookup from the session store (ttd:17)', async () => {
@@ -219,6 +245,28 @@ describe('POST /api/voice/tts', () => {
 		);
 	});
 
+	it('tees silent when both the authored synth and its cached fallback make no audio', async () => {
+		const authored = 'Yes — flare, doubly silent.';
+		const fallback = 'Yes. Plain, cached but mute.';
+		const fallbackPrompt = synthPrompt(ORACLE_VOICE, fallback);
+		const id = storeVoiceLine('authored-fb2', authored, ORACLE_VOICE, fallback);
+		tts.isCached.mockImplementation((text) => text === fallbackPrompt);
+		tts.synthesizeStream
+			.mockReturnValueOnce(streamOf()) // authored: no audio
+			.mockReturnValueOnce(streamOf()); // cached fallback: also no audio
+
+		const response = await call('authored-fb2', {
+			kind: 'authored',
+			id,
+			voice: ORACLE_VOICE,
+			text: authored
+		});
+
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('');
+		expect(getEvents('authored-fb2').at(-1)?.message).toBe('TTS — no audio — silent');
+	});
+
 	it('stays silent — no second synth — when the authored synth fails and the fallback is uncached', async () => {
 		const authored = 'Yes — flare, unique.';
 		const id = storeVoiceLine('authored-nofb', authored, ORACLE_VOICE, 'Yes. Plain, uncached.');
@@ -287,6 +335,7 @@ describe('POST /api/voice/tts', () => {
 		});
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe('pcm\n');
+		expect(getEvents('authored-q').at(-1)?.message).toBe(`TTS — voiced: "${fallback}"`);
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			fallbackPrompt,
 			ORACLE_VOICE,
@@ -312,6 +361,7 @@ describe('POST /api/voice/tts', () => {
 		});
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe('pcm\n');
+		expect(getEvents('authored-keyless').at(-1)?.message).toBe(`TTS — voiced: "${fallback}"`);
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			fallbackPrompt,
 			ORACLE_VOICE,

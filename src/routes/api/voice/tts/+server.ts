@@ -38,21 +38,31 @@ function denialReason(status: number): string {
 	return status === 429 ? 'rate-limited' : 'unavailable (no key)';
 }
 
+// A line's deterministic counterpart, voiced if an authored synth is blocked or makes no audio. Its
+// prompt (directed) and bare text travel together — null only for composed lines, which have no
+// counterpart — so the tee can always name what actually played.
+interface Fallback {
+	prompt: string;
+	text: string;
+}
+
 // The resolved words for a descriptor. `cacheable` is false only for authored lines (unique per call,
-// so they can never replay); `fallbackPrompt` is their deterministic counterpart, voiced if the
-// authored synth is blocked or makes no audio.
+// so they can never replay). `text` is the bare spoken line (no director's-notes wrapping), carried
+// for the /debug tee so two different lines in one voice read apart instead of a generic "voiced".
 interface Resolved {
 	voice: VoiceId;
 	prompt: string;
 	cacheable: boolean;
-	fallbackPrompt: string | null;
+	text: string;
+	fallback: Fallback | null;
 }
 
 interface Plan {
 	voice: VoiceId;
 	synthText: string;
 	synthMayCache: boolean;
-	fallbackPrompt: string | null;
+	selectedText: string;
+	fallback: Fallback | null;
 }
 
 // Resolve a descriptor to its words + voice — by id from the session store for an authored line, or
@@ -67,39 +77,41 @@ function resolveLine(body: LineDescriptor, sessionId: string): Resolved | null {
 			voice: stored.voice,
 			prompt: synthPrompt(stored.voice, stored.text),
 			cacheable: false,
-			fallbackPrompt: synthPrompt(stored.voice, stored.fallback)
+			text: stored.text,
+			fallback: { prompt: synthPrompt(stored.voice, stored.fallback), text: stored.fallback }
 		};
 	}
 	const line = composeLine(body);
 	if (line === null) return null;
 	const voice = voiceForLine(body);
-	return { voice, prompt: synthPrompt(voice, line), cacheable: true, fallbackPrompt: null };
+	return { voice, prompt: synthPrompt(voice, line), cacheable: true, text: line, fallback: null };
 }
 
 // A cached cacheable line replays free (no key, no slot). Otherwise gate a fresh synth on the key +
 // limiter. An authored line never replays from its own unique prompt (cacheable=false skips the cache),
 // so it always faces the gate; on a block, a cached deterministic counterpart replays before going silent.
-function planSynth(resolved: Resolved, sessionId: string, limitKey: string): Plan | Response {
-	const { voice, prompt, cacheable, fallbackPrompt } = resolved;
-	const plan = (synthText: string, synthMayCache: boolean): Plan => ({
+function planSynth(resolved: Resolved, limitKey: string): Plan | Response {
+	const { voice, prompt, cacheable, text, fallback } = resolved;
+	const plan = (synthText: string, synthMayCache: boolean, selectedText = text): Plan => ({
 		voice,
 		synthText,
 		synthMayCache,
-		fallbackPrompt
+		selectedText,
+		fallback
 	});
 	if (cacheable && isCached(prompt, voice)) return plan(prompt, true);
 
-	const fallbackReplay =
-		fallbackPrompt !== null && isCached(fallbackPrompt, voice) ? fallbackPrompt : null;
+	// The deterministic counterpart replays free only if it's already cached.
+	const replay = fallback && isCached(fallback.prompt, voice) ? fallback : null;
 	if (!env.GEMINI_API_KEY) {
-		return fallbackReplay
-			? plan(fallbackReplay, true)
+		return replay
+			? plan(replay.prompt, true, replay.text)
 			: json({ error: 'Voice is unavailable.' }, { status: 503 });
 	}
 	const verdict = claimTtsSlot(limitKey);
 	if (verdict.ok) return plan(prompt, cacheable);
-	return fallbackReplay
-		? plan(fallbackReplay, true)
+	return replay
+		? plan(replay.prompt, true, replay.text)
 		: json(
 				{ error: 'Too many voice requests. Try again shortly.' },
 				{ status: 429, headers: { 'retry-after': String(verdict.retryAfterSeconds) } }
@@ -111,7 +123,7 @@ function planSynth(resolved: Resolved, sessionId: string, limitKey: string): Pla
 // already what we're voicing. The pump is guarded so a torn stream / client disconnect closes
 // deliberately instead of escaping as an unhandled rejection — audio is best-effort past the panel text.
 function streamLine(
-	{ voice, synthText, synthMayCache, fallbackPrompt }: Plan,
+	{ voice, synthText, synthMayCache, selectedText, fallback }: Plan,
 	sessionId: string
 ): Response {
 	const encoder = new TextEncoder();
@@ -132,22 +144,22 @@ function streamLine(
 				// carries the line); the deterministic line gets cached via normal voicing elsewhere.
 				if (
 					!voiced &&
-					fallbackPrompt &&
-					synthText !== fallbackPrompt &&
-					isCached(fallbackPrompt, voice)
+					fallback &&
+					synthText !== fallback.prompt &&
+					isCached(fallback.prompt, voice)
 				) {
-					voiced = await pump(fallbackPrompt, true);
+					voiced = await pump(fallback.prompt, true);
 					logVoice(
 						sessionId,
 						voiced ? 'info' : 'warn',
-						voiced ? 'voiced the cached fallback' : 'no audio — silent',
+						voiced ? `voiced the cached fallback: "${fallback.text}"` : 'no audio — silent',
 						voice
 					);
 				} else {
 					logVoice(
 						sessionId,
 						voiced ? 'info' : 'warn',
-						voiced ? 'voiced' : 'synth produced no audio — silent',
+						voiced ? `voiced: "${selectedText}"` : 'synth produced no audio — silent',
 						voice
 					);
 				}
@@ -182,15 +194,26 @@ export const POST: RequestHandler = async ({ request, locals, getClientAddress }
 	const sessionId = locals.sessionId;
 	const resolved = resolveLine(body, sessionId);
 	if (resolved === null) {
-		logVoice(sessionId, 'warn', `refused an unknown or evicted line (kind: ${body.kind})`);
+		// Best-effort voice from the raw descriptor so a refused Sköll line isn't mis-attributed to the Oracle.
+		logVoice(
+			sessionId,
+			'warn',
+			`refused an unknown or evicted line (kind: ${body.kind})`,
+			voiceForLine(body)
+		);
 		return badLine();
 	}
 
 	const limitKey = buildLimiterKey(resolveLimiterAddress(request, getClientAddress), sessionId);
 
-	const plan = planSynth(resolved, sessionId, limitKey);
+	const plan = planSynth(resolved, limitKey);
 	if (plan instanceof Response) {
-		logVoice(sessionId, 'warn', `not voiced (${denialReason(plan.status)})`, resolved.voice);
+		logVoice(
+			sessionId,
+			'warn',
+			`not voiced (${denialReason(plan.status)}): "${resolved.text}"`,
+			resolved.voice
+		);
 		return plan;
 	}
 	return streamLine(plan, sessionId);

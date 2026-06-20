@@ -39,7 +39,7 @@ The core loop — Ask, Hex, Scry, Pass, Cast — runs on buttons and a text box.
 | Voice delivery | One server TTS route (`POST /api/voice/tts`, a `voice` param) feeding one shared client speaker (`deliver()`); no real-time session |
 | Oracle voice | `Gacrux` — swappable, single config value (`ORACLE_VOICE`) |
 | Sköll voice | `Algieba` — swappable, single config value (`SKOLL_VOICE`) |
-| Models | Oracle interpret + dramatized verdict + transcription: `gemini-3.5-flash`; Sköll: `gemini-3.1-flash-lite`; TTS: `gemini-3.1-flash-tts-preview` |
+| Models | Oracle interpret + dramatized verdict + transcription: `gemini-3.5-flash`; Sköll: `gemini-3.1-flash-lite`; TTS: primary `gemini-3.1-flash-tts-preview`, fallback `gemini-2.5-flash-preview-tts` on pre-audio 429s |
 | What the route voices | **Server-owned lines only.** Either a known line ID recomposed from the engine's truth (`lines.ts` allow-list), or a Gemini-authored line stashed server-side and fetched by an opaque per-session id — never the client's wire text |
 | Auth | `GEMINI_API_KEY` stays in Google Secret Manager, server-side only; it never reaches the browser and no client tokens are minted |
 | Input | Push-to-talk: a held recording (WAV) → `POST /api/voice/transcribe` → text → the same Ask/React pipeline as the buttons |

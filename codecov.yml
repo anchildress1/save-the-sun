@@ -1,0 +1,9 @@
+# Patch coverage keeps codecov's default "auto" target (the project's current coverage); the small
+# threshold absorbs irreducible noise — chiefly Svelte 5's compiled update-path branches on keyed
+# lists, which execute under test but aren't recorded by v8 branch instrumentation. The real coverage
+# floors live in vite.config.ts (vitest thresholds) and are enforced by `make test` + the pre-push hook.
+coverage:
+  status:
+    patch:
+      default:
+        threshold: 1%

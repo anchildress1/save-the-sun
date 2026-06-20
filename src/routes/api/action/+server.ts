@@ -482,14 +482,6 @@ function chargeAskQuota(question: string, limitKey: string): Response | null {
 	);
 }
 
-// The engine's canonical verdict for an Ask: a Hex silenced her, her answer on a clean read, or the
-// engine declining the ask.
-function askTruth(killed: boolean, oracle: OracleResult | undefined): string {
-	if (killed) return 'Hexed by Sköll — the Oracle is silent, her turn spent';
-	if (oracle?.ok) return oracle.answer;
-	return 'engine declined the Ask';
-}
-
 async function askWithSkollReaction(
 	sessionId: string,
 	engine: GameEngine,
@@ -551,31 +543,27 @@ async function askWithSkollReaction(
 		data: { choice: vs.choice, source: vs.source, ...reactIO }
 	});
 
-	let oracle;
+	// The Ask verdict is the engine's, logged at the point each outcome is decided — never restated
+	// elsewhere. The Oracle owns her interpret (above) and her flair (below); the deterministic truth
+	// is the engine's alone.
+	let oracle: Extract<OracleResult, { ok: true }> | undefined;
 	if (vs.killed) {
 		engine.passTurn(); // her question dies; her turn is spent with no answer
+		engineVerdict(sessionId, 'Ask', 'Hexed by Sköll — the Oracle is silent, her turn spent');
 	} else {
-		oracle = answerAsk(engine, 'Human', prepared.query, prepared.paraphrase);
-		if (oracle.ok) {
-			// A Scry lets Sköll overhear her answer — his earned fact.
-			if (vs.scried) skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
-			// Her spoken reply, owned by the Oracle — distinct from the Engine's verdict of the same
-			// truth below, and absent when she's hexed silent (mirrors what the voice route delivers).
-			logEvent(sessionId, {
-				owner: 'Oracle',
-				kind: 'deterministic',
-				part: 'Answer',
-				level: 'info',
-				message: `answers: ${oracle.answer}`,
-				data: { affirmative: oracle.affirmative }
-			});
-		}
+		// prepareAsk re-validated the query and it's the human's turn on an active round, so the engine
+		// always answers — answerAsk's ok:false arm is unreachable here.
+		oracle = answerAsk(engine, 'Human', prepared.query, prepared.paraphrase) as Extract<
+			OracleResult,
+			{ ok: true }
+		>;
+		// A Scry lets Sköll overhear her answer — his earned fact.
+		if (vs.scried) skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
+		engineVerdict(sessionId, 'Ask', oracle.answer);
 	}
 
 	// On a clean answer (Sköll passed), she authors her verdict aloud — sets `oracle.voiced`.
-	if (oracle?.ok && vs.choice === 'Pass') await authorAnswerFlair(sessionId, oracle);
-
-	engineVerdict(sessionId, 'Ask', askTruth(vs.killed, oracle));
+	if (oracle && vs.choice === 'Pass') await authorAnswerFlair(sessionId, oracle);
 
 	// Mirror the line the client voices for this outcome (his Hex/Scry framing, or her answer on a
 	// Pass), so a dropped Ask response recovers it instead of the false silent line.

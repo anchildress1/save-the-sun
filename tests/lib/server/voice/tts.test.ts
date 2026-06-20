@@ -22,7 +22,15 @@ const mock = vi.hoisted(() => ({
 vi.mock('$env/dynamic/private', () => ({ env: mock.env }));
 
 import { synthesizeStream, isCached, resetTtsCache } from '$lib/server/voice/tts';
-import { ORACLE_VOICE, SKOLL_VOICE, TTS_MODEL } from '$lib/voice/config';
+import { ORACLE_VOICE, SKOLL_VOICE, TTS_MODEL, TTS_FALLBACK_MODEL } from '$lib/voice/config';
+import { getEvents } from '$lib/server/debug/log';
+
+// Production shape: the client sets retryOptions, so a retried 429 escapes pRetry as a plain Error
+// with NO status — the ApiError.status path is only taken when retries are off. Default the fallback
+// tests to this so they exercise what the deployed client actually throws (not a synthetic .status).
+const rateLimit = () => new Error('Retryable HTTP Error: Too Many Requests');
+// The no-retry shape — a clean ApiError carrying the numeric status — is recognized too.
+const rateLimitApiError = () => Object.assign(new Error('429'), { status: 429 });
 
 // A Gemini stream is an async iterable of parts; each part may carry one inline-audio chunk.
 function streamOf(...chunks: (string | null)[]) {
@@ -159,6 +167,76 @@ describe('synthesizeStream', () => {
 			'whole-b'
 		]);
 		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
+	});
+
+	it('falls back to the older model when the primary 429s before any audio', async () => {
+		sdk.generateContentStream.mockRejectedValueOnce(rateLimit());
+		sdk.generateContentStream.mockResolvedValueOnce(streamOf('fb-a', 'fb-b'));
+
+		const chunks = await collect(
+			synthesizeStream('I wake with the fire.', ORACLE_VOICE, true, 's1')
+		);
+
+		expect(chunks).toEqual(['fb-a', 'fb-b']); // the line still speaks, in the same voice
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
+		expect(sdk.generateContentStream).toHaveBeenNthCalledWith(
+			1,
+			expect.objectContaining({ model: TTS_MODEL })
+		);
+		expect(sdk.generateContentStream).toHaveBeenNthCalledWith(
+			2,
+			expect.objectContaining({ model: TTS_FALLBACK_MODEL })
+		);
+		// The fallback clip caches under the same key — a replay costs no further synth.
+		expect(isCached('I wake with the fire.', ORACLE_VOICE)).toBe(true);
+		// The swap is teed to /debug as a warn, not a silent degrade.
+		const tee = getEvents('s1').at(-1);
+		expect(tee).toMatchObject({ level: 'warn', part: 'Voice' });
+		expect(tee?.message).toContain(TTS_FALLBACK_MODEL);
+	});
+
+	it('does not fall back once audio has streamed — no double-speak in the other model', async () => {
+		const partial429 = (async function* () {
+			yield { candidates: [{ content: { parts: [{ inlineData: { data: 'mid' } }] } }] };
+			throw rateLimit();
+		})();
+		sdk.generateContentStream.mockResolvedValueOnce(partial429);
+
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual(['mid']);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(1); // the second model is never tried
+	});
+
+	it('falls back when a 429 arrives as a clean ApiError (no-retry shape)', async () => {
+		sdk.generateContentStream.mockRejectedValueOnce(rateLimitApiError());
+		sdk.generateContentStream.mockResolvedValueOnce(streamOf('fb'));
+
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual(['fb']);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
+	});
+
+	it('does not fall back on a non-rate-limit failure', async () => {
+		// Same retry-wrapped shape as a 429, but a 500 — the reason phrase must not match the limiter.
+		sdk.generateContentStream.mockRejectedValueOnce(
+			new Error('Retryable HTTP Error: Internal Server Error')
+		);
+
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([]);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(1); // a 500 is terminal, not a fallback
+	});
+
+	it('does not fall back on a non-Error throw', async () => {
+		sdk.generateContentStream.mockRejectedValueOnce('boom'); // a bare string, never a rate-limit
+
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([]);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(1);
+	});
+
+	it('gives up after the fallback model also 429s — no third attempt', async () => {
+		sdk.generateContentStream.mockRejectedValueOnce(rateLimit()); // primary throttled
+		sdk.generateContentStream.mockRejectedValueOnce(rateLimit()); // fallback throttled too
+
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([]);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2); // primary + fallback, then stop
 	});
 
 	it('caps the clip cache, evicting the oldest so memory stays bounded', async () => {

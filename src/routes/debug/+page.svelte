@@ -31,10 +31,6 @@
 
 	const ownerClass = (e: DebugEvent) => e.owner.toLowerCase().replace('ö', 'o'); // 'Sköll' → 'skoll'
 	const KIND_LABEL = { input: 'input', llm: 'Gemini AI', deterministic: 'deterministic' } as const;
-	// Raw Gemini I/O is multi-KB per call; voice tool calls carry args/results. Both are collapsed
-	// so the stream reads as the parsed turn story — the detail is one click away.
-	const summaryFor = (e: DebugEvent) =>
-		e.data && 'request' in e.data ? 'full request / response' : 'details';
 </script>
 
 <svelte:head><title>Save the Sun — debug</title></svelte:head>
@@ -52,22 +48,23 @@
 	{:else}
 		<ol>
 			{#each ordered as event (event.seq)}
+				<!-- Collapsed by default: one game emits ~100 entries, so each row stays a single header
+				     line and the message/raw I/O open only when clicked — no scrolling past the whole log. -->
 				<li class="ev {ownerClass(event)} {event.level}">
-					<div class="head">
-						<span class="seq">#{event.seq}</span>
-						<span class="part">{event.part}</span>
-						<span class="who">{event.owner}</span>
-						<span class="badge kind-badge {event.kind}">{KIND_LABEL[event.kind]}</span>
-						{#if event.level !== 'info'}<span class="badge {event.level}">{event.level}</span>{/if}
-					</div>
+					<details class="entry">
+						<summary>
+							<span class="seq">#{event.seq}</span>
+							<span class="part">{event.part}</span>
+							<span class="who">{event.owner}</span>
+							<span class="badge kind-badge {event.kind}">{KIND_LABEL[event.kind]}</span>
+							{#if event.level !== 'info'}<span class="badge {event.level}">{event.level}</span
+								>{/if}
+							<span class="msg-preview">{event.message}</span>
+						</summary>
 
-					<p class="msg">{event.message}</p>
-					{#if event.data}
-						<details class="io">
-							<summary>{summaryFor(event)}</summary>
-							<pre>{pretty(event.data)}</pre>
-						</details>
-					{/if}
+						<p class="msg">{event.message}</p>
+						{#if event.data}<pre>{pretty(event.data)}</pre>{/if}
+					</details>
 				</li>
 			{/each}
 		</ol>
@@ -146,14 +143,44 @@
 		border-inline-start-color: #e05555;
 		background: #1e1518;
 	}
-	.head {
+	.entry > summary {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.35rem 0.5rem;
 		font-size: 0.8rem;
 		color: #b8b8c0;
-		margin-block-end: 0.35rem;
+		cursor: pointer;
+		list-style: none; /* drop the native triangle; the caret below sits with the chips */
+		user-select: none;
+	}
+	.entry > summary::-webkit-details-marker {
+		display: none;
+	}
+	.entry > summary::before {
+		content: '▸';
+		color: #7a7a85;
+		font-size: 0.7rem;
+	}
+	.entry[open] > summary::before {
+		content: '▾';
+	}
+	.entry > summary:focus-visible {
+		outline: 2px solid #ffe08a;
+		outline-offset: 2px;
+		border-radius: 0.2rem;
+	}
+	/* Collapsed: the message rides the header line, clipped — enough to scan the turn story at a glance. */
+	.msg-preview {
+		flex: 1 1 12rem;
+		min-inline-size: 0;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		color: #c8c8d0;
+	}
+	.entry[open] .msg-preview {
+		display: none; /* the full, wrapped message takes over once open */
 	}
 	.seq {
 		color: #7a7a85;
@@ -215,31 +242,8 @@
 		color: #ff9d9d;
 	}
 	.msg {
-		margin: 0;
+		margin: 0.4rem 0 0;
 		overflow-wrap: anywhere; /* break long unbroken tokens (echoes, names) rather than overflow */
-	}
-	.io {
-		margin-top: 0.4rem;
-	}
-	.io summary {
-		display: inline-block;
-		padding: 0.1rem 0.2rem;
-		color: #8f95a8;
-		font-size: 0.75rem;
-		letter-spacing: 0.03em;
-		cursor: pointer;
-		user-select: none;
-	}
-	.io summary:hover {
-		color: #c8cdda;
-	}
-	.io summary:focus-visible {
-		outline: 2px solid #ffe08a;
-		outline-offset: 2px;
-		border-radius: 0.2rem;
-	}
-	.io[open] summary {
-		color: #c8cdda;
 	}
 	pre {
 		margin: 0.4rem 0 0;

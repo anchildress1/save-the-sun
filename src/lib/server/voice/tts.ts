@@ -5,7 +5,7 @@
 
 import { GoogleGenAI, Modality } from '@google/genai';
 import { env } from '$env/dynamic/private';
-import { TTS_MODEL, SKOLL_VOICE, type VoiceId } from '$lib/voice/config';
+import { TTS_MODEL, TTS_FALLBACK_MODEL, SKOLL_VOICE, type VoiceId } from '$lib/voice/config';
 import { maskApiKey, logEvent } from '$lib/server/debug/log';
 
 // Keyed by voice + text: the Oracle and Sköll speak different lines, but a shared line in two voices
@@ -43,6 +43,31 @@ function ai(apiKey: string): GoogleGenAI {
 	return client;
 }
 
+// 429 is the shared-quota throttle we fall back on. The no-retry SDK path throws an ApiError with
+// `.status`, but our client sets retryOptions — so a retried 429 escapes pRetry as a plain
+// Error('Retryable HTTP Error: Too Many Requests') with no status. Match both shapes.
+const isRateLimited = (err: unknown): boolean => {
+	if ((err as { status?: number })?.status === 429) return true;
+	return err instanceof Error && /\b429\b|RESOURCE_EXHAUSTED|Too Many Requests/i.test(err.message);
+};
+
+// Drop to the next model only on a pre-audio rate-limit with a model still to try — never mid-line
+// (that would re-speak in the other voice) and never on a non-429 failure.
+const canFallBack = (err: unknown, voiced: boolean, hasNextModel: boolean): boolean =>
+	!voiced && hasNextModel && isRateLimited(err);
+
+// Tee the model swap to /debug so a quota fallback is visible, not a silent degrade to the older model.
+function logFallback(sessionId: string | undefined, voice: VoiceId): void {
+	if (!sessionId) return;
+	logEvent(sessionId, {
+		owner: voice === SKOLL_VOICE ? 'Sköll' : 'Oracle',
+		kind: 'llm',
+		part: 'Voice',
+		level: 'warn',
+		message: `TTS rate-limited on ${TTS_MODEL}; retrying on ${TTS_FALLBACK_MODEL}`
+	});
+}
+
 // A synth failure is masked (an SDK error can embed the key) and teed to /debug — without this the
 // Oracle's silence is invisible there while the panel still shows her text.
 function logSynthFailure(sessionId: string | undefined, voice: VoiceId, err: unknown): void {
@@ -57,6 +82,37 @@ function logSynthFailure(sessionId: string | undefined, voice: VoiceId, err: unk
 			level: 'error',
 			message: `TTS synth failed: ${masked.split('\n')[0]}`
 		});
+}
+
+// Stream one model's audio, yielding each base64 chunk as it arrives and caching the full clip on a
+// clean finish. Throws the SDK error to the caller, which decides fallback vs. give up. Authored lines
+// (cacheable=false) accumulate nothing — a unique key can't replay, so caching only grows memory.
+async function* streamModel(
+	apiKey: string,
+	model: string,
+	text: string,
+	voice: VoiceId,
+	cacheable: boolean,
+	key: string
+): AsyncGenerator<string> {
+	const chunks: string[] = [];
+	const stream = await ai(apiKey).models.generateContentStream({
+		model,
+		contents: [{ role: 'user', parts: [{ text }] }],
+		config: {
+			responseModalities: [Modality.AUDIO],
+			speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
+		}
+	});
+	for await (const part of stream) {
+		const data = part.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+		if (data) {
+			if (cacheable) chunks.push(data);
+			yield data;
+		}
+	}
+	// A stream that errored mid-flight throws before here, so a truncated clip never caches.
+	remember(key, chunks);
 }
 
 /**
@@ -80,35 +136,31 @@ export async function* synthesizeStream(
 		}
 	}
 
-	if (!env.GEMINI_API_KEY) {
+	const apiKey = env.GEMINI_API_KEY;
+	if (!apiKey) {
 		console.error('[voice] GEMINI_API_KEY is not configured; cannot synthesize');
 		return;
 	}
 
-	const chunks: string[] = [];
-	try {
-		const stream = await ai(env.GEMINI_API_KEY).models.generateContentStream({
-			model: TTS_MODEL,
-			contents: [{ role: 'user', parts: [{ text }] }],
-			config: {
-				responseModalities: [Modality.AUDIO],
-				speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
-			}
-		});
-		for await (const part of stream) {
-			const data = part.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-			if (data) {
-				if (cacheable) chunks.push(data);
+	// Primary then fallback: the older model is tried only when the primary 429s before a single chunk —
+	// once audio is on the wire, switching models would re-speak the line in the other voice.
+	const models = [TTS_MODEL, TTS_FALLBACK_MODEL];
+	for (let i = 0; i < models.length; i++) {
+		let voiced = false;
+		try {
+			for await (const data of streamModel(apiKey, models[i], text, voice, cacheable, key)) {
+				voiced = true;
 				yield data;
 			}
+			return;
+		} catch (err) {
+			if (canFallBack(err, voiced, i < models.length - 1)) {
+				logFallback(sessionId, voice);
+				continue;
+			}
+			logSynthFailure(sessionId, voice, err); // mask + tee; best-effort past here
+			return;
 		}
-		// Cache only a complete clip — a stream that errored mid-flight must not replay truncated.
-		// Authored lines (Gemini-written, unique every call) are never cacheable: a unique key can't
-		// replay, so caching only grows memory unbounded for the life of the process.
-		remember(key, chunks);
-	} catch (err) {
-		// Mask + tee the failure (helper keeps this generator's complexity down) — best-effort past here.
-		logSynthFailure(sessionId, voice, err);
 	}
 }
 
