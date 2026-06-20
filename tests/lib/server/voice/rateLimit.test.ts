@@ -12,7 +12,10 @@ import {
 	TTS_GLOBAL_LIMIT,
 	claimTranscribeSlot,
 	resetTranscribeWindows,
-	resolveLimit
+	resolveLimit,
+	resolveLimiterAddress,
+	buildLimiterKey,
+	resetLimiterKey
 } from '$lib/server/voice/rateLimit';
 
 const T0 = 1_000_000;
@@ -39,6 +42,70 @@ describe('resolveLimit', () => {
 		resolveLimit(undefined, 10); // unset is the normal case — no noise
 		expect(warn).toHaveBeenCalledTimes(1);
 		warn.mockRestore();
+	});
+});
+
+describe('resolveLimiterAddress', () => {
+	it('uses getClientAddress when available and stable', () => {
+		const request = new Request('http://localhost');
+		expect(resolveLimiterAddress(request, () => '198.51.100.17')).toBe('198.51.100.17');
+	});
+
+	it('falls back to x-forwarded-for when getClientAddress throws', () => {
+		const request = new Request('http://localhost', {
+			headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.1' }
+		});
+		expect(
+			resolveLimiterAddress(request, () => {
+				throw new Error('upstream proxy not configured');
+			})
+		).toBe('203.0.113.9');
+	});
+
+	it('falls back to cf-connecting-ip when getClientAddress returns undefined', () => {
+		const request = new Request('http://localhost', {
+			headers: { 'cf-connecting-ip': '198.18.0.22' }
+		});
+		expect(resolveLimiterAddress(request, () => undefined)).toBe('198.18.0.22');
+	});
+
+	it('returns unknown when no source can provide an address', () => {
+		const request = new Request('http://localhost');
+		expect(resolveLimiterAddress(request)).toBe('unknown');
+	});
+
+	it('parses the Forwarded header for= token, stripping IPv6 brackets', () => {
+		const request = new Request('http://localhost', {
+			headers: { forwarded: 'for=[2001:db8::1];proto=https' }
+		});
+		expect(resolveLimiterAddress(request)).toBe('2001:db8::1');
+	});
+
+	it('skips a Forwarded header that carries no for= token', () => {
+		const request = new Request('http://localhost', {
+			headers: { forwarded: 'proto=https;by=10.0.0.1' }
+		});
+		expect(resolveLimiterAddress(request)).toBe('unknown');
+	});
+
+	it('strips surrounding quotes and ignores a literal "unknown" address', () => {
+		const quoted = new Request('http://localhost', {
+			headers: { 'x-forwarded-for': '"203.0.113.5"' }
+		});
+		expect(resolveLimiterAddress(quoted)).toBe('203.0.113.5');
+		// A header whose first hop is the literal token `unknown` is no address — fall through.
+		const unknown = new Request('http://localhost', {
+			headers: { 'x-forwarded-for': 'unknown', 'x-real-ip': '192.0.2.7' }
+		});
+		expect(resolveLimiterAddress(unknown)).toBe('192.0.2.7');
+	});
+});
+
+describe('buildLimiterKey', () => {
+	it('joins address and session, defaulting each empty part', () => {
+		expect(buildLimiterKey('203.0.113.9', 'sess-1')).toBe('203.0.113.9:sess-1');
+		expect(buildLimiterKey(undefined, 'sess-1')).toBe('unknown:sess-1');
+		expect(buildLimiterKey('203.0.113.9', '')).toBe('203.0.113.9:nosession');
 	});
 });
 
@@ -73,6 +140,19 @@ describe('claimTtsSlot', () => {
 	it('allows exactly TTS_SESSION_LIMIT claims per session within one window', () => {
 		drainSession('witch', T0);
 		expect(claimTtsSlot('witch', T0)).toEqual({ ok: false, retryAfterSeconds: 60 });
+	});
+
+	it('resetLimiterKey gives one session a fresh window (newGame is a clean slate)', () => {
+		drainSession('witch', T0);
+		expect(claimTtsSlot('witch', T0).ok).toBe(false); // spent
+		resetLimiterKey('witch');
+		expect(claimTtsSlot('witch', T0).ok).toBe(true); // cleared → fresh allowance
+	});
+
+	it('resetLimiterKey leaves the global ceiling intact — newGame cannot bypass it', () => {
+		exhaustGlobal(T0); // global window full across many sessions
+		resetLimiterKey('late-comer'); // clearing a key's session window...
+		expect(claimTtsSlot('late-comer', T0).ok).toBe(false); // ...does NOT reopen the global
 	});
 
 	it('reports the remaining window time on a session denial', () => {

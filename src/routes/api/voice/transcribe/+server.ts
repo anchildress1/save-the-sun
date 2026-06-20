@@ -1,6 +1,10 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { buildLimiterKey, claimTranscribeSlot } from '$lib/server/voice/rateLimit';
+import {
+	buildLimiterKey,
+	claimTranscribeSlot,
+	resolveLimiterAddress
+} from '$lib/server/voice/rateLimit';
 import {
 	transcribe,
 	classifyReaction,
@@ -107,7 +111,7 @@ export const POST: RequestHandler = async ({ request, locals, getClientAddress }
 	// Gemini call behind the per-session/global limiter (a denial spends nothing).
 	if (!env.GEMINI_API_KEY) return json({ error: 'Voice is unavailable.' }, { status: 503 });
 	const limitKey = buildLimiterKey(
-		typeof getClientAddress === 'function' ? getClientAddress() : undefined,
+		resolveLimiterAddress(request, getClientAddress),
 		locals.sessionId
 	);
 	const verdict = claimTranscribeSlot(limitKey);

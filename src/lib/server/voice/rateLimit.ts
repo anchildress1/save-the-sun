@@ -34,6 +34,7 @@ interface WindowState {
 
 interface Limiter {
 	claim(key: string, now?: number): RateVerdict;
+	clearKey(key: string): void;
 	reset(): void;
 }
 
@@ -80,6 +81,11 @@ function createLimiter(label: string, sessionLimit: number, globalLimit: number)
 			global.count += 1;
 			return { ok: true };
 		},
+		// Drop ONE key's per-session window — NOT the global. A new game clears the player's own spent
+		// budget without touching the global ceiling, so newGame can't be spammed to drain the key.
+		clearKey(key) {
+			sessions.delete(key);
+		},
 		reset() {
 			sessions.clear();
 			global = { count: 0, start: 0 };
@@ -93,12 +99,67 @@ const sttLimiter = createLimiter('stt', STT_SESSION_LIMIT, STT_GLOBAL_LIMIT);
 const flashLimiter = createLimiter('flash', ASK_SESSION_LIMIT, ASK_GLOBAL_LIMIT);
 const liteLimiter = createLimiter('lite', LITE_SESSION_LIMIT, LITE_GLOBAL_LIMIT);
 
+const FORWARDED_IP_HEADERS = ['x-forwarded-for', 'cf-connecting-ip', 'x-real-ip', 'true-client-ip'];
+// Sentinel for "no client address" — the literal token proxies send AND our own fallback key part.
+const UNKNOWN_ADDRESS = 'unknown';
+
+function normalizeAddress(value: string | null | undefined): string | undefined {
+	const normalized = value?.trim();
+	if (!normalized) return undefined;
+	const first = normalized.split(',')[0]?.trim();
+	if (!first || first.toLowerCase() === UNKNOWN_ADDRESS) return undefined;
+	if (first[0] === '"' && first.at(-1) === '"') return first.slice(1, -1).trim();
+	return first;
+}
+
+function resolveAddressFromHeaders(headers: Headers): string | undefined {
+	for (const name of FORWARDED_IP_HEADERS) {
+		const fromHeader = normalizeAddress(headers.get(name));
+		if (fromHeader) return fromHeader;
+	}
+	const forwarded = headers.get('forwarded');
+	if (!forwarded) return undefined;
+	const forwardedMatch = /\bfor=([^;,\s"]+)/i.exec(forwarded);
+	if (!forwardedMatch) return undefined;
+	const token = normalizeAddress(forwardedMatch[1]);
+	return token?.replace(/^\[|\]$/g, '');
+}
+
+const getClientAddressSafe = (getClientAddress?: () => string | undefined): string | undefined => {
+	if (typeof getClientAddress !== 'function') return undefined;
+	try {
+		return normalizeAddress(getClientAddress());
+	} catch (error) {
+		console.warn(
+			`[rateLimit] failed to read request client address (${error instanceof Error ? error.message : String(error)}), using headers`
+		);
+		return undefined;
+	}
+};
+
 /**
  * Build a stable abuse key from network/client fingerprint + browser session.
  * Use this instead of session-only keys if one source is the attack vector.
  */
 export const buildLimiterKey = (address: string | undefined, sessionId: string): string =>
-	`${address || 'unknown'}:${sessionId || 'nosession'}`;
+	`${address || UNKNOWN_ADDRESS}:${sessionId || 'nosession'}`;
+
+export const resolveLimiterAddress = (
+	request: Request,
+	getClientAddress?: () => string | undefined
+): string => {
+	return (
+		getClientAddressSafe(getClientAddress) ||
+		resolveAddressFromHeaders(request.headers) ||
+		UNKNOWN_ADDRESS
+	);
+};
+
+// Drop a single session's spent windows across every bucket (newGame = a clean slate). Per-session
+// only — the global ceilings keep counting, so this can't be spammed to bypass the abuse guard.
+export const resetLimiterKey = (key: string): void => {
+	for (const limiter of [ttsLimiter, sttLimiter, flashLimiter, liteLimiter]) limiter.clearKey(key);
+};
 
 export const claimTtsSlot = (key: string, now?: number): RateVerdict => ttsLimiter.claim(key, now);
 export const claimTranscribeSlot = (key: string, now?: number): RateVerdict =>

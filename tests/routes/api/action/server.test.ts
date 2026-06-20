@@ -34,7 +34,11 @@ import {
 	getLastLine
 } from '$lib/server/engine/session';
 import { getEvents, captureGemini, runWithSession } from '$lib/server/debug/log';
-import { resetOracleWindows, ASK_SESSION_LIMIT } from '$lib/server/voice/rateLimit';
+import {
+	resetOracleWindows,
+	resetLiteWindows,
+	ASK_SESSION_LIMIT
+} from '$lib/server/voice/rateLimit';
 import { selectSecret } from '$lib/server/engine/engine';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 import { OUTCOME_LINES, VOICED_SEQUENCE } from '$lib/voice/outcomeLines';
@@ -73,6 +77,7 @@ describe('POST /api/action', () => {
 		vi.clearAllMocks();
 		resetEngine(SID, SEED);
 		resetOracleWindows(); // the Ask limiter is module state — clear it so cases don't share a window
+		resetLiteWindows(); // same for the lite limiter (Sköll's move + reaction) — no cross-case bleed
 		skollDecides(async () => ({ kind: 'cast', runeName: WRONG })); // default: Sköll misplays a cast
 		skollReacts(async () => ({ reaction: 'Pass' })); // default: Sköll lets the human's Ask pass
 	});

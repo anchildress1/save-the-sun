@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { buildLimiterKey, claimTtsSlot } from '$lib/server/voice/rateLimit';
+import { buildLimiterKey, claimTtsSlot, resolveLimiterAddress } from '$lib/server/voice/rateLimit';
 import {
 	composeLine,
 	isLineDescriptor,
@@ -186,10 +186,7 @@ export const POST: RequestHandler = async ({ request, locals, getClientAddress }
 		return badLine();
 	}
 
-	const limitKey = buildLimiterKey(
-		typeof getClientAddress === 'function' ? getClientAddress() : undefined,
-		sessionId
-	);
+	const limitKey = buildLimiterKey(resolveLimiterAddress(request, getClientAddress), sessionId);
 
 	const plan = planSynth(resolved, sessionId, limitKey);
 	if (plan instanceof Response) {

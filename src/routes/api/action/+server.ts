@@ -17,7 +17,12 @@ import {
 	storeVoiceLine
 } from '$lib/server/engine/session';
 import { composeLine, type LineDescriptor } from '$lib/server/voice/lines';
-import { claimLiteSlot, claimOracleSlot, buildLimiterKey } from '$lib/server/voice/rateLimit';
+import {
+	claimLiteSlot,
+	claimOracleSlot,
+	buildLimiterKey,
+	resolveLimiterAddress
+} from '$lib/server/voice/rateLimit';
 import { interpret, composeOracleFlair, composeEndingFlair } from '$lib/server/oracle/gemini';
 import { voiceAnswer, prepareAsk, answerAsk } from '$lib/server/oracle/oracle';
 import type { OracleResult } from '$lib/server/oracle/types';
@@ -253,24 +258,13 @@ function flairKeepsVerdict(flair: string, affirmative: boolean): boolean {
 	return firstWord === (affirmative ? 'yes' : 'no');
 }
 
+// No own quota: the flair is a second flash call WITHIN the Ask the gate already charged — it rides
+// under that one Ask slot (the Ask budget is sized for the ~3 Gemini calls a turn fans out to). The
+// engine answer stands if the flair synth/compose drops.
 async function authorAnswerFlair(
 	sessionId: string,
-	oracle: Extract<OracleResult, { ok: true }>,
-	limitKey: string
+	oracle: Extract<OracleResult, { ok: true }>
 ): Promise<void> {
-	const verdict = claimLiteSlot(limitKey);
-	if (!verdict.ok) {
-		logEvent(sessionId, {
-			owner: 'Oracle',
-			kind: 'llm',
-			part: 'Ask',
-			level: 'warn',
-			message: 'flair skipped — rate limited',
-			data: { retryAfterSeconds: verdict.retryAfterSeconds }
-		});
-		return;
-	}
-
 	const flair = await composeOracleFlair(oracle.answer);
 	const io = geminiIO(sessionId);
 	const note = (level: 'info' | 'warn', message: string, extra: Record<string, unknown> = {}) =>
@@ -335,7 +329,7 @@ export const POST: RequestHandler = async ({ request, locals, getClientAddress }
 
 	// runWithSession scopes any raw Gemini I/O teed this turn to THIS session's sink, never another's.
 	const limitKey = buildLimiterKey(
-		typeof getClientAddress === 'function' ? getClientAddress() : undefined,
+		resolveLimiterAddress(request, getClientAddress),
 		locals.sessionId
 	);
 
@@ -519,7 +513,20 @@ async function askWithSkollReaction(
 		data: { query: prepared.query, ...askIO }
 	});
 
-	const vs = await reactToHumanAsk(engine, skoll, prepared.query, decideSkollReaction, skoll.rng);
+	// His reaction is a flash-lite call — charge it against the lite budget. A denial returns an empty
+	// decision, which floors him to a deterministic Pass (never bluffs a reaction off no decision).
+	const decideSkollReactionWithQuota: typeof decideSkollReaction = async (view) => {
+		const verdict = claimLiteSlot(limitKey);
+		if (!verdict.ok) return {};
+		return decideSkollReaction(view);
+	};
+	const vs = await reactToHumanAsk(
+		engine,
+		skoll,
+		prepared.query,
+		decideSkollReactionWithQuota,
+		skoll.rng
+	);
 	const reactIO = geminiIO(sessionId);
 	logEvent(sessionId, {
 		owner: 'Sköll',
@@ -552,7 +559,7 @@ async function askWithSkollReaction(
 	}
 
 	// On a clean answer (Sköll passed), she authors her verdict aloud — sets `oracle.voiced`.
-	if (oracle?.ok && vs.choice === 'Pass') await authorAnswerFlair(sessionId, oracle, limitKey);
+	if (oracle?.ok && vs.choice === 'Pass') await authorAnswerFlair(sessionId, oracle);
 
 	let truth: string;
 	if (vs.killed) truth = 'Hexed by Sköll — the Oracle is silent, her turn spent';

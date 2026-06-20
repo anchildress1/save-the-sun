@@ -37,8 +37,9 @@ export function isCached(text: string, voice: string): boolean {
 
 let client: GoogleGenAI | null = null;
 function ai(apiKey: string): GoogleGenAI {
-	// 1 attempt; limiter-level throttles keep abuse down and prevent retry amplification.
-	client ??= new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 1 } } });
+	// 2 attempts (1 retry): the TTS preview model 500s occasionally, so one retry saves a line from
+	// dropping to text-only — without the amplification a higher count piles onto a throttled key.
+	client ??= new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 2 } } });
 	return client;
 }
 
