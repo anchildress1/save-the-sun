@@ -74,6 +74,8 @@ The whole game is an imitation game with a referee. You ask in plain English and
 ## Play
 
 - **Live:** [savethesun.anchildress1.dev](https://savethesun.anchildress1.dev/)
+- **Demo:** [watch the rite on YouTube](https://youtu.be/dbzMQcoGObc)
+- **The story:** [_The Oracle and the Wolf — I Made Gemini Lose Like a Kid_](https://dev.to/anchildress1/the-oracle-and-the-wolf-i-made-gemini-lose-like-a-kid-3nk5)
 - Desktop-first; the embedded board plays down to 750px wide. Below that, the rite asks for a wider sky.
 
 ---
