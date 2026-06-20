@@ -366,6 +366,14 @@ describe('POST /api/action', () => {
 		expect(data.skollVsYou).toEqual({ reaction: 'Hex' });
 		expect(data.oracle).toBeUndefined(); // silenced — no Oracle line
 		expect(data.state.activePlayer).toBe('Sköll'); // her turn spent → his to take on Advance
+		// The Hex outcome's verdict is the engine's, logged at the kill — deterministic, owner Engine,
+		// never relabeled as an Oracle row.
+		const verdict = getEvents(SID)
+			.filter((e) => e.owner === 'Engine' && e.part === 'Ask')
+			.at(-1)!;
+		expect(verdict).toMatchObject({ kind: 'deterministic', part: 'Ask' });
+		expect(verdict.message).toContain('Hexed');
+		expect(getEvents(SID).some((e) => e.owner === 'Oracle' && e.part === 'Answer')).toBe(false);
 	});
 
 	it('lets Sköll Scry the human Ask — she still gets her answer, he overhears it', async () => {

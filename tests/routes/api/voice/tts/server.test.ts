@@ -141,7 +141,7 @@ describe('POST /api/voice/tts', () => {
 
 	it('distinguishes two different lines in one voice — his cast and his Ask read apart', async () => {
 		// The end of a Sköll win voices two of his lines back to back; the tee must tell them apart
-		// instead of logging both as a bare "voiced" (the #69-vs-#70 confusion).
+		// instead of logging both as an indistinguishable bare "voiced".
 		tts.synthesizeStream.mockImplementation(() => streamOf('pcm'));
 		const castLine = skollCastEcho('Sowilo');
 		const query = { axis: 'element', value: 'Fire' };
