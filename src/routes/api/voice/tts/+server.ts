@@ -46,6 +46,10 @@ interface Resolved {
 	prompt: string;
 	cacheable: boolean;
 	fallbackPrompt: string | null;
+	// The bare spoken line (no director's-notes wrapping) — carried only for the /debug tee, so two
+	// different lines in one voice read apart instead of both as a generic "voiced".
+	text: string;
+	fallbackText: string | null;
 }
 
 interface Plan {
@@ -53,6 +57,8 @@ interface Plan {
 	synthText: string;
 	synthMayCache: boolean;
 	fallbackPrompt: string | null;
+	text: string;
+	fallbackText: string | null;
 }
 
 // Resolve a descriptor to its words + voice — by id from the session store for an authored line, or
@@ -67,25 +73,36 @@ function resolveLine(body: LineDescriptor, sessionId: string): Resolved | null {
 			voice: stored.voice,
 			prompt: synthPrompt(stored.voice, stored.text),
 			cacheable: false,
-			fallbackPrompt: synthPrompt(stored.voice, stored.fallback)
+			fallbackPrompt: synthPrompt(stored.voice, stored.fallback),
+			text: stored.text,
+			fallbackText: stored.fallback
 		};
 	}
 	const line = composeLine(body);
 	if (line === null) return null;
 	const voice = voiceForLine(body);
-	return { voice, prompt: synthPrompt(voice, line), cacheable: true, fallbackPrompt: null };
+	return {
+		voice,
+		prompt: synthPrompt(voice, line),
+		cacheable: true,
+		fallbackPrompt: null,
+		text: line,
+		fallbackText: null
+	};
 }
 
 // A cached cacheable line replays free (no key, no slot). Otherwise gate a fresh synth on the key +
 // limiter. An authored line never replays from its own unique prompt (cacheable=false skips the cache),
 // so it always faces the gate; on a block, a cached deterministic counterpart replays before going silent.
-function planSynth(resolved: Resolved, sessionId: string, limitKey: string): Plan | Response {
-	const { voice, prompt, cacheable, fallbackPrompt } = resolved;
+function planSynth(resolved: Resolved, limitKey: string): Plan | Response {
+	const { voice, prompt, cacheable, fallbackPrompt, text, fallbackText } = resolved;
 	const plan = (synthText: string, synthMayCache: boolean): Plan => ({
 		voice,
 		synthText,
 		synthMayCache,
-		fallbackPrompt
+		fallbackPrompt,
+		text,
+		fallbackText
 	});
 	if (cacheable && isCached(prompt, voice)) return plan(prompt, true);
 
@@ -111,7 +128,7 @@ function planSynth(resolved: Resolved, sessionId: string, limitKey: string): Pla
 // already what we're voicing. The pump is guarded so a torn stream / client disconnect closes
 // deliberately instead of escaping as an unhandled rejection — audio is best-effort past the panel text.
 function streamLine(
-	{ voice, synthText, synthMayCache, fallbackPrompt }: Plan,
+	{ voice, synthText, synthMayCache, fallbackPrompt, text, fallbackText }: Plan,
 	sessionId: string
 ): Response {
 	const encoder = new TextEncoder();
@@ -140,14 +157,14 @@ function streamLine(
 					logVoice(
 						sessionId,
 						voiced ? 'info' : 'warn',
-						voiced ? 'voiced the cached fallback' : 'no audio — silent',
+						voiced ? `voiced the cached fallback: "${fallbackText}"` : 'no audio — silent',
 						voice
 					);
 				} else {
 					logVoice(
 						sessionId,
 						voiced ? 'info' : 'warn',
-						voiced ? 'voiced' : 'synth produced no audio — silent',
+						voiced ? `voiced: "${text}"` : 'synth produced no audio — silent',
 						voice
 					);
 				}
@@ -188,9 +205,14 @@ export const POST: RequestHandler = async ({ request, locals, getClientAddress }
 
 	const limitKey = buildLimiterKey(resolveLimiterAddress(request, getClientAddress), sessionId);
 
-	const plan = planSynth(resolved, sessionId, limitKey);
+	const plan = planSynth(resolved, limitKey);
 	if (plan instanceof Response) {
-		logVoice(sessionId, 'warn', `not voiced (${denialReason(plan.status)})`, resolved.voice);
+		logVoice(
+			sessionId,
+			'warn',
+			`not voiced (${denialReason(plan.status)}): "${resolved.text}"`,
+			resolved.voice
+		);
 		return plan;
 	}
 	return streamLine(plan, sessionId);

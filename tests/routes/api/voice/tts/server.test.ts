@@ -120,9 +120,9 @@ describe('POST /api/voice/tts', () => {
 		tts.synthesizeStream.mockReturnValueOnce(streamOf('pcm'));
 		const ok = await call('log-ok', { kind: 'refusal', refusal: 'empty' });
 		await ok.text(); // consume the stream so its start() runs and the outcome logs
-		expect(
-			getEvents('log-ok').some((e) => e.part === 'Voice' && /TTS — voiced/.test(e.message))
-		).toBe(true);
+		// The tee carries the spoken line, so two different lines in one voice read apart.
+		const voiced = getEvents('log-ok').find((e) => e.part === 'Voice');
+		expect(voiced?.message).toBe(`TTS — voiced: "${refusalLine('empty')}"`);
 
 		// An unresolvable line used to 400 silently — now it leaves a trace to follow.
 		const res = await call('log-bad', {
@@ -137,6 +137,23 @@ describe('POST /api/voice/tts', () => {
 				(e) => e.level === 'warn' && /TTS — refused.*unknown/.test(e.message)
 			)
 		).toBe(true);
+	});
+
+	it('distinguishes two different lines in one voice — his cast and his Ask read apart', async () => {
+		// The end of a Sköll win voices two of his lines back to back; the tee must tell them apart
+		// instead of logging both as a bare "voiced" (the #69-vs-#70 confusion).
+		tts.synthesizeStream.mockImplementation(() => streamOf('pcm'));
+		const castLine = skollCastEcho('Sowilo');
+		const query = { axis: 'element', value: 'Fire' };
+		const askLine = skollAskEcho(query as Parameters<typeof skollAskEcho>[0]);
+
+		await (await call('two-skoll', { kind: 'skoll-cast', rune: 'Sowilo' })).text();
+		await (await call('two-skoll', { kind: 'skoll-ask', query })).text();
+
+		const voiced = getEvents('two-skoll')
+			.filter((e) => e.part === 'Voice')
+			.map((e) => e.message);
+		expect(voiced).toEqual([`TTS — voiced: "${castLine}"`, `TTS — voiced: "${askLine}"`]);
 	});
 
 	it('voices an authored line by id lookup from the session store (ttd:17)', async () => {
