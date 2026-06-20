@@ -57,8 +57,8 @@ interface Plan {
 	synthText: string;
 	synthMayCache: boolean;
 	fallbackPrompt: string | null;
-	text: string;
 	fallbackText: string | null;
+	selectedText: string;
 }
 
 // Resolve a descriptor to its words + voice — by id from the session store for an authored line, or
@@ -96,13 +96,13 @@ function resolveLine(body: LineDescriptor, sessionId: string): Resolved | null {
 // so it always faces the gate; on a block, a cached deterministic counterpart replays before going silent.
 function planSynth(resolved: Resolved, limitKey: string): Plan | Response {
 	const { voice, prompt, cacheable, fallbackPrompt, text, fallbackText } = resolved;
-	const plan = (synthText: string, synthMayCache: boolean): Plan => ({
+	const plan = (synthText: string, synthMayCache: boolean, selectedText = text): Plan => ({
 		voice,
 		synthText,
 		synthMayCache,
 		fallbackPrompt,
-		text,
-		fallbackText
+		fallbackText,
+		selectedText
 	});
 	if (cacheable && isCached(prompt, voice)) return plan(prompt, true);
 
@@ -110,13 +110,13 @@ function planSynth(resolved: Resolved, limitKey: string): Plan | Response {
 		fallbackPrompt !== null && isCached(fallbackPrompt, voice) ? fallbackPrompt : null;
 	if (!env.GEMINI_API_KEY) {
 		return fallbackReplay
-			? plan(fallbackReplay, true)
+			? plan(fallbackReplay, true, fallbackText ?? text)
 			: json({ error: 'Voice is unavailable.' }, { status: 503 });
 	}
 	const verdict = claimTtsSlot(limitKey);
 	if (verdict.ok) return plan(prompt, cacheable);
 	return fallbackReplay
-		? plan(fallbackReplay, true)
+		? plan(fallbackReplay, true, fallbackText ?? text)
 		: json(
 				{ error: 'Too many voice requests. Try again shortly.' },
 				{ status: 429, headers: { 'retry-after': String(verdict.retryAfterSeconds) } }
@@ -128,7 +128,7 @@ function planSynth(resolved: Resolved, limitKey: string): Plan | Response {
 // already what we're voicing. The pump is guarded so a torn stream / client disconnect closes
 // deliberately instead of escaping as an unhandled rejection — audio is best-effort past the panel text.
 function streamLine(
-	{ voice, synthText, synthMayCache, fallbackPrompt, text, fallbackText }: Plan,
+	{ voice, synthText, synthMayCache, fallbackPrompt, fallbackText, selectedText }: Plan,
 	sessionId: string
 ): Response {
 	const encoder = new TextEncoder();
@@ -164,7 +164,7 @@ function streamLine(
 					logVoice(
 						sessionId,
 						voiced ? 'info' : 'warn',
-						voiced ? `voiced: "${text}"` : 'synth produced no audio — silent',
+						voiced ? `voiced: "${selectedText}"` : 'synth produced no audio — silent',
 						voice
 					);
 				}

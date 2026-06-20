@@ -304,6 +304,7 @@ describe('POST /api/voice/tts', () => {
 		});
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe('pcm\n');
+		expect(getEvents('authored-q').at(-1)?.message).toBe(`TTS — voiced: "${fallback}"`);
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			fallbackPrompt,
 			ORACLE_VOICE,
@@ -329,6 +330,7 @@ describe('POST /api/voice/tts', () => {
 		});
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe('pcm\n');
+		expect(getEvents('authored-keyless').at(-1)?.message).toBe(`TTS — voiced: "${fallback}"`);
 		expect(tts.synthesizeStream).toHaveBeenCalledExactlyOnceWith(
 			fallbackPrompt,
 			ORACLE_VOICE,
