@@ -5,13 +5,29 @@
 
 import { GoogleGenAI, Modality } from '@google/genai';
 import { env } from '$env/dynamic/private';
-import { TTS_MODEL } from '$lib/voice/config';
-import { maskApiKey } from '$lib/server/debug/log';
+import { TTS_MODEL, SKOLL_VOICE, type VoiceId } from '$lib/voice/config';
+import { maskApiKey, logEvent } from '$lib/server/debug/log';
 
 // Keyed by voice + text: the Oracle and Sköll speak different lines, but a shared line in two voices
 // must cache as two clips, not collide.
 const cache = new Map<string, string[]>();
 const cacheKey = (voice: string, text: string) => `${voice}\n${text}`;
+
+// The deterministic line space is finite, but a hard cap keeps the cache provably bounded regardless —
+// PCM clips are large, and nothing else evicts them for the life of the process.
+const MAX_CLIPS = 128;
+
+// Store a finished clip; an empty one is dropped — a synth that yielded nothing, or an uncacheable
+// authored line whose chunks were never accumulated. Insertion-ordered, so once over the cap the
+// oldest falls off the front.
+function remember(key: string, chunks: string[]): void {
+	if (chunks.length === 0) return;
+	cache.set(key, chunks);
+	if (cache.size > MAX_CLIPS) {
+		const oldest = cache.keys().next().value;
+		if (oldest !== undefined) cache.delete(oldest);
+	}
+}
 
 /** Whether this exact line+voice is already synthesized — a cached replay costs no Gemini call, so the
  *  route can serve it without spending a synth-rate-limit slot. */
@@ -21,23 +37,47 @@ export function isCached(text: string, voice: string): boolean {
 
 let client: GoogleGenAI | null = null;
 function ai(apiKey: string): GoogleGenAI {
-	// 3 backoff attempts (408/429/5xx) — the TTS preview model 500s occasionally, and one blip
-	// shouldn't drop a line to text-only.
-	client ??= new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 3 } } });
+	// 2 attempts (1 retry): the TTS preview model 500s occasionally, so one retry saves a line from
+	// dropping to text-only — without the amplification a higher count piles onto a throttled key.
+	client ??= new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 2 } } });
 	return client;
+}
+
+// A synth failure is masked (an SDK error can embed the key) and teed to /debug — without this the
+// Oracle's silence is invisible there while the panel still shows her text.
+function logSynthFailure(sessionId: string | undefined, voice: VoiceId, err: unknown): void {
+	const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
+	const masked = maskApiKey(detail);
+	console.error('[voice] TTS synth failed:', masked);
+	if (sessionId)
+		logEvent(sessionId, {
+			owner: voice === SKOLL_VOICE ? 'Sköll' : 'Oracle',
+			kind: 'llm',
+			part: 'Voice',
+			level: 'error',
+			message: `TTS synth failed: ${masked.split('\n')[0]}`
+		});
 }
 
 /**
  * Stream one allow-listed line as base64 PCM chunks. Replays a cached clip's chunks when one
  * exists; otherwise streams from Gemini, accumulating the chunks to cache only on a clean finish.
  * Yields nothing (silent) when the key is missing or synthesis fails — the panel still has the line.
+ * @param cacheable false for an authored one-off line — skips both the cache replay and storage.
  */
-export async function* synthesizeStream(text: string, voice: string): AsyncGenerator<string> {
+export async function* synthesizeStream(
+	text: string,
+	voice: VoiceId,
+	cacheable = true,
+	sessionId?: string
+): AsyncGenerator<string> {
 	const key = cacheKey(voice, text);
-	const cached = cache.get(key);
-	if (cached !== undefined) {
-		yield* cached;
-		return;
+	if (cacheable) {
+		const cached = cache.get(key);
+		if (cached !== undefined) {
+			yield* cached;
+			return;
+		}
 	}
 
 	if (!env.GEMINI_API_KEY) {
@@ -58,16 +98,17 @@ export async function* synthesizeStream(text: string, voice: string): AsyncGener
 		for await (const part of stream) {
 			const data = part.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 			if (data) {
-				chunks.push(data);
+				if (cacheable) chunks.push(data);
 				yield data;
 			}
 		}
 		// Cache only a complete clip — a stream that errored mid-flight must not replay truncated.
-		if (chunks.length > 0) cache.set(key, chunks);
+		// Authored lines (Gemini-written, unique every call) are never cacheable: a unique key can't
+		// replay, so caching only grows memory unbounded for the life of the process.
+		remember(key, chunks);
 	} catch (err) {
-		// Keep the stack but mask it — an SDK error can embed the request URL, and with it the key.
-		const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
-		console.error('[voice] TTS synth failed:', maskApiKey(detail));
+		// Mask + tee the failure (helper keeps this generator's complexity down) — best-effort past here.
+		logSynthFailure(sessionId, voice, err);
 	}
 }
 

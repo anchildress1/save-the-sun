@@ -1,4 +1,4 @@
-// Output-mute preference (R11): one toggle silences the spoken voices while their captions keep
+// Output-mute preference: one toggle silences the spoken voices while their captions keep
 // rendering. Persisted in sessionStorage so it survives a reload but resets with the tab — "for
 // the session," distinct from the per-round view in viewState.ts. Every access is guarded:
 // storage throws in private mode, and a failure degrades to unmuted, never to broken play.

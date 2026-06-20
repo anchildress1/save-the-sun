@@ -63,15 +63,15 @@ export interface GameState {
 }
 
 /**
- * What Sköll did on his turn, attached to the response after the human's action (S6). He either
+ * What Sköll did on his turn, attached to the response after the human's action. He either
  * casts (round may end) or opens a reaction window with his Ask — `asks` present means the client
  * must show the interrupt prompt; his answer is produced only once the human reacts.
  */
 export interface SkollTurn {
 	// `query` rides along so the client can voice his Ask through the TTS route (the server recomposes
-	// his line from it — never arbitrary client text); `echo` is the same line as text (R10).
+	// his line from it — never arbitrary client text); `echo` is the same line as text.
 	asks?: { echo: string; query: Query };
-	// A winning cast is a game move too (R10): `rune` rides along so the client voices his line through
+	// A winning cast is a game move too: `rune` rides along so the client voices his line through
 	// the TTS route (server recomposes), `echo` is the same line as text. Present only when his cast
 	// WON — a wrong cast just hands the turn back, with no line.
 	casts?: { echo: string; rune: string };
@@ -100,7 +100,7 @@ export interface PendingReaction {
 }
 
 /**
- * A Gemini-authored closing line voiced on the end screen (ttd:22) — the Oracle's blessing on a win,
+ * A Gemini-authored closing line voiced on the end screen — the Oracle's blessing on a win,
  * Sköll's gloat on a loss. Structurally an `authored` LineDescriptor: its words live in the session's
  * voice-line store (the TTS route voices them by `id` lookup, never from the wire). Absent when
  * authoring failed (client falls back to the fixed splash beat).
@@ -157,11 +157,24 @@ export type ActionResponse<T extends ActionResult['type'] = ActionResult['type']
 /** Route one action to the engine/Oracle. */
 export async function handleAction(action: GameAction, deps: ActionDeps): Promise<ActionResult> {
 	switch (action.type) {
-		case 'Ask':
+		case 'Ask': {
+			// A stale Ask — not this player's live, active turn — can't commit, so refuse it from the
+			// engine state BEFORE the Gemini interpret. A stale tab (Sköll's turn, or a won round) then
+			// can't drain the shared key or the Ask quota on a request that was never going to land.
+			const engine = deps.engine;
+			if (engine.status !== 'active' || engine.activePlayer !== action.player) {
+				const engineReason: 'round-over' | 'not-your-turn' =
+					engine.status === 'active' ? 'not-your-turn' : 'round-over';
+				return {
+					type: 'Ask',
+					oracle: { ok: false, reason: 'engine', engineReason, turnConsumed: false }
+				};
+			}
 			return {
 				type: 'Ask',
-				oracle: await runOracle(deps.engine, action.player, action.question, deps.interpret)
+				oracle: await runOracle(engine, action.player, action.question, deps.interpret)
 			};
+		}
 		case 'Cast':
 			return { type: 'Cast', cast: deps.engine.cast(action.player, action.runeName) };
 		case 'CrossOff':

@@ -64,12 +64,6 @@ Emoji in diegetic copy. Exclamation marks in Oracle/Sól lines (Sköll earns one
 
 ## 1. Oracle
 
-### Wake invitation (voice, first wake of a round)
-
-Spoken once per round on the first successful wake of the voice session. Later wakes resume silent, including across a mid-round reload. The line is fixed: the model is directed to speak it verbatim (`oraclePersona.ts`), so a variant can never ramble. Kept short on purpose—a long greeting gives the open mic time to hear her own audio and trip a barge-in mid-line.
-
-> "I wake with the fire."
-
 ### Spoken moves (voice, S7)
 
 A voiced action calls the same engine function as its button, and the Oracle voices the same line the panel shows. When a spoken move isn't on offer, nothing executes; the engine truth below reaches the model as the tool result, voiced in her register (these never show in the panel — no move was made):
@@ -335,6 +329,8 @@ Delivered through the onboarding popovers (R7), not as persistent on-board text.
 ### Eclipse medallion (push-to-talk control)
 
 The medallion is the push-to-talk control: **hold** it (Space or Enter when it's focused, or the `` ` `` key from anywhere — never page-wide Space, which activates whatever control has focus) to record an Ask, release to send. Its accessible name carries the state plus the hold affordance; the announcement column is the polite live-region line for each transition. Visual states live in `v2-voice-requirements.md` R6.
+
+Hovering or focusing the disc (while live, not sealed) reveals a small hint — **"Hold to speak, or hold `` ` ``"** — so the page-wide backtick key is discoverable, not buried. The hint is also the button's `aria-describedby`, so it is read on focus, not only seen on hover.
 
 | State | Button label | Announced |
 |---|---|---|

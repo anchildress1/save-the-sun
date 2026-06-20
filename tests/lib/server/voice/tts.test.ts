@@ -117,7 +117,17 @@ describe('synthesizeStream', () => {
 
 		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([]);
 		expect(sdk.GoogleGenAI).not.toHaveBeenCalled();
-		expect(vi.mocked(console.error).mock.calls.flat().join(' ')).toContain('not configured');
+	});
+
+	it('does not cache an uncacheable (authored) line — a unique clip can never replay', async () => {
+		sdk.generateContentStream.mockResolvedValue(streamOf('a', 'b'));
+		const line = 'No, she does not reach for the color of the deep.';
+
+		expect(await collect(synthesizeStream(line, ORACLE_VOICE, false))).toEqual(['a', 'b']);
+		expect(isCached(line, ORACLE_VOICE)).toBe(false); // never stored — no memory accrual
+		// A second call re-synthesizes; there is no cached clip to replay.
+		await collect(synthesizeStream(line, ORACLE_VOICE, false));
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
 	});
 
 	it('masks the key and stops when the stream rejects', async () => {
@@ -149,5 +159,19 @@ describe('synthesizeStream', () => {
 			'whole-b'
 		]);
 		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
+	});
+
+	it('caps the clip cache, evicting the oldest so memory stays bounded', async () => {
+		const MAX_CLIPS = 128;
+		// A fresh generator per call — a single shared one would be exhausted after the first synth.
+		sdk.generateContentStream.mockImplementation(async () => streamOf('pcm'));
+		const oldest = 'clip 0';
+		// Fill exactly to the cap, then one past it — the very first clip falls off the front.
+		for (let i = 0; i < MAX_CLIPS; i++) await collect(synthesizeStream(`clip ${i}`, ORACLE_VOICE));
+		expect(isCached(oldest, ORACLE_VOICE)).toBe(true);
+
+		await collect(synthesizeStream(`clip ${MAX_CLIPS}`, ORACLE_VOICE));
+		expect(isCached(oldest, ORACLE_VOICE)).toBe(false); // evicted
+		expect(isCached(`clip ${MAX_CLIPS}`, ORACLE_VOICE)).toBe(true); // the newest survives
 	});
 });

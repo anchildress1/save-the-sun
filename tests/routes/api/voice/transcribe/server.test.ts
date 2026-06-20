@@ -50,6 +50,17 @@ describe('POST /api/voice/transcribe', () => {
 		expect(stt.transcribe).toHaveBeenCalledExactlyOnceWith('UklGRg==');
 	});
 
+	it('returns a clean 503 when a Gemini call throws — not an unstructured 500', async () => {
+		stt.transcribe.mockRejectedValueOnce(new Error('provider exploded'));
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		const response = await call('boom', { wavBase64: 'UklGRg==' });
+
+		expect(response.status).toBe(503);
+		expect((await response.json()).error).toContain('unavailable');
+		errorSpy.mockRestore();
+	});
+
 	it('classifies a reaction in reaction mode', async () => {
 		stt.classifyReaction.mockResolvedValueOnce('hex');
 
@@ -108,6 +119,40 @@ describe('POST /api/voice/transcribe', () => {
 		expect(stt.transcribe).not.toHaveBeenCalled();
 	});
 
+	// The debug tee renders an empty classifier result as '(unclear)' / '(nothing)' — exercise the
+	// fallback side of each so a mishear is still diagnosable in the stream.
+	it('tees an unclear cast (empty match) in cast mode', async () => {
+		stt.classifyCast.mockResolvedValueOnce('');
+		const response = await call('cast-unclear', {
+			wavBase64: 'UklGRg==',
+			mode: 'cast',
+			runes: ['Sowilo']
+		});
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ rune: '' });
+	});
+
+	it('tees an unclear hands-free cast (empty match) in ask mode', async () => {
+		stt.interpretAsk.mockResolvedValueOnce({ cast: '' });
+		const response = await call('ask-cast-unclear', { wavBase64: 'UklGRg==', runes: ['Sowilo'] });
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ rune: '' });
+	});
+
+	it('tees nothing-heard when interpretAsk reads an empty question', async () => {
+		stt.interpretAsk.mockResolvedValueOnce({ text: '' });
+		const response = await call('ask-empty', { wavBase64: 'UklGRg==', runes: ['Sowilo'] });
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ text: '' });
+	});
+
+	it('tees nothing-heard when a plain transcribe returns empty', async () => {
+		stt.transcribe.mockResolvedValueOnce('');
+		const response = await call('plain-empty', { wavBase64: 'UklGRg==' });
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ text: '' });
+	});
+
 	it('rejects an unknown mode with 400', async () => {
 		const response = await call('bad-mode', { wavBase64: 'UklGRg==', mode: 'shout' });
 		expect(response.status).toBe(400);
@@ -135,6 +180,15 @@ describe('POST /api/voice/transcribe', () => {
 	])('rejects $label with 400', async ({ body }) => {
 		const response = await call('bad', body);
 		expect(response.status).toBe(400);
+		expect(stt.transcribe).not.toHaveBeenCalled();
+	});
+
+	it('rejects a body over the request cap with 413, enforced while streaming (no Content-Length trust)', async () => {
+		// The cap (MAX_WAV_BASE64 5_000_000 + 16_384 margin) is enforced as the body streams in, so a
+		// chunked or Content-Length-less request can't slip an oversized payload past a header check.
+		const huge = 'a'.repeat(5_000_000 + 16_384 + 1_000);
+		const response = await call('flooder', { wavBase64: huge });
+		expect(response.status).toBe(413);
 		expect(stt.transcribe).not.toHaveBeenCalled();
 	});
 

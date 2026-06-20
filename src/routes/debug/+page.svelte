@@ -34,7 +34,7 @@
 	// Raw Gemini I/O is multi-KB per call; voice tool calls carry args/results. Both are collapsed
 	// so the stream reads as the parsed turn story — the detail is one click away.
 	const summaryFor = (e: DebugEvent) =>
-		e.message.startsWith('raw Gemini') ? 'full request / response' : 'details';
+		e.data && 'request' in e.data ? 'full request / response' : 'details';
 </script>
 
 <svelte:head><title>Save the Sun — debug</title></svelte:head>

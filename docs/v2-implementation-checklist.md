@@ -31,13 +31,13 @@ Every game move is composed server-side and voiced through the one `deliver()` s
 
 Push-to-talk control + living state indicator (`src/lib/components/EclipseMedallion.svelte`). Static art, animated light only.
 
-- [x] States: idle (mic glyph etched), recording (corona flares), thinking (rune ring orbits), Oracle-speaking (corona pulses), Sköll-speaking (ember + the disc deepens toward total eclipse with an ember rim — read by brightness/shape, never color alone)
+- [x] States: idle (mic glyph etched), recording (corona flares), thinking (rune ring orbits), Oracle-speaking (steady gold corona), Sköll-speaking (ember + the disc deepens toward total eclipse with an ember rim — read by brightness/shape, never color alone). The indicator switches voices on the delivery queue — driven by which clip is sounding, not enqueue — so Sköll's ember shows only once his clip plays
 - [x] `prefers-reduced-motion` → static glow intensities; ARIA label + polite live-region announcement per state
 - [x] The medallion + the output-mute toggle sit in one labeled `role="group"`, both keyboard-operable
 
 ## Output mute 🔇
 
-- [x] One toggle silences both characters via a master gain on the shared speaker — audio still decodes/drains, so captions and the state machine are byte-for-byte unaffected; mic behavior untouched (`src/lib/voice/outputMute.ts`)
+- [x] One toggle silences both characters by closing the shared speaker, aborting in-flight audio, and dropping pending voice; captions and mic behavior stay untouched (`src/lib/voice/outputMute.ts`, `src/lib/voice/delivery.ts`)
 - [x] Preference persists for the session (`sessionStorage`), distinct from the per-round view state
 
 ## Deferred (V3) 🔭

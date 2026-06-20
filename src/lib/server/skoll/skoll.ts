@@ -145,7 +145,7 @@ export function buildPayload(state: SkollState): SkollPayload {
 }
 
 /**
- * A readable one-line digest of the state Sköll reasoned from — the S8 fallback shown when the
+ * A readable one-line digest of the state Sköll reasoned from — the fallback shown when the
  * model returns no thinking trace (and the only "reasoning" available when the floor played, since
  * the floor doesn't reason). Earned facts and his sheet, never the secret.
  */
@@ -277,6 +277,10 @@ async function planMove(
 	try {
 		const raw = await decide(payload);
 		const move = validateMove(raw);
+		// Record any legal cross-offs he reasoned BEFORE the move is accepted or rejected — a
+		// guard-forced (cornered) or malformed move can still carry valid eliminations, and dropping
+		// them desyncs his sheet from the facts the demo shows.
+		for (const id of legalCrossOffs(raw.crossOff)) state.crossed.add(id);
 		// Convergence guard (server-authoritative): once a SINGLE rune can still be the secret the answer
 		// is already decided, so anything but casting that rune wastes the turn — force the cast whether he
 		// asked the meaningless lone-survivor question OR cast some already-dead rune. At two he keeps his
@@ -287,7 +291,6 @@ async function planMove(
 			survivors.length <= 1 &&
 			!(move.kind === 'cast' && move.runeName === survivors[0]?.name);
 		if (move && !cornered) {
-			for (const id of legalCrossOffs(raw.crossOff)) state.crossed.add(id);
 			if (dev && state.crossed.size)
 				console.debug(`[skoll] sheet: ${[...state.crossed].join(',')}`);
 			// His thinking trace when the model returns one; otherwise the facts he reasoned from.
@@ -428,7 +431,7 @@ async function planReaction(
 }
 
 /**
- * Let Sköll react to the human's *pending* Ask, before its answer (the S5 window, reverse
+ * Let Sköll react to the human's *pending* Ask, before its answer (the reaction window, reverse
  * direction). Opens the window on the human's Ask, asks Gemini whether to Scry/Hex/Pass (floor =
  * Pass on any failure), and resolves it. The caller answers the Ask afterward — unless `killed`,
  * in which case the question dies and the human's turn is spent with no answer.

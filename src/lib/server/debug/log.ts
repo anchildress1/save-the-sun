@@ -17,8 +17,8 @@ import { env } from '$env/dynamic/private';
 // (→ badge), part (→ chip). A verdict is the ENGINE's, never the actor's whose turn it was.
 export type Owner = 'Human' | 'Oracle' | 'Sköll' | 'Engine';
 export type Kind = 'input' | 'llm' | 'deterministic';
-// 'Voice' = the Live-session channel, teed from the browser via /api/voice/debug. 'Answer' = the
-// Oracle's spoken reply to an Ask, recorded apart from the Engine's verdict of the same truth.
+// 'Voice' = a voice-path event recorded server-side (the transcribe heard-line tee, a TTS outcome).
+// 'Answer' = the Oracle's spoken reply to an Ask, recorded apart from the Engine's verdict of the same truth.
 export type TurnPart = 'Ask' | 'Answer' | 'Cast' | 'React' | 'Round' | 'Voice';
 
 export interface DebugEvent {

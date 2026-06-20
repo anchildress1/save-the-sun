@@ -57,6 +57,18 @@ describe('voice transcribe', () => {
 		expect(await transcribe('WAV')).toBe('');
 	});
 
+	it('masks the key out of a failed-read error before logging it', async () => {
+		mock.env.GEMINI_API_KEY = 'secret-key-xyz';
+		// An SDK error can embed the request URL — and with it the key — in its message/stack.
+		sdk.generateContent.mockRejectedValueOnce(
+			new Error('GET https://api?key=secret-key-xyz failed')
+		);
+		expect(await transcribe('WAV')).toBe('');
+		const logged = vi.mocked(console.error).mock.calls.flat().join(' ');
+		expect(logged).not.toContain('secret-key-xyz');
+		expect(logged).toContain('[gemini-api-key]');
+	});
+
 	it('classifies a reaction (lowercased), and unclear for anything else', async () => {
 		reply('HEX');
 		expect(await classifyReaction('WAV')).toBe('hex');

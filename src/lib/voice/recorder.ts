@@ -1,4 +1,5 @@
-// Push-to-talk capture. Hold to record, release to get a WAV (PCM16 mono @ 16kHz) the transcribe
+// Push-to-talk capture. Hold to record, release to get a WAV (PCM16 mono, 16kHz requested — the
+// actual rate is read back from the AudioContext) the transcribe
 // route accepts. The mic stream is acquired per hold and released on let-go (so Chrome's in-use
 // indicator clears between holds); the AudioContext + worklet are built once and kept alive so a
 // re-acquire pays only getUserMedia, never the worklet load. A denial is remembered so the rite
@@ -30,7 +31,7 @@ let source: MediaStreamAudioSourceNode | null = null;
 let node: AudioWorkletNode | null = null;
 let buffers: Float32Array[] = [];
 let recording = false;
-// A denied/absent mic is terminal for the session (R1): never re-prompt once sealed.
+// A denied/absent mic is terminal for the session: never re-prompt once sealed.
 let sealed: RecorderFailure | null = null;
 // Bumped by closeRecorder so a setup still awaiting permission/worklet when teardown runs discards
 // the stream/context it finally gets instead of storing them onto a torn-down (unmounted) page.

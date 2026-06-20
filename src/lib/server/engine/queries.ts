@@ -10,6 +10,12 @@ import { runes, type Rune } from '$lib/board';
 // IS, so a negated Ask ("is it not fire?") is refused, never turned into a query.
 export type PowerOp = 'eq' | 'lt' | 'lte' | 'gt' | 'gte';
 
+// The closed sets the engine referees on — exported as the single source for the Gemini schemas and
+// prompts, so what the models are told can't drift from what parseQuery accepts. Mutable arrays (not
+// `as const`) so they pass straight into the response schema's `enum`, which wants a string[].
+export const POWER_OPS: PowerOp[] = ['eq', 'lt', 'lte', 'gt', 'gte'];
+export const FILLS: ('Light' | 'Dark')[] = ['Light', 'Dark'];
+
 export interface ElementQuery {
 	axis: 'element';
 	value: string;
@@ -37,12 +43,11 @@ export type Query = ElementQuery | FillQuery | ColorQuery | RuneQuery | PowerQue
 const ELEMENTS = new Set(runes.map((r) => r.element));
 const COLORS = new Set(runes.map((r) => r.color));
 const NAMES = new Set(runes.map((r) => r.name));
-const POWER_OPS: ReadonlySet<string> = new Set<PowerOp>(['eq', 'lt', 'lte', 'gt', 'gte']);
+const POWER_OP_SET: ReadonlySet<string> = new Set(POWER_OPS);
 
-// Single-value axes: a {axis, value} query whose value must be in the allowed set.
 const VALUE_AXES: Record<string, ReadonlySet<unknown>> = {
 	element: ELEMENTS,
-	fill: new Set(['Light', 'Dark']),
+	fill: new Set(FILLS),
 	color: COLORS,
 	rune: NAMES
 };
@@ -103,7 +108,7 @@ function parsePowerQuery(q: Record<string, unknown>): Query | null {
 	if (
 		!shapeOk(q, 'axis', 'op', 'value') ||
 		typeof q.op !== 'string' ||
-		!POWER_OPS.has(q.op) ||
+		!POWER_OP_SET.has(q.op) ||
 		!Number.isInteger(q.value)
 	) {
 		return null;

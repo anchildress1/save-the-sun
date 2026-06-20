@@ -5,6 +5,7 @@ import { GameEngine, selectSecret } from './engine';
 import { freshSkollState, type SkollState } from '$lib/server/skoll/skoll';
 import { resetLog, logEvent } from '$lib/server/debug/log';
 import type { LineDescriptor } from '$lib/server/voice/lines';
+import type { VoiceId } from '$lib/voice/config';
 
 // LRU-capped so abandoned rounds can't grow memory without bound — Map insertion order makes the
 // first key the least-recently-used; every access re-inserts to the end. 1000 is far above any
@@ -19,7 +20,7 @@ const skolls = new Map<string, SkollState>();
 // can never leak the answer.
 const roundIds = new Map<string, string>();
 // The public display seed for the on-screen board order, held for the round's lifetime so a
-// reload does not reshuffle. Independent of the secret seed — exposing it can't leak the answer.
+// reload does not reshuffle. Independent of the secret seed (see roundIds).
 const boardSeeds = new Map<string, number>();
 // The last committed voiced line per session (the spoken words + the descriptor that voices them).
 // A >30s-but-successful action drops its response client-side while the server commits under the
@@ -37,7 +38,9 @@ const lastLines = new Map<string, RecoverableLine>();
 // round authors a handful; the per-session map is bounded and cleared with the round.
 export interface AuthoredVoiceLine {
 	text: string;
-	voice: string;
+	voice: VoiceId;
+	// The deterministic, cacheable line the TTS route voices when this authored synth makes no audio.
+	fallback: string;
 }
 const MAX_VOICE_LINES = 32;
 const voiceLines = new Map<string, Map<string, AuthoredVoiceLine>>();
@@ -85,12 +88,17 @@ function remember(sessionId: string, engine: GameEngine): GameEngine {
 	engines.delete(sessionId);
 	engines.set(sessionId, engine);
 	if (engines.size > MAX_SESSIONS) {
-		// size > cap ⇒ the registry is non-empty, so the first key always exists.
-		const [lru] = engines.keys();
-		engines.delete(lru);
-		evictRoundState(lru);
-		// Rare, but the resulting fresh-secret-on-next-access desync is otherwise invisible.
-		console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
+		// Evict the oldest session that is NOT mid-turn. Evicting a locked one would detach the engine
+		// an in-flight request still holds and mint a fresh secret under it, restarting that round
+		// mid-flight. If every session is locked (implausible), skip — the map stays over cap until a
+		// later access finds an unlocked session.
+		for (const lru of engines.keys()) {
+			if (locks.has(lru)) continue;
+			engines.delete(lru);
+			evictRoundState(lru);
+			console.warn(`[session] registry full (${MAX_SESSIONS}); evicted LRU ${lru}`);
+			break;
+		}
 	}
 	return engine;
 }
@@ -112,7 +120,7 @@ export function resetEngine(sessionId: string, seed?: number): GameEngine {
 /**
  * The session's per-round token for the client's view-state storage key. Stable across a
  * refresh (same round), regenerated on a new round so persisted crossings/transcript never
- * restore onto a fresh secret. Opaque and independent of the secret seed.
+ * restore onto a fresh secret. Opaque.
  */
 export function getRoundId(sessionId: string): string {
 	requireId(sessionId);
@@ -151,11 +159,6 @@ export function getSkoll(sessionId: string): SkollState {
 	return state;
 }
 
-/** Live session count — bounded by MAX_SESSIONS. */
-export function sessionCount(): number {
-	return engines.size;
-}
-
 /**
  * Record the line a just-committed action voiced, so a dropped response can recover the real result.
  * Call on every committed *voiced* move (Ask answer/refusal, reaction resolution, cast outcome, his
@@ -175,14 +178,19 @@ export function getLastLine(sessionId: string): RecoverableLine | null {
 }
 
 /**
- * Stash an authored line for the TTS route to voice by id (ttd:17/ttd:22). Returns the opaque id the
+ * Stash an authored line for the TTS route to voice by id. Returns the opaque id the
  * client echoes back — the words live only here, never on the wire the route trusts. Bounded per round.
  */
-export function storeVoiceLine(sessionId: string, text: string, voice: string): string {
+export function storeVoiceLine(
+	sessionId: string,
+	text: string,
+	voice: VoiceId,
+	fallback: string
+): string {
 	requireId(sessionId);
 	const id = crypto.randomUUID();
 	const lines = voiceLines.get(sessionId) ?? new Map<string, AuthoredVoiceLine>();
-	lines.set(id, { text, voice });
+	lines.set(id, { text, voice, fallback });
 	// Insertion-ordered: drop the oldest once over the cap so a marathon round can't grow unbounded.
 	if (lines.size > MAX_VOICE_LINES) lines.delete(lines.keys().next().value as string);
 	voiceLines.set(sessionId, lines);
@@ -213,4 +221,16 @@ export function withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Pro
 		if (locks.get(sessionId) === tail) locks.delete(sessionId); // drop drained sessions
 	});
 	return result;
+}
+
+/** Test isolation only — wipe the whole per-session registry so module singleton state can't leak
+ *  between tests (the eviction and lifecycle suites assert against a clean map). */
+export function resetSessionRegistry(): void {
+	engines.clear();
+	skolls.clear();
+	roundIds.clear();
+	boardSeeds.clear();
+	lastLines.clear();
+	voiceLines.clear();
+	locks.clear();
 }

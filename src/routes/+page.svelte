@@ -14,7 +14,6 @@
 		deliver,
 		whenDrained,
 		subscribeDelivery,
-		currentLevel,
 		type DeliveryEvent
 	} from '$lib/voice/delivery';
 	import {
@@ -60,6 +59,8 @@
 		wolfMoving: 'The wolf is moving. Hold.',
 		riteMoving: 'The rite is moving. Hold.',
 		oracleSilent: "The Oracle falls silent — the rite can't reach Sól.",
+		oracleBusy: 'The Oracle needs a moment. Ask again shortly.',
+		voiceBusy: 'The fire needs a moment. Speak again shortly.',
 		castFalters: CAST_FALTERS,
 		wrongCast: wrongCastLine,
 		runeTrue: CAST_TRUE,
@@ -82,7 +83,7 @@
 		chooseTarget: 'Choose a rune from the board.',
 		desktopOnly: 'The rite needs a wider sky. Return on a desktop to take up the runes.',
 		castPrompt: (name: string) => `Cast ${name}?`,
-		// Spoken-move guards (S7): engine truth handed to the model when a voiced action can't
+		// Spoken-move guards: engine truth handed to the model when a voiced action can't
 		// run — never shown in the panel, since no move was made.
 		wolfAsking: 'His question hangs — scry, hex, or pass.',
 		noReactionWindow: 'Sköll asks nothing to scry, hex, or pass.',
@@ -93,10 +94,10 @@
 		hexSpent: 'Your hex is spent for the night.',
 		riteDone: 'The longest day is decided — begin anew.',
 		unknownRune: (name: string) => `No rune named ${name} lies on the board.`,
-		// Cast lockout (S9, R5): while a cast's engine round-trip is in flight, every voiced
+		// Cast lockout: while a cast's engine round-trip is in flight, every voiced
 		// command answers with this and dispatches nothing — the cast completes regardless.
 		castSacred: 'The cast is sacred. Hold.',
-		// Spoken-move confirmations (S8): voiced by the Oracle as the tool result when a
+		// Spoken-move confirmations: voiced by the Oracle as the tool result when a
 		// destructive call arms the gate — like the guards, never shown in the panel.
 		// Short by design: the exchanges recur, and a spoken preamble every time wears thin.
 		// The irreversibility doctrine lives in the persona, not the question.
@@ -114,11 +115,11 @@
 		askHintPending: 'The rite is moving. Hold, then ask.',
 		askHintWolf: 'Sköll is moving. Hold, then ask.',
 		askHintOver: 'The rite is over.',
-		// Output mute (R11): the toggle's accessible name carries the action plus the reassurance
+		// Output mute: the toggle's accessible name carries the action plus the reassurance
 		// that nothing is lost — the words still arrive in the panel.
 		muteVoices: 'Silence the voices. Their words still appear in writing.',
 		unmuteVoices: 'Let the voices be heard.',
-		// Push-to-talk (R1): a denied or absent mic seals the medallion; the rite goes on by hand.
+		// Push-to-talk: a denied or absent mic seals the medallion; the rite goes on by hand.
 		micDenied: 'The fire cannot hear you. The rite continues by hand.',
 		// A transient mic failure (not sealed) — the player can hold again to retry.
 		micRetry: 'The fire flickered. Hold again to speak.'
@@ -167,7 +168,7 @@
 	let humanWon = $derived(roundOver && winner === 'Human');
 	let skollWon = $derived(roundOver && winner === 'Sköll');
 	let outcomeLine = $derived(humanWon ? RITE.sunCrests : RITE.skollTakes);
-	// The end-screen rite takes over when the round resolves (S9). It owns the replay surface, so the
+	// The end-screen rite takes over when the round resolves. It owns the replay surface, so the
 	// header's own controls fold away while it is up — one "Begin another night" on screen, not two.
 	// Held back (`endHeld`) until the Oracle's last spoken line has drained, so the splash never stomps
 	// her answer mid-sentence when Sköll's winning cast lands right behind it.
@@ -181,7 +182,7 @@
 	let showEndScreen = $derived(roundOver && !endHeld);
 	let endOutcome = $derived<'win' | 'lose'>(humanWon ? 'win' : 'lose');
 
-	// Voice the closing rite once the splash is up (ux-copy §4, ttd:22): the winner speaks ONE authored
+	// Voice the closing rite once the splash is up (ux-copy §4): the winner speaks ONE authored
 	// in-character line — the Oracle's blessing on a win, Sköll's gloat on a loss — carried (as an
 	// `authored` id) on the resolving response. NOT a read of the fixed splash copy (the player reads
 	// that on screen). When no authored line rode the response (authoring failed, or a resumed round),
@@ -251,7 +252,7 @@
 			skollEcho = skoll.asks.echo;
 			skollAsking = true;
 		} else if (skoll.casts) {
-			// His winning cast is a written game move (R10) — his box shows the line he speaks as the
+			// His winning cast is a written game move — his box shows the line he speaks as the
 			// night closes; the end screen rises behind it once it's been heard.
 			skollEcho = skoll.casts.echo;
 			skollAsking = false;
@@ -266,7 +267,7 @@
 	let seedOverride: number | null = $state(null);
 	let boardSeed = $derived(seedOverride ?? data.boardSeed);
 
-	// View-state resume (S8.5): the engine resumes server-side, but the client's presentation — the
+	// View-state resume: the engine resumes server-side, but the client's presentation — the
 	// crossings and the voiced Oracle line — is otherwise thrown away on reload. Persist it keyed by a
 	// stable per-round token (opaque, minted with the round) and restore it on mount.
 	let roundIdOverride: string | null = $state(null);
@@ -281,8 +282,8 @@
 	// the panel and pill agree; a Sköll win leaves the last voiced line alone (restored from the
 	// saved view) — the end screen owns the defeat text, and the panel must not repeat it.
 	let answer = $state(
-		untrack(
-			() => (data.state.status === 'won' && data.state.winner === 'Human' ? RITE.runeTrue : '') // blank until the Oracle has a response to voice (or the saved view restores one)
+		untrack(() =>
+			data.state.status === 'won' && data.state.winner === 'Human' ? RITE.runeTrue : ''
 		)
 	);
 
@@ -296,9 +297,10 @@
 		if (restored && !skollStalled) writeViewState(roundId, snapshot);
 	});
 
-	// The most recent Oracle line's audio (or null when none/text-only). Not reactive — just a handle
-	// the end-screen hold awaits so the splash never preempts her final answer.
-	let answerAudio: Promise<void> | null = null;
+	// The most recent Oracle line's audio (or null when none/text-only). The end-screen hold effect
+	// awaits it and tracks it reactively, so a freshly assigned line re-runs the hold instead of
+	// depending on every assigner also flipping another tracked signal in the same tick.
+	let answerAudio = $state<Promise<void> | null>(null);
 
 	// A Sköll line generated before the speaker is open (a reload that resumes on his turn re-drives his
 	// move in onMount, before the first gesture) is held here and voiced once audio is ready, so it isn't
@@ -313,6 +315,10 @@
 	function voiceSkoll(descriptor: LineDescriptor): Promise<void> {
 		if (audioReady) return deliver(descriptor);
 		if (!audioOn) return Promise.resolve();
+		// Only one line can wait for the first gesture. A second supersedes it — settle the dropped
+		// one's promise so a caller awaiting it (the end-screen hold via answerAudio) doesn't stall to
+		// the hold cap.
+		pendingSkollResolve?.();
 		pendingSkollVoice = descriptor;
 		return new Promise<void>((resolve) => {
 			pendingSkollResolve = resolve;
@@ -338,8 +344,6 @@
 			skollCastPending = false;
 			return;
 		}
-		// answerAudio is a plain handle, not reactive; the effect re-runs on roundOver/audioOn/cast, by
-		// when it's set.
 		const holdForAudio = audioOn && answerAudio !== null;
 		const holdForBeat = !audioOn && skollCastPending;
 		if (!holdForAudio && !holdForBeat) {
@@ -390,6 +394,9 @@
 	let medalState = $state<MedallionState>('idle');
 	// One quiet line when the mic is denied/absent; the button game is unaffected.
 	let voiceNotice = $state('');
+	// Set by readUtterance on a transcribe 429 so finishHold skips the respond path — a react/cast
+	// fallback would otherwise read as a player mishear on top of the throttle notice. Reset per hold.
+	let voiceThrottled = false;
 	// Audio preference + speaker readiness (voice-as-delivery). The preference can be on before the
 	// browser lets us open an AudioContext; delivery should spend one-shot lines only once ready.
 	let audioOn = $state(false);
@@ -451,9 +458,9 @@
 		writeMuted(!audioOn);
 	}
 
-	// Push-to-talk (R1/R6). Hold the medallion (or Space) to record; the mic opens on first hold (one
-	// prompt). A denial/absent mic seals it for the session — the medallion goes inert and the rite
-	// continues by hand. Recording is independent of audio output: you can ask with the sound off.
+	// Push-to-talk. Hold the medallion — or the backtick anywhere — to record; the mic opens on first
+	// hold (one prompt). A denial/absent mic seals it for the session — the medallion goes inert and the
+	// rite continues by hand. Recording is independent of audio output: you can ask with the sound off.
 	async function startHold() {
 		if (recorderSealed()) {
 			medalState = 'denied';
@@ -489,6 +496,7 @@
 			await finishHold();
 			return;
 		}
+		voiceNotice = ''; // a fresh hold clears any prior mic/voice notice
 		medalState = 'recording';
 	}
 
@@ -509,6 +517,7 @@
 		const casting = holdCasting;
 		const token = holdToken;
 		const fresh = () => `${roundId}:${turns}` === token;
+		voiceThrottled = false;
 		medalState = 'thinking';
 		try {
 			const clip = await stopRecording();
@@ -517,13 +526,15 @@
 			releaseRecorder();
 			if (clip && reacting) {
 				const choice = await classifyReactionUtterance(clip.wavBase64);
-				if (fresh()) await respondReaction(choice);
+				// Skip the respond on a throttle — its 'unclear' fallback would blame the player for a
+				// server 429, on top of the voice notice already shown.
+				if (fresh() && !voiceThrottled) await respondReaction(choice);
 			} else if (clip && casting) {
 				// Armed by hand: the rune name alone casts (the arm already declared intent). Re-check the
 				// arm generation AFTER the transcribe — "Not yet" (or a cancel-then-re-arm) bumps it, so an
 				// irreversible cast can't land against an arm the player abandoned.
 				const name = await classifyCastUtterance(clip.wavBase64);
-				if (fresh() && castArm === holdCastArm) await respondCast(name);
+				if (fresh() && castArm === holdCastArm && !voiceThrottled) await respondCast(name);
 			} else if (clip) {
 				// A normal hold is a question — or a hands-free cast when the player explicitly names a
 				// rune. The spoken words never fill the typing box (the route tees what was heard to
@@ -570,44 +581,62 @@
 		}
 	}
 
-	// Read a normal hold: a question, or a hands-free cast when the player names a board rune. Sends the
+	// Read a held clip through the transcribe route, mapping the JSON with `pick`. Falls back on a
+	// non-ok response, a parse failure, or a missing field — so a mishear or dropped call never
+	// silently spends a charge or stakes a cast. (`?? fallback` keeps an intentional empty cast '' —
+	// only null/undefined coalesces, not the empty string the server returns for a refused cast.)
+	async function readUtterance<T>(
+		body: object,
+		fallback: T,
+		pick: (data: Record<string, unknown>) => T | null | undefined
+	): Promise<T> {
+		const res = await postUtterance(body);
+		if (res?.status === 429) {
+			// An intentional STT throttle, not silence: flag it (so finishHold won't blame the player on
+			// a react/cast read) and surface the retry guidance.
+			voiceThrottled = true;
+			voiceNotice = RITE.voiceBusy;
+			return fallback;
+		}
+		if (!res?.ok) return fallback;
+		try {
+			const result = pick((await res.json()) as Record<string, unknown>) ?? fallback;
+			voiceNotice = ''; // a clean read clears any stale voice/mic notice
+			return result;
+		} catch {
+			return fallback;
+		}
+	}
+
+	// A normal hold: a question, or a hands-free cast when the player names a board rune. Sends the
 	// board names so the server can match a spoken cast; a `cast` result (even '') means cast intent,
 	// so it routes to respondCast rather than being re-read as a question. Degrades to an empty Ask.
-	async function interpretUtterance(
-		wavBase64: string
-	): Promise<{ cast: string } | { text: string }> {
-		const res = await postUtterance({ wavBase64, runes: runes.map((r) => r.name) });
-		if (!res?.ok) return { text: '' };
-		try {
-			const data = (await res.json()) as { rune?: string; text?: string };
-			return typeof data.rune === 'string' ? { cast: data.rune } : { text: data.text ?? '' };
-		} catch {
-			return { text: '' };
-		}
+	function interpretUtterance(wavBase64: string): Promise<{ cast: string } | { text: string }> {
+		// Trust no field's type — a non-string text/rune degrades to an empty ask, not a crash.
+		return readUtterance({ wavBase64, runes: runes.map((r) => r.name) }, { text: '' }, (d) =>
+			typeof d.rune === 'string'
+				? { cast: d.rune }
+				: { text: typeof d.text === 'string' ? d.text : '' }
+		);
 	}
 
-	// Classify a held reply to Sköll's hanging question into a reaction; `unclear` on any failure, so
+	// A held reply to Sköll's hanging question, classified into a reaction; `unclear` on any failure so
 	// a misheard or dropped call never silently spends a one-use charge.
-	async function classifyReactionUtterance(wavBase64: string): Promise<SpokenReaction> {
-		const res = await postUtterance({ wavBase64, mode: 'reaction' });
-		if (!res?.ok) return 'unclear';
-		try {
-			return ((await res.json()) as { choice?: SpokenReaction }).choice ?? 'unclear';
-		} catch {
-			return 'unclear';
-		}
+	function classifyReactionUtterance(wavBase64: string): Promise<SpokenReaction> {
+		// Validate against the known set — an unexpected value (wrong type, or a word outside the four)
+		// degrades to `unclear` (asks again) instead of indexing the reaction map with garbage.
+		return readUtterance({ wavBase64, mode: 'reaction' }, 'unclear', (d) => {
+			const c = d.choice;
+			return c === 'scry' || c === 'hex' || c === 'pass' || c === 'unclear' ? c : 'unclear';
+		});
 	}
 
-	// Match a held cast utterance to a board rune (server constrains the answer to the names we send);
-	// '' on any failure or a name that isn't on the board, so a mishear never commits the cast.
-	async function classifyCastUtterance(wavBase64: string): Promise<string> {
-		const res = await postUtterance({ wavBase64, mode: 'cast', runes: runes.map((r) => r.name) });
-		if (!res?.ok) return '';
-		try {
-			return ((await res.json()) as { rune?: string }).rune ?? '';
-		} catch {
-			return '';
-		}
+	// A held cast matched to a board rune (server constrains the answer to the names we send); '' on
+	// any failure or an off-board name, so a mishear never commits the cast.
+	function classifyCastUtterance(wavBase64: string): Promise<string> {
+		return readUtterance({ wavBase64, mode: 'cast', runes: runes.map((r) => r.name) }, '', (d) =>
+			typeof d.rune === 'string' ? d.rune : ''
+		);
 	}
 
 	// Run a spoken reaction through the same dispatch the prompt buttons use. Guards mirror the
@@ -673,6 +702,25 @@
 	// call degrades through the existing catch paths. Generous because the model round-trip is the cost.
 	const ACTION_TIMEOUT_MS = 30_000;
 
+	// One bounded POST/GET: aborts after ACTION_TIMEOUT_MS so a hung request can't strand `pending`,
+	// then degrades through the caller's catch. Throws on a non-ok status (the message carries it).
+	async function boundedAction<T>(url: string, init?: RequestInit): Promise<T> {
+		const abort = new AbortController();
+		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
+		try {
+			const res = await fetch(url, { ...init, signal: abort.signal });
+			if (!res.ok) {
+				// Carry the status so a caller can tell an intentional throttle (429) from a real failure.
+				const err = new Error(`${init?.method ?? 'GET'} ${url} rejected (${res.status})`);
+				(err as Error & { status: number }).status = res.status;
+				throw err;
+			}
+			return (await res.json()) as T;
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+
 	// Mirrors the load/`/api/state` snapshot — the authoritative round the client resyncs to.
 	type RecoveredLine = { text: string; voice: LineDescriptor | null };
 	type StateSnapshot = {
@@ -680,7 +728,7 @@
 		roundId: string;
 		state: GameState;
 		pendingReaction: { echo: string; held: { Scry: boolean; Hex: boolean } } | null;
-		// The last committed voiced line — the real result a dropped response lost (ttd:29).
+		// The last committed voiced line — the real result a dropped response lost.
 		lastLine: RecoveredLine | null;
 	};
 
@@ -721,6 +769,22 @@
 		return false;
 	}
 
+	// Zero the per-round presentation state for a fresh secret — the single list of what a new round
+	// clears, so a new field can't be forgotten in one of the two reset paths (reconcile, new-game).
+	// (skollEcho/skollAsking are NOT reset here: new-game clears them, reconcile sets them from the
+	// snapshot — so each path owns those two explicitly.)
+	function resetForNewRound() {
+		restoreCrossed = [];
+		crossings = [];
+		answer = '';
+		askValue = '';
+		heldScry = true;
+		heldHex = true;
+		outcomeVoiced = false;
+		endFlair = null;
+		stopDelivery();
+	}
+
 	// Resync to authoritative server state after a dropped action response. A timed-out or failed POST
 	// aborts the browser fetch, but the server completed the move under `withSessionLock`, so the
 	// engine has moved on — without this the UI strands on a stale turn/board (or a retry that no-ops)
@@ -728,13 +792,9 @@
 	// the resync landed.
 	async function reconcile(): Promise<{ landed: boolean; lastLine: RecoveredLine | null }> {
 		const prevRoundId = roundId;
-		const abort = new AbortController();
-		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
 		let snap: StateSnapshot;
 		try {
-			const res = await fetch('/api/state', { signal: abort.signal });
-			if (!res.ok) throw new Error(`State reconcile rejected (${res.status})`);
-			snap = (await res.json()) as StateSnapshot;
+			snap = await boundedAction<StateSnapshot>('/api/state');
 			// A malformed snapshot (no turn state) can't be trusted to re-key the view — fail the resync
 			// rather than apply a partial that would crash applyState or mis-key persistence.
 			if (!snap?.state || !snap.roundId)
@@ -742,23 +802,11 @@
 		} catch (err) {
 			console.error('[ui] reconcile failed:', err);
 			return { landed: false, lastLine: null };
-		} finally {
-			clearTimeout(timer);
 		}
 		// A dropped new-game still reset the round server-side — drop the per-round view so crossings,
 		// the voiced line, and the outcome can't resume against a new secret. A fresh round also restores
 		// both reaction charges.
-		if (snap.roundId !== prevRoundId) {
-			restoreCrossed = [];
-			crossings = [];
-			answer = '';
-			askValue = '';
-			outcomeVoiced = false;
-			endFlair = null;
-			heldScry = true;
-			heldHex = true;
-			stopDelivery();
-		}
+		if (snap.roundId !== prevRoundId) resetForNewRound();
 		seedOverride = snap.boardSeed;
 		roundIdOverride = snap.roundId;
 		applyState(snap.state);
@@ -783,20 +831,11 @@
 	async function dispatch<T extends GameAction['type']>(
 		action: Extract<GameAction, { type: T }>
 	): Promise<ActionResponse<T>> {
-		const abort = new AbortController();
-		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
-		try {
-			const res = await fetch('/api/action', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(action),
-				signal: abort.signal
-			});
-			if (!res.ok) throw new Error(`Action rejected (${res.status})`);
-			return (await res.json()) as ActionResponse<T>;
-		} finally {
-			clearTimeout(timer);
-		}
+		return boundedAction<ActionResponse<T>>('/api/action', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(action)
+		});
 	}
 
 	// Sköll's move is its own request, fired after any action that hands him the turn — so the
@@ -808,18 +847,13 @@
 		// reaction — advancing then is a server no-op, and the prompt is already up.
 		if (roundStatus !== 'active' || activePlayer !== 'Sköll' || skollAsking) return;
 		await tick();
-		const abort = new AbortController();
-		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
 		try {
-			const res = await fetch('/api/action', {
+			const { skoll, state, outcomeFlair } = await boundedAction<AdvanceResponse>('/api/action', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ type: 'Advance' }),
-				signal: abort.signal
+				body: JSON.stringify({ type: 'Advance' })
 			});
-			if (!res.ok) throw new Error(`Advance rejected (${res.status})`);
-			const { skoll, state, outcomeFlair } = (await res.json()) as AdvanceResponse;
-			// His gloat for the end screen when this Advance was his winning cast (ttd:22).
+			// His gloat for the end screen when this Advance was his winning cast.
 			if (outcomeFlair) endFlair = outcomeFlair;
 			// His winning cast is a turn that must play. Hold the splash synchronously — BEFORE applyState
 			// flips roundOver — so his cast frame shows first, even with audio off (which would otherwise
@@ -830,7 +864,7 @@
 			}
 			applyState(state);
 			applySkoll(skoll);
-			// His Ask is a game move (R10) — written on his frame and voiced in his own voice through the
+			// His Ask is a game move — written on his frame and voiced in his own voice through the
 			// same delivery seam as the Oracle (a no-op when audio is off). The medallion shows
 			// 'skoll-speaking' from the delivery event while it plays.
 			if (skoll?.asks) void voiceSkoll(skollVoice(skoll.asks.query));
@@ -856,8 +890,6 @@
 				answer = RITE.wolfStalled;
 				skollStalled = true;
 			}
-		} finally {
-			clearTimeout(timer);
 		}
 	}
 
@@ -939,7 +971,7 @@
 		window.addEventListener('blur', onBlur);
 
 		// Audio output is ON by default (honoring a session mute the player set), EXCEPT under
-		// prefers-reduced-motion — the PRD's reduced tier (R9) keeps audio muted. The player can still
+		// prefers-reduced-motion — the PRD's reduced tier keeps audio muted. The player can still
 		// opt in via the toggle. The delivery speaker still needs a user gesture to open (browsers block
 		// an AudioContext otherwise), so prime it on the first interaction — tap or key — then retire.
 		const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1041,7 +1073,7 @@
 		showOnboarding = true;
 	}
 
-	// One Ask path for the typed field and the spoken `ask` tool (S7): identical dispatch,
+	// One Ask path for the typed field and the spoken `ask` tool: identical dispatch,
 	// identical panel updates. `hers` marks lines the Oracle herself voices (answer, refusal) —
 	// system lines stay text-only; `consumed` tells the typed path whether to clear the field.
 	// Never throws: a failed dispatch settles the panel and reports the silent-Oracle line.
@@ -1079,8 +1111,8 @@
 				// Refusal wins before the answer branch: a refused sign is never voiced as a verdict.
 				outcome = { line: oracle.line, consumed: false, voice: oracleVoice(oracle) };
 			} else if (oracle?.ok) {
-				// Her dramatized line when the server authored one this turn (ttd:17, voiced by id lookup);
-				// else the deterministic answer. The panel shows exactly what she voices (R10).
+				// Her dramatized line when the server authored one this turn (voiced by id lookup);
+				// else the deterministic answer. The panel shows exactly what she voices.
 				outcome = oracle.voiced
 					? { line: oracle.voiced.text, consumed: true, voice: oracle.voiced }
 					: { line: oracle.answer, consumed: true, voice: oracleVoice(oracle) };
@@ -1098,6 +1130,12 @@
 			answer = outcome.line;
 			return outcome;
 		} catch (err) {
+			// An intentional Ask throttle (429), not an outage: the turn never landed, so surface the
+			// retry guidance instead of the false Oracle-silent line and don't run the drop-recovery.
+			if ((err as { status?: number })?.status === 429) {
+				answer = RITE.oracleBusy;
+				return { line: RITE.oracleBusy, consumed: false, voice: null };
+			}
 			// A real 500 here means something the server-side degradation did NOT catch — keep
 			// a trace so it's distinguishable from an expected in-world refusal.
 			console.error('[ui] Ask dispatch failed:', err);
@@ -1130,6 +1168,9 @@
 	}
 
 	async function submitAsk() {
+		// Mirror the voiced path's gate — the disabled input is presentation, not a real guard, so a
+		// programmatic or race-y submit can't slip an Ask in mid-move or while a cast is armed.
+		if (pending || castMode || !canAct) return;
 		const question = askValue.trim();
 		if (question === '') {
 			// An empty Ask never consumes a turn — gated client-side, no dispatch.
@@ -1225,21 +1266,16 @@
 	// Returns whether the reset landed, so a caller can avoid advancing the view on a failed reset.
 	async function newGame(): Promise<boolean> {
 		pending = true;
-		let res: Response | undefined;
-		const abort = new AbortController();
-		const timer = setTimeout(() => abort.abort(), ACTION_TIMEOUT_MS);
 		try {
-			res = await fetch('/api/new-game', { method: 'POST', signal: abort.signal });
-			if (!res.ok) throw new Error(`New game rejected (${res.status})`);
 			const {
 				boardSeed: seed,
 				roundId: nextRoundId,
 				state
-			} = (await res.json()) as {
+			} = await boundedAction<{
 				boardSeed: number;
 				roundId: string;
 				state: GameState;
-			};
+			}>('/api/new-game', { method: 'POST' });
 			// A 200 with no usable seed/token would leave the view keyed to the OLD round while the
 			// server reset — treat it as a hard failure, not a silent no-op that mis-keys persistence.
 			if (!Number.isFinite(seed)) throw new Error('New game response missing boardSeed');
@@ -1250,24 +1286,15 @@
 			// effect overwrites the single record with the fresh round's empty state — stale marks never
 			// resume. (`crossings` here is the parent's mirror, distinct from the grid's own crossedOff.)
 			roundIdOverride = nextRoundId;
-			restoreCrossed = [];
-			crossings = [];
-			answer = '';
-			askValue = '';
+			resetForNewRound();
+			// New-game also clears his parked Ask (reconcile instead restores it from the snapshot).
 			skollEcho = '';
 			skollAsking = false;
-			heldScry = true;
-			heldHex = true;
-			outcomeVoiced = false; // the fresh round re-arms the end-screen outcome voice
-			endFlair = null;
-			// Drop any still-playing/queued Oracle line from the round just ended — TTS delivery is
-			// fire-and-forget, so without this a prior answer could bleed over the fresh blank round.
-			stopDelivery();
 			applyState(state);
 			cancelCast();
 			return true;
 		} catch (err) {
-			console.error(`[ui] New game failed (status ${res?.status ?? 'network'}):`, err);
+			console.error('[ui] New game failed:', err);
 			// resetEngine() may have minted the fresh round before the response dropped — resync so the
 			// board matches the new secret. The reset took ONLY if the resync lands on a NEW round: a
 			// same-round resync (the POST failed before resetting) left the board/secret unchanged, so
@@ -1278,7 +1305,6 @@
 			if (!reset) answer = RITE.oracleSilent;
 			return reset;
 		} finally {
-			clearTimeout(timer);
 			pending = false;
 		}
 	}
@@ -1292,7 +1318,7 @@
 				runeName
 			});
 			applyState(state);
-			// Her blessing for the end screen when this cast won (ttd:22); the effect voices it on the splash.
+			// Her blessing for the end screen when this cast won; the effect voices it on the splash.
 			if (outcomeFlair) endFlair = outcomeFlair;
 			let line: string;
 			let voice: LineDescriptor;
@@ -1446,12 +1472,7 @@
 					aria-label="Oracle voice controls"
 					data-coach="voice"
 				>
-					<EclipseMedallion
-						state={medalState}
-						getLevel={currentLevel}
-						onHoldStart={startHold}
-						onHoldEnd={endHold}
-					/>
+					<EclipseMedallion state={medalState} onHoldStart={startHold} onHoldEnd={endHold} />
 					<button
 						class="voice-switch"
 						type="button"
@@ -1483,7 +1504,7 @@
 			<div class="oracle-header">
 				<h2 class="oracle-title">The Oracle</h2>
 				<div class="turn-pill-row">
-					<!-- role=status: turn changes are narrated politely without stealing focus (v1.5 SR pass). -->
+					<!-- role=status: turn changes are narrated politely without stealing focus. -->
 					<div
 						class="turn-pill"
 						class:won={humanWon}
@@ -2010,6 +2031,13 @@
 
 	.oracle-panel > .oracle-header {
 		z-index: 4;
+	}
+
+	/* Lift the voice controls above the decorative divider (and header): the medallion's hover hint
+	   overflows the disc downward, and at the shared z-index:2 the later divider painted over it,
+	   striking the text through. Above them, the hint reads cleanly. */
+	.oracle-panel > .voice-stack {
+		z-index: 5;
 	}
 
 	/* Name left, turn pill + AI note right — one line instead of two stacked rows. Wrap is

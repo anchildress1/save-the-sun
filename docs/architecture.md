@@ -27,6 +27,7 @@ flowchart TB
     subgraph Routes["SvelteKit routes"]
         Action["POST /api/action<br/>Ask / Cast / React / Advance"]
         NewGame["POST /api/new-game"]
+        State["GET /api/state<br/>resync snapshot"]
         Transcribe["POST /api/voice/transcribe"]
         TTS["POST /api/voice/tts"]
         Debug["GET /api/debug"]
@@ -44,6 +45,7 @@ flowchart TB
 
     Page --> Action
     Page --> NewGame
+    Page --> State
     Medallion --> Rec
     Rec --> Transcribe
     Transcribe -.text.-> Page
@@ -55,6 +57,7 @@ flowchart TB
     Action --> Sköll
     Action --> Oracle
     NewGame --> Engine
+    State --> Engine
     Transcribe --> Gemini
     TTS --> Gemini
     Sköll --> Gemini
@@ -118,7 +121,7 @@ sequenceDiagram
 
 ## Voice — input (push-to-talk) and output (delivery)
 
-Voice is two decoupled layers. **Output** is mic-independent: every game move is composed server-side and voiced through one TTS route and a shared speaker, so the board speaks whether or not the mic is on. **Input** is push-to-talk: hold the medallion (or hold `Space`) to record an Ask, release to send. There is no real-time session — one held recording per Ask, turn-based like the text box. The board buttons and the text box play fully without the mic.
+Voice is two decoupled layers. **Output** is mic-independent: every game move is composed server-side and voiced through one TTS route and a shared speaker, so the board speaks whether or not the mic is on. **Input** is push-to-talk: hold the medallion (or the `` ` `` backtick key) to record an Ask, release to send. There is no real-time session — one held recording per Ask, turn-based like the text box. The board buttons and the text box play fully without the mic.
 
 ### Output — delivery
 
@@ -151,14 +154,14 @@ sequenceDiagram
 
 ### Input — push-to-talk (optional)
 
-Holding the medallion (or `Space`) records a short utterance; releasing sends it to `POST /api/voice/transcribe`, which transcribes it server-side via Gemini and returns the text. The page then runs that text through the **exact same Ask pipeline as the text box** — interpret → engine → delivery — so a spoken Ask and a typed Ask are identical past transcription. The mic opens once (one permission prompt); the board and text box never depend on it.
+Holding the medallion (or the `` ` `` backtick key) records a short utterance; releasing sends it to `POST /api/voice/transcribe`, which transcribes it server-side via Gemini and returns the text. The page then runs that text through the **exact same Ask pipeline as the text box** — interpret → engine → delivery — so a spoken Ask and a typed Ask are identical past transcription. The mic opens once (one permission prompt); the board and text box never depend on it.
 
 ```mermaid
 sequenceDiagram
     accTitle: Voice input - push-to-talk to a transcribed Ask
-    accDescr: Holding the medallion or Space records a WAV; release posts it to the transcribe route, which returns text; the page runs that text through the same Ask pipeline as the typed box.
+    accDescr: Holding the medallion or the backtick key records a WAV; release posts it to the transcribe route, which returns text; the page runs that text through the same Ask pipeline as the typed box.
 
-    participant Medallion as EclipseMedallion / Space
+    participant Medallion as EclipseMedallion / backtick
     participant Rec as recorder.ts (WAV)
     participant STT as POST /api/voice/transcribe
     participant Page as +page.svelte (submitAsk)
@@ -166,7 +169,7 @@ sequenceDiagram
 
     Medallion->>Rec: hold = startRecording
     Medallion->>Rec: release = stopRecording -> WAV
-    Rec->>STT: { wavBase64 }
+    Rec->>STT: { wavBase64, mode?, runes? }
     STT-->>Page: { text }
     Page->>Action: Ask (same dispatch as the typed box)
     Action-->>Page: oracle answer -> delivery
@@ -174,12 +177,12 @@ sequenceDiagram
 
 - **Server-side key, allow-listed surface.** The browser sends only audio; `GEMINI_API_KEY` stays server-side (masked at the debug sink). The transcribe route is rate-limited per session and globally, like the TTS route.
 - **Ask, plus the reaction.** A held reply produces an Ask — or, when Sköll's question hangs, a scry/hex/pass classified server-side (`reaction` mode of the transcribe route), run through the same `performReact` dispatch the buttons use. A mishear is safe: an `unclear` reply asks again and a spent scry/hex is refused, never a silent pass. Cast stays on the board button (with its own confirmation).
-- **Turn-based.** A held recording is one request/response — no socket, no silence timeout, no barge-in. `Space` is the talk key everywhere except inside a text field (where it types); buttons keep Enter for keyboard activation.
+- **Turn-based.** A held recording is one request/response — no socket, no silence timeout, no barge-in. The `` ` `` backtick key is the page-wide talk key, including inside the Ask field, where it starts push-to-talk instead of typing; Space/Enter operate the medallion only while it is focused, and buttons keep Enter for keyboard activation.
 - A denied or absent mic seals the medallion into the inert `denied` state (one quiet notice, never re-prompted); the button + text game is untouched.
 
 ### Controls
 
-- **Eclipse medallion** — the push-to-talk control (hold to record, release to ask — pointer or `Space`) and the living indicator: idle when ready, a flaring corona while recording, the rune ring orbiting while the utterance is transcribed, and the corona pulsing while a line plays. **When Sköll speaks the disc deepens toward total eclipse with an ember rim** — the sun devoured — so the speaker reads by brightness and shape, never color alone. Reduced motion swaps the pulses for static glow intensities. Each state carries an ARIA label and a polite live-region announcement.
+- **Eclipse medallion** — the push-to-talk control (hold to record, release to ask — pointer, or the `` ` `` backtick key) and the living indicator: idle when ready, a flaring corona while recording, the rune ring orbiting while the utterance is transcribed, and the disc breathing a brightness pulse (its corona dropping to a faint halo) while a line plays. The indicator switches in step with the delivery queue — driven by which clip is actually sounding, not by enqueue — so Sköll's turn shows only once his clip starts, never while her line is still playing. **When Sköll speaks the disc deepens toward total eclipse with an ember rim** — the sun devoured — so the speaker reads by brightness and shape, never color alone. Reduced motion swaps the recording flare and ring orbit for static glow intensities. Each state carries an ARIA label and a polite live-region announcement.
 - **Output mute** — a separate toggle that silences both voices while their captions keep arriving in the panel. Set-and-forget, persists for the session (R11), independent of the mic: muting is not sleeping.
 
 ## Session & state lifecycle
@@ -201,7 +204,7 @@ flowchart TB
         DLog["debug log<br/>per-session events"]
     end
 
-    ClientStore["Client view-state<br/>crossings, voiced line, voiceInvited<br/>keyed by roundId"]
+    ClientStore["Client view-state<br/>crossings, voiced line<br/>keyed by roundId"]
 
     Cookie -->|sessionId| Registry
 
@@ -212,7 +215,8 @@ flowchart TB
     Reload["page reload"] -->|same roundId| ClientStore
     Reload -->|same sessionId| Registry
 
-    Evict["LRU eviction / new round"] -->|drops| SköllMem
+    Evict["LRU eviction / new round"] -->|drops| Engine
+    Evict -->|drops| SköllMem
     Evict -->|drops| RoundId
     Evict -->|drops| BoardSeed
     Evict -->|resets| DLog
@@ -220,5 +224,5 @@ flowchart TB
 
 - **`roundId`** is opaque and independent of the secret seed, so exposing it can't leak the answer. It's stable across a refresh (same round) and reminted on a new round, so persisted crossings never restore onto a fresh secret.
 - **`boardSeed`** fixes the on-screen board order for the round's life — a reload doesn't reshuffle. Independent of the secret seed.
-- The registry is LRU-capped at `MAX_SESSIONS`; evicting a session drops its Sköll memory, round id, board seed, and log together.
+- The registry is LRU-capped at `MAX_SESSIONS`; eviction drops the engine together with its Sköll memory, round id, board seed, and log — and skips any session mid-turn (one holding its lock), so a live round is never detached under an in-flight request.
 - All state is in-memory: no accounts, no database.

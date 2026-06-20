@@ -134,17 +134,32 @@ describe('EclipseMedallion — state visuals', () => {
 		expect(Number(getComputedStyle(layer(button, '.corona')).opacity)).toBeGreaterThan(0.4);
 	});
 
-	it('deepens the disc toward eclipse only while Sköll speaks — a brightness signal, not color alone', () => {
-		const { button } = renderMedallion('skoll-speaking');
-		expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('1');
-		expect(getComputedStyle(button).getPropertyValue('--corona-rgb').trim()).toBe('200, 71, 63');
+	const coronaOf = (state: MedallionState) =>
+		getComputedStyle(renderMedallion(state).button).getPropertyValue('--corona-rgb').trim();
+
+	it('gives recording, the Oracle, and Sköll three distinct corona hues — none mistaken for another', () => {
+		// The contract is distinctness (input ≠ Oracle ≠ wolf), not the exact CSS hex — a palette tweak
+		// must not fail this while the signal still reads.
+		const hues = [coronaOf('recording'), coronaOf('speaking'), coronaOf('skoll-speaking')];
+		expect(new Set(hues).size).toBe(3);
+		expect(hues).not.toContain('');
 	});
 
-	it('keeps the gold palette and hides the eclipse for every Oracle-side state', () => {
+	it('shares one gold corona across the Oracle-side states; recording and Sköll carry their own', () => {
+		const gold = coronaOf('speaking');
+		for (const state of ALL_STATES.filter((s) => s !== 'skoll-speaking' && s !== 'recording')) {
+			expect(coronaOf(state)).toBe(gold); // idle/thinking/speaking/denied all the Oracle's hue
+		}
+		expect(coronaOf('recording')).not.toBe(gold);
+		expect(coronaOf('skoll-speaking')).not.toBe(gold);
+	});
+
+	it('deepens the disc toward eclipse only while Sköll speaks — a shape signal, not color alone', () => {
+		const shadowOf = (state: MedallionState) =>
+			getComputedStyle(layer(renderMedallion(state).button, '.eclipse-shadow')).opacity;
+		expect(shadowOf('skoll-speaking')).toBe('1');
 		for (const state of ALL_STATES.filter((s) => s !== 'skoll-speaking')) {
-			const { button } = renderMedallion(state);
-			expect(getComputedStyle(button).getPropertyValue('--corona-rgb').trim()).toBe('217, 169, 74');
-			expect(getComputedStyle(layer(button, '.eclipse-shadow')).opacity).toBe('0');
+			expect(shadowOf(state)).toBe('0');
 		}
 	});
 });
@@ -183,27 +198,18 @@ describe('EclipseMedallion — reduced motion (R6)', () => {
 	it.each([
 		{ state: 'idle' as const, selector: '.corona', why: 'breathing pulse' },
 		{ state: 'recording' as const, selector: '.corona', why: 'recording pulse' },
-		{ state: 'speaking' as const, selector: '.corona', why: 'voice pulse' },
-		{ state: 'skoll-speaking' as const, selector: '.corona', why: 'ember pulse' },
-		{ state: 'speaking' as const, selector: '.disc', why: 'playback loop' }
+		{ state: 'recording' as const, selector: '.disc', why: 'sprite loop' }
 	])('replaces the $why with a static glow in the $state state', ({ state, selector }) => {
 		const { button } = renderMedallion(state);
 		expect(getComputedStyle(layer(button, selector)).animationName).toBe('none');
 	});
 
-	it('ignores the live output level under reduced motion — the disc holds its static frame', () => {
-		// A loud level (0.2 → frame 2 if it pulsed) must NOT move the disc here: reduced motion pins it
-		// to the speaking state's static peak, so the JS pulse honors the preference like the CSS loops.
-		const screen = render(EclipseMedallion, {
-			state: 'speaking' as MedallionState,
-			getLevel: () => 0.2,
-			onHoldStart: vi.fn(),
-			onHoldEnd: vi.fn()
-		});
-		const button = screen.container.querySelector<HTMLButtonElement>(
-			'[data-testid="eclipse-medallion"]'
-		)!;
+	it('holds the speaking disc at its static peak — no audio-driven pulse to honor or ignore', () => {
+		// The live-level pulse was stripped: speaking is a steady lit disc, so the frame is the state's
+		// fixed peak regardless of any playback, with no animation to disable under reduced motion.
+		const { button } = renderMedallion('speaking');
 		expect(button.style.getPropertyValue('--sprite-level')).toBe(String(SPRITE_LEVELS - 1));
+		expect(getComputedStyle(layer(button, '.disc')).animationName).toBe('none');
 	});
 });
 
@@ -226,5 +232,33 @@ describe('EclipseMedallion — state announcements', () => {
 		await expect.element(status).toHaveTextContent('Sköll speaks.');
 
 		expect(status.element().getAttribute('role')).toBe('status');
+	});
+
+	it('leaves the sealed state silent — the page voice-notice narrates the denial, not a double-speak', async () => {
+		const screen = render(EclipseMedallion, {
+			state: 'denied' as MedallionState,
+			onHoldStart: vi.fn(),
+			onHoldEnd: vi.fn()
+		});
+		// The struck mic glyph still shows the seal visually; the announcement is left empty so a
+		// screen reader hears the denial once, from the voice-notice, not twice.
+		expect(screen.getByTestId('medallion-status').element().textContent).toBe('');
+	});
+});
+
+describe('EclipseMedallion — backtick hint', () => {
+	it('shows the backtick hold-hint and describes it to the button while live', () => {
+		const { screen, button } = renderMedallion('idle');
+		const hint = screen.container.querySelector('#mic-hint');
+		expect(hint).not.toBeNull();
+		expect(hint?.textContent).toContain('`');
+		// Read on focus, not only seen on hover.
+		expect(button.getAttribute('aria-describedby')).toBe('mic-hint');
+	});
+
+	it('drops the hint while sealed — the key does nothing without a mic', () => {
+		const { screen, button } = renderMedallion('denied');
+		expect(screen.container.querySelector('#mic-hint')).toBeNull();
+		expect(button.getAttribute('aria-describedby')).toBeNull();
 	});
 });

@@ -24,11 +24,24 @@ vi.mock('$lib/server/skoll/gemini', () => ({
 }));
 
 import { POST } from '$routes/api/action/+server';
+import { interpret, composeEndingFlair } from '$lib/server/oracle/gemini';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
-import { resetEngine, getEngine, getSkoll, getVoiceLine } from '$lib/server/engine/session';
+import {
+	resetEngine,
+	getEngine,
+	getSkoll,
+	getVoiceLine,
+	getLastLine
+} from '$lib/server/engine/session';
 import { getEvents, captureGemini, runWithSession } from '$lib/server/debug/log';
+import {
+	resetOracleWindows,
+	resetLiteWindows,
+	ASK_SESSION_LIMIT
+} from '$lib/server/voice/rateLimit';
 import { selectSecret } from '$lib/server/engine/engine';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
+import { OUTCOME_LINES, VOICED_SEQUENCE } from '$lib/voice/outcomeLines';
 import { runes } from '$lib/board';
 
 const SEED = 1;
@@ -63,6 +76,8 @@ describe('POST /api/action', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		resetEngine(SID, SEED);
+		resetOracleWindows(); // the Ask limiter is module state — clear it so cases don't share a window
+		resetLiteWindows(); // same for the lite limiter (Sköll's move + reaction) — no cross-case bleed
 		skollDecides(async () => ({ kind: 'cast', runeName: WRONG })); // default: Sköll misplays a cast
 		skollReacts(async () => ({ reaction: 'Pass' })); // default: Sköll lets the human's Ask pass
 	});
@@ -77,6 +92,83 @@ describe('POST /api/action', () => {
 		// The wolf's move is a SEPARATE request, so the answer comes back alone, his turn pending.
 		expect(data.skoll).toBeUndefined();
 		expect(data.state).toMatchObject({ activePlayer: 'Sköll', status: 'active' });
+	});
+
+	it('rate-limits the Ask turn once the session window is spent, with a retry-after', async () => {
+		for (let i = 0; i < ASK_SESSION_LIMIT; i++) {
+			resetEngine(SID, SEED); // each Ask consumes the live human turn — re-arm it
+			expect((await ask()).status).toBe(200);
+		}
+		resetEngine(SID, SEED);
+		const denied = await ask();
+		expect(denied.status).toBe(429);
+		expect(Number(denied.headers.get('retry-after'))).toBeGreaterThan(0);
+	});
+
+	it('never charges the Ask limiter for an empty question — it short-circuits before Gemini', async () => {
+		// Empty asks return the cheap `empty` refusal with no Gemini call, so a flood of them must not
+		// spend the quota real asks need (or a client could deny every player for the window).
+		for (let i = 0; i < ASK_SESSION_LIMIT + 5; i++) {
+			resetEngine(SID, SEED);
+			const res = await call({ type: 'Ask', player: 'Human', question: '   ' });
+			expect(res.status).toBe(200);
+			expect((await res.json()).oracle).toMatchObject({ ok: false });
+		}
+		// The full Ask allowance is intact — a real ask still answers.
+		resetEngine(SID, SEED);
+		expect((await ask()).status).toBe(200);
+	});
+
+	it('serializes overlapping POSTs for one session — the lock is wired into the route', async () => {
+		// Hold the first (live) ask's interpret open; the second ask is queued behind the session lock
+		// and can't run until the first settles. Once it does, the first has consumed the turn, so the
+		// second resolves as a stale not-your-turn — proving the two never interleaved.
+		let release: () => void = () => {};
+		const held = new Promise<void>((resolve) => (release = resolve));
+		let firstInterpret = true;
+		vi.mocked(interpret).mockImplementation(async () => {
+			if (firstInterpret) {
+				firstInterpret = false;
+				await held;
+			}
+			return {
+				kind: 'query',
+				query: { axis: 'fill', value: 'Light' },
+				paraphrase: 'whether it is light'
+			};
+		});
+
+		resetEngine(SID, SEED);
+		const p1 = ask();
+		const p2 = ask();
+
+		await vi.waitFor(() => expect(interpret).toHaveBeenCalledTimes(1)); // p1's interpret is in flight
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		let p2done = false;
+		void Promise.resolve(p2).then(() => (p2done = true));
+		await Promise.resolve();
+		expect(p2done).toBe(false); // p2 can't complete while p1 holds the lock
+
+		release();
+		const [r1, r2] = await Promise.all([p1, p2]);
+		// p1 answered live; p2 ran only AFTER p1 committed the turn, so it's a stale not-your-turn —
+		// never interleaved. interpret ran once (the live ask); the stale one is refused before Gemini.
+		expect((await r1.json()).oracle).toMatchObject({ ok: true });
+		expect((await r2.json()).oracle).toMatchObject({ ok: false, engineReason: 'not-your-turn' });
+		expect(interpret).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not charge the Ask quota for a stale ask refused before Gemini', async () => {
+		// A non-empty ask while it is NOT the human's live turn (Sköll active) is refused from engine
+		// state before interpret — it must not spend the Ask quota, or a stale tab could deny real turns.
+		await ask(); // turn now sits with Sköll
+		for (let i = 0; i < ASK_SESSION_LIMIT + 5; i++) {
+			const stale = await json(await ask());
+			expect(stale.oracle).toMatchObject({ ok: false, engineReason: 'not-your-turn' });
+		}
+		// The full Ask allowance survives — a fresh live ask still answers.
+		resetEngine(SID, SEED);
+		expect((await json(await ask())).oracle).toMatchObject({ ok: true });
 	});
 
 	it('voices a Gemini-authored line, stored by id, on a clean answer (ttd:17)', async () => {
@@ -94,10 +186,12 @@ describe('POST /api/action', () => {
 			voice: ORACLE_VOICE
 		});
 		// The words live in the session store, keyed by the id on the wire — the route voices them by
-		// lookup, never from the wire. The stored line matches the display text.
+		// lookup, never from the wire. The stored line matches the display text; the deterministic answer
+		// rides along as the cacheable fallback the TTS route voices if the authored synth 429s.
 		expect(getVoiceLine(SID, data.oracle.voiced.id)).toEqual({
 			text: 'No — the white sign stays cold; Sól does not reach into light.',
-			voice: ORACLE_VOICE
+			voice: ORACLE_VOICE,
+			fallback: data.oracle.answer
 		});
 	});
 
@@ -316,7 +410,8 @@ describe('POST /api/action', () => {
 		});
 		expect(getVoiceLine(SID, data.outcomeFlair.id)).toEqual({
 			text: 'The dawn is kept; Sól climbs free.',
-			voice: ORACLE_VOICE
+			voice: ORACLE_VOICE,
+			fallback: OUTCOME_LINES.win[VOICED_SEQUENCE.win[0]] // the deterministic splash beat
 		});
 	});
 
@@ -338,7 +433,8 @@ describe('POST /api/action', () => {
 		});
 		expect(getVoiceLine(SID, data.outcomeFlair.id)).toEqual({
 			text: 'The sun is mine. Your night has no morning.',
-			voice: SKOLL_VOICE
+			voice: SKOLL_VOICE,
+			fallback: OUTCOME_LINES.lose[VOICED_SEQUENCE.lose[0]] // the deterministic splash beat
 		});
 	});
 
@@ -433,6 +529,17 @@ describe('POST /api/action', () => {
 		});
 	});
 
+	it('rejects a non-Advance action claiming to be Sköll — the client only ever acts as the Human', async () => {
+		// Sköll is a valid player (passes the shape check) but his turn runs server-side through Advance;
+		// a direct POST as Sköll would drive his Gemini-backed Ask off the quota.
+		await expect(
+			call({ type: 'Ask', player: 'Sköll', question: 'is it a fire rune?' })
+		).rejects.toMatchObject({
+			status: 400,
+			body: expect.objectContaining({ message: 'Only the Human may act.' })
+		});
+	});
+
 	// Debug log — the chronological stream the /debug view reads. Three orthogonal facts per event:
 	// owner (who), kind (input · llm · deterministic), part (turn phase). A verdict is the ENGINE's,
 	// never the actor's; the inference that reached a move is its own owner.
@@ -441,10 +548,9 @@ describe('POST /api/action', () => {
 	// Engine verdicts — the deterministic truth rows (the round's opening secret is part 'Round').
 	const verdicts = () => byOwner('Engine').filter((e) => e.part !== 'Round');
 	const lastVerdict = () => verdicts().at(-1)!;
-	// Sköll's on-stage move/reaction events, apart from the raw model I/O he also owns.
-	const isRawIO = (e: { message: string }) => e.message.startsWith('raw Gemini');
-	const skollMoves = () => byOwner('Sköll').filter((e) => !isRawIO(e));
-	const geminiIO = () => byOwner('Sköll').filter(isRawIO);
+	// Sköll's on-stage events. Each Gemini call is now ONE entry — its readable move/reaction line with
+	// the raw request/response folded into that entry's `data` — so there's no separate raw-I/O row.
+	const skollMoves = () => byOwner('Sköll');
 
 	describe('debug log (S8)', () => {
 		it('opens the round naming the secret and its seed — the on-stage record is a spoiler by design', () => {
@@ -563,48 +669,55 @@ describe('POST /api/action', () => {
 			expect(String(move.data?.reasoning)).toContain('hunch');
 		});
 
-		it('drains raw Gemini I/O onto the log as a Sköll llm event', async () => {
-			// The real seam is mocked here, so seed THIS session's sink the way gemini.ts would (inside
-			// the session context), then advance — the route drains it as a Sköll llm event.
+		it('folds raw Gemini move I/O into the Sköll move event', async () => {
+			// The real seam is mocked, so seed THIS session's sink the way gemini.ts would (inside the
+			// session context), then advance — the route drains it into his move entry, not a separate row.
 			await ask(); // hand the wolf his turn
 			runWithSession(SID, () =>
 				captureGemini({ label: 'move', request: { contents: 'board…' }, response: { text: '{}' } })
 			);
 			await advance();
-			const io = geminiIO().at(-1)!;
-			expect(io).toMatchObject({ kind: 'llm', owner: 'Sköll' });
-			expect(io.message).toContain('move');
-			expect(io.data).toMatchObject({ response: { text: '{}' } });
+			const move = skollMoves().at(-1)!;
+			expect(move).toMatchObject({ kind: 'llm', owner: 'Sköll' });
+			expect(move.data).toMatchObject({ source: 'gemini', response: { text: '{}' } });
 		});
 
-		it('drains a raw oracle call as the Oracle’s own llm event on the Ask', async () => {
-			// The interpret seam is mocked, so tee the oracle call the way oracle/gemini.ts would; the
-			// next Ask drains it attributed to the Oracle (owner), not Sköll.
+		it('folds a raw oracle call into the Oracle’s reading event on the Ask', async () => {
+			// The interpret seam is mocked, so tee the oracle call the way oracle/gemini.ts would; the next
+			// Ask drains it into her reading entry (owner Oracle), raw request/response under its details.
 			runWithSession(SID, () =>
 				captureGemini({ label: 'oracle', request: { contents: 'is it light?' }, response: {} })
 			);
 			await ask();
-			const io = byOwner('Oracle').find(isRawIO)!;
-			expect(io).toMatchObject({ kind: 'llm', part: 'Ask' });
-			expect(io.message).toContain('oracle');
+			const reading = byOwner('Oracle').find((e) => e.part === 'Ask')!;
+			expect(reading).toMatchObject({ kind: 'llm', part: 'Ask' });
+			expect(reading.message).toContain('reads it as');
+			expect(reading.data).toMatchObject({
+				query: { axis: 'fill', value: 'Light' },
+				request: { contents: 'is it light?' }
+			});
 		});
 
-		it('attributes ending flair raw I/O to the ending speaker on the Cast beat', async () => {
-			skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
-			await ask();
-			runWithSession(SID, () =>
+		it('folds ending-flair I/O into the ending speaker’s Cast event', async () => {
+			skollDecides(async () => ({ kind: 'cast', runeName: SECRET })); // his winning cast ends the round
+			// composeEndingFlair runs inside authorEnding, AFTER his move beat drains — capture there so
+			// the I/O folds onto the ending entry (his gloat), not his move.
+			vi.mocked(composeEndingFlair).mockImplementationOnce(async () => {
 				captureGemini({
 					label: 'skoll-ending-flair',
 					request: { contents: 'closing gloat' },
 					response: { text: 'The sun is mine.' }
-				})
-			);
+				});
+				return 'The sun is mine.';
+			});
 
+			await ask();
 			await advance();
 
-			const io = byOwner('Sköll').find((e) => e.message.includes('skoll-ending-flair'))!;
-			expect(io).toMatchObject({ kind: 'llm', owner: 'Sköll', part: 'Cast' });
-			expect(byOwner('Oracle').some((e) => e.message.includes('skoll-ending-flair'))).toBe(false);
+			const ending = byOwner('Sköll').find((e) => e.message.includes('closing verse'))!;
+			expect(ending).toMatchObject({ kind: 'llm', owner: 'Sköll', part: 'Cast' });
+			expect(ending.data).toMatchObject({ response: { text: 'The sun is mine.' } });
+			expect(byOwner('Oracle').some((e) => e.message.includes('closing verse'))).toBe(false);
 		});
 	});
 
@@ -621,5 +734,36 @@ describe('POST /api/action', () => {
 			await callAs('player-two', { type: 'Cast', player: 'Human', runeName: SECRET })
 		);
 		expect(stillWinnable).toMatchObject({ type: 'Cast', cast: { won: true } });
+	});
+
+	// ttd:29 — every committed voiced move records its line + descriptor so a dropped response recovers
+	// the real result instead of the client's false silent/falters line. The route is where it's written.
+	describe('lastLine recovery wiring (ttd:29)', () => {
+		it('records the answer line + descriptor on a committed human Ask', async () => {
+			await ask(); // a clean answer (Sköll passes by default)
+			const last = getLastLine(SID);
+			expect(last).not.toBeNull();
+			// The query/seed verdict here is "No"; the recovered line is her deterministic answer.
+			expect(last!.text).toMatch(/^(Yes|No)\. Sól is/);
+			expect(last!.voice).toMatchObject({ kind: 'answer' });
+		});
+
+		it('records the cast outcome line + descriptor on a committed human Cast', async () => {
+			await call({ type: 'Cast', player: 'Human', runeName: WRONG }); // a resolved wrong cast
+			const last = getLastLine(SID);
+			expect(last).not.toBeNull();
+			// A wrong cast voices the "wrong" line naming the rune the human cast.
+			expect(last!.voice).toMatchObject({ kind: 'cast', result: 'wrong', rune: WRONG });
+			expect(last!.text).toContain(WRONG);
+		});
+
+		it('does not clobber the prior recorded line on a CrossOff (nothing voiced)', async () => {
+			await ask(); // records her answer line
+			const before = getLastLine(SID);
+			expect(before).not.toBeNull();
+			// A CrossOff voices nothing — rememberLine must be a no-op, leaving the prior line intact.
+			await call({ type: 'CrossOff', player: 'Human', runeId: 1, crossed: true });
+			expect(getLastLine(SID)).toEqual(before);
+		});
 	});
 });

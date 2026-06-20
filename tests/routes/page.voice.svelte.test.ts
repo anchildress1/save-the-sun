@@ -2,6 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Page from '$routes/+page.svelte';
 import type { GameState } from '$lib/server/engine/actions';
+import { HUMAN_TURN, SKOLL_TURN, HUMAN_WON, ASK_ANSWER, props } from '../helpers/gameFixtures';
 
 // Push-to-talk + delivery, mocked at the module boundary: these tests assert the page wires the
 // recorder, the transcribe route, and the delivery seam — not that a real mic or AudioContext opens.
@@ -15,7 +16,6 @@ const deliveryMock = vi.hoisted(() => {
 		stopDelivery: vi.fn(),
 		deliver: vi.fn<(descriptor: { kind: string }) => Promise<void>>(async () => {}),
 		whenDrained: vi.fn(async () => {}),
-		currentLevel: vi.fn(() => 0),
 		subscribeDelivery(listener: (event: unknown) => void) {
 			listeners.add(listener);
 			return () => listeners.delete(listener);
@@ -39,21 +39,7 @@ vi.mock('$lib/voice/recorder', () => recorderMock);
 type DeliveryEvent = { type: 'speaking'; voice: 'oracle' | 'skoll' } | { type: 'idle' };
 const emitDelivery = (event: DeliveryEvent) => deliveryMock.emit(event);
 
-const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
-const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 4 };
-const pageProps = {
-	data: {
-		boardSeed: 0,
-		roundId: 'test-round',
-		state: HUMAN_TURN,
-		pendingReaction: null,
-		lastLine: null
-	},
-	params: {},
-	form: null
-};
-
-const ASK_ANSWER = 'No. Sól is not reaching for a fire rune.';
+const pageProps = props(HUMAN_TURN);
 
 // Default fetch: transcribe returns a question, an Ask answers, everything else is empty.
 function mockFetch(transcript = 'is it a fire rune') {
@@ -248,6 +234,87 @@ describe('Save the Sun page — push-to-talk medallion', () => {
 			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
 		);
 		expect(actionBodies()).toHaveLength(0); // no Ask dispatched
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('treats a failed transcribe (non-ok) as nothing heard — no Ask, settles idle', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe') return new Response('boom', { status: 500 });
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		press(screen);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'recording');
+		release(screen);
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies()).toHaveLength(0);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('treats an unparseable transcribe body as nothing heard', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			// 200 OK, but the body throws on .json() — the read must degrade, not surface garbage.
+			if (String(input) === '/api/voice/transcribe') return new Response('<<not json>>');
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		press(screen);
+		release(screen);
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies()).toHaveLength(0);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('treats a transcribe response with neither text nor rune as an empty ask', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe') return new Response('{}'); // ok JSON, no fields
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		press(screen);
+		release(screen);
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies()).toHaveLength(0);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('treats a non-string text from a garbled transcribe as an empty ask — never a crash', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			// A number where text is expected would crash on `.trim()` without the type guard.
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(JSON.stringify({ text: 123 }));
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		press(screen);
+		release(screen);
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies()).toHaveLength(0);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('surfaces a transcribe 429 as a voice notice, not silence', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(JSON.stringify({ error: 'busy' }), { status: 429 });
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		press(screen);
+		release(screen);
+
+		await expect
+			.element(screen.getByTestId('voice-notice'))
+			.toHaveTextContent('The fire needs a moment');
+		expect(actionBodies()).toHaveLength(0); // the throttled speech never became an Ask
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
 	});
 
@@ -504,6 +571,46 @@ describe('Save the Sun page — cast by voice', () => {
 			.element(screen.getByTestId('answer'))
 			.toHaveTextContent('Name a rune on the board to cast it');
 	});
+
+	it('treats a non-string rune from the cast read as off-board — commits nothing', async () => {
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(
+					body.mode === 'cast' ? JSON.stringify({ rune: 123 }) : JSON.stringify({ text: '' })
+				);
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click();
+
+		press(screen);
+		release(screen);
+
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies().some((b) => b.type === 'Cast')).toBe(false);
+	});
+
+	it('treats a spoken cast with no rune field as off-board — commits nothing', async () => {
+		vi.mocked(fetch).mockImplementation(async (input, init) => {
+			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(body.mode === 'cast' ? '{}' : JSON.stringify({ text: '' }));
+			return new Response('{}');
+		});
+		const screen = render(Page, pageProps);
+		await screen.getByRole('button', { name: 'Cast the rune' }).click(); // arm cast mode
+
+		press(screen);
+		release(screen);
+
+		await vi.waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith('/api/voice/transcribe', expect.anything())
+		);
+		expect(actionBodies().some((b) => b.type === 'Cast')).toBe(false);
+	});
 });
 
 describe('Save the Sun page — delivery drives the medallion voice', () => {
@@ -618,12 +725,6 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 	it('queues a Sköll Ask resumed before the speaker opens, voicing it on the first gesture', async () => {
 		allowMotion(); // audio defaults on
 		const ASK_QUERY = { axis: 'element', value: 'Fire' };
-		const SKOLL_TURN: GameState = {
-			activePlayer: 'Sköll',
-			status: 'active',
-			winner: null,
-			turns: 1
-		};
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
 			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
@@ -735,12 +836,6 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 
 	it("voices Sköll's Ask through the delivery seam when his Advance asks", async () => {
 		const ASK_QUERY = { axis: 'element', value: 'Fire' };
-		const SKOLL_TURN: GameState = {
-			activePlayer: 'Sköll',
-			status: 'active',
-			winner: null,
-			turns: 1
-		};
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
 			const body = JSON.parse(String((init as RequestInit)?.body ?? '{}'));
@@ -827,12 +922,6 @@ describe('Save the Sun page — game moves voiced via delivery', () => {
 
 	it('holds the end-screen for a winning cast resumed before the speaker, then plays it on first gesture', async () => {
 		allowMotion(); // audio defaults on
-		const SKOLL_TURN: GameState = {
-			activePlayer: 'Sköll',
-			status: 'active',
-			winner: null,
-			turns: 1
-		};
 		const WON_TURN: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 2 };
 		vi.mocked(fetch).mockImplementation(async (input, init) => {
 			if (String(input) !== '/api/action') return new Response('{}');
@@ -911,6 +1000,17 @@ describe('Save the Sun page — spoken reaction to Sköll', () => {
 			.toHaveTextContent("You close the Oracle's lips; his turn dies with the question.");
 	});
 
+	it('classifies a spoken pass and dispatches it — letting the question stand', async () => {
+		mockReaction('pass', { hexed: false });
+		const screen = render(Page, reactionProps());
+		await holdRelease(screen);
+
+		await vi.waitFor(() =>
+			expect(actionBodies()).toContainEqual({ type: 'React', player: 'Human', reaction: 'Pass' })
+		);
+		expect(actionBodies().some((b) => b.type === 'Ask')).toBe(false);
+	});
+
 	it('an unclear reply asks again and spends nothing', async () => {
 		mockReaction('unclear');
 		const screen = render(Page, reactionProps());
@@ -921,6 +1021,53 @@ describe('Save the Sun page — spoken reaction to Sköll', () => {
 			.toHaveTextContent('Scry, hex, or pass — or let his question stand.');
 		expect(actionBodies()).toHaveLength(0); // no React, no Ask
 		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('a throttled (429) reply shows the voice notice, never the player-blaming unclear line', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(JSON.stringify({ error: 'busy' }), { status: 429 });
+			return new Response('{}');
+		});
+		const screen = render(Page, reactionProps());
+		await holdRelease(screen);
+
+		await expect
+			.element(screen.getByTestId('voice-notice'))
+			.toHaveTextContent('The fire needs a moment');
+		// The throttle is the rite's fault, not the player's — the "try again" blame line must NOT show.
+		await expect.element(screen.getByTestId('answer')).not.toHaveTextContent('Scry, hex, or pass');
+		expect(actionBodies()).toHaveLength(0);
+		await expect.element(medallion(screen)).toHaveAttribute('data-voice-state', 'idle');
+	});
+
+	it('treats an out-of-set reaction choice as unclear — asks again', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe')
+				return new Response(JSON.stringify({ choice: 'bogus' }));
+			return new Response('{}');
+		});
+		const screen = render(Page, reactionProps());
+		await holdRelease(screen);
+
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Scry, hex, or pass — or let his question stand.');
+		expect(actionBodies()).toHaveLength(0);
+	});
+
+	it('treats a reaction reply with no choice field as unclear — asks again, spends nothing', async () => {
+		vi.mocked(fetch).mockImplementation(async (input) => {
+			if (String(input) === '/api/voice/transcribe') return new Response('{}'); // reaction mode, no choice
+			return new Response('{}');
+		});
+		const screen = render(Page, reactionProps());
+		await holdRelease(screen);
+
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('Scry, hex, or pass — or let his question stand.');
+		expect(actionBodies()).toHaveLength(0);
 	});
 
 	it('refuses a spoken scry whose charge is spent — never silently passes', async () => {

@@ -16,47 +16,19 @@
 	// (Aliased locally: a binding literally named `state` collides with the $state rune.)
 	let {
 		state: current,
-		getLevel,
 		onHoldStart,
 		onHoldEnd
 	}: {
 		state: MedallionState;
-		// Live output level (RMS 0–1) sampled each frame while a voice plays — drives the disc/corona
-		// pulse from the real audio envelope instead of a fixed CSS loop. Absent → static fallback.
-		getLevel?: () => number;
 		onHoldStart: () => void;
 		onHoldEnd: () => void;
 	} = $props();
 
 	let sealed = $derived(current === 'denied');
-	const isSpeaking = (s: MedallionState) => s === 'speaking' || s === 'skoll-speaking';
 
-	// The live output envelope (RMS 0–1), polled each frame while a voice plays and motion is allowed.
-	// Reset to 0 otherwise, so a non-speaking or reduced-motion medallion falls back to spriteLevel.
-	let liveLevel = $state(0);
-	let reducedMotion = $state(false);
-	let pulsing = $derived(isSpeaking(current) && !reducedMotion && getLevel !== undefined);
-
-	// Disc frame: the live envelope mapped onto the 0–11 strip while pulsing; the state's fixed frame
-	// otherwise. Corona level (0–1) drives the speaking-state glow's opacity/scale from the same source.
-	let level = $derived(
-		pulsing ? Math.round(liveLevel * (SPRITE_LEVELS - 1)) : spriteLevel(current)
-	);
-	let coronaLevel = $derived(pulsing ? liveLevel : 0);
-
-	// Poll the speaker's level each animation frame while a voice plays — the disc/corona then pulse
-	// to the real envelope. Stops the moment the state leaves speaking (or motion is reduced).
-	$effect(() => {
-		if (!pulsing) {
-			liveLevel = 0;
-			return;
-		}
-		let raf = requestAnimationFrame(function tick() {
-			liveLevel = getLevel!();
-			raf = requestAnimationFrame(tick);
-		});
-		return () => cancelAnimationFrame(raf);
-	});
+	// Disc frame: the state's fixed brightness step. The speaking/recording motion is a CSS loop on the
+	// disc (sprite-level), not a JS/audio pulse; this value is the still frame it holds under reduced motion.
+	let level = $derived(spriteLevel(current));
 
 	// pointerdown begins the hold; release/leave/cancel ends it. Guarded against a denied mic and
 	// against a stray pointerup with no matching down (e.g. a release that started off the disc).
@@ -102,19 +74,12 @@
 		// The timeout bounds a page that never goes idle — the art must still arrive.
 		if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 1500 });
 		else setTimeout(load, 500);
-
-		// Honor prefers-reduced-motion for the JS-driven pulse too (the CSS @media only covers the
-		// loops): when reduced, the live level is ignored and the disc/corona hold their static frame.
-		const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-		if (!motion) return;
-		reducedMotion = motion.matches;
-		const onChange = (e: MediaQueryListEvent) => (reducedMotion = e.matches);
-		motion.addEventListener('change', onChange);
-		return () => motion.removeEventListener('change', onChange);
 	});
 
-	// Re-announces only when the line changes, so a steady state never re-narrates.
-	let announced = $derived(MEDALLION_ANNOUNCEMENT[current]);
+	// Re-announces only when the line changes, so a steady state never re-narrates. The sealed state
+	// is left to the page's voice-notice live region (which carries the actionable "continues by
+	// hand") — narrating it here too would double-speak the same denial to a screen reader.
+	let announced = $derived(sealed ? '' : MEDALLION_ANNOUNCEMENT[current]);
 </script>
 
 <div class="medallion-wrap">
@@ -125,9 +90,10 @@
 		data-voice-state={current}
 		aria-label={MEDALLION_LABEL[current]}
 		aria-disabled={sealed}
+		aria-describedby={sealed ? undefined : 'mic-hint'}
 		style="--ring-step: {360 /
 			RING_RUNES.length}deg; --sprite-level: {level}; --sprite-size: {SPRITE_LEVELS *
-			100}%; --sprite-peak: {SPRITE_LEVELS - 1}; --corona-level: {coronaLevel}"
+			100}%; --sprite-peak: {SPRITE_LEVELS - 1}"
 		onpointerdown={begin}
 		onpointerup={end}
 		onpointerleave={end}
@@ -170,12 +136,59 @@
 		</span>
 	</button>
 	<span class="sr-only" role="status" data-testid="medallion-status">{announced}</span>
+	<!-- Discoverability for the page-wide push-to-talk key: a hover/focus hint that the backtick holds
+	     too. Also the button's aria-describedby, so it is read on focus, not just seen on hover. Hidden
+	     while sealed — the key does nothing without a mic. -->
+	{#if !sealed}
+		<span class="mic-hint" id="mic-hint">
+			Hold to speak, or hold <kbd aria-label="the backtick key">`</kbd>
+		</span>
+	{/if}
 </div>
 
 <style>
 	.medallion-wrap {
 		display: flex;
 		justify-content: center;
+		position: relative;
+	}
+
+	/* Hover/focus hint that the backtick key holds the mic too. Hidden until the disc is hovered or
+	   focused; pointer-events off so it never blocks the hold gesture. */
+	.mic-hint {
+		position: absolute;
+		top: calc(100% + 0.4rem);
+		left: 50%;
+		transform: translateX(-50%) translateY(0.15rem);
+		z-index: 5;
+		white-space: nowrap;
+		padding: 0.3rem 0.55rem;
+		border: 1px solid var(--gold-dim);
+		border-radius: 0.4rem;
+		background: rgba(6, 9, 18, 0.92);
+		color: var(--gold-bright);
+		font-size: 0.72rem;
+		line-height: 1;
+		opacity: 0;
+		pointer-events: none;
+		transition:
+			opacity 0.16s ease,
+			transform 0.16s ease;
+	}
+
+	.mic-hint kbd {
+		font-family: inherit;
+		font-size: 0.78rem;
+		padding: 0 0.28rem;
+		border: 1px solid var(--gold-dim);
+		border-radius: 0.25rem;
+		background: rgba(217, 169, 74, 0.12);
+	}
+
+	.medallion:hover ~ .mic-hint,
+	.medallion:focus-visible ~ .mic-hint {
+		opacity: 1;
+		transform: translateX(-50%) translateY(0);
 	}
 
 	.medallion {
@@ -202,6 +215,12 @@
 	/* Ember palette is never the only Sköll signal — the disc deepens to eclipse below. */
 	.medallion[data-voice-state='skoll-speaking'] {
 		--corona-rgb: 200, 71, 63;
+	}
+
+	/* The player's own voice (input) reads moonlight silver-blue — distinct from the Oracle's gold and
+	   the wolf's ember, so recording is never mistaken for a spoken reply. Paired with the flare below. */
+	.medallion[data-voice-state='recording'] {
+		--corona-rgb: 150, 185, 225;
 	}
 
 	.medallion:focus-visible {
@@ -256,13 +275,14 @@
 		animation: sprite-level 1.1s steps(12, jump-none) infinite alternate;
 	}
 
-	/* Speaking: the disc frame is driven by the live output level (--sprite-level, set per frame from
-	   RMS in script) — no CSS loop, so the strip pulses with the actual voice. Reduced motion holds
-	   the static frame (the live level isn't sampled then). */
-
-	/* Ember shift for the wolf — paired with the deepening eclipse below, never the only signal. */
 	.medallion[data-voice-state='skoll-speaking'] .disc {
 		filter: hue-rotate(-40deg) saturate(1.25);
+	}
+
+	/* Recording shifts the gold disc toward the same moonlight silver-blue as its corona, so the
+	   player's voice reads cohesively cool — distinct from gold/ember. The flare animation rides on top. */
+	.medallion[data-voice-state='recording'] .disc {
+		filter: hue-rotate(170deg) saturate(0.9);
 	}
 
 	/* Sköll speaking: a dark overlay swallows the disc center (the sun devoured) while an inset
@@ -285,6 +305,29 @@
 
 	.medallion[data-voice-state='skoll-speaking'] .eclipse-shadow {
 		opacity: 1;
+	}
+
+	/* The ember itself prowls: a bright hotspot near the rim rotates around the eclipse edge, so the
+	   RED moves — not the rim glyphs (those spin only while thinking). The dark center holds still;
+	   only the ember travels the circle. */
+	.medallion[data-voice-state='skoll-speaking'] .eclipse-shadow::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: 50%;
+		background: radial-gradient(
+			circle at 50% 9%,
+			rgba(232, 104, 78, 0.95) 0%,
+			rgba(200, 71, 63, 0.35) 13%,
+			transparent 24%
+		);
+		animation: ember-orbit 3.4s linear infinite;
+	}
+
+	@keyframes ember-orbit {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	@keyframes sprite-level {
@@ -342,7 +385,7 @@
 		display: none;
 	}
 
-	/* Denied (R1): the struck glyph is the shape signal that this is the seal, not idle — and the
+	/* Denied: the struck glyph is the shape signal that this is the seal, not idle — and the
 	   cursor drops the hold affordance with it. */
 	.medallion[data-voice-state='denied'] {
 		cursor: default;
@@ -369,7 +412,7 @@
 
 	.medallion[data-voice-state='recording'] .ring-rune {
 		opacity: 0.7;
-		filter: var(--rune-tint) drop-shadow(0 0 4px rgba(217, 169, 74, 0.8));
+		filter: var(--rune-tint) drop-shadow(0 0 4px rgba(150, 185, 225, 0.8));
 	}
 
 	/* Thinking: the rune ring orbits slowly while the words are read. */
@@ -385,13 +428,17 @@
 		opacity: 0.55;
 	}
 
-	/* Speaking: the corona swells with the live output level (--corona-level, RMS per frame) — gold
-	   for the Oracle, ember for the wolf — instead of a fixed pulse loop. At rest (level 0) it sits at
-	   its base glow; a loud beat brightens and grows it. Reduced motion pins it static (@media below). */
+	/* Speaking: the sun breathes from the inside — the disc cycles its brightness strip, the same inner
+	   pulse as recording (gold/ember, not blue). The corona drops to a faint halo so the movement reads
+	   ON the disc, not as an outer glow. Reduced motion holds the disc on its peak. */
+	.medallion[data-voice-state='speaking'] .disc,
+	.medallion[data-voice-state='skoll-speaking'] .disc {
+		animation: sprite-level 1.3s steps(12, jump-none) infinite alternate;
+	}
+
 	.medallion[data-voice-state='speaking'] .corona,
 	.medallion[data-voice-state='skoll-speaking'] .corona {
-		opacity: calc(0.34 + var(--corona-level, 0) * 0.5);
-		transform: scale(calc(1 + var(--corona-level, 0) * 0.04));
+		opacity: 0.2;
 	}
 
 	.medallion[data-voice-state='speaking'] .ring-rune,
@@ -427,7 +474,7 @@
 		}
 	}
 
-	/* Static glow intensities replace the pulses and orbit (R6). The theme's global near-zero
+	/* Static glow intensities replace the pulses and orbit. The theme's global near-zero
 	   durations aren't enough here: a frozen keyframe could park at its dimmest frame, so the
 	   animations are removed and each state gets a fixed intensity. The disc freezes on its inline
 	   static frame (spriteLevel). */
@@ -450,10 +497,8 @@
 			opacity: 0.85;
 		}
 
-		.medallion[data-voice-state='speaking'] .corona,
-		.medallion[data-voice-state='skoll-speaking'] .corona {
-			opacity: 0.7;
-			transform: none;
+		.medallion[data-voice-state='skoll-speaking'] .eclipse-shadow::after {
+			animation: none;
 		}
 	}
 

@@ -44,7 +44,7 @@ The core loop — Ask, Hex, Scry, Pass, Cast — runs on buttons and a text box.
 | Auth | `GEMINI_API_KEY` stays in Google Secret Manager, server-side only; it never reaches the browser and no client tokens are minted |
 | Input | Push-to-talk: a held recording (WAV) → `POST /api/voice/transcribe` → text → the same Ask/React pipeline as the buttons |
 | Captions | All spoken content also lands as text (Answer panel for the Oracle, his frame for Sköll) |
-| Output mute | One toggle (a master gain) silences both characters; captions and the state machine are untouched; persists for the session |
+| Output mute | One toggle closes the shared speaker, aborts in-flight audio, and drops pending voice; captions and mic behavior are untouched; persists for the session |
 | Cast safety | A spoken cast commits only on an exact board-rune match; the deliberate arm (or "cast {rune}") stands in for a confirm; a mishear or off-board word is refused, never staked |
 | Turn parity | Voice intents call the exact same engine dispatch as the buttons; buttons never disappear |
 
@@ -88,9 +88,9 @@ The medallion at the top of the Oracle panel is both the push-to-talk control an
 - **Idle** — disc unveiled, ready (a small mic glyph etched for discoverability).
 - **Recording** — corona flares with the player's voice while the hold is down.
 - **Thinking** — the rune ring orbits while the utterance is transcribed.
-- **Oracle speaking** — corona pulses with her line.
-- **Sköll speaking** — the glow shifts gold→ember **and** the disc deepens toward total eclipse with an ember rim — the sun devoured — so the speaker reads by brightness and shape, never color alone.
-- `prefers-reduced-motion` swaps every pulse/orbit for a static glow intensity.
+- **Oracle speaking** — a steady gold corona while her line plays.
+- **Sköll speaking** — the glow shifts gold→ember **and** the disc deepens toward total eclipse with an ember rim — the sun devoured — so the speaker reads by brightness and shape, never color alone. The indicator follows the delivery queue (which clip is actually sounding), so his ember shows only once his clip plays — never while her line is still being heard.
+- `prefers-reduced-motion` swaps the recording flare and ring orbit for static glow intensities (the speaking states are already steady).
 - Each state carries an ARIA label and a polite live-region announcement; the medallion and the mute toggle sit in one labeled `role="group"` and are keyboard-operable.
 
 ## Every game move is written (R10) ✍️
@@ -99,7 +99,7 @@ Voice never solely carries game information. An Ask and its answer, a reaction, 
 
 ## Output mute 🔇
 
-One toggle silences both characters' audio; captions, text, and mic behavior are unaffected — a master gain on the shared speaker attenuates to silence without dropping the queue, so caption timing is byte-for-byte identical. The preference persists for the session (`sessionStorage`).
+One toggle silences both characters' audio; captions, text, and mic behavior are unaffected. Turning output off closes the shared speaker, aborts in-flight audio, and drops pending voice so a muted board never posts to the TTS route. The preference persists for the session (`sessionStorage`).
 
 ## Success Metrics 📈
 

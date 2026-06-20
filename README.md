@@ -8,11 +8,11 @@
 </p>
 
 <p align="center">
-  <img alt="CI GHA Status" src="https://img.shields.io/github/actions/workflow/status/anchildress1/save-the-sun/.github%2Fworkflows%2Fci.yml?style=for-the-badge&logo=github&label=CI" />
-  <img alt="CodeQL GHA Status" src="https://img.shields.io/github/actions/workflow/status/anchildress1/save-the-sun/.github%2Fworkflows%2Fcodeql.yml?style=for-the-badge&logo=github&label=CodeQL" />
+  <img alt="CI GHA Status" src="https://img.shields.io/github/actions/workflow/status/anchildress1/save-the-sun/.github%2Fworkflows%2Fci.yml?branch=main&style=for-the-badge&logo=github&label=CI" />
+  <img alt="CodeQL GHA Status" src="https://img.shields.io/github/actions/workflow/status/anchildress1/save-the-sun/.github%2Fworkflows%2Fcodeql.yml?branch=main&style=for-the-badge&logo=github&label=CodeQL" />
   <br/>
-  <img alt="Sonar Quality Gate" src="https://img.shields.io/sonar/quality_gate/anchildress1_save-the-sun?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge" />
-  <img alt="Sonar Coverage" src="https://img.shields.io/sonar/coverage/anchildress1_save-the-sun?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&color=limegreen" />
+  <img alt="Sonar Quality Gate" src="https://img.shields.io/sonar/quality_gate/anchildress1_save-the-sun?branch=main&server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge" />
+  <img alt="Sonar Coverage" src="https://img.shields.io/sonar/coverage/anchildress1_save-the-sun?branch=main&server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&color=limegreen" />
   <img alt="Lighthouse accessibility score 100, enforced pre-push" src="https://img.shields.io/badge/Lighthouse_a11y-100-limegreen?style=for-the-badge&logo=lighthouse" />
 </p>
 
@@ -23,6 +23,7 @@
 ## Table of Contents
 
 - [About](#about)
+- [AI & Prizes](#ai--prizes)
 - [Play](#play)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
@@ -41,11 +42,32 @@
 
 ## About
 
-It's the eve of the longest day, and the dawn must be earned. Twenty-four runes stand; one is the solstice offering. You question the Oracle in plain English, cross runes off by hand, and cast your answer before Sköll names it first. The deduction is rigorous and deterministic — every round is provably winnable through legal Asks alone, and the Oracle never lies — but it's wrapped in a night-to-dawn ritual instead of a logic grid. The night visibly advances as turns pass; the moon sets; dawn gathers at the edge of the world.
+It's the eve of the longest day, and the dawn must be earned. Twenty-four runes stand; one is the solstice offering.
 
-And it's spoken. Ask aloud — hold the medallion and say your question — or type it; either way the Oracle answers in her own voice, dramatized live, while Sköll answers from the dark in his. Every spoken line is also written, so nothing is lost with the sound off.
+- **Deduction-as-ritual, not a logic grid** — question the Oracle in plain English, cross runes off by hand, and **Cast** before Sköll names the rune first. Every round is provably winnable through legal Asks alone, and the Oracle never lies.
+- **It's spoken** — hold the medallion and ask aloud, or type. The Oracle answers in her voice, dramatized live; Sköll answers from the dark in his. Every line is captioned, so nothing is lost with the sound off.
+- **The night advances** — turns slide the moon toward the horizon while dawn gathers at the edge of the world. Win and the sun rises; lose and the night never breaks.
 
 Design intent: [`docs/prd.md`](docs/prd.md) · mechanics: [`docs/game-spec.md`](docs/game-spec.md) · voice & copy: [`docs/ux-copy.md`](docs/ux-copy.md) · voice architecture: [`docs/architecture.md`](docs/architecture.md#voice--input-push-to-talk-and-output-delivery).
+
+---
+
+## AI & Prizes
+
+Two categories, on purpose: **Gemini** (primary) and **Ode to Turing**.
+
+### Gemini, in four roles
+
+- **Oracle** — interprets free-text Asks and dramatizes her verdicts: `gemini-3.5-flash` (full Flash — she must read language exactly).
+- **Sköll** — plays the wolf: `gemini-3.1-flash-lite` (the lite tier on purpose — he plays looser, like a clever twelve-year-old).
+- **Speech-to-text** — transcribes push-to-talk Asks: `gemini-3.5-flash`.
+- **Text-to-speech** — voices both characters through one route, a `voice` param apart: `gemini-3.1-flash-tts-preview`.
+
+**The engine referees truth; Gemini never sees the secret.** A deterministic in-memory engine holds and judges the answer — the model only interprets language, plays the wolf, transcribes speech, and voices server-owned lines.
+
+### Ode to Turing
+
+The whole game is an imitation game with a referee. You ask in plain English and Gemini has to read your intent exactly. Two AI characters answer back in voice — the Oracle straight, Sköll bluffing on the lite tier like a clever kid who's good at the game. Neither is ever trusted with the truth; the engine settles every claim.
 
 ---
 
@@ -58,29 +80,23 @@ Design intent: [`docs/prd.md`](docs/prd.md) · mechanics: [`docs/game-spec.md`](
 
 ## Features
 
-| Feature            | What it does                                                                                                                                                                                                                                                                                   |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Free-text Asks     | Type a yes/no question — group, range, light/dark, hue, or a single rune. Gemini interprets it, echoes its reading, and the engine answers truthfully. Refusals (negation, mixed types, secret-fishing) don't cost the turn.                                                                   |
-| Two voices         | Every game move is spoken — the Oracle in her voice, Sköll in his — through Gemini TTS, and written as captions so the sound-off game is identical. Her verdicts are dramatized live (never canned), guarded so a restyle can't flip the answer; the win/loss endings are spoken in character. |
-| Talk to the Oracle | Push-to-talk: hold the medallion (or the backtick key), speak your Ask, release. The recording is transcribed server-side and runs the exact same pipeline as the text box — and you can answer Sköll's question (Scry / Hex / Pass) by voice too.                                             |
-| The Cast           | Naming the rune is a separate, armed action — deliberate, sacred, and uninterruptible. Right wins the round; wrong wastes only the turn.                                                                                                                                                       |
-| Sköll              | The wolf runs his own deduction over the same board and races you to the rune. His asks are visible; his reasoning isn't.                                                                                                                                                                      |
-| Scry & Hex         | One-use reactions to his Ask: Scry steals his answer, Hex silences the Oracle and wastes his turn. He holds the same charges against you.                                                                                                                                                      |
-| The night advances | Every turn slides the painted moon toward the horizon while dawn gathers at the header's edge. Win and the sun rises; lose and the night never breaks.                                                                                                                                         |
-| Resume on reload   | A refresh resumes the same round — same secret, same board order, same crossings, same voiced Oracle line. In-memory only; no accounts, no database.                                                                                                                                           |
-| Accessibility      | Whole round playable by keyboard, axe-clean across surfaces (WCAG 2.1 AA), screen-reader narration via status regions, reduced-motion respected.                                                                                                                                               |
-| Honest degradation | With all mood graphics and audio failed or off, the game remains fully playable and fair on the plain grid.                                                                                                                                                                                    |
+- **Free-text Asks** — type a yes/no question (group, range, light/dark, hue, or a single rune); Gemini reads it, echoes its reading, and the engine answers truthfully. Refusals (negation, mixed types, secret-fishing) don't cost the turn.
+- **Two voices** — every move is spoken (Oracle and Sköll) through Gemini TTS and captioned, so the sound-off game is identical. Verdicts are dramatized live, guarded so a restyle can't flip the answer; endings are spoken in character.
+- **Talk to the Oracle** — push-to-talk: hold the medallion (or the backtick key), speak, release. Transcribed server-side through the exact same pipeline as the text box — and you can answer Sköll (Scry / Hex / Pass) by voice too.
+- **The Cast** — naming the rune is a separate, armed, uninterruptible action. Right wins the round; wrong wastes only the turn.
+- **Sköll** — the wolf runs his own deduction over the same board and races you. His asks are visible; his reasoning isn't.
+- **Scry & Hex** — one-use reactions to his Ask: Scry steals his answer, Hex silences the Oracle and wastes his turn. He holds the same charges against you.
+- **The night advances** — every turn slides the painted moon toward the horizon while dawn gathers at the header's edge. Win and the sun rises; lose and the night holds.
+- **Resume on reload** — a refresh resumes the same round: same secret, board order, crossings, and voiced Oracle line. In-memory only; no accounts, no database.
+- **Accessibility** — whole round keyboard-playable, axe-clean across surfaces (WCAG 2.1 AA), screen-reader narration via status regions, reduced-motion respected.
+- **Honest degradation** — with all mood graphics and audio failed or off, the game stays fully playable and fair on the plain grid.
 
 ---
 
 ## Tech Stack
 
 - **App:** [SvelteKit 2](https://svelte.dev/docs/kit) / Svelte 5 (runes), TypeScript, Node.js ≥ 26, ESM
-- **AI:** [Gemini API](https://ai.google.dev/) (`@google/genai`) in four roles:
-  - **Oracle** — interprets free-text Asks and dramatizes her verdicts: `gemini-3.5-flash` (full Flash — she must read language exactly)
-  - **Sköll** — plays the wolf: `gemini-3.1-flash-lite` (the lite tier on purpose — he plays looser, like a clever twelve-year-old)
-  - **Speech-to-text** — transcribes push-to-talk Asks: `gemini-3.5-flash`
-  - **Text-to-speech** — voices both characters through one route, a `voice` param apart: `gemini-3.1-flash-tts-preview`
+- **AI:** [Gemini API](https://ai.google.dev/) (`@google/genai`) — Oracle, Sköll, speech-to-text, text-to-speech (see [AI & Prizes](#ai--prizes))
 - **Tests:** Vitest (unit + browser-mode component), Playwright e2e, `@axe-core/playwright`, Lighthouse CI (pre-push)
 - **Quality:** ESLint, Prettier, svelte-check, commitlint (conventional + RAI), secretlint, Lefthook hooks
 - **CI/CD:** GitHub Actions (CI, CodeQL, Release Please), SonarCloud, Docker → Google Cloud Run
@@ -115,13 +131,14 @@ flowchart LR
     Routes -->|"server-owned line → PCM"| Spk
 ```
 
-The engine holds the secret rune and referees every turn; Gemini only ever interprets language, plays the wolf, transcribes speech, and voices server-owned lines — it is never trusted with the answer. The board order, round token, secret, and the recoverable last-voiced line all live server-side per session: a reload resumes, a dropped response recovers, a new game reshuffles.
-
-Deeper diagrams — turn flow, the push-to-talk + delivery voice loop, and the session lifecycle — live in [`docs/architecture.md`](docs/architecture.md).
+The engine holds the secret and referees every turn; Gemini only interprets language, plays the wolf, transcribes speech, and voices server-owned lines — never the answer. Per-session state (board order, round token, secret, last-voiced line) lives server-side, so a reload resumes and a dropped response recovers. Deeper diagrams — turn flow, the push-to-talk + delivery voice loop, the session lifecycle — live in [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
 ## Project Structure
+
+<details>
+<summary>Source tree</summary>
 
 ```
 src/
@@ -145,6 +162,8 @@ docs/                  # design spec, mechanics, rune data, voice & copy, archit
 tests/                 # unit + component (vitest browser) + e2e (playwright, axe)
 ```
 
+</details>
+
 ---
 
 ## Getting Started
@@ -154,9 +173,8 @@ git clone git@github.com:anchildress1/save-the-sun.git
 cd save-the-sun
 make install                 # pnpm install + playwright browsers
 cp .env.example .env         # then add your GEMINI_API_KEY
-# Heads up: saving a server-side file restarts the SSR module (Vite HMR), which clears the
-# in-memory game state — the round's secret re-rolls and /debug resets. Restart for a clean
-# round, or just reload, after a server edit. Client-only edits hot-reload normally.
+# Heads up: saving a server-side file restarts the SSR module (Vite HMR) and clears the
+# in-memory round — reload or restart for a clean game. Client edits hot-reload normally.
 make dev                     # vite dev server
 ```
 
@@ -169,21 +187,22 @@ make dev                     # vite dev server
 
 ## Configuration
 
-| Variable         | Required | What it does                                                                                                |
-| ---------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
-| `GEMINI_API_KEY` | Yes      | Server-side only — powers the Oracle and Sköll. Get one at [AI Studio](https://aistudio.google.com/apikey). |
+| Variable                                      | Required | What it does                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY`                              | Yes      | Server-side only — powers the Oracle and Sköll. Get one at [AI Studio](https://aistudio.google.com/apikey).                                                                                                                                                                                                                           |
+| `TTS_*` · `STT_*` · `ASK_*` · `LITE_*` limits | No       | Per-minute, per-instance ceilings for the in-memory abuse guard — one bucket per surface (`ASK_*` the Oracle/flash budget, `LITE_*` Sköll's flash-lite, plus TTS and transcribe), keyed by client+session. Sized so a whole game never throttles and the limiter trips before Google's quota; the billing cap is the hard spend stop. |
 
-Local secrets live in `.env` (gitignored). Deployed, the key rides Google Secret Manager via [`deploy.sh`](deploy.sh).
+Local secrets live in `.env` (gitignored); the rate-limit knobs are documented there too. Deployed, the key rides Google Secret Manager and any limit overrides set in your shell are forwarded to Cloud Run — both via [`deploy.sh`](deploy.sh).
 
 ---
 
 ## Security
 
-- The secret rune never enters gameplay responses, the client bundle, or the public board seed — the engine alone holds and judges the answer, and Gemini prompts are secret-free by construction (the model interprets language and plays the wolf). The always-on `/debug` stream is the one deliberate exception: it names the secret because following the engine's truth live is its whole point — a spoiler surface by design.
-- `GEMINI_API_KEY` is server-side only: `.env` locally, Secret Manager on Cloud Run. It can never enter the `/debug` stream — every logged string is masked at the sink, and tests assert it.
-- The TTS route voices **only server-owned lines** — known line IDs recomposed server-side from the engine's truth, or Gemini-authored lines looked up by an opaque per-session id (never the client's wire text) — and is rate-limited per session and globally, so it can't be turned into a free text-to-speech endpoint. The transcribe route takes audio only; the key never leaves the server.
-- Sessions are an `httpOnly`, `secure`, `sameSite=lax` cookie holding an opaque UUID — no user data, no accounts, nothing durable.
-- `secretlint` runs in the pre-commit hook; CodeQL runs in CI.
+- **Secret never leaks** — the secret rune stays out of gameplay responses, the client bundle, and the public board seed; the engine alone holds and judges it, and Gemini prompts are secret-free by construction. The always-on `/debug` stream is the one deliberate spoiler — naming the secret live is its whole point.
+- **Key is server-only** — `GEMINI_API_KEY` lives in `.env` locally, Secret Manager on Cloud Run, masked at every log sink (tests assert it) so it can never reach `/debug`.
+- **No open TTS** — the TTS route voices only server-owned lines (known IDs, or opaque per-session lookups — never client wire text), rate-limited per session and globally. Transcribe takes audio only; the key never leaves the server.
+- **Throwaway sessions** — an `httpOnly`, `secure`, `sameSite=lax` cookie holding an opaque UUID; no user data, no accounts, nothing durable.
+- **Scanned** — `secretlint` pre-commit, CodeQL in CI.
 
 ---
 

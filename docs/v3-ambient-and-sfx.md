@@ -71,7 +71,7 @@ You are in **one lifecycle phase at a time**, so buckets are near-mutually-exclu
 |---|---|---|
 | splash open | splash mount | component mount |
 | idle | input wait past N seconds | **net-new** input-wait timer (none exists yet) |
-| hunt mood | `nightT` crosses a threshold (≈ 0.6) | `nightT` (line 192) — already an escalation curve off `turns` |
+| hunt mood | `nightT` crosses a threshold (≈ 0.6) | `nightT` — already an escalation curve off `turns` |
 | defeat exit | the **human win** (Sól wins) end-screen — ux-copy §2 "the witch wins" | `humanWon` |
 
 **`nightT` is the hunt-mood signal.** It is `Math.min(0.95, 1 - Math.pow(0.85, turns))` — a 0→1 menace ramp already derived client-side. Hunt mood off the *player-visible* board (turns) is free. Hunt mood off **Sköll's own closing-in** (how narrowed his guess is) is thematically better but net-new — the engine does not surface his confidence today. Deferred as the P2 upgrade path.
@@ -108,7 +108,7 @@ Short, non-vocal, latency-critical one-shots. **Not TTS** — a shipped sound-de
 | rune crossed off | RuneGrid **user-change** event | not `crossings` directly — it also sets on restore/reset |
 | hex / scry | reaction dispatch | react handler |
 | medallion wake / sleep | recorder hold | `startHold` / `endHold` — not delivery enable/disable (that's the speaker lifecycle) |
-| win / loss sting | outcome | `roundStatus` (line 159) |
+| win / loss sting | outcome | `roundStatus` |
 
 ### Rules
 
@@ -123,7 +123,7 @@ Short, non-vocal, latency-critical one-shots. **Not TTS** — a shipped sound-de
 
 We will likely not implement V3. These are the seams v2 must **not** close off, so V3 is additive rather than a refactor. Each is cheap to honor now and expensive to retrofit.
 
-1. **Source-agnostic playback.** `Speaker` (`src/lib/voice/audio.ts`) plays PCM16@24kHz chunks only (`enqueue(base64Pcm)`). V3 clips/SFX are decoded buffers. Keep the gain + analyser + context **mechanics decoupled from the PCM-chunk assumption** so a `playBuffer(AudioBuffer)` path can be added beside `enqueue` without rewriting the speaker. Do not bake "audio == streamed TTS PCM" into the speaker's contract.
+1. **Source-agnostic playback.** `Speaker` (`src/lib/voice/audio.ts`) plays streamed PCM16@24kHz voice chunks tagged with their speaker (`enqueue(base64Pcm, voice)`). V3 clips/SFX are decoded buffers. Keep the gain/context mechanics and speaking-indicator callbacks **decoupled from the PCM-chunk assumption** so a `playBuffer(AudioBuffer)` path can be added beside `enqueue` without rewriting the speaker. Do not bake "audio == streamed TTS PCM" into the speaker's contract.
 
 2. **Mute is the shared audio authority.** The S11 mute preference lives in `sessionStorage` (external to any speaker) — keep it that way. All three buses (added later) consult the same key. Do not couple mute to the Voice speaker instance such that a second bus can't read it.
 

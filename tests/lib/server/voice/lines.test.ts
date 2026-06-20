@@ -169,6 +169,19 @@ describe('composeLine', () => {
 		).toBeNull();
 	});
 
+	// The route resolves authored lines by id from the per-session store and never trusts the wire's
+	// words — composeLine must refuse to synthesize the descriptor's text directly.
+	it('never voices an authored line from the descriptor', () => {
+		expect(
+			composeLine({
+				kind: 'authored',
+				id: 'vl-1',
+				voice: 'any-voice',
+				text: 'client-supplied words that must never be synthesized'
+			})
+		).toBeNull();
+	});
+
 	// Allow-list IDs are matched by own-property only — an inherited key (e.g. a prototype method
 	// name) must be rejected with null, never resolve to a function the route would synthesize.
 	it('rejects an inherited-property id for react and outcome', () => {
@@ -207,6 +220,15 @@ describe('voiceForLine', () => {
 		expect(voiceForLine({ kind: 'outcome', result: 'win', beat: 'coda' })).toBe(ORACLE_VOICE);
 		expect(voiceForLine({ kind: 'outcome', result: 'lose', beat: 'verse' })).toBe(SKOLL_VOICE);
 	});
+
+	it('voices an authored line in its own carried voice (ttd:17/ttd:22)', () => {
+		expect(
+			voiceForLine({ kind: 'authored', id: 'vl-1', voice: SKOLL_VOICE, text: 'his gloat' })
+		).toBe(SKOLL_VOICE);
+		expect(
+			voiceForLine({ kind: 'authored', id: 'vl-2', voice: ORACLE_VOICE, text: 'her blessing' })
+		).toBe(ORACLE_VOICE);
+	});
 });
 
 describe('synthPrompt', () => {
@@ -243,6 +265,10 @@ describe('isLineDescriptor', () => {
 		expect(isLineDescriptor({ kind: 'react', line: 'human-hex' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'cast', result: 'true' })).toBe(true);
 		expect(isLineDescriptor({ kind: 'outcome', result: 'win', beat: 'coda' })).toBe(true);
+		// authored carries the words' display copy + voice + the store id (the words live server-side).
+		expect(
+			isLineDescriptor({ kind: 'authored', id: 'vl-1', voice: ORACLE_VOICE, text: 'her line' })
+		).toBe(true);
 	});
 
 	it('rejects malformed shapes', () => {
@@ -257,5 +283,9 @@ describe('isLineDescriptor', () => {
 		expect(isLineDescriptor({ kind: 'react' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'cast' })).toBe(false);
 		expect(isLineDescriptor({ kind: 'outcome', result: 'win' })).toBe(false); // beat required
+		// authored requires all three string fields — dropping any one fails the guard.
+		expect(isLineDescriptor({ kind: 'authored', voice: ORACLE_VOICE, text: 'x' })).toBe(false); // no id
+		expect(isLineDescriptor({ kind: 'authored', id: 'vl-1', text: 'x' })).toBe(false); // no voice
+		expect(isLineDescriptor({ kind: 'authored', id: 'vl-1', voice: ORACLE_VOICE })).toBe(false); // no text
 	});
 });

@@ -1,3 +1,5 @@
-# allow crawling everything by default
+# Public demo — crawl and index freely. Social unfurl bots and search engines are all welcome.
 User-agent: *
-Disallow:
+Allow: /
+
+Sitemap: https://savethesun.anchildress1.dev/sitemap.xml

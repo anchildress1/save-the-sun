@@ -36,7 +36,7 @@ export type OracleResult =
 			answer: string;
 			affirmative: boolean;
 			turnConsumed: true;
-			// The dramatized line to voice instead of the deterministic `answer` (ttd:17): its words live
+			// The dramatized line to voice instead of the deterministic `answer`: its words live
 			// in the session's voice-line store, keyed by `id` (the route voices it by lookup). Absent when
 			// flair was skipped or fell back — the client then voices the `answer` template. Structurally
 			// an `authored` LineDescriptor (not imported, to avoid a types↔lines cycle).

@@ -5,7 +5,6 @@
 	import imFellEnglishFont from '$lib/assets/fonts/im-fell-english-latin.woff2?url&no-inline';
 	import imFellEnglishItalicFont from '$lib/assets/fonts/im-fell-english-italic-latin.woff2?url&no-inline';
 	import imFellEnglishScFont from '$lib/assets/fonts/im-fell-english-sc-latin.woff2?url&no-inline';
-	import ogImage from '$lib/assets-webp/banners/intro-splash.webp?url&no-inline';
 	import buttonBorder from '$lib/assets-webp/ui/button-border.webp?url&no-inline';
 
 	let { children } = $props();
@@ -18,8 +17,29 @@
 		'A free browser deduction game for the longest day. Question the Oracle, read the signs, and name the true rune before Sköll the wolf swallows the sun.';
 	const OG_IMAGE_ALT =
 		'A rune stone blazing with golden light at sunrise while Sköll, the great wolf, watches from a dark ridge.';
-	// .pathname, not .href: the client bundle imports the asset absolute, and .href would let hydration rewrite the tag to the page origin.
-	const ogImageUrl = SITE_URL + new URL(ogImage, SITE_URL).pathname;
+	// Temp social banner served from static/ at the web root; absolute URL so unfurl bots can fetch it.
+	const ogImageUrl = `${SITE_URL}/social-banner.jpg`;
+
+	// Structured data crawlers can actually read: a free, browser-playable deduction game
+	// (schema.org/VideoGame). `<` is escaped so a value could never break out of the script tag below.
+	const jsonLd = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'VideoGame',
+		name: TITLE,
+		description: DESCRIPTION,
+		url: `${SITE_URL}/`,
+		image: ogImageUrl,
+		author: { '@type': 'Person', name: 'Ashley Childress' },
+		genre: 'Deduction',
+		applicationCategory: 'Game',
+		operatingSystem: 'Web browser',
+		inLanguage: 'en',
+		offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
+	}).replace(/</g, '\\u003c');
+	// Built from a tag variable so the opening/closing script-tag tokens never appear literally in
+	// this component source — Svelte would otherwise read them as a second top-level script element.
+	const SCRIPT_TAG = 'script';
+	const jsonLdScript = `<${SCRIPT_TAG} type="application/ld+json">${jsonLd}</${SCRIPT_TAG}>`;
 </script>
 
 <svelte:head>
@@ -56,6 +76,7 @@
 	<link rel="canonical" href="{SITE_URL}/" />
 	<meta name="description" content={DESCRIPTION} />
 	<meta name="author" content="Ashley Childress" />
+	<meta name="robots" content="index, follow" />
 
 	<meta property="og:type" content="website" />
 	<meta property="og:site_name" content={TITLE} />
@@ -64,9 +85,9 @@
 	<meta property="og:url" content="{SITE_URL}/" />
 	<meta property="og:locale" content="en_US" />
 	<meta property="og:image" content={ogImageUrl} />
-	<meta property="og:image:type" content="image/webp" />
-	<meta property="og:image:width" content="1440" />
-	<meta property="og:image:height" content="900" />
+	<meta property="og:image:type" content="image/jpeg" />
+	<meta property="og:image:width" content="1376" />
+	<meta property="og:image:height" content="768" />
 	<meta property="og:image:alt" content={OG_IMAGE_ALT} />
 
 	<meta name="twitter:card" content="summary_large_image" />
@@ -74,6 +95,9 @@
 	<meta name="twitter:description" content={DESCRIPTION} />
 	<meta name="twitter:image" content={ogImageUrl} />
 	<meta name="twitter:image:alt" content={OG_IMAGE_ALT} />
+
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted, build-time constants; `<` escaped above -->
+	{@html jsonLdScript}
 </svelte:head>
 
 {@render children()}

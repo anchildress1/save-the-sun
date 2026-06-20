@@ -266,12 +266,13 @@ describe('takeSkollTurn — Gemini plays, engine referees', () => {
 		const out = await takeSkollTurn(
 			engine,
 			state,
-			decideAsk({ axis: 'fill', value: 'Light' }),
+			decideAsk({ axis: 'fill', value: 'Light' }, [3]),
 			mulberry32(1)
 		);
 		expect(out.kind).toBe('cast'); // not the ask Gemini returned
 		expect(out.source).toBe('guard'); // forced by the guard, distinct from a failure floor
 		if (out.kind === 'cast') expect(out.runeName).toBe('Sowilo');
+		expect(state.crossed.has(3)).toBe(true); // his reasoned cross-off survives the guard override
 		expect(engine.reactionWindow).toBeNull(); // a cast — no Ask window opened
 	});
 

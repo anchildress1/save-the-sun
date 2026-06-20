@@ -8,13 +8,10 @@ import { env } from '$env/dynamic/private';
 import { ELEMENTS, COLORS, RUNE_NAMES as NAMES } from '$lib/board';
 import { captureGemini } from '$lib/server/debug/log';
 import type { GeminiCall } from '$lib/server/debug/log';
-import { queryFromFields, type PowerOp } from '$lib/server/engine/queries';
+import { queryFromFields, POWER_OPS, FILLS, type PowerOp } from '$lib/server/engine/queries';
 import type { Interpretation, Interpret, RefusalClass } from './types';
 
 const MODEL = 'gemini-3.5-flash';
-
-const FILLS: string[] = ['Light', 'Dark'];
-const POWER_OPS: PowerOp[] = ['eq', 'lt', 'lte', 'gt', 'gte'];
 
 const SYSTEM_INSTRUCTION = `You are the Oracle in "Save the Sun," a rite where a witch hunts one secret rune by asking yes/no questions about its traits. You do NOT know the secret and you never answer the question yourself — you only read the witch's words into exactly one structured query, or refuse.
 
@@ -96,15 +93,15 @@ function normalize(raw: RawResponse): Interpretation {
 
 let client: GoogleGenAI | null = null;
 function ai(): GoogleGenAI {
-	// 3 backoff attempts (408/429/5xx) — a rate-limit blip shouldn't silence the Oracle mid-rite.
+	// 1 attempt; limiter-level throttles keep abuse down and prevent SDK retry amplification.
 	client ??= new GoogleGenAI({
 		apiKey: env.GEMINI_API_KEY,
-		httpOptions: { retryOptions: { attempts: 3 } }
+		httpOptions: { retryOptions: { attempts: 1 } }
 	});
 	return client;
 }
 
-// She authors her verdict aloud (ttd:17): the deterministic line in, ONE dramatized in-character line
+// She authors her verdict aloud: the deterministic line in, ONE dramatized in-character line
 // out — same meaning, fresh words, so repeated Asks never sound canned. Full Flash like interpret (the
 // Oracle reads/speaks right, never plays down — `gemini-model-tier-split`), MINIMAL thinking (a rephrase,
 // not reasoning), temp 1 for variety. The model is given only the finished verdict, so it can't invent a
@@ -128,26 +125,26 @@ Verdict: No. Sól is not reaching for a rune of more than 4 power.
 Line: No. She does not reach past the weight of four.
 </examples>`;
 
-// The closing rite, spoken in character (ttd:22 — not a read of the fixed splash copy, which the
+// The closing rite, spoken in character (not a read of the fixed splash copy, which the
 // player reads on screen). A fresh authored line per outcome: the Oracle's blessing on a win (Sól rides
-// her voice), Sköll's gloat on a loss. Bounded to ~one or two sentences so it runs ~4-5s, never the
-// ~10s of reading the whole verse. The splash text is the written record (R10); this is flavor on top.
+// her voice), Sköll's gloat on a loss. Bounded to exactly one sentence so it runs ~4-5s, never the
+// ~10s of reading the whole verse. The splash text is the written record; this is flavor on top.
 const WIN_ENDING_SYSTEM = `<role>You are the Oracle in "Save the Sun." The witch has cast the true rune and saved Sól; the longest day breaks and the light is kept.</role>
 
-<task>Speak the closing blessing — ONE or two short, triumphant, in-character sentences marking the sun's return. Luminous, reverent, certain.</task>
+<task>Speak the closing blessing — exactly ONE short, triumphant, in-character sentence marking the sun's return. Luminous, reverent, certain.</task>
 
 <never>
 - Never name the secret rune or any game mechanic; never address yourself; never ask a question.
-- Keep it brief (~4-5 seconds spoken, at most two short sentences). No quotation marks, no emoji, no stage directions — output only the line.
+- Keep it brief (~4-5 seconds spoken, exactly one short sentence). No quotation marks, no emoji, no stage directions — output only the line.
 </never>`;
 
 const LOSE_ENDING_SYSTEM = `<role>You are Sköll, the great wolf, and you have swallowed the sun. The witch failed; the night is everlasting and the day will not break.</role>
 
-<task>Speak your closing gloat — ONE or two short, cruel, victorious sentences over the devoured sun. Deep, menacing, final.</task>
+<task>Speak your closing gloat — exactly ONE short, cruel, victorious sentence over the devoured sun. Deep, menacing, final.</task>
 
 <never>
 - Never name the secret rune or any game mechanic; never ask a question.
-- Keep it brief (~4-5 seconds spoken, at most two short sentences). No quotation marks, no emoji, no stage directions — output only the line.
+- Keep it brief (~4-5 seconds spoken, exactly one short sentence). No quotation marks, no emoji, no stage directions — output only the line.
 </never>`;
 
 // Bounded so a slow author never eats the response budget — past this the caller falls back (the
@@ -166,6 +163,9 @@ async function authorLine(
 	maxOutputTokens: number
 ): Promise<string | null> {
 	const request = { systemInstruction: system, contents };
+	// Hold the timeout id so the race's loser is cleared in `finally` — when the API call wins, the
+	// timer (and its closure) would otherwise linger until it fires for nothing.
+	let timeout: ReturnType<typeof setTimeout> | undefined;
 	try {
 		const result = await Promise.race([
 			ai().models.generateContent({
@@ -178,7 +178,9 @@ async function authorLine(
 					maxOutputTokens
 				}
 			}),
-			new Promise<null>((resolve) => setTimeout(() => resolve(null), FLAIR_TIMEOUT_MS))
+			new Promise<null>((resolve) => {
+				timeout = setTimeout(() => resolve(null), FLAIR_TIMEOUT_MS);
+			})
 		]);
 		if (result === null) {
 			captureGemini({
@@ -190,7 +192,7 @@ async function authorLine(
 		}
 		captureGemini({ label, request, response: result });
 		// First line only (drops any stray stage-note/preamble the model adds on a new line), with
-		// wrapping quotes stripped. One or two short sentences live on one line. Empty → fall back.
+		// wrapping quotes stripped. The authored line lives on one line. Empty → fall back.
 		const line = (result.text ?? '')
 			.trim()
 			.split('\n')[0]
@@ -201,6 +203,8 @@ async function authorLine(
 		captureGemini({ label, request, error: String(err) });
 		console.error('[oracle] Gemini flair failed:', { model: MODEL, error: err });
 		return null;
+	} finally {
+		clearTimeout(timeout);
 	}
 }
 
@@ -221,14 +225,45 @@ export function composeOracleFlair(verdict: string): Promise<string | null> {
  * Author the closing line for an outcome — the Oracle's blessing (win) or Sköll's gloat (loss) — in
  * character, ~4-5s. Null on failure so the caller can fall back to the fixed splash beat. Never throws.
  */
-export function composeEndingFlair(outcome: 'win' | 'lose'): Promise<string | null> {
+export async function composeEndingFlair(outcome: 'win' | 'lose'): Promise<string | null> {
 	const system = outcome === 'win' ? WIN_ENDING_SYSTEM : LOSE_ENDING_SYSTEM;
-	return authorLine(
+	const line = await authorLine(
 		outcome === 'win' ? 'oracle-ending-flair' : 'skoll-ending-flair',
 		system,
 		'Speak the closing line now.',
 		ENDING_MAX_TOKENS
 	);
+	return line ? firstSentence(line) : line;
+}
+
+// The ending narration is exactly one sentence (the splash carries the full verse on screen). The
+// prompt asks for one; this trims a model that returns two to the first. A linear scan (not a lazy
+// regex, which Sonar flags as backtracking-prone): stop at the first terminator run that is a real
+// boundary — whitespace + a capital (the next sentence), the end, or a lone period before whitespace
+// (a model that drops the capital still gets trimmed) — so a dramatic mid-line "..." or an exclamation
+// like "Sól!" is preserved, not cut. NOT applied to the answer flair, which opens with its own
+// "Yes."/"No." sentence by design.
+function firstSentence(line: string): string {
+	let i = 0;
+	while (i < line.length) {
+		if (line[i] !== '.' && line[i] !== '!' && line[i] !== '?') {
+			i++;
+			continue;
+		}
+		// Consume a run of terminators so a mid-line "..." or "!?" stays whole.
+		let end = i;
+		while (end + 1 < line.length && '.!?'.includes(line[end + 1])) end++;
+		const rest = line.slice(end + 1);
+		// A real boundary: end of line; whitespace then an optional quote then a capital (next sentence);
+		// or a SINGLE period then whitespace even before a lowercase word (a model that drops the capital
+		// still gets trimmed to one sentence). A run like "..." or a "Sól!" still needs the capital, so
+		// dramatic mid-line punctuation stays whole.
+		const singlePeriod = end === i && line[i] === '.';
+		if (rest === '' || /^\s+["“]?\p{Lu}/u.test(rest) || (singlePeriod && /^\s/.test(rest)))
+			return line.slice(0, end + 1).trim();
+		i = end + 1;
+	}
+	return line;
 }
 
 export const interpret: Interpret = async (question) => {

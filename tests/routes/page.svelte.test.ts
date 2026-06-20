@@ -3,6 +3,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Page from '$routes/+page.svelte';
 import { VIEW_STATE_KEY } from '$lib/viewState';
 import type { GameState } from '$lib/server/engine/actions';
+import {
+	HUMAN_TURN,
+	SKOLL_TURN,
+	HUMAN_WON,
+	SKOLL_WON,
+	ASK_ANSWER,
+	props,
+	propsWith
+} from '../helpers/gameFixtures';
 
 // These tests are about the board, the Ask flow, and the end-screen — not voice. Mock the audio
 // layer so it stays inert: no real AudioContext, no TTS fetch, drains instantly (the voice surface
@@ -27,26 +36,7 @@ vi.mock('$lib/voice/recorder', () => ({
 
 const ONBOARDED_KEY = 'save-the-sun:onboarded';
 
-// Full page props (data normally comes from +page.server.ts). A fixed seed keeps the
-// board order deterministic across these behavioral tests; the hydrated state opens the
-// page human-first on a live round.
-const HUMAN_TURN: GameState = { activePlayer: 'Human', status: 'active', winner: null, turns: 0 };
-const SKOLL_TURN: GameState = { activePlayer: 'Sköll', status: 'active', winner: null, turns: 1 };
-const HUMAN_WON: GameState = { activePlayer: 'Human', status: 'won', winner: 'Human', turns: 1 };
-const SKOLL_WON: GameState = { activePlayer: 'Sköll', status: 'won', winner: 'Sköll', turns: 5 };
-
-type PendingReaction = { echo: string; held: { Scry: boolean; Hex: boolean } } | null;
-const props = (
-	state: GameState,
-	pendingReaction: PendingReaction = null,
-	roundId = 'test-round'
-) => ({
-	data: { boardSeed: 0, roundId, state, pendingReaction, lastLine: null },
-	params: {},
-	form: null
-});
 const pageProps = props(HUMAN_TURN);
-const propsWith = (state: GameState) => props(state);
 
 // These tests drive the in-game board, so mark the player onboarded before each render to clear the
 // first-run title screen. The onboarding flow itself is covered below.
@@ -97,7 +87,7 @@ function gameStub(opts: { ask?: object; advance?: object; react?: object }) {
 
 const defaultAsk = (skollVsYou: object = { reaction: 'Pass' }) => ({
 	type: 'Ask',
-	oracle: { ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+	oracle: { ok: true, answer: ASK_ANSWER, turnConsumed: true },
 	skollVsYou,
 	state: SKOLL_TURN
 });
@@ -203,7 +193,7 @@ describe('Save the Sun page', () => {
 		const spy = askResult({
 			ok: true,
 			echo: 'You ask after the fire-runes.',
-			answer: 'No. Sól is not reaching for a fire rune.',
+			answer: ASK_ANSWER,
 			affirmative: false,
 			turnConsumed: true
 		});
@@ -331,6 +321,17 @@ describe('Save the Sun page', () => {
 		expect(error).toHaveBeenCalledWith('[ui] Ask dispatch failed:', expect.any(Error));
 	});
 
+	it('shows the needs-a-moment line on a 429 throttle, not the silent outage', async () => {
+		// An Ask-limiter 429 is an intentional throttle — surface the retry guidance, no error trace.
+		stubFetch(async () => new Response(JSON.stringify({ error: 'busy' }), { status: 429 }));
+		const screen = render(Page, pageProps);
+		await screen.getByLabelText(/ask the oracle/i).fill('Is it gold?');
+		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
+		await expect
+			.element(screen.getByTestId('answer'))
+			.toHaveTextContent('The Oracle needs a moment');
+	});
+
 	// S11: the error path swaps only the voiced line — a failed dispatch must never cost
 	// the player their board state. Crossings and the turn survive the Oracle falling silent.
 	it('preserves crossings and turn state when the Ask dispatch fails', async () => {
@@ -376,7 +377,7 @@ describe('Save the Sun page', () => {
 					type: 'Ask',
 					oracle: {
 						ok: true,
-						answer: 'No. Sól is not reaching for a fire rune.',
+						answer: ASK_ANSWER,
 						turnConsumed: true
 					},
 					state: HUMAN_TURN
@@ -401,7 +402,10 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
-		expect(error).toHaveBeenCalledWith('[ui] New game failed (status 500):', expect.any(Error));
+		expect(error).toHaveBeenCalledWith(
+			'[ui] New game failed:',
+			expect.objectContaining({ message: expect.stringContaining('500') })
+		);
 	});
 
 	it('treats a 200 with no board seed as a failure, not a silent no-op', async () => {
@@ -410,7 +414,10 @@ describe('Save the Sun page', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
-		expect(error).toHaveBeenCalledWith('[ui] New game failed (status 200):', expect.any(Error));
+		expect(error).toHaveBeenCalledWith(
+			'[ui] New game failed:',
+			expect.objectContaining({ message: expect.stringContaining('boardSeed') })
+		);
 	});
 
 	it('opens on the early-night progress line before any turn is spent', async () => {
@@ -439,15 +446,17 @@ describe('Save the Sun page', () => {
 		const pageShell = screen.container.querySelector('main') as HTMLElement;
 		const header = screen.container.querySelector('.rite-header') as HTMLElement;
 		expect(pageShell.style.getPropertyValue('--night-t')).toMatch(/^0\.\d{3}$/);
-		expect(getComputedStyle(pageShell, '::before').backgroundImage).toContain('rgba(220, 171, 73');
+		// The gradient renders (not 'none') and is visible — but don't pin its exact dawn color, a CSS
+		// literal a palette tweak would break with no behavior change.
+		expect(getComputedStyle(pageShell, '::before').backgroundImage).not.toBe('none');
 		expect(Number(getComputedStyle(pageShell, '::before').opacity)).toBeGreaterThan(0);
-		expect(getComputedStyle(header, '::after').backgroundImage).toContain('rgba(220, 171, 73');
+		expect(getComputedStyle(header, '::after').backgroundImage).not.toBe('none');
 		expect(Number(getComputedStyle(header, '::after').opacity)).toBeGreaterThan(0);
 	});
 
 	it('advances the night-progress as turns are spent on an Ask', async () => {
 		askResult(
-			{ ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
+			{ ok: true, answer: ASK_ANSWER, turnConsumed: true },
 			{
 				...HUMAN_TURN,
 				turns: 6
@@ -533,10 +542,7 @@ describe('Save the Sun page', () => {
 	});
 
 	it('hands the turn to Sköll — pill flips and Ask + Cast disable', async () => {
-		askResult(
-			{ ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
-			SKOLL_TURN
-		);
+		askResult({ ok: true, answer: ASK_ANSWER, turnConsumed: true }, SKOLL_TURN);
 		const screen = render(Page, pageProps);
 		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
@@ -551,10 +557,7 @@ describe('Save the Sun page', () => {
 	});
 
 	it('paints the pill in Sköll’s steel on his live turn — opponent on, terminal classes off', async () => {
-		askResult(
-			{ ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
-			SKOLL_TURN
-		);
+		askResult({ ok: true, answer: ASK_ANSWER, turnConsumed: true }, SKOLL_TURN);
 		const screen = render(Page, pageProps);
 		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
@@ -576,10 +579,7 @@ describe('Save the Sun page', () => {
 	});
 
 	it('keeps cross-off live during Sköll’s turn — the reading is always yours', async () => {
-		askResult(
-			{ ok: true, answer: 'No. Sól is not reaching for a fire rune.', turnConsumed: true },
-			SKOLL_TURN
-		);
+		askResult({ ok: true, answer: ASK_ANSWER, turnConsumed: true }, SKOLL_TURN);
 		const screen = render(Page, pageProps);
 		await screen.getByLabelText(/ask the oracle/i).fill('Is it a fire rune?');
 		await screen.getByRole('button', { name: 'Ask the Oracle' }).click();
@@ -734,7 +734,7 @@ describe('Save the Sun page', () => {
 		const hex = screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement;
 		const pass = screen.getByRole('button', { name: 'Pass' }).element() as HTMLButtonElement;
 
-		expect(scry.disabled).toBe(true);
+		expect(scry.getAttribute('aria-disabled')).toBe('true');
 		expect(scry.classList).toContain('reaction-choice--spent');
 		expect(hex.disabled).toBe(false);
 		expect(pass.disabled).toBe(false);
@@ -796,8 +796,10 @@ describe('Save the Sun page', () => {
 		await humanAsks(screen);
 		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
 		expect(
-			(screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement).disabled
-		).toBe(true);
+			(screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement).getAttribute(
+				'aria-disabled'
+			)
+		).toBe('true');
 		expect(
 			(screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement).disabled
 		).toBe(false);
@@ -1069,7 +1071,7 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 					type: 'Ask',
 					oracle: {
 						ok: true,
-						answer: 'No. Sól is not reaching for a fire rune.',
+						answer: ASK_ANSWER,
 						turnConsumed: true
 					},
 					state: SKOLL_TURN
@@ -1097,7 +1099,10 @@ describe('Save the Sun page — view resume on reload (S8.5)', () => {
 		const screen = render(Page, pageProps);
 		await screen.getByRole('button', { name: 'Begin another night' }).click();
 		await expect.element(screen.getByTestId('answer')).toHaveTextContent('The Oracle falls silent');
-		expect(error).toHaveBeenCalledWith('[ui] New game failed (status 200):', expect.any(Error));
+		expect(error).toHaveBeenCalledWith(
+			'[ui] New game failed:',
+			expect.objectContaining({ message: expect.stringContaining('roundId') })
+		);
 	});
 
 	it('degrades to no restore when reading storage throws (private mode) — never breaks play', async () => {
@@ -1227,7 +1232,7 @@ describe('Save the Sun page — dropped action response reconcile', () => {
 					type: 'Ask',
 					oracle: {
 						ok: true,
-						answer: 'No. Sól is not reaching for a fire rune.',
+						answer: ASK_ANSWER,
 						turnConsumed: true
 					},
 					state: SKOLL_TURN
@@ -1438,7 +1443,7 @@ describe('Save the Sun page — dropped action response reconcile', () => {
 		await expect.element(screen.getByTestId('reaction-prompt')).toBeInTheDocument();
 		const scry = screen.getByRole('button', { name: 'Scry' }).element() as HTMLButtonElement;
 		const hex = screen.getByRole('button', { name: 'Hex' }).element() as HTMLButtonElement;
-		expect(scry.disabled).toBe(true); // spent
+		expect(scry.getAttribute('aria-disabled')).toBe('true'); // spent
 		expect(hex.disabled).toBe(false); // untouched
 		expect(error).toHaveBeenCalled();
 	});

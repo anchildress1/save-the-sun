@@ -6,7 +6,11 @@ import { selectSecret } from '$lib/server/engine/engine';
 const SEED = 1;
 
 function call(sessionId: string) {
-	return POST({ locals: { sessionId } } as unknown as Parameters<typeof POST>[0]);
+	return POST({
+		locals: { sessionId },
+		request: new Request('http://localhost/api/new-game', { method: 'POST' }),
+		getClientAddress: () => '127.0.0.1'
+	} as unknown as Parameters<typeof POST>[0]);
 }
 
 describe('POST /api/new-game', () => {

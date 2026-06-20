@@ -4,9 +4,9 @@ const audio = vi.hoisted(() => {
 	const speaker = {
 		enqueue: vi.fn(),
 		stop: vi.fn(),
-		setMuted: vi.fn(),
 		close: vi.fn(),
 		onDrained: vi.fn(),
+		onSpeaking: vi.fn(),
 		busy: false
 	};
 	const createSpeaker = vi.fn(() => speaker);
@@ -20,14 +20,13 @@ import {
 	disableDelivery,
 	stopDelivery,
 	deliveryReady,
-	setDeliveryMuted,
 	deliver,
 	whenDrained,
 	subscribeDelivery,
 	resetDelivery,
 	type DeliveryEvent
 } from '$lib/voice/delivery';
-import { SKOLL_VOICE } from '$lib/voice/config';
+import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
 
 const LINE = { kind: 'refusal', refusal: 'empty' } as const;
 
@@ -36,6 +35,15 @@ const fireDrain = () => {
 	const handler = audio.speaker.onDrained.mock.calls.at(-1)?.[0];
 	if (!handler) throw new Error('delivery never registered an onDrained handler');
 	handler();
+};
+
+// The speaking handler delivery registers at enable() — calling it simulates the speaker reaching
+// a clip of `voice` in the queue. Playback timing (which voice, when) is the speaker's job, proven
+// in audio.test.ts; here we drive it directly to prove delivery forwards it to subscribers.
+const fireSpeaking = (voice: 'oracle' | 'skoll') => {
+	const handler = audio.speaker.onSpeaking.mock.calls.at(-1)?.[0];
+	if (!handler) throw new Error('delivery never registered an onSpeaking handler');
+	handler(voice);
 };
 
 // A streaming TTS response: NDJSON, one base64 chunk per line.
@@ -69,6 +77,13 @@ describe('delivery seam', () => {
 		expect(audio.speaker.enqueue).not.toHaveBeenCalled();
 	});
 
+	it('does not fetch TTS once a mute has closed the speaker — no Gemini credit for unheard audio', async () => {
+		enableDelivery();
+		disableDelivery(); // the page mutes by closing the speaker, not by gating a gain node
+		await deliver(LINE);
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
 	it('streams the line audio and enqueues each chunk as it arrives', async () => {
 		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm-a', 'pcm-b', 'pcm-c'));
 		enableDelivery();
@@ -81,7 +96,7 @@ describe('delivery seam', () => {
 			body: JSON.stringify(LINE),
 			signal: expect.any(AbortSignal)
 		});
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['pcm-a', 'pcm-b', 'pcm-c']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['pcm-a', 'pcm-b', 'pcm-c']);
 	});
 
 	it('stays silent when the route refuses the line', async () => {
@@ -121,12 +136,12 @@ describe('delivery seam', () => {
 
 		const inflight = deliver(LINE);
 		// Let the first chunk be read, then close the speaker before releasing the second.
-		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first'));
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first', 'oracle'));
 		disableDelivery();
 		releaseSecond();
 		await inflight;
 
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['first']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['first']);
 		expect(audio.speaker.close).toHaveBeenCalledTimes(1);
 	});
 
@@ -151,7 +166,7 @@ describe('delivery seam', () => {
 		enableDelivery();
 
 		const inflight = deliver(LINE);
-		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first'));
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first', 'oracle'));
 		expect(capturedSignal?.aborted).toBe(false);
 
 		// In real fetch this aborts the body stream and unblocks the pending read; here we assert the
@@ -161,7 +176,7 @@ describe('delivery seam', () => {
 
 		releaseSecond();
 		await inflight;
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['first']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['first']);
 	});
 
 	it('serializes back-to-back deliveries so two lines never interleave their chunks', async () => {
@@ -188,16 +203,21 @@ describe('delivery seam', () => {
 		const first = deliver(LINE);
 		const second = deliver(LINE);
 
-		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('her-1'));
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('her-1', 'oracle'));
 		// The second line has NOT begun — it is queued behind the first, so only one fetch so far.
 		expect(fetch).toHaveBeenCalledTimes(1);
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['her-1']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['her-1']);
 
 		releaseFirst();
 		await Promise.all([first, second]);
 
 		// Her whole line enqueued before his — no interleaving.
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['her-1', 'her-2', 'his-1', 'his-2']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual([
+			'her-1',
+			'her-2',
+			'his-1',
+			'his-2'
+		]);
 	});
 
 	it('drops a line queued behind an in-flight one when a stop lands before its turn', async () => {
@@ -223,7 +243,7 @@ describe('delivery seam', () => {
 
 		const first = deliver(LINE);
 		const second = deliver(LINE);
-		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('her-1'));
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('her-1', 'oracle'));
 
 		stopDelivery(); // a new round bumps generation while the second line is still queued
 		releaseFirst();
@@ -231,7 +251,7 @@ describe('delivery seam', () => {
 
 		// The first's remaining chunk and the entire second line are dropped — only the pre-stop chunk
 		// played, and the queued line never fetched.
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['her-1']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['her-1']);
 		expect(fetch).toHaveBeenCalledTimes(1);
 	});
 
@@ -252,14 +272,14 @@ describe('delivery seam', () => {
 		enableDelivery();
 
 		const inflight = deliver(LINE);
-		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first'));
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first', 'oracle'));
 		// A new round stops delivery while this fetch is still streaming.
 		stopDelivery();
 		releaseSecond();
 		await inflight;
 
 		// The stale chunk is dropped, but the speaker stays open (stop, not close).
-		expect(audio.speaker.enqueue.mock.calls.flat()).toEqual(['first']);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['first']);
 		expect(audio.speaker.stop).toHaveBeenCalled();
 		expect(audio.speaker.close).not.toHaveBeenCalled();
 		expect(deliveryReady()).toBe(true);
@@ -304,6 +324,134 @@ describe('delivery seam', () => {
 		}
 	});
 
+	it('whenDrained holds for a line still fetching before any chunk is queued', async () => {
+		let releaseFetch: (res: Response) => void = () => {};
+		vi.mocked(fetch).mockReturnValueOnce(
+			new Promise<Response>((resolve) => {
+				releaseFetch = resolve;
+			})
+		);
+		enableDelivery();
+		audio.speaker.busy = false; // no chunks queued yet — the old busy-only gate would resolve early
+
+		const inflight = deliver(LINE);
+		let drained = false;
+		const gate = whenDrained(10_000).then(() => {
+			drained = true;
+		});
+
+		await Promise.resolve();
+		expect(drained).toBe(false); // the line is still in flight; the hold must not release yet
+
+		releaseFetch(ndjsonResponse('pcm-a'));
+		await inflight;
+		await gate;
+		expect(drained).toBe(true);
+	});
+
+	it('releases whenDrained at once after a stop during an in-flight delivery — the dead round resets pending', async () => {
+		let releaseFetch: (res: Response) => void = () => {};
+		vi.mocked(fetch).mockReturnValueOnce(
+			new Promise<Response>((resolve) => {
+				releaseFetch = resolve;
+			})
+		);
+		enableDelivery();
+		audio.speaker.busy = false;
+
+		const inflight = deliver(LINE); // fetch in flight → pendingDeliveries = 1
+		stopDelivery(); // abandons the round — pending must reset so a "hold until heard" can't strand
+
+		await expect(whenDrained(10_000)).resolves.toBeUndefined(); // immediate, not stuck behind the abort
+
+		releaseFetch(ndjsonResponse('late')); // the aborted fetch settling must not drive the counter negative
+		await inflight;
+		await expect(whenDrained(10_000)).resolves.toBeUndefined();
+	});
+
+	it("a stopped round's late retirement does not strand the next round in whenDrained", async () => {
+		let releaseNext: (res: Response) => void = () => {};
+		vi.mocked(fetch).mockReturnValueOnce(
+			new Promise<Response>((resolve) => {
+				releaseNext = resolve;
+			})
+		);
+		enableDelivery();
+		audio.speaker.busy = false;
+
+		deliver(LINE); // round A
+		stopDelivery(); // abandon A — generation bumps, pending resets; A's queued line goes stale
+		const next = deliver(LINE); // round B — its fetch is the held one below
+
+		// A's stale line settles and retires; with the generation-scoped guard that retire is a no-op,
+		// so B's slot survives. Wait for B's fetch so A has already settled by then.
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+		let drained = false;
+		void whenDrained(10_000).then(() => {
+			drained = true;
+		});
+		await Promise.resolve();
+		expect(drained).toBe(false); // B is still outstanding — A's stale retire must not have zeroed it
+
+		releaseNext(ndjsonResponse('b'));
+		await next;
+		await expect(whenDrained(10_000)).resolves.toBeUndefined();
+	});
+
+	it('does not release whenDrained on a mid-stream dry queue while a delivery is still streaming', async () => {
+		let releaseSecond: () => void = () => {};
+		const body = new ReadableStream<Uint8Array>({
+			async start(controller) {
+				const enc = new TextEncoder();
+				controller.enqueue(enc.encode('first\n'));
+				await new Promise<void>((resolve) => {
+					releaseSecond = resolve;
+				});
+				controller.enqueue(enc.encode('second\n'));
+				controller.close();
+			}
+		});
+		vi.mocked(fetch).mockResolvedValueOnce(new Response(body));
+		enableDelivery();
+
+		const inflight = deliver(LINE);
+		let drained = false;
+		const gate = whenDrained(10_000).then(() => {
+			drained = true;
+		});
+
+		await vi.waitFor(() => expect(audio.speaker.enqueue).toHaveBeenCalledWith('first', 'oracle'));
+		// The speaker's queue runs dry mid-stream (the inter-chunk gap outran the queued audio). With
+		// the deliver still fetching the next chunk, this must NOT release the hold.
+		fireDrain();
+		await Promise.resolve();
+		expect(drained).toBe(false);
+
+		// Finish the stream; the final drain (pendingDeliveries === 0) releases the hold.
+		releaseSecond();
+		await inflight;
+		await gate;
+		expect(drained).toBe(true);
+	});
+
+	it('a body-less 200 releases whenDrained on completion, not via the timeout', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 200 }));
+		enableDelivery();
+		audio.speaker.busy = false;
+
+		const inflight = deliver(LINE);
+		let drained = false;
+		// A 10s fallback that this test never advances: resolving proves completion settled it, not the timer.
+		const gate = whenDrained(10_000).then(() => {
+			drained = true;
+		});
+
+		await inflight;
+		await gate;
+		expect(drained).toBe(true);
+		expect(audio.speaker.enqueue).not.toHaveBeenCalled();
+	});
+
 	it('stopDelivery drops the queue without closing the speaker', () => {
 		enableDelivery();
 		stopDelivery();
@@ -315,17 +463,6 @@ describe('delivery seam', () => {
 	it('stopDelivery is a no-op with no speaker open', () => {
 		expect(() => stopDelivery()).not.toThrow();
 		expect(audio.speaker.stop).not.toHaveBeenCalled();
-	});
-
-	it('applies mute to a live speaker and remembers it for a later one', () => {
-		enableDelivery();
-		setDeliveryMuted(true);
-		expect(audio.speaker.setMuted).toHaveBeenCalledWith(true);
-
-		disableDelivery();
-		enableDelivery();
-		// The reopened speaker starts muted from the remembered preference.
-		expect(audio.createSpeaker).toHaveBeenLastCalledWith(true);
 	});
 });
 
@@ -345,39 +482,61 @@ describe('delivery speaking events', () => {
 		return events;
 	}
 
-	const speaking = (events: DeliveryEvent[]) => events.filter((e) => e.type === 'speaking');
-
-	it("emits the Oracle's voice when her line begins, idle when it drains", async () => {
+	it('forwards the voice the speaker is sounding to subscribers, idle when it drains', async () => {
 		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm-a'));
 		enableDelivery();
 		const events = collect();
 
-		await deliver(LINE); // refusal → her voice
+		await deliver(LINE); // refusal → her voice, tagged on enqueue
+		// Enqueue alone is silent: nothing is "spoken" until the speaker actually reaches the clip.
+		expect(events).toEqual([]);
+
+		fireSpeaking('oracle');
 		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }]);
 
 		fireDrain();
 		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }, { type: 'idle' }]);
 	});
 
-	it("emits Sköll's voice for his Ask and the loss outcome", async () => {
+	it('tags each chunk with the voice its descriptor maps to (his Ask and the loss are Sköll)', async () => {
 		vi.mocked(fetch).mockImplementation(async () => ndjsonResponse('pcm-a'));
 		enableDelivery();
-		const events = collect();
 
 		await deliver({ kind: 'skoll-ask', query: { axis: 'power', value: 3 } });
 		await deliver({ kind: 'outcome', result: 'win', beat: 'coda' });
 		await deliver({ kind: 'outcome', result: 'lose', beat: 'verse' });
-		expect(speaking(events)).toEqual([
-			{ type: 'speaking', voice: 'skoll' },
-			{ type: 'speaking', voice: 'oracle' },
-			{ type: 'speaking', voice: 'skoll' }
-		]);
+
+		// The voice tag is what the speaker later announces — Ask + loss are his, the win is hers.
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[1])).toEqual(['skoll', 'oracle', 'skoll']);
 	});
 
-	it("emits Sköll's voice for authored Sköll lines", async () => {
+	it('skips an empty NDJSON line without enqueuing it as a clip', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm-a', '', 'pcm-b'));
+		enableDelivery();
+
+		await deliver(LINE);
+
+		// The blank line between chunks is dropped, never enqueued as an empty clip.
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[0])).toEqual(['pcm-a', 'pcm-b']);
+	});
+
+	it('tags an authored Oracle line as hers', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(ndjsonResponse('pcm'));
+		enableDelivery();
+
+		await deliver({
+			kind: 'authored',
+			id: 'vl-oracle-1',
+			voice: ORACLE_VOICE,
+			text: 'The sun holds — for now.'
+		});
+
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[1])).toEqual(['oracle']);
+	});
+
+	it('tags authored Sköll lines as his', async () => {
 		vi.mocked(fetch).mockImplementation(async () => ndjsonResponse('pcm-a'));
 		enableDelivery();
-		const events = collect();
 
 		await deliver({ kind: 'outcome', result: 'win', beat: 'coda' });
 		await deliver({
@@ -387,10 +546,7 @@ describe('delivery speaking events', () => {
 			text: 'The sun is mine. Your night has no morning.'
 		});
 
-		expect(speaking(events)).toEqual([
-			{ type: 'speaking', voice: 'oracle' },
-			{ type: 'speaking', voice: 'skoll' }
-		]);
+		expect(audio.speaker.enqueue.mock.calls.map((c) => c[1])).toEqual(['oracle', 'skoll']);
 	});
 
 	it('stays idle when a line produces no audio', async () => {
@@ -408,6 +564,7 @@ describe('delivery speaking events', () => {
 		const events = collect();
 
 		await deliver(LINE);
+		fireSpeaking('oracle');
 		stopDelivery();
 		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }, { type: 'idle' }]);
 	});
@@ -419,8 +576,38 @@ describe('delivery speaking events', () => {
 		const off = subscribeDelivery((e) => events.push(e));
 
 		await deliver(LINE);
+		fireSpeaking('oracle');
 		off();
 		fireDrain();
 		expect(events).toEqual([{ type: 'speaking', voice: 'oracle' }]);
+	});
+
+	it('de-dupes a repeat of the same voice — only a switch re-emits', () => {
+		enableDelivery();
+		const events = collect();
+
+		fireSpeaking('oracle');
+		fireSpeaking('oracle'); // same voice already sounding → no second emit
+		fireSpeaking('skoll'); // a switch re-emits
+		expect(events).toEqual([
+			{ type: 'speaking', voice: 'oracle' },
+			{ type: 'speaking', voice: 'skoll' }
+		]);
+	});
+
+	it('a throwing subscriber is logged and never starves the others', () => {
+		enableDelivery();
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const seen: DeliveryEvent[] = [];
+		subscribeDelivery(() => {
+			throw new Error('listener boom');
+		});
+		subscribeDelivery((e) => seen.push(e));
+
+		fireSpeaking('oracle');
+
+		expect(seen).toEqual([{ type: 'speaking', voice: 'oracle' }]); // the good one still heard it
+		expect(errSpy).toHaveBeenCalledWith('[delivery] listener threw:', expect.any(Error));
+		errSpy.mockRestore();
 	});
 });

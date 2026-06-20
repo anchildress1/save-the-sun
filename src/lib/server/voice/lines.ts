@@ -7,7 +7,8 @@ import { parseQuery } from '$lib/server/engine/queries';
 import { refusalLine, voiceAnswer } from '$lib/server/oracle/oracle';
 import { skollAskEcho, skollCastEcho } from '$lib/server/skoll/skoll';
 import type { RefusalClass } from '$lib/server/oracle/types';
-import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
+import { ORACLE_VOICE, SKOLL_VOICE, type VoiceId } from '$lib/voice/config';
+import { speakerOf } from '$lib/voice/speaker';
 import { REACTION_LINES, carriesAnswer, type ReactionLineId } from '$lib/voice/reactionLines';
 import { CAST_TRUE, CAST_FALTERS, wrongCastLine } from '$lib/voice/castLines';
 import { OUTCOME_LINES, type Outcome, type OutcomeBeat } from '$lib/voice/outcomeLines';
@@ -32,10 +33,10 @@ const MAX_POWER = 6;
 export type LineDescriptor =
 	| { kind: 'refusal'; refusal: string }
 	| { kind: 'answer'; query: unknown; affirmative: boolean }
-	// Sköll's Ask (a game move, R10): his first-person line composed from the same query the engine
+	// Sköll's Ask (a game move): his first-person line composed from the same query the engine
 	// parked, so the route still voices only a server-owned line — never arbitrary client text.
 	| { kind: 'skoll-ask'; query: unknown }
-	// Sköll's winning cast (a game move, R10): his line composed from the rune he named, validated
+	// Sköll's winning cast (a game move): his line composed from the rune he named, validated
 	// against the board so the route still voices only a server-owned line — just in his voice.
 	| { kind: 'skoll-cast'; rune: unknown }
 	// A reaction resolution (Scry/Hex/Pass, ux-copy §3): the fixed framing from REACTION_LINES, plus
@@ -47,7 +48,7 @@ export type LineDescriptor =
 	// The end-screen outcome (ux-copy §4): one beat of the staged splash copy, voiced in sequence — the
 	// win in the Oracle's voice, the loss in Sköll's, so the player hears who took the day.
 	| { kind: 'outcome'; result: Outcome; beat: OutcomeBeat }
-	// A Gemini-authored line (ttd:17/ttd:22): dynamic, so it can't be recomposed from a descriptor like
+	// A Gemini-authored line: dynamic, so it can't be recomposed from a descriptor like
 	// the others. The words live server-side, keyed by `id`; the route voices them by id lookup, never
 	// from the wire — same "client never supplies the words" invariant as every other descriptor. `voice`
 	// drives the medallion client-side; `text` is the display copy (the route ignores it, voicing the
@@ -128,18 +129,14 @@ export function composeLine(descriptor: LineDescriptor): string | null {
 	}
 }
 
-/** Which prebuilt voice speaks a descriptor — Sköll's lines (his Ask, the loss) in his voice,
- *  everything else the Oracle's. */
-export function voiceForLine(descriptor: LineDescriptor): string {
+/** Maps a descriptor to its prebuilt VoiceId; the who-speaks rule itself lives in speakerOf. */
+export function voiceForLine(descriptor: LineDescriptor): VoiceId {
 	// An authored line carries its own voice. (Not a security check: the TTS route resolves authored
 	// lines by id from the session store and uses the STORED voice — this is just the correct answer
 	// if voiceForLine is ever called on one.)
-	if (descriptor.kind === 'authored') return descriptor.voice;
-	const skoll =
-		descriptor.kind === 'skoll-ask' ||
-		descriptor.kind === 'skoll-cast' ||
-		(descriptor.kind === 'outcome' && descriptor.result === 'lose');
-	return skoll ? SKOLL_VOICE : ORACLE_VOICE;
+	if (descriptor.kind === 'authored')
+		return descriptor.voice === SKOLL_VOICE ? SKOLL_VOICE : ORACLE_VOICE;
+	return speakerOf(descriptor) === 'skoll' ? SKOLL_VOICE : ORACLE_VOICE;
 }
 
 // Director's-notes prompts the TTS model reads as a delivery instruction, speaking only the quoted

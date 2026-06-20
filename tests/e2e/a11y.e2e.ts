@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import type { Page } from '@playwright/test';
 
 // S10 — R9 accessibility basics, proven against the live build. axe sweeps every surface for
 // names/roles + WCAG 2.1 AA contrast (both rune palettes are on the board at once) + color

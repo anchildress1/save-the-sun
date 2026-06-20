@@ -17,10 +17,17 @@ import {
 	storeVoiceLine
 } from '$lib/server/engine/session';
 import { composeLine, type LineDescriptor } from '$lib/server/voice/lines';
+import {
+	claimLiteSlot,
+	claimOracleSlot,
+	buildLimiterKey,
+	resolveLimiterAddress
+} from '$lib/server/voice/rateLimit';
 import { interpret, composeOracleFlair, composeEndingFlair } from '$lib/server/oracle/gemini';
 import { voiceAnswer, prepareAsk, answerAsk } from '$lib/server/oracle/oracle';
 import type { OracleResult } from '$lib/server/oracle/types';
 import { ORACLE_VOICE, SKOLL_VOICE } from '$lib/voice/config';
+import { OUTCOME_LINES, VOICED_SEQUENCE } from '$lib/voice/outcomeLines';
 import { resolveReaction } from '$lib/server/engine/reactions';
 import type { Query } from '$lib/server/engine/queries';
 import {
@@ -33,7 +40,13 @@ import {
 	type SkollVsHuman
 } from '$lib/server/skoll/skoll';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
-import { logEvent, drainGemini, runWithSession, type TurnPart } from '$lib/server/debug/log';
+import {
+	logEvent,
+	drainGemini,
+	runWithSession,
+	type Owner,
+	type TurnPart
+} from '$lib/server/debug/log';
 import type { CastResult, GameEngine } from '$lib/server/engine/engine';
 import type { RequestHandler } from './$types';
 
@@ -101,41 +114,22 @@ function humanAsks(sessionId: string, question: string): void {
 	});
 }
 
-// The raw Gemini I/O, drained onto the log: the Oracle's interpret call is hers; the move and
-// reaction calls are Sköll's own.
-function geminiEvents(sessionId: string, movePart: TurnPart): void {
-	for (const call of drainGemini(sessionId)) {
-		let owner: 'Oracle' | 'Sköll' = 'Sköll';
-		let part: TurnPart = movePart;
-		switch (call.label) {
-			case 'oracle':
-			case 'oracle-answer-flair':
-				owner = 'Oracle';
-				part = 'Ask';
-				break;
-			case 'oracle-ending-flair':
-				owner = 'Oracle';
-				part = 'Cast';
-				break;
-			case 'skoll-ending-flair':
-				part = 'Cast';
-				break;
-			case 'reaction':
-				part = 'React';
-				break;
-		}
-		logEvent(sessionId, {
-			owner,
-			kind: 'llm',
-			part,
-			level: call.error ? 'error' : 'info',
-			message: `raw Gemini ${call.label} call${call.error ? ' failed' : ''}`,
-			data: call.error
-				? { request: call.request, error: call.error }
-				: { request: call.request, response: call.response }
-		});
-	}
+// The raw Gemini I/O captured since the last drain, shaped to fold into the readable event for that
+// call — so each Gemini call is ONE log entry (its readable line, with the raw request/response under
+// that entry's details), not a separate "raw … call" row beside it. One call per beat is the norm;
+// if a beat drained more, they ride together under `calls` so none is dropped. `{}` when nothing was
+// captured (e.g. a floor fallback that never reached Gemini), so the spread adds nothing.
+function geminiIO(sessionId: string): Record<string, unknown> {
+	const calls = drainGemini(sessionId);
+	if (calls.length === 0) return {};
+	if (calls.length > 1) return { calls };
+	const [call] = calls;
+	return call.error === undefined
+		? { request: call.request, response: call.response }
+		: { request: call.request, error: call.error };
 }
+
+const hasContent = (data: Record<string, unknown>): boolean => Object.keys(data).length > 0;
 
 // Remember the words a committed move voiced (and the descriptor that voices them) so a dropped
 // response can recover the real result. Composes through the same allow-list the voice route uses —
@@ -166,20 +160,40 @@ function castVoiceLine(cast: CastResult, runeName: string): LineDescriptor | nul
 		: { kind: 'cast', result: 'wrong', rune: runeName };
 }
 
-// Author the end-screen closing line for the action that just resolved the round (ttd:22): the
+// Author the end-screen closing line for the action that just resolved the round: the
 // Oracle's blessing on a win, Sköll's gloat on a loss. The words are stashed in the session store and
 // voiced by id; no-op requests after a won round never reach here, so none mint fresh Gemini copy.
 async function authorEnding(
 	sessionId: string,
-	outcome: 'win' | 'lose'
+	outcome: 'win' | 'lose',
+	limitKey: string
 ): Promise<AuthoredLine | undefined> {
+	const verdict = claimOracleSlot(limitKey);
+	if (!verdict.ok) return undefined;
+
 	const text = await composeEndingFlair(outcome);
-	geminiEvents(sessionId, 'Cast'); // a Gemini call happened — tee its raw I/O to the debug log
+	const io = geminiIO(sessionId);
+	// Win → the Oracle's blessing; loss → Sköll's gloat. The closing-verse call belongs to its speaker.
+	const owner: Owner = outcome === 'win' ? 'Oracle' : 'Sköll';
+	if (hasContent(io))
+		logEvent(sessionId, {
+			owner,
+			kind: 'llm',
+			part: 'Cast',
+			level: 'info',
+			message:
+				text === null
+					? 'no closing verse — the splash beat stands'
+					: `authors the closing verse: ${text}`,
+			data: io
+		});
 	if (text === null) return undefined;
 	const voice = outcome === 'win' ? ORACLE_VOICE : SKOLL_VOICE;
 	// Stash the words server-side; the wire carries only the id (+ voice/text for the client), and the
-	// TTS route voices it by id lookup — never from the wire.
-	const id = storeVoiceLine(sessionId, text, voice);
+	// TTS route voices it by id lookup — never from the wire. The deterministic splash beat is the
+	// cacheable fallback if the authored synth 429s.
+	const fallback = OUTCOME_LINES[outcome][VOICED_SEQUENCE[outcome][0]];
+	const id = storeVoiceLine(sessionId, text, voice, fallback);
 	return { kind: 'authored', id, voice, text };
 }
 
@@ -187,10 +201,11 @@ async function authorEnding(
 async function castEnding(
 	sessionId: string,
 	engine: GameEngine,
-	cast: CastResult
+	cast: CastResult,
+	limitKey: string
 ): Promise<AuthoredLine | undefined> {
 	if (!cast.ok || !cast.won || engine.winner === null) return undefined;
-	return authorEnding(sessionId, engine.winner === 'Human' ? 'win' : 'lose');
+	return authorEnding(sessionId, engine.winner === 'Human' ? 'win' : 'lose', limitKey);
 }
 
 // The line the client voices for the human's reaction to Sköll's parked Ask (ux-copy §3), mirrored so
@@ -231,7 +246,7 @@ function skollMoveVoice(out: SkollOutcome): LineDescriptor | null {
 	return null;
 }
 
-// She authors her verdict aloud on a clean answer (ttd:17): when Sköll neither hexed nor scried, the
+// She authors her verdict aloud on a clean answer: when Sköll neither hexed nor scried, the
 // deterministic line is restyled by Gemini and stashed server-side, so the route voices only her own
 // words by id — never arbitrary text. A failed/slow author leaves `voiced` unset; the client then
 // voices the deterministic `answer`. The engine verdict + the answer log stay the canonical truth.
@@ -243,19 +258,38 @@ function flairKeepsVerdict(flair: string, affirmative: boolean): boolean {
 	return firstWord === (affirmative ? 'yes' : 'no');
 }
 
+// No own quota: the flair is a second flash call WITHIN the Ask the gate already charged — it rides
+// under that one Ask slot (the Ask budget is sized for the ~3 Gemini calls a turn fans out to). The
+// engine answer stands if the flair synth/compose drops.
 async function authorAnswerFlair(
 	sessionId: string,
 	oracle: Extract<OracleResult, { ok: true }>
 ): Promise<void> {
 	const flair = await composeOracleFlair(oracle.answer);
-	geminiEvents(sessionId, 'Ask'); // drain the flair call's raw I/O onto this turn's Ask beat
-	if (!flair) return;
-	if (!flairKeepsVerdict(flair, oracle.affirmative)) {
-		console.warn(`[oracle] flair dropped — verdict not preserved: ${JSON.stringify(flair)}`);
+	const io = geminiIO(sessionId);
+	const note = (level: 'info' | 'warn', message: string, extra: Record<string, unknown> = {}) =>
+		logEvent(sessionId, {
+			owner: 'Oracle',
+			kind: 'llm',
+			part: 'Ask',
+			level,
+			message,
+			data: { ...extra, ...io }
+		});
+	if (flair && flairKeepsVerdict(flair, oracle.affirmative)) {
+		const id = storeVoiceLine(sessionId, flair, ORACLE_VOICE, oracle.answer);
+		oracle.voiced = { kind: 'authored', id, voice: ORACLE_VOICE, text: flair };
+		note('info', `dramatizes her answer: ${flair}`);
 		return;
 	}
-	const id = storeVoiceLine(sessionId, flair, ORACLE_VOICE);
-	oracle.voiced = { kind: 'authored', id, voice: ORACLE_VOICE, text: flair };
+	if (flair) {
+		console.warn(`[oracle] flair dropped — verdict not preserved: ${JSON.stringify(flair)}`);
+		note('warn', 'flair dropped — verdict not preserved', { flair });
+		return;
+	}
+	// Flair came back empty (the model declined / the synth failed): only worth a row when a real
+	// call's I/O is there to inspect — otherwise the deterministic answer above already told the story.
+	if (hasContent(io)) note('info', 'no flair — the plain answer stands');
 }
 
 // His templated Ask is surfaced for the human to react to; his WINNING cast rides along too so the
@@ -270,7 +304,7 @@ function describeTurn(out: SkollOutcome): SkollTurn {
 
 // Validation is pure and runs before the lock; everything touching shared engine/Sköll memory runs
 // under the per-session lock, so a duplicate tab / retry / direct POST can't interleave mid-turn.
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, getClientAddress }) => {
 	let body: Partial<GameAction>;
 	try {
 		body = await request.json();
@@ -287,9 +321,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		error(400, 'Malformed action payload.');
 	}
 
+	// The client only ever acts as the Human; Sköll's turn runs server-side through Advance. Reject any
+	// action claiming to be Sköll, or a direct POST could drive his Gemini-backed Ask off the quota.
+	if ((body.type as string) !== 'Advance' && body.player !== 'Human') {
+		error(400, 'Only the Human may act.');
+	}
+
 	// runWithSession scopes any raw Gemini I/O teed this turn to THIS session's sink, never another's.
+	const limitKey = buildLimiterKey(
+		resolveLimiterAddress(request, getClientAddress),
+		locals.sessionId
+	);
+
 	return withSessionLock(locals.sessionId, () =>
-		runWithSession(locals.sessionId, () => resolveAction(body, locals.sessionId))
+		runWithSession(locals.sessionId, () => resolveAction(body, locals.sessionId, limitKey))
 	);
 };
 
@@ -298,10 +343,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 async function advanceTurn(
 	sessionId: string,
 	engine: GameEngine,
-	skoll: SkollState
+	skoll: SkollState,
+	limitKey: string
 ): Promise<Response> {
-	const skollTurn = await playSkollIfActive(sessionId, engine, skoll);
-	const outcomeFlair = skollTurn?.casts ? await authorEnding(sessionId, 'lose') : undefined;
+	const skollTurn = await playSkollIfActive(sessionId, engine, skoll, limitKey);
+	const outcomeFlair = skollTurn?.casts
+		? await authorEnding(sessionId, 'lose', limitKey)
+		: undefined;
 	const response: AdvanceResponse = {
 		type: 'Advance',
 		...(skollTurn && { skoll: skollTurn }),
@@ -359,11 +407,23 @@ function reactToParkedAsk(
 async function resolveOther(
 	sessionId: string,
 	engine: GameEngine,
-	action: GameAction
+	action: GameAction,
+	limitKey: string
 ): Promise<Response> {
 	const result = await handleAction(action, { engine, interpret });
 	if (result.type === 'Ask') {
-		geminiEvents(sessionId, 'Ask'); // a stale Ask still ran interpret — drain its raw I/O
+		// A stale/decided Ask still ran interpret — surface its I/O as one Oracle row (drain regardless,
+		// so it never leaks onto a later beat).
+		const io = geminiIO(sessionId);
+		if (hasContent(io))
+			logEvent(sessionId, {
+				owner: 'Oracle',
+				kind: 'llm',
+				part: 'Ask',
+				level: 'info',
+				message: 'reads a stale sign',
+				data: io
+			});
 		rememberLine(sessionId, oracleVoiceLine(result.oracle));
 	}
 	if (result.type === 'Cast') {
@@ -379,17 +439,21 @@ async function resolveOther(
 			engineVerdict(sessionId, 'Cast', castTruth(action.player, runeName, result.cast.won));
 		}
 		rememberLine(sessionId, castVoiceLine(result.cast, runeName));
-		const outcomeFlair = await castEnding(sessionId, engine, result.cast);
+		const outcomeFlair = await castEnding(sessionId, engine, result.cast, limitKey);
 		return json({ ...result, state: gameState(engine), ...(outcomeFlair && { outcomeFlair }) });
 	}
 	return json({ ...result, state: gameState(engine) });
 }
 
-async function resolveAction(body: Partial<GameAction>, sessionId: string): Promise<Response> {
+async function resolveAction(
+	body: Partial<GameAction>,
+	sessionId: string,
+	limitKey: string
+): Promise<Response> {
 	const engine = getEngine(sessionId);
 	const skoll = getSkoll(sessionId);
 
-	if ((body.type as string) === 'Advance') return advanceTurn(sessionId, engine, skoll);
+	if ((body.type as string) === 'Advance') return advanceTurn(sessionId, engine, skoll, limitKey);
 
 	// Past Advance, validation in POST guarantees a well-formed player action.
 	const action = body as GameAction;
@@ -399,28 +463,48 @@ async function resolveAction(body: Partial<GameAction>, sessionId: string): Prom
 
 	// Gated on it actually being the human's live turn, so a stale Ask (Sköll's turn, or a resolved
 	// round) falls through with NO side effects rather than opening a window or spending a charge.
-	if (
-		action.type === 'Ask' &&
-		action.player === 'Human' &&
-		engine.status === 'active' &&
-		engine.activePlayer === 'Human'
-	) {
-		return askWithSkollReaction(sessionId, engine, skoll, action.question);
-	}
+	if (action.type === 'Ask' && engine.status === 'active' && engine.activePlayer === 'Human')
+		return askWithSkollReaction(sessionId, engine, skoll, action.question, limitKey);
 
-	return resolveOther(sessionId, engine, action);
+	return resolveOther(sessionId, engine, action, limitKey);
+}
+
+// Charge the human's live Ask against the Oracle (Flash) budget — only a non-empty ask that actually
+// fans out to Gemini. Empty/stale asks short-circuit before Gemini, so they spend nothing. Returns a
+// 429 Response when the window is spent, else null to proceed.
+function chargeAskQuota(question: string, limitKey: string): Response | null {
+	if (question.trim() === '') return null;
+	const verdict = claimOracleSlot(limitKey);
+	if (verdict.ok) return null;
+	return json(
+		{ error: 'The Oracle needs a moment. Try again shortly.' },
+		{ status: 429, headers: { 'retry-after': String(verdict.retryAfterSeconds) } }
+	);
+}
+
+// The engine's canonical verdict for an Ask: a Hex silenced her, her answer on a clean read, or the
+// engine declining the ask.
+function askTruth(killed: boolean, oracle: OracleResult | undefined): string {
+	if (killed) return 'Hexed by Sköll — the Oracle is silent, her turn spent';
+	if (oracle?.ok) return oracle.answer;
+	return 'engine declined the Ask';
 }
 
 async function askWithSkollReaction(
 	sessionId: string,
 	engine: GameEngine,
 	skoll: SkollState,
-	question: string
+	question: string,
+	limitKey: string
 ) {
+	const denied = chargeAskQuota(question, limitKey);
+	if (denied) return denied;
+
 	const prepared = await prepareAsk(question, interpret);
 	humanAsks(sessionId, question);
-	// Drain her interpret call now so its raw I/O lands between her Ask and the Oracle's reading.
-	geminiEvents(sessionId, 'Ask');
+	// Fold her interpret call's raw I/O into the reading (or refusal) event below — one Oracle entry,
+	// raw request/response under its details, not a separate "raw … call" row beside it.
+	const askIO = geminiIO(sessionId);
 	// A refusal never opens a window, spends a turn, or rouses Sköll.
 	if (!prepared.ok) {
 		logEvent(sessionId, {
@@ -429,7 +513,7 @@ async function askWithSkollReaction(
 			part: 'Ask',
 			level: 'warn',
 			message: `Oracle refuses the sign`,
-			data: { result: prepared.result }
+			data: { result: prepared.result, ...askIO }
 		});
 		rememberLine(sessionId, oracleVoiceLine(prepared.result));
 		return json({ type: 'Ask', oracle: prepared.result, state: gameState(engine) });
@@ -440,18 +524,31 @@ async function askWithSkollReaction(
 		part: 'Ask',
 		level: 'info',
 		message: `reads it as: ${prepared.paraphrase}`,
-		data: { query: prepared.query }
+		data: { query: prepared.query, ...askIO }
 	});
 
-	const vs = await reactToHumanAsk(engine, skoll, prepared.query, decideSkollReaction, skoll.rng);
-	geminiEvents(sessionId, 'React');
+	// His reaction is a flash-lite call — charge it against the lite budget. A denial returns an empty
+	// decision, which floors him to a deterministic Pass (never bluffs a reaction off no decision).
+	const decideSkollReactionWithQuota: typeof decideSkollReaction = async (view) => {
+		const verdict = claimLiteSlot(limitKey);
+		if (!verdict.ok) return {};
+		return decideSkollReaction(view);
+	};
+	const vs = await reactToHumanAsk(
+		engine,
+		skoll,
+		prepared.query,
+		decideSkollReactionWithQuota,
+		skoll.rng
+	);
+	const reactIO = geminiIO(sessionId);
 	logEvent(sessionId, {
 		owner: 'Sköll',
 		kind: vs.source === 'gemini' ? 'llm' : 'deterministic',
 		part: 'React',
 		level: 'info',
 		message: `reacts to your Ask: ${vs.choice}`,
-		data: { choice: vs.choice, source: vs.source }
+		data: { choice: vs.choice, source: vs.source, ...reactIO }
 	});
 
 	let oracle;
@@ -475,14 +572,10 @@ async function askWithSkollReaction(
 		}
 	}
 
-	// On a clean answer (Sköll passed), she authors her verdict aloud (ttd:17) — sets `oracle.voiced`.
+	// On a clean answer (Sköll passed), she authors her verdict aloud — sets `oracle.voiced`.
 	if (oracle?.ok && vs.choice === 'Pass') await authorAnswerFlair(sessionId, oracle);
 
-	let truth: string;
-	if (vs.killed) truth = 'Hexed by Sköll — the Oracle is silent, her turn spent';
-	else if (oracle?.ok) truth = oracle.answer;
-	else truth = 'engine declined the Ask';
-	engineVerdict(sessionId, 'Ask', truth);
+	engineVerdict(sessionId, 'Ask', askTruth(vs.killed, oracle));
 
 	// Mirror the line the client voices for this outcome (his Hex/Scry framing, or her answer on a
 	// Pass), so a dropped Ask response recovers it instead of the false silent line.
@@ -500,7 +593,8 @@ async function askWithSkollReaction(
 async function playSkollIfActive(
 	sessionId: string,
 	engine: GameEngine,
-	skoll: SkollState
+	skoll: SkollState,
+	limitKey: string
 ): Promise<SkollTurn | undefined> {
 	if (engine.status !== 'active' || engine.activePlayer !== 'Sköll') return undefined;
 	// He already has an Ask parked, waiting on the human's reaction — never start a second turn.
@@ -508,9 +602,15 @@ async function playSkollIfActive(
 	// Snapshot the sheet BEFORE the move so the event shows only the delta crossed THIS turn, matching
 	// `reasoning` (the pre-move state) — not the post-move sheet, which read one move ahead.
 	const before = new Set(skoll.crossed);
-	const out = await takeSkollTurn(engine, skoll, decideSkollMove, skoll.rng);
+	const decideSkollMoveWithQuota: typeof decideSkollMove = async (state) => {
+		const verdict = claimLiteSlot(limitKey);
+		if (!verdict.ok) return {};
+		return decideSkollMove(state);
+	};
+
+	const out = await takeSkollTurn(engine, skoll, decideSkollMoveWithQuota, skoll.rng);
 	const part: TurnPart = out.kind === 'cast' ? 'Cast' : 'Ask';
-	geminiEvents(sessionId, part);
+	const moveIO = geminiIO(sessionId);
 	const crossedThisMove = [...skoll.crossed].filter((id) => !before.has(id));
 
 	// llm when Gemini decided; deterministic when the floor did (a failure fallback OR the guard's
@@ -526,7 +626,8 @@ async function playSkollIfActive(
 		data: {
 			source: out.source,
 			reasoning: out.reasoning,
-			...(crossedThisMove.length > 0 && { crossedThisMove })
+			...(crossedThisMove.length > 0 && { crossedThisMove }),
+			...moveIO
 		}
 	});
 

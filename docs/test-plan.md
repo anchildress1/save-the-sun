@@ -248,7 +248,7 @@ Not a coverage-gated suite, but an automated lint + eval pass over player-facing
 - **String lint (automated):** no emoji in diegetic copy; no exclamation in any diegetic line (Sköll's cast line, the old winning-cast exclamation allowlist, was cut); banned modern idiom and arcade phrases ("Correct!/Wrong!", "Play again", "Game over", "?"-only CTAs) absent.
 - **Terminology lint:** world-nouns enforced (rune not "answer", Ask/Cast not "guess/submit", power not "pips", light/dark not "filled", hue not "color" in player copy, Scry/Hex never "card").
 - **Speaker-distinctness eval:** sampled Oracle vs Sköll lines are attributable to the correct speaker (the "rewrite until unmistakable" rule).
-- **Sköll surface:** his box shows his templated Ask (text). Under voice P2 his **Ask is also voiced** in his own voice through the shared TTS route — the `skoll-ask` line descriptor recomposes his line server-side from the engine's parked query (`lines.ts`/`tts.ts` voice-keyed cache are unit-gated; the page deliver + `skoll-echo` text is component-gated). His winning cast and the deferred **ambience** taunt library (audio-only, no caption) are future work.
+- **Sköll surface:** his box shows his templated Ask (text). Under voice P2 his **Ask is also voiced** in his own voice through the shared TTS route — the `skoll-ask` line descriptor recomposes his line server-side from the engine's parked query (`lines.ts`/`tts.ts` voice-keyed cache are unit-gated; the page deliver + `skoll-echo` text is component-gated). His winning cast is voiced too (the `skoll-cast` descriptor). The deferred **ambience** taunt library (audio-only, no caption) is future work.
 
 ---
 

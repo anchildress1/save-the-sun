@@ -15,6 +15,15 @@
 		onReact: (choice: ReactionChoice) => void;
 		busy?: boolean;
 	} = $props();
+
+	// One source for each choice's tooltip and its described-by. A title shows the hint on hover; the
+	// sr-only span + aria-describedby read it to SR users. A spent Scry/Hex stays aria-disabled (not
+	// `disabled`) so it keeps its place in the a11y tree — the player still hears the option existed.
+	const HINTS = {
+		Scry: 'When your rival asks, hear the answer too.',
+		Hex: "When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted.",
+		Pass: 'When your rival asks, let the question stand.'
+	} as const;
 </script>
 
 <div
@@ -28,9 +37,11 @@
 			class="btn btn--primary reaction-choice"
 			class:reaction-choice--spent={!held.Scry}
 			type="button"
-			title="When your rival asks, hear the answer too."
-			disabled={busy || !held.Scry}
-			onclick={() => onReact('Scry')}
+			title={HINTS.Scry}
+			aria-describedby="reaction-hint-scry"
+			disabled={busy}
+			aria-disabled={!held.Scry}
+			onclick={() => held.Scry && onReact('Scry')}
 		>
 			Scry
 		</button>
@@ -38,16 +49,26 @@
 			class="btn btn--primary reaction-choice"
 			class:reaction-choice--spent={!held.Hex}
 			type="button"
-			title="When your rival asks, seal the Oracle's lips — no answer comes, and his turn is wasted."
-			disabled={busy || !held.Hex}
-			onclick={() => onReact('Hex')}
+			title={HINTS.Hex}
+			aria-describedby="reaction-hint-hex"
+			disabled={busy}
+			aria-disabled={!held.Hex}
+			onclick={() => held.Hex && onReact('Hex')}
 		>
 			Hex
 		</button>
-		<button class="btn btn--secondary" type="button" disabled={busy} onclick={() => onReact('Pass')}
-			>Pass</button
+		<button
+			class="btn btn--secondary"
+			type="button"
+			title={HINTS.Pass}
+			aria-describedby="reaction-hint-pass"
+			disabled={busy}
+			onclick={() => onReact('Pass')}>Pass</button
 		>
 	</div>
+	<span id="reaction-hint-scry" class="sr-only">{HINTS.Scry}</span>
+	<span id="reaction-hint-hex" class="sr-only">{HINTS.Hex}</span>
+	<span id="reaction-hint-pass" class="sr-only">{HINTS.Pass}</span>
 </div>
 
 <style>
@@ -82,5 +103,17 @@
 		opacity: 0.46;
 		filter: grayscale(0.85) saturate(0.45);
 		cursor: not-allowed;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>
