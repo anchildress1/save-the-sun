@@ -10,6 +10,17 @@ SECRET_GEMINI="SAVE_THE_SUN_GEMINI_API_KEY"
 # Billing labels stamped on every resource so spend is attributable per-app in the billing console.
 RESOURCE_LABELS="app=${SERVICE_NAME},managed-by=deploy-script"
 
+# Production rate-limit ceilings (per minute, per Cloud Run instance — at most 2 run). Generous per
+# SESSION so the Oracle never throttles mid-game; the GLOBAL value is the abuse backstop and should sit
+# at or below the key's real per-model RPM. The billing cap is the hard spend stop. Export any single
+# var before `make deploy` to override just that one without touching this block.
+PROD_LIMITS=(
+  TTS_SESSION_LIMIT=30 TTS_GLOBAL_LIMIT=120
+  STT_SESSION_LIMIT=15 STT_GLOBAL_LIMIT=60
+  ASK_SESSION_LIMIT=12 ASK_GLOBAL_LIMIT=48
+  VOICE_DEBUG_SESSION_LIMIT=30 VOICE_DEBUG_GLOBAL_LIMIT=120
+)
+
 RULE="═══════════════════════════════════════════════════════════"
 
 # ─── Preflight ──────────────────────────────────────────────────────────────────
@@ -122,20 +133,18 @@ gcloud builds submit --tag "${IMAGE}" --quiet
 # Float :latest to this build for humans / quick rollback reference.
 gcloud artifacts docker tags add "${IMAGE}" "${LATEST}" --quiet
 
-# Forward any rate-limit overrides set in the environment so the Gemini ceiling can be clamped at
-# deploy time — no code change. Unset vars fall through to the in-app defaults. --set-env-vars makes
-# the deployed set match the shell exactly, so unsetting one and redeploying reverts it to default.
+# Build the runtime env from PROD_LIMITS: each var takes its exported shell value if set, else the prod
+# default above. Every deploy sets EXPLICIT ceilings — prod never silently inherits the in-app dev
+# defaults, and unsetting an override then redeploying restores the prod default (not the code default).
 RUNTIME_ENV=""
-for var in TTS_SESSION_LIMIT TTS_GLOBAL_LIMIT STT_SESSION_LIMIT STT_GLOBAL_LIMIT \
-  ASK_SESSION_LIMIT ASK_GLOBAL_LIMIT VOICE_DEBUG_SESSION_LIMIT VOICE_DEBUG_GLOBAL_LIMIT; do
-  [[ -n "${!var:-}" ]] && RUNTIME_ENV="${RUNTIME_ENV:+${RUNTIME_ENV},}${var}=${!var}"
+for pair in "${PROD_LIMITS[@]}"; do
+  var="${pair%%=*}"
+  default="${pair#*=}"
+  override="${!var:-}"
+  RUNTIME_ENV="${RUNTIME_ENV:+${RUNTIME_ENV},}${var}=${override:-$default}"
 done
-if [[ -n "${RUNTIME_ENV}" ]]; then
-  ENV_FLAG=(--set-env-vars="${RUNTIME_ENV}")
-  echo "» Rate-limit overrides: ${RUNTIME_ENV}"
-else
-  ENV_FLAG=(--clear-env-vars)
-fi
+echo "» Rate-limit ceilings: ${RUNTIME_ENV}"
+ENV_FLAG=(--set-env-vars="${RUNTIME_ENV}")
 
 # ─── Deploy (cost-optimized: scale to zero, small ceiling) ──────────────────────
 echo "» Deploying to Cloud Run..."

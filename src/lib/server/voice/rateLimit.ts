@@ -20,26 +20,26 @@ export const resolveLimit = (raw: string | undefined, fallback: number): number 
 
 const WINDOW_MS = 60_000;
 
-// TTS synth: only UNCACHED lines claim a slot (cached replays are free), so the budget is Google's
-// fresh-synth RPM for the TTS preview model — a tight, unpublished ceiling. The old 200/min sat far
-// above it, so we rubber-stamped requests Google then 429'd. Defaults track the free-tier reality
-// (~10 RPM); raise via env on a paid key. The per-session slice caps one player below the global so
-// a single session can't drain the shared key.
-export const TTS_SESSION_LIMIT = resolveLimit(env.TTS_SESSION_LIMIT, 4);
-export const TTS_GLOBAL_LIMIT = resolveLimit(env.TTS_GLOBAL_LIMIT, 10);
+// TTS synth: only UNCACHED lines claim a slot (cached replays are free). Active play voices ~2 fresh
+// lines per turn (the authored flair + each new answer, before they cache), so a single player burns
+// the budget fast — the old free-tier-sized 4/10 throttled the Oracle silent mid-game. Sized for real
+// play now: generous per session, with a global abuse ceiling. Env-tune to your key's actual TTS RPM;
+// the billing cap is the real spend stop.
+export const TTS_SESSION_LIMIT = resolveLimit(env.TTS_SESSION_LIMIT, 30);
+export const TTS_GLOBAL_LIMIT = resolveLimit(env.TTS_GLOBAL_LIMIT, 120);
 
-// Push-to-talk transcription: every held utterance is an uncached Gemini call. Same free-tier-sized
-// defaults, env-tunable.
-export const STT_SESSION_LIMIT = resolveLimit(env.STT_SESSION_LIMIT, 4);
-export const STT_GLOBAL_LIMIT = resolveLimit(env.STT_GLOBAL_LIMIT, 10);
+// Push-to-talk transcription: every held utterance is one uncached Gemini call. Lower volume than TTS
+// (one per spoken Ask, not per move), but a voice-heavy player still needs headroom. Env-tunable.
+export const STT_SESSION_LIMIT = resolveLimit(env.STT_SESSION_LIMIT, 15);
+export const STT_GLOBAL_LIMIT = resolveLimit(env.STT_GLOBAL_LIMIT, 60);
 
 // A live Ask fans out to ~3 Gemini calls (Oracle interpret + flair, Sköll reaction) on the same Flash
 // quota as voice, with no audio required to trigger it. These are REQUEST budgets, so the effective
 // Gemini-call ceiling is ~3x lower — sized so a human (an Ask round-trips in seconds) never trips them
 // while a scripted client can't fan a flood of fresh-session asks into a multiple of the call budget.
 // Env-tunable for a stricter or paid-tier key.
-export const ASK_SESSION_LIMIT = resolveLimit(env.ASK_SESSION_LIMIT, 8);
-export const ASK_GLOBAL_LIMIT = resolveLimit(env.ASK_GLOBAL_LIMIT, 24);
+export const ASK_SESSION_LIMIT = resolveLimit(env.ASK_SESSION_LIMIT, 12);
+export const ASK_GLOBAL_LIMIT = resolveLimit(env.ASK_GLOBAL_LIMIT, 48);
 
 interface Window {
 	count: number;
