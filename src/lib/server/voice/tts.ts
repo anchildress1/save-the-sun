@@ -43,10 +43,16 @@ function ai(apiKey: string): GoogleGenAI {
 	return client;
 }
 
-// The SDK's ApiError carries the HTTP code on `.status`; 429 is the shared-quota throttle we fall back on.
-const isRateLimited = (err: unknown): boolean => (err as { status?: number })?.status === 429;
+// 429 is the shared-quota throttle we fall back on. The no-retry SDK path throws an ApiError with
+// `.status`, but our client sets retryOptions — so a retried 429 escapes pRetry as a plain
+// Error('Retryable HTTP Error: Too Many Requests') with no status. Match both shapes.
+const isRateLimited = (err: unknown): boolean => {
+	const status = (err as { status?: number })?.status;
+	const message = String((err as { message?: unknown })?.message ?? '');
+	return status === 429 || /\b429\b|RESOURCE_EXHAUSTED|Too Many Requests/i.test(message);
+};
 
-// Tee the model swap to /debug so a quota fallback is visible, not a silent degrade to the older voice.
+// Tee the model swap to /debug so a quota fallback is visible, not a silent degrade to the older model.
 function logFallback(sessionId: string | undefined, voice: VoiceId): void {
 	if (!sessionId) return;
 	logEvent(sessionId, {

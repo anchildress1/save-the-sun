@@ -25,8 +25,12 @@ import { synthesizeStream, isCached, resetTtsCache } from '$lib/server/voice/tts
 import { ORACLE_VOICE, SKOLL_VOICE, TTS_MODEL, TTS_FALLBACK_MODEL } from '$lib/voice/config';
 import { getEvents } from '$lib/server/debug/log';
 
-// The SDK throws an ApiError carrying the HTTP code on `.status`; 429 is the shared-quota throttle.
-const rateLimit = () => Object.assign(new Error('429 RESOURCE_EXHAUSTED'), { status: 429 });
+// Production shape: the client sets retryOptions, so a retried 429 escapes pRetry as a plain Error
+// with NO status — the ApiError.status path is only taken when retries are off. Default the fallback
+// tests to this so they exercise what the deployed client actually throws (not a synthetic .status).
+const rateLimit = () => new Error('Retryable HTTP Error: Too Many Requests');
+// The no-retry shape — a clean ApiError carrying the numeric status — is recognized too.
+const rateLimitApiError = () => Object.assign(new Error('429'), { status: 429 });
 
 // A Gemini stream is an async iterable of parts; each part may carry one inline-audio chunk.
 function streamOf(...chunks: (string | null)[]) {
@@ -202,8 +206,19 @@ describe('synthesizeStream', () => {
 		expect(sdk.generateContentStream).toHaveBeenCalledTimes(1); // the second model is never tried
 	});
 
+	it('falls back when a 429 arrives as a clean ApiError (no-retry shape)', async () => {
+		sdk.generateContentStream.mockRejectedValueOnce(rateLimitApiError());
+		sdk.generateContentStream.mockResolvedValueOnce(streamOf('fb'));
+
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual(['fb']);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2);
+	});
+
 	it('does not fall back on a non-rate-limit failure', async () => {
-		sdk.generateContentStream.mockRejectedValueOnce(new Error('500 internal'));
+		// Same retry-wrapped shape as a 429, but a 500 — the reason phrase must not match the limiter.
+		sdk.generateContentStream.mockRejectedValueOnce(
+			new Error('Retryable HTTP Error: Internal Server Error')
+		);
 
 		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([]);
 		expect(sdk.generateContentStream).toHaveBeenCalledTimes(1); // a 500 is terminal, not a fallback
