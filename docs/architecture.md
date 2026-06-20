@@ -175,7 +175,7 @@ sequenceDiagram
     Action-->>Page: oracle answer -> delivery
 ```
 
-- **Server-side key, allow-listed surface.** The browser sends only audio; `GEMINI_API_KEY` stays server-side (masked at the debug sink). The transcribe route is rate-limited per session and globally, like the TTS route. A `POST /api/voice/debug` route is available to tee voice events into the `/debug` stream — owner/kind/part fixed server-side so a client can't forge Engine verdicts, bounded by a message cap, a rate limiter, and the log's event trim — though the current push-to-talk client does not call it (Live-session residue).
+- **Server-side key, allow-listed surface.** The browser sends only audio; `GEMINI_API_KEY` stays server-side (masked at the debug sink). The transcribe route is rate-limited per session and globally, like the TTS route.
 - **Ask, plus the reaction.** A held reply produces an Ask — or, when Sköll's question hangs, a scry/hex/pass classified server-side (`reaction` mode of the transcribe route), run through the same `performReact` dispatch the buttons use. A mishear is safe: an `unclear` reply asks again and a spent scry/hex is refused, never a silent pass. Cast stays on the board button (with its own confirmation).
 - **Turn-based.** A held recording is one request/response — no socket, no silence timeout, no barge-in. The `` ` `` backtick key is the page-wide talk key, including inside the Ask field, where it starts push-to-talk instead of typing; Space/Enter operate the medallion only while it is focused, and buttons keep Enter for keyboard activation.
 - A denied or absent mic seals the medallion into the inert `denied` state (one quiet notice, never re-prompted); the button + text game is untouched.
