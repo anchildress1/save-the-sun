@@ -224,6 +224,21 @@ describe('synthesizeStream', () => {
 		expect(sdk.generateContentStream).toHaveBeenCalledTimes(1); // a 500 is terminal, not a fallback
 	});
 
+	it('does not fall back on a non-Error throw', async () => {
+		sdk.generateContentStream.mockRejectedValueOnce('boom'); // a bare string, never a rate-limit
+
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([]);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(1);
+	});
+
+	it('gives up after the fallback model also 429s — no third attempt', async () => {
+		sdk.generateContentStream.mockRejectedValueOnce(rateLimit()); // primary throttled
+		sdk.generateContentStream.mockRejectedValueOnce(rateLimit()); // fallback throttled too
+
+		expect(await collect(synthesizeStream('I wake with the fire.', ORACLE_VOICE))).toEqual([]);
+		expect(sdk.generateContentStream).toHaveBeenCalledTimes(2); // primary + fallback, then stop
+	});
+
 	it('caps the clip cache, evicting the oldest so memory stays bounded', async () => {
 		const MAX_CLIPS = 128;
 		// A fresh generator per call — a single shared one would be exhausted after the first synth.

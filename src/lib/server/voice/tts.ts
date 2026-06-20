@@ -47,10 +47,14 @@ function ai(apiKey: string): GoogleGenAI {
 // `.status`, but our client sets retryOptions — so a retried 429 escapes pRetry as a plain
 // Error('Retryable HTTP Error: Too Many Requests') with no status. Match both shapes.
 const isRateLimited = (err: unknown): boolean => {
-	const status = (err as { status?: number })?.status;
-	const message = String((err as { message?: unknown })?.message ?? '');
-	return status === 429 || /\b429\b|RESOURCE_EXHAUSTED|Too Many Requests/i.test(message);
+	if ((err as { status?: number })?.status === 429) return true;
+	return err instanceof Error && /\b429\b|RESOURCE_EXHAUSTED|Too Many Requests/i.test(err.message);
 };
+
+// Drop to the next model only on a pre-audio rate-limit with a model still to try — never mid-line
+// (that would re-speak in the other voice) and never on a non-429 failure.
+const canFallBack = (err: unknown, voiced: boolean, hasNextModel: boolean): boolean =>
+	!voiced && hasNextModel && isRateLimited(err);
 
 // Tee the model swap to /debug so a quota fallback is visible, not a silent degrade to the older model.
 function logFallback(sessionId: string | undefined, voice: VoiceId): void {
@@ -80,6 +84,37 @@ function logSynthFailure(sessionId: string | undefined, voice: VoiceId, err: unk
 		});
 }
 
+// Stream one model's audio, yielding each base64 chunk as it arrives and caching the full clip on a
+// clean finish. Throws the SDK error to the caller, which decides fallback vs. give up. Authored lines
+// (cacheable=false) accumulate nothing — a unique key can't replay, so caching only grows memory.
+async function* streamModel(
+	apiKey: string,
+	model: string,
+	text: string,
+	voice: VoiceId,
+	cacheable: boolean,
+	key: string
+): AsyncGenerator<string> {
+	const chunks: string[] = [];
+	const stream = await ai(apiKey).models.generateContentStream({
+		model,
+		contents: [{ role: 'user', parts: [{ text }] }],
+		config: {
+			responseModalities: [Modality.AUDIO],
+			speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
+		}
+	});
+	for await (const part of stream) {
+		const data = part.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+		if (data) {
+			if (cacheable) chunks.push(data);
+			yield data;
+		}
+	}
+	// A stream that errored mid-flight throws before here, so a truncated clip never caches.
+	remember(key, chunks);
+}
+
 /**
  * Stream one allow-listed line as base64 PCM chunks. Replays a cached clip's chunks when one
  * exists; otherwise streams from Gemini, accumulating the chunks to cache only on a clean finish.
@@ -101,7 +136,8 @@ export async function* synthesizeStream(
 		}
 	}
 
-	if (!env.GEMINI_API_KEY) {
+	const apiKey = env.GEMINI_API_KEY;
+	if (!apiKey) {
 		console.error('[voice] GEMINI_API_KEY is not configured; cannot synthesize');
 		return;
 	}
@@ -110,38 +146,19 @@ export async function* synthesizeStream(
 	// once audio is on the wire, switching models would re-speak the line in the other voice.
 	const models = [TTS_MODEL, TTS_FALLBACK_MODEL];
 	for (let i = 0; i < models.length; i++) {
-		const chunks: string[] = [];
 		let voiced = false;
 		try {
-			const stream = await ai(env.GEMINI_API_KEY).models.generateContentStream({
-				model: models[i],
-				contents: [{ role: 'user', parts: [{ text }] }],
-				config: {
-					responseModalities: [Modality.AUDIO],
-					speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
-				}
-			});
-			for await (const part of stream) {
-				const data = part.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-				if (data) {
-					voiced = true;
-					if (cacheable) chunks.push(data);
-					yield data;
-				}
+			for await (const data of streamModel(apiKey, models[i], text, voice, cacheable, key)) {
+				voiced = true;
+				yield data;
 			}
-			// Cache only a complete clip — a stream that errored mid-flight must not replay truncated.
-			// Authored lines (Gemini-written, unique every call) are never cacheable: a unique key can't
-			// replay, so caching only grows memory unbounded for the life of the process.
-			remember(key, chunks);
 			return;
 		} catch (err) {
-			// A pre-audio 429 with a model still to try drops to the fallback; anything else (or a tear
-			// after audio already played) is the end — mask + tee, best-effort past here.
-			if (!voiced && isRateLimited(err) && i < models.length - 1) {
+			if (canFallBack(err, voiced, i < models.length - 1)) {
 				logFallback(sessionId, voice);
 				continue;
 			}
-			logSynthFailure(sessionId, voice, err);
+			logSynthFailure(sessionId, voice, err); // mask + tee; best-effort past here
 			return;
 		}
 	}
