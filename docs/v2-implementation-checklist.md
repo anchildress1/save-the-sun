@@ -37,7 +37,7 @@ Push-to-talk control + living state indicator (`src/lib/components/EclipseMedall
 
 ## Output mute 🔇
 
-- [x] One toggle silences both characters via a master gain on the shared speaker — audio still decodes/drains, so captions and the state machine are byte-for-byte unaffected; mic behavior untouched (`src/lib/voice/outputMute.ts`)
+- [x] One toggle silences both characters by closing the shared speaker, aborting in-flight audio, and dropping pending voice; captions and mic behavior stay untouched (`src/lib/voice/outputMute.ts`, `src/lib/voice/delivery.ts`)
 - [x] Preference persists for the session (`sessionStorage`), distinct from the per-round view state
 
 ## Deferred (V3) 🔭

@@ -44,7 +44,7 @@ The core loop — Ask, Hex, Scry, Pass, Cast — runs on buttons and a text box.
 | Auth | `GEMINI_API_KEY` stays in Google Secret Manager, server-side only; it never reaches the browser and no client tokens are minted |
 | Input | Push-to-talk: a held recording (WAV) → `POST /api/voice/transcribe` → text → the same Ask/React pipeline as the buttons |
 | Captions | All spoken content also lands as text (Answer panel for the Oracle, his frame for Sköll) |
-| Output mute | One toggle (a master gain) silences both characters; captions and the state machine are untouched; persists for the session |
+| Output mute | One toggle closes the shared speaker, aborts in-flight audio, and drops pending voice; captions and mic behavior are untouched; persists for the session |
 | Cast safety | A spoken cast commits only on an exact board-rune match; the deliberate arm (or "cast {rune}") stands in for a confirm; a mishear or off-board word is refused, never staked |
 | Turn parity | Voice intents call the exact same engine dispatch as the buttons; buttons never disappear |
 
@@ -99,7 +99,7 @@ Voice never solely carries game information. An Ask and its answer, a reaction, 
 
 ## Output mute 🔇
 
-One toggle silences both characters' audio; captions, text, and mic behavior are unaffected — a master gain on the shared speaker attenuates to silence without dropping the queue, so caption timing is byte-for-byte identical. The preference persists for the session (`sessionStorage`).
+One toggle silences both characters' audio; captions, text, and mic behavior are unaffected. Turning output off closes the shared speaker, aborts in-flight audio, and drops pending voice so a muted board never posts to the TTS route. The preference persists for the session (`sessionStorage`).
 
 ## Success Metrics 📈
 
