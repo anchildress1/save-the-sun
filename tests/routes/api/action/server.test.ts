@@ -24,7 +24,7 @@ vi.mock('$lib/server/skoll/gemini', () => ({
 }));
 
 import { POST } from '$routes/api/action/+server';
-import { interpret } from '$lib/server/oracle/gemini';
+import { interpret, composeEndingFlair } from '$lib/server/oracle/gemini';
 import { decideSkollMove, decideSkollReaction } from '$lib/server/skoll/gemini';
 import {
 	resetEngine,
@@ -543,10 +543,9 @@ describe('POST /api/action', () => {
 	// Engine verdicts — the deterministic truth rows (the round's opening secret is part 'Round').
 	const verdicts = () => byOwner('Engine').filter((e) => e.part !== 'Round');
 	const lastVerdict = () => verdicts().at(-1)!;
-	// Sköll's on-stage move/reaction events, apart from the raw model I/O he also owns.
-	const isRawIO = (e: { message: string }) => e.message.startsWith('raw Gemini');
-	const skollMoves = () => byOwner('Sköll').filter((e) => !isRawIO(e));
-	const geminiIO = () => byOwner('Sköll').filter(isRawIO);
+	// Sköll's on-stage events. Each Gemini call is now ONE entry — its readable move/reaction line with
+	// the raw request/response folded into that entry's `data` — so there's no separate raw-I/O row.
+	const skollMoves = () => byOwner('Sköll');
 
 	describe('debug log (S8)', () => {
 		it('opens the round naming the secret and its seed — the on-stage record is a spoiler by design', () => {
@@ -665,48 +664,55 @@ describe('POST /api/action', () => {
 			expect(String(move.data?.reasoning)).toContain('hunch');
 		});
 
-		it('drains raw Gemini I/O onto the log as a Sköll llm event', async () => {
-			// The real seam is mocked here, so seed THIS session's sink the way gemini.ts would (inside
-			// the session context), then advance — the route drains it as a Sköll llm event.
+		it('folds raw Gemini move I/O into the Sköll move event', async () => {
+			// The real seam is mocked, so seed THIS session's sink the way gemini.ts would (inside the
+			// session context), then advance — the route drains it into his move entry, not a separate row.
 			await ask(); // hand the wolf his turn
 			runWithSession(SID, () =>
 				captureGemini({ label: 'move', request: { contents: 'board…' }, response: { text: '{}' } })
 			);
 			await advance();
-			const io = geminiIO().at(-1)!;
-			expect(io).toMatchObject({ kind: 'llm', owner: 'Sköll' });
-			expect(io.message).toContain('move');
-			expect(io.data).toMatchObject({ response: { text: '{}' } });
+			const move = skollMoves().at(-1)!;
+			expect(move).toMatchObject({ kind: 'llm', owner: 'Sköll' });
+			expect(move.data).toMatchObject({ source: 'gemini', response: { text: '{}' } });
 		});
 
-		it('drains a raw oracle call as the Oracle’s own llm event on the Ask', async () => {
-			// The interpret seam is mocked, so tee the oracle call the way oracle/gemini.ts would; the
-			// next Ask drains it attributed to the Oracle (owner), not Sköll.
+		it('folds a raw oracle call into the Oracle’s reading event on the Ask', async () => {
+			// The interpret seam is mocked, so tee the oracle call the way oracle/gemini.ts would; the next
+			// Ask drains it into her reading entry (owner Oracle), raw request/response under its details.
 			runWithSession(SID, () =>
 				captureGemini({ label: 'oracle', request: { contents: 'is it light?' }, response: {} })
 			);
 			await ask();
-			const io = byOwner('Oracle').find(isRawIO)!;
-			expect(io).toMatchObject({ kind: 'llm', part: 'Ask' });
-			expect(io.message).toContain('oracle');
+			const reading = byOwner('Oracle').find((e) => e.part === 'Ask')!;
+			expect(reading).toMatchObject({ kind: 'llm', part: 'Ask' });
+			expect(reading.message).toContain('reads it as');
+			expect(reading.data).toMatchObject({
+				query: { axis: 'fill', value: 'Light' },
+				request: { contents: 'is it light?' }
+			});
 		});
 
-		it('attributes ending flair raw I/O to the ending speaker on the Cast beat', async () => {
-			skollDecides(async () => ({ kind: 'cast', runeName: SECRET }));
-			await ask();
-			runWithSession(SID, () =>
+		it('folds ending-flair I/O into the ending speaker’s Cast event', async () => {
+			skollDecides(async () => ({ kind: 'cast', runeName: SECRET })); // his winning cast ends the round
+			// composeEndingFlair runs inside authorEnding, AFTER his move beat drains — capture there so
+			// the I/O folds onto the ending entry (his gloat), not his move.
+			vi.mocked(composeEndingFlair).mockImplementationOnce(async () => {
 				captureGemini({
 					label: 'skoll-ending-flair',
 					request: { contents: 'closing gloat' },
 					response: { text: 'The sun is mine.' }
-				})
-			);
+				});
+				return 'The sun is mine.';
+			});
 
+			await ask();
 			await advance();
 
-			const io = byOwner('Sköll').find((e) => e.message.includes('skoll-ending-flair'))!;
-			expect(io).toMatchObject({ kind: 'llm', owner: 'Sköll', part: 'Cast' });
-			expect(byOwner('Oracle').some((e) => e.message.includes('skoll-ending-flair'))).toBe(false);
+			const ending = byOwner('Sköll').find((e) => e.message.includes('closing verse'))!;
+			expect(ending).toMatchObject({ kind: 'llm', owner: 'Sköll', part: 'Cast' });
+			expect(ending.data).toMatchObject({ response: { text: 'The sun is mine.' } });
+			expect(byOwner('Oracle').some((e) => e.message.includes('closing verse'))).toBe(false);
 		});
 	});
 
