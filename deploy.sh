@@ -15,7 +15,7 @@ RESOURCE_LABELS="app=${SERVICE_NAME},managed-by=deploy-script"
 # at or below the key's real per-model RPM. The billing cap is the hard spend stop. Export any single
 # var before `make deploy` to override just that one without touching this block.
 PROD_LIMITS=(
-  TTS_SESSION_LIMIT=30 TTS_GLOBAL_LIMIT=120
+  TTS_SESSION_LIMIT=150 TTS_GLOBAL_LIMIT=450
   STT_SESSION_LIMIT=15 STT_GLOBAL_LIMIT=60
   ASK_SESSION_LIMIT=12 ASK_GLOBAL_LIMIT=48
 )

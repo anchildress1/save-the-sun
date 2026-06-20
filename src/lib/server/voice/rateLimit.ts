@@ -20,13 +20,14 @@ export const resolveLimit = (raw: string | undefined, fallback: number): number 
 
 const WINDOW_MS = 60_000;
 
-// TTS synth: only UNCACHED lines claim a slot (cached replays are free). Active play voices ~2 fresh
-// lines per turn (the authored flair + each new answer, before they cache), so a single player burns
-// the budget fast — the old free-tier-sized 4/10 throttled the Oracle silent mid-game. Sized for real
-// play now: generous per session, with a global abuse ceiling. Env-tune to your key's actual TTS RPM;
-// the billing cap is the real spend stop.
-export const TTS_SESSION_LIMIT = resolveLimit(env.TTS_SESSION_LIMIT, 30);
-export const TTS_GLOBAL_LIMIT = resolveLimit(env.TTS_GLOBAL_LIMIT, 120);
+// TTS synth: only UNCACHED lines claim a slot (cached replays are free). The synth REQUEST fires the
+// instant a line is delivered — NOT when its audio plays — so a player clicking briskly through a game
+// queues dozens of fresh synths within one window while the audio drains over minutes. A single full
+// game can need 70+ fresh synths, so a per-burst ceiling throttles legit solo play mid-game. Size the
+// SESSION limit above a WHOLE game (not a turn), with a global ceiling as the cross-session abuse
+// backstop. The billing cap is the real spend stop; env-tune these to the key's actual TTS RPM.
+export const TTS_SESSION_LIMIT = resolveLimit(env.TTS_SESSION_LIMIT, 150);
+export const TTS_GLOBAL_LIMIT = resolveLimit(env.TTS_GLOBAL_LIMIT, 450);
 
 // Push-to-talk transcription: every held utterance is one uncached Gemini call. Lower volume than TTS
 // (one per spoken Ask, not per move), but a voice-heavy player still needs headroom. Env-tunable.
