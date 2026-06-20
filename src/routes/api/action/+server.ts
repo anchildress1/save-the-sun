@@ -546,23 +546,24 @@ async function askWithSkollReaction(
 	// The Ask verdict is the engine's, logged at the point each outcome is decided — never restated
 	// elsewhere. The Oracle owns her interpret (above) and her flair (below); the deterministic truth
 	// is the engine's alone.
-	let oracle;
+	let oracle: Extract<OracleResult, { ok: true }> | undefined;
 	if (vs.killed) {
 		engine.passTurn(); // her question dies; her turn is spent with no answer
 		engineVerdict(sessionId, 'Ask', 'Hexed by Sköll — the Oracle is silent, her turn spent');
 	} else {
-		oracle = answerAsk(engine, 'Human', prepared.query, prepared.paraphrase);
-		if (oracle.ok) {
-			// A Scry lets Sköll overhear her answer — his earned fact.
-			if (vs.scried) skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
-			engineVerdict(sessionId, 'Ask', oracle.answer);
-		} else {
-			engineVerdict(sessionId, 'Ask', 'engine declined the Ask');
-		}
+		// prepareAsk re-validated the query and it's the human's turn on an active round, so the engine
+		// always answers — answerAsk's ok:false arm is unreachable here.
+		oracle = answerAsk(engine, 'Human', prepared.query, prepared.paraphrase) as Extract<
+			OracleResult,
+			{ ok: true }
+		>;
+		// A Scry lets Sköll overhear her answer — his earned fact.
+		if (vs.scried) skoll.facts.push({ query: prepared.query, answer: oracle.affirmative });
+		engineVerdict(sessionId, 'Ask', oracle.answer);
 	}
 
 	// On a clean answer (Sköll passed), she authors her verdict aloud — sets `oracle.voiced`.
-	if (oracle?.ok && vs.choice === 'Pass') await authorAnswerFlair(sessionId, oracle);
+	if (oracle && vs.choice === 'Pass') await authorAnswerFlair(sessionId, oracle);
 
 	// Mirror the line the client voices for this outcome (his Hex/Scry framing, or her answer on a
 	// Pass), so a dropped Ask response recovers it instead of the false silent line.

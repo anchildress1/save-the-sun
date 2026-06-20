@@ -575,8 +575,9 @@ describe('POST /api/action', () => {
 			expect(human).toMatchObject({ kind: 'input', part: 'Ask' });
 			expect(human.message).toContain('is it light?');
 			expect(human.data).toMatchObject({ question: 'is it light?' });
-			// The Oracle's LLM reading — its own event, not bolted onto the engine's verdict.
-			const reading = byOwner('Oracle').find((e) => e.message.includes('reads it as'))!;
+			// The Oracle's LLM reading — its own event, not bolted onto the engine's verdict. Selected by
+			// structured fields (first llm/Ask = the read, logged before the flair), not display copy.
+			const reading = byOwner('Oracle').find((e) => e.kind === 'llm' && e.part === 'Ask')!;
 			expect(reading).toMatchObject({ kind: 'llm', part: 'Ask' });
 			expect(reading.message).toContain('whether it is light'); // the Oracle's read, in the message
 			expect(reading.data).toMatchObject({ query: { axis: 'fill', value: 'Light' } });

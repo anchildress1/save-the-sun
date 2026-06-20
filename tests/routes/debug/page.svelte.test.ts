@@ -167,6 +167,11 @@ describe('/debug view', () => {
 		expect(container.querySelector('.session code')?.textContent).toBe('abc-123');
 	});
 
+	it('omits the session line when there is no session id', () => {
+		const { container } = renderWith([verdict], '');
+		expect(container.querySelector('.session')).toBeNull();
+	});
+
 	it('polls /api/debug for the browser’s own cookie session', async () => {
 		vi.useRealTimers();
 		const calls: string[] = [];
@@ -207,6 +212,35 @@ describe('/debug view', () => {
 		await expect
 			.poll(() => container.querySelector('.msg')?.textContent, { timeout: 3000 })
 			.toContain('Human asks: "fresh"');
+		unmount();
+	});
+
+	it('updates a row in place when a new round reuses its seq with new content', async () => {
+		// A new round resets the log (resetLog) and re-counts from seq 1, so a poll can return the same
+		// seq carrying a different owner/kind/level — the keyed row must update in place, not go stale.
+		vi.useRealTimers();
+		const next = {
+			events: [
+				{
+					seq: 1,
+					owner: 'Sköll',
+					kind: 'llm',
+					part: 'Cast',
+					level: 'warn',
+					message: 'new round, same seq'
+				} as DebugEvent
+			]
+		};
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response(JSON.stringify(next)))
+		);
+		const { container, unmount } = renderWith([verdict]); // seq 1: Engine · deterministic · info
+		await expect
+			.poll(() => container.querySelector('.who')?.textContent, { timeout: 3000 })
+			.toBe('Sköll');
+		expect(container.querySelector('.kind-badge')?.textContent).toContain('Gemini'); // kind info→llm
+		expect(container.querySelector('.badge.warn')).not.toBeNull(); // the level badge now shows
 		unmount();
 	});
 
