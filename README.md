@@ -61,7 +61,7 @@ Two categories, on purpose: **Gemini** (primary) and **Ode to Turing**.
 - **Oracle** — interprets free-text Asks and dramatizes her verdicts: `gemini-3.5-flash` (full Flash — she must read language exactly).
 - **Sköll** — plays the wolf: `gemini-3.1-flash-lite` (the lite tier on purpose — he plays looser, like a clever twelve-year-old).
 - **Speech-to-text** — transcribes push-to-talk Asks: `gemini-3.5-flash`.
-- **Text-to-speech** — voices both characters through one route, a `voice` param apart: `gemini-3.1-flash-tts-preview`.
+- **Text-to-speech** — voices both characters through one route, a `voice` param apart: primary `gemini-3.1-flash-tts-preview`, fallback `gemini-2.5-flash-preview-tts` on pre-audio 429s.
 
 **The engine referees truth; Gemini never sees the secret.** A deterministic in-memory engine holds and judges the answer — the model only interprets language, plays the wolf, transcribes speech, and voices server-owned lines.
 
