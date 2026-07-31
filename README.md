@@ -16,6 +16,17 @@
   <img alt="Lighthouse accessibility score 100, enforced pre-push" src="https://img.shields.io/badge/Lighthouse_a11y-100-limegreen?style=for-the-badge&logo=lighthouse" />
 </p>
 
+<div align="center">
+
+<!-- prettier-ignore-start -->
+<!--START_SECTION:rai-badge-->
+<!--END_SECTION:rai-badge-->
+<!-- prettier-ignore-end -->
+
+</div>
+
+<p align="center"><em>AI attribution, scored from git history by <a href="https://github.com/anchildress1/rai-commit-badge">rai-commit-badge</a>.</em></p>
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/anchildress1/save-the-sun/main/docs/assets/social-banner.webp" alt="A rune stone blazing with golden light at sunrise while Sköll, the great wolf, watches from a dark ridge." />
 </p>
