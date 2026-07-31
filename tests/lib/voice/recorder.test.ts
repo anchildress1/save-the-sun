@@ -78,7 +78,7 @@ describe('recorder — capture', () => {
 		const bytes = Uint8Array.from(atob(clip!.wavBase64), (c) => c.charCodeAt(0));
 		expect(String.fromCharCode(...bytes.slice(0, 4))).toBe('RIFF');
 		expect(String.fromCharCode(...bytes.slice(8, 12))).toBe('WAVE');
-		expect(bytes.length).toBe(44 + 5000 * 2); // header + PCM16 samples
+		expect(bytes).toHaveLength(44 + 5000 * 2); // header + PCM16 samples
 	});
 
 	it('releases the mic stream on release so Chrome stops showing it in use', async () => {

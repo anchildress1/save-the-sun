@@ -113,7 +113,7 @@ describe('chooseFloorMove', () => {
 		for (let seed = 0; seed < 200; seed++) {
 			const move = chooseFloorMove([], asked, mulberry32(seed));
 			if (move.kind === 'ask') {
-				expect(move.query.axis === 'fill').toBe(false);
+				expect(move.query.axis).not.toBe('fill');
 			}
 		}
 	});
