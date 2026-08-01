@@ -85,8 +85,7 @@ function refuse(cls: RefusalClass): OracleResult {
 
 /** An Ask that interpreted into a valid query, ready to resolve — or a refusal to return as-is. */
 export type PreparedAsk =
-	| { ok: true; query: Query; paraphrase: string }
-	| { ok: false; result: OracleResult };
+	{ ok: true; query: Query; paraphrase: string } | { ok: false; result: OracleResult };
 
 /**
  * Interpret + validate an Ask, stopping short of resolving it. Splitting this from the answer is

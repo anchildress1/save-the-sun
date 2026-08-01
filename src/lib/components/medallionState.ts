@@ -9,12 +9,7 @@ import type { RuneName } from './runeVisuals';
 /** Push-to-talk display states: idle (ready), recording (holding), thinking (transcribe + Ask),
  *  the two delivered voices, and denied (mic sealed shut for the session). */
 export type MedallionState =
-	| 'idle'
-	| 'recording'
-	| 'thinking'
-	| 'speaking'
-	| 'skoll-speaking'
-	| 'denied';
+	'idle' | 'recording' | 'thinking' | 'speaking' | 'skoll-speaking' | 'denied';
 
 // Canonical copy: docs/ux-copy.md §6 (eclipse medallion). The label carries the state plus the
 // hold-to-record affordance. Readonly via `as const` so TS-guarded code can't fork the canon.
