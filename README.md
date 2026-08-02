@@ -20,6 +20,7 @@
 
 <!-- prettier-ignore-start -->
 <!--START_SECTION:rai-badge-->
+![AI attribution](https://img.shields.io/badge/AI%20attribution-85%25%20since%202026--06-C03070?style=for-the-badge)
 <!--END_SECTION:rai-badge-->
 <!-- prettier-ignore-end -->
 
