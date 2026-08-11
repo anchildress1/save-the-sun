@@ -50,7 +50,7 @@
 		"vitest-browser-svelte": "^2.2.1"
 	},
 	"dependencies": {
-		"@google/genai": "^2.13.0",
+		"@google/genai": "^2.15.0",
 		"gsap": "^3.15.0"
 	},
 	"volta": {
