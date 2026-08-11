@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.1.0](https://github.com/anchildress1/save-the-sun/compare/v2.0.0...v2.1.0) (2026-08-11)
+
+
+### Features
+
+* add rai-commit-badge to score AI attribution from git history ([#81](https://github.com/anchildress1/save-the-sun/issues/81)) ([edd2b20](https://github.com/anchildress1/save-the-sun/commit/edd2b20739db2ef3d18cefd6062ec2f99a78eaf5))
+
+
+### Bug Fixes
+
+* replace deprecated @checkmarkdevtools/commitlint-plugin-rai ([#82](https://github.com/anchildress1/save-the-sun/issues/82)) ([0300664](https://github.com/anchildress1/save-the-sun/commit/0300664e6fa2501f47f8b61c00a6cfad6d5681e3))
+* use dedicated matchers over generic assertions in two tests ([#80](https://github.com/anchildress1/save-the-sun/issues/80)) ([56095b2](https://github.com/anchildress1/save-the-sun/commit/56095b26a5ad832301610a8240fba10166a47730))
+
 ## [2.0.0](https://github.com/anchildress1/save-the-sun/compare/v1.0.0...v2.0.0) (2026-06-20)
 
 
