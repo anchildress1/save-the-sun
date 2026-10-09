@@ -5,19 +5,15 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  cookie: ^0.7.2
-  tmp: ^0.2.6
-  uuid: ^11.1.1
-  protobufjs@<=7.6.2: '>=7.6.3 <8'
-  js-yaml@<=4.1.1: '>=4.2.0 <5'
+  cookie: ^0.7.0
 
 importers:
 
   .:
     dependencies:
       '@google/genai':
-        specifier: ^2.24.0
-        version: 2.24.0(supports-color@10.2.2)
+        specifier: ^2.27.0
+        version: 2.27.0(supports-color@10.2.2)
       gsap:
         specifier: ^3.15.0
         version: 3.15.0
@@ -302,8 +298,8 @@ packages:
   '@formatjs/intl-localematcher@0.6.2':
     resolution: {integrity: sha512-XOMO2Hupl0wdd172Y06h6kLpBz6Dv+J4okPLl4LPtzbr8f66WbIoy4ev98EBuZ6ZK4h5ydTN6XneT4QVpD7cdA==}
 
-  '@google/genai@2.24.0':
-    resolution: {integrity: sha512-bIu5eoxF1AaPWs9ivmUJGp1RpDHyapoODvWvnkzRDx2CTIW6UJXFhDdjj0BlRve3ZHMMuEkQBVrA/ALqpW4apA==}
+  '@google/genai@2.27.0':
+    resolution: {integrity: sha512-W6F9Y9d4h7cVQNa85IPCOVVP9PiUzve/ZQPBvQnBmnBJcLvxstEw+R2X/RyCH0SOe0HVDQzeKDpDUf6ZRtbmdQ==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@modelcontextprotocol/sdk': ^1.25.2
@@ -3512,7 +3508,7 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@google/genai@2.24.0(supports-color@10.2.2)':
+  '@google/genai@2.27.0(supports-color@10.2.2)':
     dependencies:
       google-auth-library: 10.9.1(supports-color@10.2.2)
       p-retry: 4.6.2
