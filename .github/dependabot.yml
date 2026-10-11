@@ -3,7 +3,7 @@ version: 2
 updates:
   # JS dependencies. Dependabot forbids two npm entries on one directory/branch, so production and
   # development are split into separate grouped PRs here rather than two top-level configs.
-  - package-ecosystem: npm
+  - package-ecosystem: pnpm
     directory: '/'
     schedule:
       interval: weekly
