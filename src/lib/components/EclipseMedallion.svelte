@@ -474,10 +474,9 @@
 		}
 	}
 
-	/* Static glow intensities replace the pulses and orbit. The theme's global near-zero
-	   durations aren't enough here: a frozen keyframe could park at its dimmest frame, so the
-	   animations are removed and each state gets a fixed intensity. The disc freezes on its inline
-	   static frame (spriteLevel). */
+	/* Static glow intensities replace the pulses and orbit. Animations are removed rather than
+	   paused at a potentially dim keyframe, and each state gets a fixed intensity. The disc freezes
+	   on its inline static frame (spriteLevel). */
 	@media (prefers-reduced-motion: reduce) {
 		.medallion[data-voice-state] .corona,
 		.medallion[data-voice-state] .rune-ring,

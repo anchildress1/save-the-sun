@@ -16,6 +16,7 @@ describe('reduced motion — the rite is present at once, never mid-animation', 
 		// opacity:1 with no animation, so the whole verse is legible the instant it mounts.
 		for (const el of lines) {
 			expect(getComputedStyle(el).opacity).toBe('1');
+			expect(getComputedStyle(el).animationName).toBe('none');
 		}
 	});
 
