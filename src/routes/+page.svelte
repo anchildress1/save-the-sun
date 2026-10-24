@@ -1737,7 +1737,9 @@
 			);
 		opacity: var(--night-t, 0);
 		pointer-events: none;
-		transition: opacity 1.2s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition: opacity 1.2s ease;
+		}
 	}
 
 	.rite-header {
@@ -1786,7 +1788,9 @@
 			linear-gradient(180deg, rgba(6, 9, 18, 0) 0%, rgba(220, 171, 73, 0.14) 100%);
 		opacity: var(--night-t, 0);
 		pointer-events: none;
-		transition: opacity 1.2s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition: opacity 1.2s ease;
+		}
 	}
 
 	.ornate-divider {
@@ -1824,7 +1828,9 @@
 		translate: 0 calc(var(--night-t, 0) * 44px);
 		filter: saturate(1.04) brightness(0.92) contrast(1.02);
 		pointer-events: none;
-		transition: translate 1.2s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition: translate 1.2s ease;
+		}
 	}
 
 	.title-block {
@@ -1865,7 +1871,9 @@
 		border: 0;
 		background: none;
 		cursor: pointer;
-		transition: color 0.2s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition: color 0.2s ease;
+		}
 	}
 
 	.title-home:hover {
@@ -2082,9 +2090,11 @@
 		border-radius: 999px;
 		background: rgba(6, 9, 18, 0.6);
 		cursor: pointer;
-		transition:
-			background 0.2s ease,
-			border-color 0.2s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition:
+				background 0.2s ease,
+				border-color 0.2s ease;
+		}
 	}
 
 	/* ON: only a whisper of warmth in the track — the thumb's position and gold carry the state. */
@@ -2111,10 +2121,12 @@
 		border: 1px solid var(--gold-dim);
 		color: var(--ink-muted);
 		transform: translateY(-50%);
-		transition:
-			inset-inline-start 0.2s ease,
-			border-color 0.2s ease,
-			color 0.2s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition:
+				inset-inline-start 0.2s ease,
+				border-color 0.2s ease,
+				color 0.2s ease;
+		}
 	}
 
 	.voice-switch[aria-checked='true'] .voice-switch__thumb {
@@ -2329,7 +2341,9 @@
 		-webkit-text-fill-color: var(--ink);
 		-webkit-box-shadow: 0 0 0 1000px var(--ask-field-bg) inset;
 		caret-color: var(--ink);
-		transition: background-color 9999s ease-in-out 0s;
+		@media (prefers-reduced-motion: no-preference) {
+			transition: background-color 9999s ease-in-out 0s;
+		}
 	}
 
 	.ask input:-webkit-autofill:focus {
@@ -2418,9 +2432,11 @@
 		opacity: 0;
 		visibility: hidden;
 		transform: translateY(-0.25rem);
-		transition:
-			opacity 0.12s ease,
-			transform 0.12s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition:
+				opacity 0.12s ease,
+				transform 0.12s ease;
+		}
 		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
 	}
 

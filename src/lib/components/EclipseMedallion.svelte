@@ -171,9 +171,11 @@
 		line-height: 1;
 		opacity: 0;
 		pointer-events: none;
-		transition:
-			opacity 0.16s ease,
-			transform 0.16s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition:
+				opacity 0.16s ease,
+				transform 0.16s ease;
+		}
 	}
 
 	.mic-hint kbd {
@@ -246,7 +248,9 @@
 			transparent 78%
 		);
 		opacity: 0.08;
-		transition: opacity 0.25s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition: opacity 0.25s ease;
+		}
 	}
 
 	/* The disc clips the inner layers; the corona stays outside so its glow can spill. */
@@ -300,7 +304,9 @@
 		);
 		box-shadow: inset 0 0 12px 2px rgba(200, 71, 63, 0.9);
 		opacity: 0;
-		transition: opacity 0.3s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition: opacity 0.3s ease;
+		}
 	}
 
 	.medallion[data-voice-state='skoll-speaking'] .eclipse-shadow {
@@ -356,9 +362,11 @@
 		--rune-tint: invert(0.78) sepia(0.55) saturate(4) hue-rotate(-18deg);
 		filter: var(--rune-tint);
 		opacity: 0.2;
-		transition:
-			opacity 0.25s ease,
-			filter 0.25s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition:
+				opacity 0.25s ease,
+				filter 0.25s ease;
+		}
 	}
 
 	/* Idle: the etched mic glyph marks "hold to speak"; denied dims and strikes it. */
@@ -374,7 +382,9 @@
 		stroke-width: 1.6;
 		stroke-linecap: round;
 		opacity: 0;
-		transition: opacity 0.25s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition: opacity 0.25s ease;
+		}
 	}
 
 	.medallion[data-voice-state='idle'] .mic-glyph {

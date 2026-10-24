@@ -214,7 +214,9 @@
 		--card-action-brightness: 1;
 		transform: translateY(var(--card-hover-lift)) scale(var(--card-action-scale));
 		filter: brightness(var(--card-action-brightness));
-		transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+		@media (prefers-reduced-motion: no-preference) {
+			transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+		}
 	}
 
 	.rune-card:hover {
@@ -238,7 +240,9 @@
 		object-fit: fill;
 		pointer-events: none;
 		filter: brightness(var(--stone-brightness)) contrast(var(--stone-contrast));
-		transition: filter 0.2s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition: filter 0.2s ease;
+		}
 	}
 
 	.ambient {

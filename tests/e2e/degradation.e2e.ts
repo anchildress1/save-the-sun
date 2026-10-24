@@ -78,3 +78,27 @@ test.describe('degradation — Reduced tier (prefers-reduced-motion)', () => {
 		await expect(endScreen.locator('#end-screen-lead')).toHaveText('The rune is true.');
 	});
 });
+
+test('component transitions follow live motion preference changes', async ({ page }) => {
+	await page.emulateMedia({ reducedMotion: 'no-preference' });
+	await page.goto('/');
+	await expect(page.locator('.rune-card')).toHaveCount(24);
+	const transitions = () =>
+		page.evaluate(() =>
+			[...document.querySelectorAll('*')].flatMap((element) =>
+				[null, '::before', '::after'].flatMap((pseudo) => {
+					const style = getComputedStyle(element, pseudo);
+					if (pseudo && ['none', 'normal'].includes(style.content)) return [];
+					return style.transitionProperty !== 'none' &&
+						style.transitionDuration.split(',').some((duration) => Number.parseFloat(duration) > 0)
+						? [`${element.tagName}.${element.className}${pseudo ?? ''}`]
+						: [];
+				})
+			)
+		);
+	await expect.poll(async () => (await transitions()).length).toBeGreaterThan(0);
+	await page.emulateMedia({ reducedMotion: 'reduce' });
+	await expect.poll(transitions).toEqual([]);
+	await page.emulateMedia({ reducedMotion: 'no-preference' });
+	await expect.poll(async () => (await transitions()).length).toBeGreaterThan(0);
+});

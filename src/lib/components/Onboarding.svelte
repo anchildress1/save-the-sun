@@ -343,11 +343,13 @@
 		border: 2px solid var(--gold-bright);
 		box-shadow: 0 0 0 9999px rgba(6, 9, 18, 0.8);
 		pointer-events: none;
-		transition:
-			top 0.25s ease,
-			left 0.25s ease,
-			width 0.25s ease,
-			height 0.25s ease;
+		@media (prefers-reduced-motion: no-preference) {
+			transition:
+				top 0.25s ease,
+				left 0.25s ease,
+				width 0.25s ease,
+				height 0.25s ease;
+		}
 	}
 
 	.popover {
