@@ -163,7 +163,7 @@ export async function startRecording(): Promise<RecorderResult> {
 
 /** Stop capturing on release and assemble the held audio into a base64 WAV. Returns null when
  *  nothing was recording or the utterance was too short to be a real Ask. */
-export async function stopRecording(): Promise<{ wavBase64: string } | null> {
+export function stopRecording(): { wavBase64: string } | null {
 	if (!recording) return null;
 	recording = false;
 	const captured = buffers;

@@ -29,7 +29,7 @@ vi.mock('$lib/voice/delivery', () => deliveryMock);
 
 const recorderMock = vi.hoisted(() => ({
 	startRecording: vi.fn(async () => ({ ok: true }) as { ok: boolean; reason?: string }),
-	stopRecording: vi.fn(async () => ({ wavBase64: 'WAV' }) as { wavBase64: string } | null),
+	stopRecording: vi.fn(() => ({ wavBase64: 'WAV' }) as { wavBase64: string } | null),
 	releaseRecorder: vi.fn(),
 	recorderSealed: vi.fn<() => string | null>(() => null),
 	closeRecorder: vi.fn()
@@ -112,7 +112,7 @@ beforeEach(() => {
 	vi.resetAllMocks();
 	deliveryMock.listeners.clear();
 	recorderMock.startRecording.mockResolvedValue({ ok: true });
-	recorderMock.stopRecording.mockResolvedValue({ wavBase64: 'WAV' });
+	recorderMock.stopRecording.mockReturnValue({ wavBase64: 'WAV' });
 	recorderMock.recorderSealed.mockReturnValue(null);
 	sessionStorage.clear();
 	localStorage.setItem('save-the-sun:onboarded', '1');

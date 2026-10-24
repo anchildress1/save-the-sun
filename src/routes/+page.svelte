@@ -520,7 +520,7 @@
 		voiceThrottled = false;
 		medalState = 'thinking';
 		try {
-			const clip = await stopRecording();
+			const clip = stopRecording();
 			// Drop the mic the instant the clip is assembled — before the transcribe round-trip — so
 			// Chrome's in-use indicator clears on release, not at the end of the turn.
 			releaseRecorder();
