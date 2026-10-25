@@ -103,12 +103,14 @@
 	border-radius: 10px;
 	overflow: visible;
 	cursor: pointer;
-	transition:
-		background 0.18s ease,
-		border-color 0.18s ease,
-		box-shadow 0.18s ease,
-		color 0.18s ease,
-		transform 0.12s cubic-bezier(0.2, 0, 0, 1);
+	@media (prefers-reduced-motion: no-preference) {
+		transition:
+			background 0.18s ease,
+			border-color 0.18s ease,
+			box-shadow 0.18s ease,
+			color 0.18s ease,
+			transform 0.12s cubic-bezier(0.2, 0, 0, 1);
+	}
 }
 
 .btn::before {
@@ -128,9 +130,11 @@
 	   double. Hover/focus just brightens it. */
 	opacity: 0.82;
 	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.42));
-	transition:
-		filter 0.18s ease,
-		opacity 0.18s ease;
+	@media (prefers-reduced-motion: no-preference) {
+		transition:
+			filter 0.18s ease,
+			opacity 0.18s ease;
+	}
 }
 
 .btn:hover:not(:disabled)::before,
@@ -210,13 +214,4 @@ body {
 	background-attachment: fixed;
 	color: var(--ink);
 	font-family: var(--font-body);
-}
-
-@media (prefers-reduced-motion: reduce) {
-	*,
-	*::before,
-	*::after {
-		animation-duration: 0.001ms !important;
-		transition-duration: 0.001ms !important;
-	}
 }

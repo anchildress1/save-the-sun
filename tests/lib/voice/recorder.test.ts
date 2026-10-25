@@ -72,7 +72,7 @@ describe('recorder — capture', () => {
 		expect(getUserMedia).toHaveBeenCalledTimes(1);
 
 		feed(5000); // > 0.25s at 16kHz → a real utterance
-		const clip = await stopRecording();
+		const clip = stopRecording();
 		expect(isRecording()).toBe(false);
 		expect(clip).not.toBeNull();
 		const bytes = Uint8Array.from(atob(clip!.wavBase64), (c) => c.charCodeAt(0));
@@ -84,7 +84,7 @@ describe('recorder — capture', () => {
 	it('releases the mic stream on release so Chrome stops showing it in use', async () => {
 		await startRecording();
 		feed(5000);
-		await stopRecording();
+		stopRecording();
 		releaseRecorder();
 		expect(track.stop).toHaveBeenCalledTimes(1); // tracks dropped, indicator clears
 		expect(isRecording()).toBe(false);
@@ -93,12 +93,12 @@ describe('recorder — capture', () => {
 	it('re-acquires the stream on the next hold but keeps the one context + worklet', async () => {
 		await startRecording();
 		feed(5000);
-		await stopRecording();
+		stopRecording();
 		releaseRecorder();
 
 		expect(await startRecording()).toEqual({ ok: true });
 		feed(5000);
-		expect(await stopRecording()).not.toBeNull();
+		expect(stopRecording()).not.toBeNull();
 		// A fresh stream each hold (no re-prompt — the grant is remembered), but the context and its
 		// worklet are built once and reused, so a re-acquire never pays the worklet load.
 		expect(getUserMedia).toHaveBeenCalledTimes(2);
@@ -109,19 +109,19 @@ describe('recorder — capture', () => {
 	it('returns null for an utterance too short to be a real Ask', async () => {
 		await startRecording();
 		feed(100); // ~6ms — an accidental tap
-		expect(await stopRecording()).toBeNull();
+		expect(stopRecording()).toBeNull();
 	});
 
 	it('returns null when stop is called with nothing recording', async () => {
-		expect(await stopRecording()).toBeNull();
+		expect(stopRecording()).toBeNull();
 	});
 
 	it('drops audio captured while not recording', async () => {
 		await startRecording();
-		await stopRecording(); // recording is now false
+		stopRecording(); // recording is now false
 		feed(5000); // a late worklet block must not buffer
 		await startRecording();
-		expect(await stopRecording()).toBeNull(); // fresh buffer, nothing captured
+		expect(stopRecording()).toBeNull(); // fresh buffer, nothing captured
 	});
 });
 

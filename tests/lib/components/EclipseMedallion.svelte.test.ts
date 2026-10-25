@@ -198,10 +198,19 @@ describe('EclipseMedallion — reduced motion (R6)', () => {
 	it.each([
 		{ state: 'idle' as const, selector: '.corona', why: 'breathing pulse' },
 		{ state: 'recording' as const, selector: '.corona', why: 'recording pulse' },
-		{ state: 'recording' as const, selector: '.disc', why: 'sprite loop' }
+		{ state: 'recording' as const, selector: '.disc', why: 'sprite loop' },
+		{ state: 'thinking' as const, selector: '.rune-ring', why: 'rune orbit' },
+		{ state: 'skoll-speaking' as const, selector: '.disc', why: 'wolf sprite loop' }
 	])('replaces the $why with a static glow in the $state state', ({ state, selector }) => {
 		const { button } = renderMedallion(state);
 		expect(getComputedStyle(layer(button, selector)).animationName).toBe('none');
+	});
+
+	it('disables the wolf ember orbit on the shadow pseudo-element', () => {
+		const { button } = renderMedallion('skoll-speaking');
+		expect(getComputedStyle(layer(button, '.eclipse-shadow'), '::after').animationName).toBe(
+			'none'
+		);
 	});
 
 	it('holds the speaking disc at its static peak — no audio-driven pulse to honor or ignore', () => {

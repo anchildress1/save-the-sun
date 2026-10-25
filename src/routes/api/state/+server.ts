@@ -11,4 +11,4 @@ import type { RequestHandler } from './$types';
 // read must queue behind that in-flight writer and snapshot only once it commits — otherwise the
 // resync races the locked mutation and re-applies stale state. Read-only: resumes, never resets.
 export const GET: RequestHandler = ({ locals }) =>
-	withSessionLock(locals.sessionId, async () => json(gameSnapshot(locals.sessionId)));
+	withSessionLock(locals.sessionId, () => Promise.resolve(json(gameSnapshot(locals.sessionId))));
