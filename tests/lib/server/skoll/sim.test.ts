@@ -139,6 +139,51 @@ describe('skollSeedFor', () => {
 	});
 });
 
+describe('simulateFloor sequencing', () => {
+	it('finishes each seeded game before starting the next', async () => {
+		const passes = vi.spyOn(GameEngine.prototype, 'passTurn');
+		const casts = vi.spyOn(GameEngine.prototype, 'cast');
+		try {
+			const metrics = await simulateFloor(3, 40);
+			const games = [...new Set(passes.mock.contexts)];
+			expect(games).toHaveLength(3);
+			expect(passes.mock.contexts).toEqual(
+				games.flatMap((game) => passes.mock.contexts.filter((context) => context === game))
+			);
+			expect(games.every((game) => game instanceof GameEngine && game.status === 'won')).toBe(true);
+			const winners = casts.mock.results.flatMap(({ value }) =>
+				value.ok && value.won ? [value.rune.name] : []
+			);
+			expect(winners).toEqual([40, 41, 42].map((seed) => selectSecret(seed).name));
+			expect(metrics.games).toBe(3);
+			expect(metrics.wins).toBe(3);
+		} finally {
+			passes.mockRestore();
+			casts.mockRestore();
+		}
+	});
+
+	it('stops the sweep on a failed game and restores console methods', async () => {
+		const failure = new Error('simulation invariant failed');
+		const originalError = console.error;
+		const originalWarn = console.warn;
+		const passes = vi.spyOn(GameEngine.prototype, 'passTurn');
+		const casts = vi.spyOn(GameEngine.prototype, 'cast').mockImplementationOnce(() => {
+			throw failure;
+		});
+		try {
+			await expect(simulateFloor(3, 40)).rejects.toBe(failure);
+			expect(new Set(passes.mock.contexts).size).toBe(1);
+			expect(casts).toHaveBeenCalledOnce();
+			expect(console.error).toBe(originalError);
+			expect(console.warn).toBe(originalWarn);
+		} finally {
+			passes.mockRestore();
+			casts.mockRestore();
+		}
+	});
+});
+
 describe('simulateFloor — pacing target', () => {
 	// The deliverable: Sköll's OWN wins average 7.5–9 turns so a competent human can beat him. The
 	// floor is the seeded, network-free proxy for that pacing (Gemini can't run in CI). The sim runs
