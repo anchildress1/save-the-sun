@@ -147,7 +147,14 @@ export async function simulateFloor(games: number, startSeed = 1): Promise<SimMe
 	// pure noise here). Silence the expected error/warn for the duration of the sweep only.
 	const results = await withQuietConsole(async () => {
 		const out: SimResult[] = [];
-		for (let i = 0; i < games; i++) out.push(await playFloorGame(startSeed + i));
+		let pending = Promise.resolve();
+		for (let i = 0; i < games; i++) {
+			const seed = startSeed + i;
+			pending = pending.then(async () => {
+				out.push(await playFloorGame(seed));
+			});
+		}
+		await pending;
 		return out;
 	});
 
